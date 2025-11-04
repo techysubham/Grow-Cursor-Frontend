@@ -47,7 +47,7 @@ export default function App() {
         <Route
           path="/admin/*"
           element={
-            token && user && (user.role === 'admin' || user.role === 'superadmin') ? (
+            token && user && (user.role === 'productadmin' || user.role === 'listingadmin' || user.role === 'superadmin') ? (
               <AdminLayout user={user} onLogout={logout} />
             ) : (
               <Navigate to="/login" replace />

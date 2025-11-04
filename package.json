@@ -13,9 +13,12 @@
     "@emotion/styled": "^11.13.0",
     "@mui/icons-material": "^6.1.6",
     "@mui/material": "^6.1.6",
+    "@mui/x-date-pickers": "^8.16.0",
     "axios": "^1.7.7",
+    "date-fns": "^4.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-infinite-scroll-component": "^6.1.0",
     "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
@@ -23,4 +26,3 @@
     "vite": "^5.4.10"
   }
 }
-

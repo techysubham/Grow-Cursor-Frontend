@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AppBar, Box, Button, Card, CardActions, CardContent, Grid, Toolbar, Typography, Divider } from '@mui/material';
+import { AppBar, Box, Button, Card, CardActions, CardContent, Grid, Toolbar, Typography, Divider, TextField } from '@mui/material';
 import api from '../../lib/api.js';
 
 export default function ListerDashboard({ user, onLogout }) {
@@ -40,10 +40,17 @@ export default function ListerDashboard({ user, onLogout }) {
                   <Typography variant="body2">Range: {t.range} | Category: {t.category}</Typography>
                   <Typography variant="body2">Qty: {t.quantity} | Selling Price: {t.sellingPrice}</Typography>
                   <Typography variant="body2">Listing: {t.listingPlatform?.name} / {t.store?.name}</Typography>
-                  <Typography variant="body2"><a href={t.link} target="_blank" rel="noreferrer">Source Link</a></Typography>
+                  <Typography variant="body2"><a href={t.supplierLink} target="_blank" rel="noreferrer">Supplier Link</a></Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>Completed: {t.completedQuantity || 0} / {t.quantity}</Typography>
                 </CardContent>
                 <CardActions>
-                  <Button size="small" onClick={() => complete(t._id, t.quantity)}>Mark Completed</Button>
+                  <TextField size="small" type="number" label="Completed Qty" inputProps={{ min: 0, max: t.quantity }} value={t.completedQuantity || 0} onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (Number.isFinite(val) && val >= 0 && val <= t.quantity) {
+                      complete(t._id, val);
+                    }
+                  }} sx={{ width: 120, mr: 1 }} />
+                  <Button size="small" onClick={() => complete(t._id, t.quantity)}>Mark Fully Completed</Button>
                 </CardActions>
               </Card>
             </Grid>
@@ -68,7 +75,7 @@ export default function ListerDashboard({ user, onLogout }) {
                   <Typography variant="body2">Range: {t.range} | Category: {t.category}</Typography>
                   <Typography variant="body2">Qty: {t.quantity} | Selling Price: {t.sellingPrice}</Typography>
                   <Typography variant="body2">Listing: {t.listingPlatform?.name} / {t.store?.name}</Typography>
-                  <Typography variant="body2"><a href={t.link} target="_blank" rel="noreferrer">Source Link</a></Typography>
+                  <Typography variant="body2"><a href={t.supplierLink} target="_blank" rel="noreferrer">Supplier Link</a></Typography>
                   <Typography variant="body2" sx={{ mt: 1 }}>Status: completed</Typography>
                 </CardContent>
               </Card>
