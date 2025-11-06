@@ -252,6 +252,7 @@ export default function StockLedgerPage() {
               <TableCell>Platform</TableCell>
               <TableCell>Store</TableCell>
               <TableCell>Category</TableCell>
+              <TableCell>Subcategory</TableCell>
               <TableCell>Range</TableCell>
               <TableCell align="right">Assigned</TableCell>
               <TableCell align="right">Completed</TableCell>
@@ -265,6 +266,7 @@ export default function StockLedgerPage() {
                 <TableCell>{r.platform || '—'}</TableCell>
                 <TableCell>{r.store || '—'}</TableCell>
                 <TableCell>{r.category || '—'}</TableCell>
+                <TableCell>{r.subcategory || '—'}</TableCell>
                 <TableCell>{r.range || '—'}</TableCell>
                 <TableCell align="right">{r.totalAssigned}</TableCell>
                 <TableCell align="right">{r.totalCompleted}</TableCell>
@@ -273,7 +275,7 @@ export default function StockLedgerPage() {
             ))}
             {/* Totals row */}
             <TableRow>
-              <TableCell colSpan={5} align="right"><b>Totals</b></TableCell>
+              <TableCell colSpan={6} align="right"><b>Totals</b></TableCell>
               <TableCell align="right"><b>{totals.assigned}</b></TableCell>
               <TableCell align="right"><b>{totals.completed}</b></TableCell>
               <TableCell align="right"><b>{totals.pending}</b></TableCell>

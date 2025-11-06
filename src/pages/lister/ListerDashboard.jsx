@@ -2,8 +2,11 @@
 import { useEffect, useState } from 'react';
 import {
   AppBar, Box, Button, Card, CardActions, CardContent, Grid,
-  Toolbar, Typography, Divider, TextField
+  Toolbar, Typography, Divider, TextField, FormControl, InputLabel,
+  Select, MenuItem, Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, Paper, Stack, Alert, IconButton
 } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../../lib/api.js';
 
 export default function ListerDashboard({ user, onLogout }) {
@@ -11,16 +14,28 @@ export default function ListerDashboard({ user, onLogout }) {
   const [pending, setPending] = useState([]);
   const [completed, setCompleted] = useState([]);
 
-  // Per-assignment local draft values (string) and saving flags
-  const [drafts, setDrafts] = useState({});   // { [assignmentId]: '12' }
-  const [saving, setSaving] = useState({});   // { [assignmentId]: true/false }
+  // Per-assignment UI state
+  const [selectedRanges, setSelectedRanges] = useState({}); // { [assignmentId]: rangeId }
+  const [rangeQtys, setRangeQtys] = useState({});          // { [assignmentId]: quantity }
+  const [ranges, setRanges] = useState({});                // { [assignmentId]: ranges[] }
+  const [saving, setSaving] = useState({});                // { [assignmentId]: true/false }
 
-  const initDraftsFrom = (arrays) => {
-    const map = {};
+  // Prefetch ranges for each assignment’s subcategory
+  const prefetchRanges = (arrays) => {
     arrays.flat().forEach(a => {
-      map[a._id] = String(a.completedQuantity ?? 0);
+      if (a?.task?.subcategory?._id) {
+        loadRangesForAssignment(a._id, a.task.subcategory._id);
+      }
     });
-    setDrafts(map);
+  };
+
+  const loadRangesForAssignment = async (assignmentId, subcategoryId) => {
+    try {
+      const { data } = await api.get('/ranges', { params: { subcategoryId } });
+      setRanges(prev => ({ ...prev, [assignmentId]: data }));
+    } catch (e) {
+      console.error('Failed to load ranges', e);
+    }
   };
 
   const load = async () => {
@@ -31,113 +46,205 @@ export default function ListerDashboard({ user, onLogout }) {
     setToday(t);
     setPending(p);
     setCompleted(c);
-    initDraftsFrom([t, p, c]);
+    prefetchRanges([t, p, c]);
   };
 
   useEffect(() => { load(); }, []);
 
-  const commitQuantity = async (assignmentId, qty) => {
+  const addRangeQuantity = async (assignmentId) => {
+    const rangeId = selectedRanges[assignmentId];
+    const qty = Number(rangeQtys[assignmentId] || 0);
+    if (!rangeId || qty <= 0) return;
+
     setSaving(s => ({ ...s, [assignmentId]: true }));
     try {
-      await api.post(`/assignments/${assignmentId}/complete`, { completedQuantity: qty });
-      await load(); // refresh buckets and reset drafts to canonical values
+      await api.post(`/assignments/${assignmentId}/complete-range`, { rangeId, quantity: qty });
+      // clear inputs for this assignment
+      setRangeQtys(prev => ({ ...prev, [assignmentId]: '' }));
+      setSelectedRanges(prev => ({ ...prev, [assignmentId]: '' }));
+      await load();
+    } catch (e) {
+      console.error('Failed to save range quantity', e);
+      alert('Failed to save range quantity. Please try again.');
     } finally {
       setSaving(s => ({ ...s, [assignmentId]: false }));
     }
   };
 
-  const markFullyCompleted = (a) => commitQuantity(a._id, a.quantity);
-
-  const onInputChange = (assignmentId, next) => {
-    // store as raw string to preserve partial typing; no API call here
-    setDrafts(d => ({ ...d, [assignmentId]: next }));
+  const removeRangeQuantity = async (assignmentId, rangeId) => {
+    setSaving(s => ({ ...s, [assignmentId]: true }));
+    try {
+      // Remove by setting quantity to 0
+      await api.post(`/assignments/${assignmentId}/complete-range`, { rangeId, quantity: 0 });
+      await load();
+    } catch (e) {
+      console.error('Failed to remove range quantity', e);
+      alert('Failed to remove range quantity. Please try again.');
+    } finally {
+      setSaving(s => ({ ...s, [assignmentId]: false }));
+    }
   };
 
-  const onRevertDraft = (a) => {
-    setDrafts(d => ({ ...d, [a._id]: String(a.completedQuantity ?? 0) }));
+  const submitAssignment = async (assignmentId) => {
+    setSaving(s => ({ ...s, [assignmentId]: true }));
+    try {
+      await api.post(`/assignments/${assignmentId}/submit`);
+      await load();
+    } catch (e) {
+      console.error('Failed to submit assignment', e);
+      alert('Failed to submit assignment. Please try again.');
+    } finally {
+      setSaving(s => ({ ...s, [assignmentId]: false }));
+    }
   };
 
   const renderCard = (a) => {
     const t = a.task || {};
-    const draft = drafts[a._id] ?? String(a.completedQuantity ?? 0);
-
-    const parsed = Number(draft);
-    const isNumber = Number.isFinite(parsed);
-    const clampedParsed = isNumber ? Math.max(0, Math.min(parsed, a.quantity)) : null;
-
-    const savedVal = a.completedQuantity ?? 0;
-    const isChanged = isNumber ? (parsed !== savedVal) : true; // non-number counts as changed
-    const withinRange = isNumber && parsed >= 0 && parsed <= a.quantity;
-
+    const availableRanges = ranges[a._id] || [];
+    const selectedRangeId = selectedRanges[a._id] || '';
+    const rangeQty = rangeQtys[a._id] || '';
     const isSaving = !!saving[a._id];
-    const canSave = !isSaving && withinRange && isChanged;
 
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter' && canSave) {
-        e.preventDefault();
-        commitQuantity(a._id, clampedParsed);
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        onRevertDraft(a);
-      }
-    };
+    // Always trust server copy for saved breakdown
+    const savedRqList = (a.rangeQuantities || []).map(rq => ({
+      rangeId: rq.range?._id || rq.range,
+      rangeName: rq.range?.name || '',
+      quantity: rq.quantity || 0
+    }));
+    const savedTotal = savedRqList.reduce((sum, rq) => sum + (rq.quantity || 0), 0);
+    const remaining = Math.max(0, a.quantity - savedTotal);
+    const canSubmit = savedTotal >= a.quantity && !a.completedAt;
+
+    // Lazy load ranges if not ready
+    if (t.subcategory?._id && !ranges[a._id]) {
+      loadRangesForAssignment(a._id, t.subcategory._id);
+    }
 
     return (
-      <Card key={a._id}>
+      <Card key={a._id} sx={{ mb: 2 }}>
         <CardContent>
-          <Typography variant="subtitle1">{t.productTitle}</Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>{t.productTitle}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             {new Date(a.createdAt).toLocaleDateString()}
           </Typography>
-          <Typography variant="body2">Range: {t.range} | Category: {t.category}</Typography>
-          <Typography variant="body2">Qty: {a.quantity} | Saved: {savedVal}</Typography>
-          <Typography variant="body2">Listing: {a.listingPlatform?.name} / {a.store?.name}</Typography>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Category: {t.category?.name || '-'} | Subcategory: {t.subcategory?.name || '-'}
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Total Qty: {a.quantity} | Distributed: {savedTotal} | Remaining: {remaining}
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Listing: {a.listingPlatform?.name} / {a.store?.name}
+          </Typography>
           {t.supplierLink ? (
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ mb: 2 }}>
               <a href={t.supplierLink} target="_blank" rel="noreferrer">Supplier Link</a>
             </Typography>
           ) : null}
+
+          {a.completedAt ? (
+            <Alert severity="success" sx={{ mb: 2 }}>Assignment Submitted!</Alert>
+          ) : null}
+
+          <Stack spacing={2} sx={{ mb: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Select Range</InputLabel>
+              <Select
+                label="Select Range"
+                value={selectedRangeId}
+                onChange={(e) => setSelectedRanges(prev => ({ ...prev, [a._id]: e.target.value }))}
+                disabled={isSaving || !!a.completedAt}
+              >
+                {availableRanges.map((r) => (
+                  <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Stack direction="row" spacing={1}>
+              <TextField
+                size="small"
+                type="number"
+                label="Quantity"
+                value={rangeQty}
+                onChange={(e) => setRangeQtys(prev => ({ ...prev, [a._id]: e.target.value }))}
+                inputProps={{ min: 0, max: remaining }}
+                disabled={isSaving || !!a.completedAt || !selectedRangeId}
+                sx={{ flex: 1 }}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => addRangeQuantity(a._id)}
+                disabled={
+                  isSaving ||
+                  !!a.completedAt ||
+                  !selectedRangeId ||
+                  !rangeQty ||
+                  Number(rangeQty) <= 0 ||
+                  Number(rangeQty) > remaining
+                }
+              >
+                {isSaving ? 'Saving...' : 'Add'}
+              </Button>
+            </Stack>
+          </Stack>
+
+          {savedRqList.length > 0 && (
+            <TableContainer component={Paper} sx={{ mb: 2 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Range</TableCell>
+                    <TableCell>Quantity</TableCell>
+                    <TableCell>Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {savedRqList.map((rq, idx) => {
+                    const rangeName =
+                      ranges[a._id]?.find(r => r._id === rq.rangeId)?.name ||
+                      rq.rangeName ||
+                      'Unknown';
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell>{rangeName}</TableCell>
+                        <TableCell>{rq.quantity}</TableCell>
+                        <TableCell>
+                          <IconButton
+                            size="small"
+                            onClick={() => removeRangeQuantity(a._id, rq.rangeId)}
+                            disabled={isSaving || !!a.completedAt}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          {savedRqList.length > 0 && (
+            <Typography variant="body2" sx={{ mb: 1, mt: 2 }}>
+              Total Distributed: {savedTotal} / {a.quantity}
+            </Typography>
+          )}
         </CardContent>
 
         <CardActions>
-          <TextField
-            size="small"
-            type="number"
-            label="Completed Qty"
-            inputProps={{ min: 0, max: a.quantity }}
-            value={draft}
-            onChange={(e) => onInputChange(a._id, e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isSaving}
-            sx={{ width: 160, mr: 1 }}
-            helperText={
-              !withinRange ? `Enter 0 to ${a.quantity}` :
-              isChanged ? 'Press Enter or Save' :
-              'Up to date'
-            }
-          />
-          <Button
-            size="small"
-            variant="contained"
-            disabled={!canSave}
-            onClick={() => commitQuantity(a._id, clampedParsed)}
-          >
-            {isSaving ? 'Saving…' : 'Save'}
-          </Button>
-          <Button
-            size="small"
-            disabled={isSaving || (!isChanged && withinRange)}
-            onClick={() => onRevertDraft(a)}
-          >
-            Revert
-          </Button>
-          <Button
-            size="small"
-            onClick={() => markFullyCompleted(a)}
-            disabled={isSaving || savedVal === a.quantity}
-          >
-            Mark Fully Completed
-          </Button>
+          {canSubmit ? (
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              onClick={() => submitAssignment(a._id)}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Submitting…' : 'Submit Assignment'}
+            </Button>
+          ) : null}
         </CardActions>
       </Card>
     );

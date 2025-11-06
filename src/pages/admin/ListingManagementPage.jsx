@@ -85,8 +85,8 @@ export default function ListingManagementPage() {
               <TableCell>Source Price</TableCell>
               <TableCell>Selling Price</TableCell>
               <TableCell>Source Platform</TableCell>
-              <TableCell>Range</TableCell>
               <TableCell>Category</TableCell>
+              <TableCell>Subcategory</TableCell>
               <TableCell>Created By</TableCell>
               <TableCell>Share</TableCell>
             </TableRow>
@@ -101,8 +101,8 @@ export default function ListingManagementPage() {
                 <TableCell>{r.sourcePrice}</TableCell>
                 <TableCell>{r.sellingPrice}</TableCell>
                 <TableCell>{r.sourcePlatform?.name || '-'}</TableCell>
-                <TableCell>{r.range}</TableCell>
-                <TableCell>{r.category}</TableCell>
+                <TableCell>{r.category?.name || '-'}</TableCell>
+                <TableCell>{r.subcategory?.name || '-'}</TableCell>
                 <TableCell>{r.createdBy?.username || '-'}</TableCell>
                 <TableCell>
                   <Button size="small" variant="contained" onClick={() => openAssign(r)}>

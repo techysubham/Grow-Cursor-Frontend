@@ -30,6 +30,7 @@ import {
   LinearProgress,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearAllIcon from '@mui/icons-material/ClearAll';
 import api from '../../lib/api.js';
@@ -62,14 +63,15 @@ const unique = (arr) => Array.from(new Set(arr.filter(Boolean)));
 export default function TaskListPage() {
   const [items, setItems] = useState([]);
   const [openFilters, setOpenFilters] = useState(false); // start collapsed for a cleaner look
+  const [expandedRows, setExpandedRows] = useState({}); // { [assignmentId]: true/false }
 
   // ====== FILTER STATE (trimmed to only requested ones) ======
   const [filters, setFilters] = useState({
     date: { mode: 'none', single: '', from: '', to: '' }, // 'none' | 'single' | 'range'
     productTitle: { contains: '' },
     sourcePlatform: { in: [] },   // task.sourcePlatform.name
-    range: { in: [] },
     category: { in: [] },
+    subcategory: { in: [] },
     createdByTask: { in: [] },    // task.createdBy.username
     listingPlatform: { in: [] },  // listingPlatform.name
     store: { in: [] },            // store.name
@@ -82,8 +84,12 @@ export default function TaskListPage() {
     date: (r) => r.createdAt,
     productTitle: (r) => r.task?.productTitle,
     sourcePlatform: (r) => r.task?.sourcePlatform?.name,
-    range: (r) => r.task?.range,
-    category: (r) => r.task?.category,
+    category: (r) => r.task?.category?.name,
+    subcategory: (r) => r.task?.subcategory?.name,
+    distributedQty: (r) => {
+      const rqList = r.rangeQuantities || [];
+      return rqList.reduce((sum, rq) => sum + (rq.quantity || 0), 0);
+    },
     createdByTask: (r) => r.task?.createdBy?.username,
     listingPlatform: (r) => r.listingPlatform?.name,
     store: (r) => r.store?.name,
@@ -139,8 +145,8 @@ export default function TaskListPage() {
   const enumOptions = useMemo(
     () => ({
       sourcePlatform: unique(items.map(A.sourcePlatform)),
-      range: unique(items.map(A.range)),
       category: unique(items.map(A.category)),
+      subcategory: unique(items.map(A.subcategory)),
       createdByTask: unique(items.map(A.createdByTask)),
       listingPlatform: unique(items.map(A.listingPlatform)),
       store: unique(items.map(A.store)),
@@ -156,8 +162,8 @@ export default function TaskListPage() {
       matchesDate(A.date(r), filters.date) &&
       matchesText(A.productTitle(r), filters.productTitle.contains) &&
       matchesEnum(A.sourcePlatform(r), filters.sourcePlatform.in) &&
-      matchesEnum(A.range(r), filters.range.in) &&
       matchesEnum(A.category(r), filters.category.in) &&
+      matchesEnum(A.subcategory(r), filters.subcategory.in) &&
       matchesEnum(A.createdByTask(r), filters.createdByTask.in) &&
       matchesEnum(A.listingPlatform(r), filters.listingPlatform.in) &&
       matchesEnum(A.store(r), filters.store.in) &&
@@ -172,7 +178,7 @@ export default function TaskListPage() {
     if (filters.date.mode === 'single' && filters.date.single) n++;
     if (filters.date.mode === 'range' && (filters.date.from || filters.date.to)) n++;
     if (filters.productTitle.contains) n++;
-    ['sourcePlatform','range','category','createdByTask','listingPlatform','store','lister','sharedBy']
+    ['sourcePlatform','category','subcategory','createdByTask','listingPlatform','store','lister','sharedBy']
       .forEach(k => { if (filters[k].in.length) n++; });
     return n;
   }, [filters]);
@@ -190,8 +196,8 @@ export default function TaskListPage() {
       date: { mode: 'none', single: '', from: '', to: '' },
       productTitle: { contains: '' },
       sourcePlatform: { in: [] },
-      range: { in: [] },
       category: { in: [] },
+      subcategory: { in: [] },
       createdByTask: { in: [] },
       listingPlatform: { in: [] },
       store: { in: [] },
@@ -330,8 +336,8 @@ export default function TaskListPage() {
             {/* Multi-select enums/relations (only the ones you want) */}
             {[
               ['sourcePlatform', 'Source Platform'],
-              ['range', 'Range'],
               ['category', 'Category'],
+              ['subcategory', 'Subcategory'],
               ['createdByTask', 'Created By'],
               ['listingPlatform', 'Listing Platform'],
               ['store', 'Store'],
@@ -382,12 +388,13 @@ export default function TaskListPage() {
               <TableCell>Source Price</TableCell>
               <TableCell>Selling Price</TableCell>
               <TableCell>Source Platform</TableCell>
-              <TableCell>Range</TableCell>
               <TableCell>Category</TableCell>
+              <TableCell>Subcategory</TableCell>
               <TableCell>Created By</TableCell>
               <TableCell>Listing Platform</TableCell>
               <TableCell>Store</TableCell>
               <TableCell>Quantity</TableCell>
+              <TableCell>Distributed Qty</TableCell>
               <TableCell>Quantity Pending</TableCell>
               <TableCell>Lister</TableCell>
               <TableCell>Shared By</TableCell>
@@ -400,39 +407,89 @@ export default function TaskListPage() {
               const q = A.quantity(it);
               const p = pendingQty(it);
               const pct = progressPct(it);
+              const distributedQty = A.distributedQty(it);
+              const rangeQuantities = it.rangeQuantities || [];
+              const isExpanded = expandedRows[it._id] || false;
+              
               return (
-                <TableRow key={it._id || idx} sx={{ '&:nth-of-type(odd)': { backgroundColor: 'action.hover' } }}>
-                  <TableCell>{idx + 1}</TableCell>
-                  <TableCell>{toISTYMD(it.createdAt)}</TableCell>
-                  <TableCell sx={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {t.productTitle || '-'}
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {t.supplierLink ? (
-                      <a href={t.supplierLink} target="_blank" rel="noreferrer">Link</a>
-                    ) : '-'}
-                  </TableCell>
-                  <TableCell>{t.sourcePrice ?? '-'}</TableCell>
-                  <TableCell>{t.sellingPrice ?? '-'}</TableCell>
-                  <TableCell>{t.sourcePlatform?.name || '-'}</TableCell>
-                  <TableCell>{t.range || '-'}</TableCell>
-                  <TableCell>{t.category || '-'}</TableCell>
-                  <TableCell>{t.createdBy?.username || '-'}</TableCell>
-                  <TableCell>{it.listingPlatform?.name || '-'}</TableCell>
-                  <TableCell>{it.store?.name || '-'}</TableCell>
-                  <TableCell>{q ?? '-'}</TableCell>
-                  <TableCell>
-                    <Stack spacing={0.5} sx={{ minWidth: 160 }}>
-                      <Typography variant="body2">{p} pending</Typography>
-                      <LinearProgress variant="determinate" value={pct} sx={{ height: 6, borderRadius: 3 }} />
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {Math.min(A.completedQuantity(it), q || 0)} / {q || 0} ({pct}%)
-                      </Typography>
-                    </Stack>
-                  </TableCell>
-                  <TableCell>{it.lister?.username || '-'}</TableCell>
-                  <TableCell>{it.createdBy?.username || '-'}</TableCell>
-                </TableRow>
+                <>
+                  <TableRow key={it._id || idx} sx={{ '&:nth-of-type(odd)': { backgroundColor: 'action.hover' } }}>
+                    <TableCell>{idx + 1}</TableCell>
+                    <TableCell>{toISTYMD(it.createdAt)}</TableCell>
+                    <TableCell sx={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {t.productTitle || '-'}
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {t.supplierLink ? (
+                        <a href={t.supplierLink} target="_blank" rel="noreferrer">Link</a>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>{t.sourcePrice ?? '-'}</TableCell>
+                    <TableCell>{t.sellingPrice ?? '-'}</TableCell>
+                    <TableCell>{t.sourcePlatform?.name || '-'}</TableCell>
+                    <TableCell>{t.category?.name || '-'}</TableCell>
+                    <TableCell>{t.subcategory?.name || '-'}</TableCell>
+                    <TableCell>{t.createdBy?.username || '-'}</TableCell>
+                    <TableCell>{it.listingPlatform?.name || '-'}</TableCell>
+                    <TableCell>{it.store?.name || '-'}</TableCell>
+                    <TableCell>{q ?? '-'}</TableCell>
+                    <TableCell>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <span>{distributedQty}</span>
+                        {rangeQuantities.length > 0 && (
+                          <IconButton
+                            size="small"
+                            onClick={() => setExpandedRows(prev => ({ ...prev, [it._id]: !isExpanded }))}
+                          >
+                            {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                          </IconButton>
+                        )}
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Stack spacing={0.5} sx={{ minWidth: 160 }}>
+                        <Typography variant="body2">{p} pending</Typography>
+                        <LinearProgress variant="determinate" value={pct} sx={{ height: 6, borderRadius: 3 }} />
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          {Math.min(A.completedQuantity(it), q || 0)} / {q || 0} ({pct}%)
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>{it.lister?.username || '-'}</TableCell>
+                    <TableCell>{it.createdBy?.username || '-'}</TableCell>
+                  </TableRow>
+                  {rangeQuantities.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={16} sx={{ py: 0, borderBottom: 0 }}>
+                        <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                          <Box sx={{ margin: 2 }}>
+                            <Typography variant="subtitle2" sx={{ mb: 1 }}>Range Quantity Breakdown:</Typography>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Range</TableCell>
+                                  <TableCell align="right">Quantity</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {rangeQuantities.map((rq, rIdx) => (
+                                  <TableRow key={rIdx}>
+                                    <TableCell>{rq.range?.name || rq.range || '-'}</TableCell>
+                                    <TableCell align="right">{rq.quantity || 0}</TableCell>
+                                  </TableRow>
+                                ))}
+                                <TableRow>
+                                  <TableCell><strong>Total</strong></TableCell>
+                                  <TableCell align="right"><strong>{distributedQty}</strong></TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </Box>
+                        </Collapse>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               );
             })}
           </TableBody>
