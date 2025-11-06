@@ -9,17 +9,20 @@ import AddListerPage from './pages/admin/AddListerPage.jsx';
 import ListingAnalyticsPage from './pages/admin/ListingAnalyticsPage.jsx';
 import ListerDashboard from './pages/lister/ListerDashboard.jsx';
 
+import { setAuthToken } from './lib/api'
+
 function useAuth() {
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(() => sessionStorage.getItem('auth_token'));
   const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem('user');
+    const raw = localStorage.getItem('user'); // keeping user in localStorage is fine
     return raw ? JSON.parse(raw) : null;
   });
   const navigate = useNavigate();
   const login = (t, u) => {
     setToken(t);
     setUser(u);
-    localStorage.setItem('token', t);
+    sessionStorage.setItem('auth_token', t);   // per-tab token
+    setAuthToken(t);
     localStorage.setItem('user', JSON.stringify(u));
     if (u.role === 'lister') navigate('/lister');
     else navigate('/admin');
@@ -27,7 +30,8 @@ function useAuth() {
   const logout = () => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('auth_token');
+    setAuthToken(null);
     localStorage.removeItem('user');
     navigate('/login');
   };
