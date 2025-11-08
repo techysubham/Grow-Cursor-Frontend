@@ -8,8 +8,8 @@ import api from '../../lib/api.js';
 export default function ProductResearchPage() {
   const [rows, setRows] = useState([]);
   const [open, setOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [sourcePlatforms, setSourcePlatforms] = useState([]);
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
@@ -75,46 +75,22 @@ export default function ProductResearchPage() {
     await load();
   };
 
-  const openEdit = (row) => {
-    setEditing({ 
-      ...row, 
-      date: row.date ? new Date(row.date).toISOString().slice(0, 10) : '',
-      categoryId: row.category?._id || row.category,
-      subcategoryId: row.subcategory?._id || row.subcategory,
-      sourcePlatformId: row.sourcePlatform?._id || row.sourcePlatform
-    });
-    setEditOpen(true);
+  const openDelete = (row) => {
+    setDeleteTarget(row);
+    setDeleteOpen(true);
   };
 
-  // Load subcategories when editing category changes
-  useEffect(() => {
-    if (editing?.categoryId) {
-      api.get('/subcategories', { params: { categoryId: editing.categoryId } })
-        .then(({ data }) => setSubcategories(data));
-    } else if (editing) {
-      setSubcategories([]);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await api.delete(`/tasks/${deleteTarget._id}`);
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+      await load();
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      alert('Failed to delete task');
     }
-  }, [editing?.categoryId]);
-
-  const saveEdit = async () => {
-    if (!editing.date || !editing.productTitle || !editing.supplierLink || !editing.sourcePrice || !editing.sellingPrice || !editing.sourcePlatformId || !editing.categoryId || !editing.subcategoryId) {
-      alert('All fields are required');
-      return;
-    }
-    const payload = {
-      date: editing.date,
-      productTitle: editing.productTitle,
-      supplierLink: editing.supplierLink,
-      sourcePrice: Number(editing.sourcePrice),
-      sellingPrice: Number(editing.sellingPrice),
-      sourcePlatformId: editing.sourcePlatformId,
-      categoryId: editing.categoryId,
-      subcategoryId: editing.subcategoryId
-    };
-    await api.put(`/tasks/${editing._id}`, payload);
-    setEditOpen(false);
-    setEditing(null);
-    await load();
   };
 
   return (
@@ -136,7 +112,7 @@ export default function ProductResearchPage() {
               <TableCell>Category</TableCell>
               <TableCell>Subcategory</TableCell>
               <TableCell>Created By</TableCell>
-              <TableCell>Edit</TableCell>
+              <TableCell>Delete</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -153,7 +129,7 @@ export default function ProductResearchPage() {
                 <TableCell>{r.subcategory?.name || '-'}</TableCell>
                 <TableCell>{r.createdBy?.username || '-'}</TableCell>
                 <TableCell>
-                  <Button size="small" onClick={() => openEdit(r)}>Edit</Button>
+                  <Button size="small" color="error" onClick={() => openDelete(r)}>Delete</Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -201,42 +177,21 @@ export default function ProductResearchPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Edit Product Research</DialogTitle>
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
-          {editing ? (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              {/* Date is set automatically by backend on create; optional to edit */}
-              <TextField label="Product Title" value={editing.productTitle} onChange={(e) => setEditing({ ...editing, productTitle: e.target.value })} required />
-              <TextField label="Supplier Link" value={editing.supplierLink} onChange={(e) => setEditing({ ...editing, supplierLink: e.target.value })} required />
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <TextField label="Source Price" type="number" value={editing.sourcePrice} onChange={(e) => setEditing({ ...editing, sourcePrice: Number(e.target.value) })} required />
-                <TextField label="Selling Price" type="number" value={editing.sellingPrice} onChange={(e) => setEditing({ ...editing, sellingPrice: Number(e.target.value) })} required />
-              </Stack>
-              <FormControl fullWidth>
-                <InputLabel>Source Platform</InputLabel>
-                <Select label="Source Platform" value={editing.sourcePlatformId} onChange={(e) => setEditing({ ...editing, sourcePlatformId: e.target.value })} required>
-                  {sourcePlatforms.map((p) => (<MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Category</InputLabel>
-                <Select label="Category" value={editing.categoryId} onChange={(e) => setEditing({ ...editing, categoryId: e.target.value, subcategoryId: '' })} required>
-                  {categories.map((c) => (<MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth disabled={!editing.categoryId}>
-                <InputLabel>Subcategory</InputLabel>
-                <Select label="Subcategory" value={editing.subcategoryId} onChange={(e) => setEditing({ ...editing, subcategoryId: e.target.value })} required>
-                  {subcategories.map((s) => (<MenuItem key={s._id} value={s._id}>{s.name}</MenuItem>))}
-                </Select>
-              </FormControl>
-            </Stack>
-          ) : null}
+          <Alert severity="warning" sx={{ mt: 1 }}>
+            Are you sure you want to delete this task? This will also delete all related assignments and compatibility assignments. This action cannot be undone.
+          </Alert>
+          {deleteTarget && (
+            <Box sx={{ mt: 2 }}>
+              <strong>Product:</strong> {deleteTarget.productTitle}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveEdit}>Save</Button>
+          <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleDelete}>Delete</Button>
         </DialogActions>
       </Dialog>
     </Box>

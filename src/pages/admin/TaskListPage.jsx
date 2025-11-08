@@ -28,6 +28,11 @@ import {
   IconButton,
   Tooltip,
   LinearProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Alert,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -64,6 +69,8 @@ export default function TaskListPage() {
   const [items, setItems] = useState([]);
   const [openFilters, setOpenFilters] = useState(false); // start collapsed for a cleaner look
   const [expandedRows, setExpandedRows] = useState({}); // { [assignmentId]: true/false }
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   // ====== FILTER STATE (trimmed to only requested ones) ======
   const [filters, setFilters] = useState({
@@ -131,15 +138,35 @@ export default function TaskListPage() {
   };
 
   // ====== DATA FETCH ======
-  useEffect(() => {
-    api
-      .get('/assignments', { params: { sortBy: 'createdAt', sortOrder: 'desc' } })
-      .then(({ data }) => {
-        const list = Array.isArray(data) ? data : (data.items || data.assignments || []);
-        setItems(list);
-      })
-      .catch(() => alert('Failed to fetch tasks.'));
-  }, []);
+  const loadItems = async () => {
+    try {
+      const { data } = await api.get('/assignments', { params: { sortBy: 'createdAt', sortOrder: 'desc' } });
+      const list = Array.isArray(data) ? data : (data.items || data.assignments || []);
+      setItems(list);
+    } catch (e) {
+      alert('Failed to fetch tasks.');
+    }
+  };
+
+  useEffect(() => { loadItems(); }, []);
+
+  const openDelete = (row) => {
+    setDeleteTarget(row);
+    setDeleteOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget?._id) return;
+    try {
+      await api.delete(`/assignments/${deleteTarget._id}`);
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+      await loadItems();
+    } catch (e) {
+      console.error('Failed to delete assignment:', e);
+      alert('Failed to delete assignment');
+    }
+  };
 
   // ====== OPTION LISTS (enums/relations pulled from data) ======
   const enumOptions = useMemo(
@@ -397,6 +424,7 @@ export default function TaskListPage() {
               <TableCell>Quantity Pending</TableCell>
               <TableCell>Lister</TableCell>
               <TableCell>Assigned By</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
 
@@ -453,6 +481,9 @@ export default function TaskListPage() {
                     </TableCell>
                     <TableCell>{it.lister?.username || '-'}</TableCell>
                     <TableCell>{it.createdBy?.username || '-'}</TableCell>
+                    <TableCell>
+                      <Button size="small" color="error" onClick={() => openDelete(it)}>Delete</Button>
+                    </TableCell>
                   </TableRow>
                   {rangeQuantities.length > 0 && (
                     <TableRow>
@@ -491,6 +522,27 @@ export default function TaskListPage() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Assignment</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mt: 1 }}>
+            Deleting this assignment will remove it from the lister dashboard and delete any related compatibility assignments. This action cannot be undone.
+          </Alert>
+          {deleteTarget && (
+            <Box sx={{ mt: 2 }}>
+              <strong>Product:</strong> {deleteTarget.task?.productTitle || '-'}
+              <br />
+              <strong>Lister:</strong> {deleteTarget.lister?.username || '-'}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleDelete}>Delete</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

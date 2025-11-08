@@ -431,7 +431,7 @@ export default function ProgressTrackingPage() {
             {/* Summary Row */}
             {filteredItems.length > 0 && (
               <TableRow sx={{ backgroundColor: 'action.hover', fontWeight: 'bold' }}>
-                <TableCell colSpan={7} sx={{ fontWeight: 'bold' }}>
+                <TableCell colSpan={6} sx={{ fontWeight: 'bold' }}>
                   <Typography variant="body2" fontWeight="bold">
                     Total ({totals.count} items)
                   </Typography>
