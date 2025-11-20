@@ -33,17 +33,16 @@ export default function CancelledStatusPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.get('/ebay/stored-orders');
-      const allOrders = res.data.orders || [];
-      // Filter for orders with cancel status not NONE_REQUESTED
-      const cancelledOrders = allOrders.filter(
-        (order) =>
-          order.cancelState &&
-          order.cancelState !== 'NONE_REQUESTED' &&
-          order.cancelState !== null
-      );
+      // NEW: Use the dedicated endpoint that filters server-side (30-day window)
+      const res = await api.get('/ebay/cancelled-orders');
+      const cancelledOrders = res.data.orders || [];
+      
+      console.log(`Loaded ${cancelledOrders.length} IN_PROGRESS orders (filtered server-side)`);
+      console.log(`Filter date: ${res.data.filterDate}`);
+      
       setOrders(cancelledOrders);
     } catch (e) {
+      console.error('Failed to fetch cancelled orders:', e);
       setError(e.response?.data?.error || e.message);
     } finally {
       setLoading(false);
@@ -264,7 +263,12 @@ export default function CancelledStatusPage() {
                           ? 'warning'
                           : 'success'
                       }
-                      sx={{ fontSize: '0.7rem' }}
+                      sx={{
+                          fontSize: '0.7rem',
+                          backgroundColor: order.cancelState === 'IN_PROGRESS' ? '#ffd700' : undefined,
+                          color: order.cancelState === 'IN_PROGRESS' ? '#000' : undefined,
+                          fontWeight: order.cancelState === 'IN_PROGRESS' ? 'bold' : 'normal'
+                        }}
                     />
                   </TableCell>
                   <TableCell>

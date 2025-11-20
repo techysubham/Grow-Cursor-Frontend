@@ -24,8 +24,10 @@ import {
   TextField,
   Tooltip,
   IconButton,
+  Pagination,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -37,7 +39,6 @@ export default function FulfillmentDashboard() {
   const [sellers, setSellers] = useState([]);
   const [selectedSeller, setSelectedSeller] = useState('');
   const [orders, setOrders] = useState([]);
-  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingAdFee, setEditingAdFee] = useState({});
@@ -52,6 +53,12 @@ export default function FulfillmentDashboard() {
   const [searchMarketplace, setSearchMarketplace] = useState('');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [ordersPerPage] = useState(50);
+
   // Expanded shipping addresses
   const [expandedShipping, setExpandedShipping] = useState({});
 
@@ -65,6 +72,8 @@ export default function FulfillmentDashboard() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('info');
+  const [snackbarOrderIds, setSnackbarOrderIds] = useState([]); // Store order IDs for copying
+  const [updatedOrderDetails, setUpdatedOrderDetails] = useState([]); // Store { orderId, changedFields }
 
   useEffect(() => {
     fetchSellers();
@@ -73,50 +82,16 @@ export default function FulfillmentDashboard() {
   }, []);
 
   useEffect(() => {
+    setCurrentPage(1); // Reset to page 1 when seller changes
     loadStoredOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSeller]);
 
+  // Reload orders when page or filters change
   useEffect(() => {
-    // Apply filters whenever orders or search criteria change
-    applyFilters();
+    loadStoredOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, searchOrderId, searchBuyerName, searchSoldDate, searchMarketplace]);
-
-  function applyFilters() {
-    let filtered = [...orders];
-
-    // Filter by Order ID
-    if (searchOrderId.trim()) {
-      filtered = filtered.filter(order =>
-        (order.orderId || '').toLowerCase().includes(searchOrderId.toLowerCase()) ||
-        (order.legacyOrderId || '').toLowerCase().includes(searchOrderId.toLowerCase())
-      );
-    }
-
-    // Filter by Buyer Name
-    if (searchBuyerName.trim()) {
-      filtered = filtered.filter(order =>
-        (order.buyer?.buyerRegistrationAddress?.fullName || '').toLowerCase().includes(searchBuyerName.toLowerCase())
-      );
-    }
-
-    // Filter by Sold Date
-    if (searchSoldDate.trim()) {
-      filtered = filtered.filter(order => {
-        if (!order.dateSold) return false;
-        const orderDate = formatDate(order.dateSold);
-        return orderDate.includes(searchSoldDate);
-      });
-    }
-
-    // Filter by Marketplace
-    if (searchMarketplace && searchMarketplace !== '') {
-      filtered = filtered.filter(order => order.purchaseMarketplaceId === searchMarketplace);
-    }
-
-    setFilteredOrders(filtered);
-  }
+  }, [currentPage, searchOrderId, searchBuyerName, searchSoldDate, searchMarketplace]);
 
   async function fetchSellers() {
     setError('');
@@ -133,9 +108,37 @@ export default function FulfillmentDashboard() {
     setError('');
     setPollResults(null);
     try {
-      const params = selectedSeller ? { sellerId: selectedSeller } : {};
+      const params = {
+        page: currentPage,
+        limit: ordersPerPage
+      };
+      
+      if (selectedSeller) {
+        params.sellerId = selectedSeller;
+      }
+      
+      // Add search filters to backend query
+      if (searchOrderId.trim()) {
+        params.searchOrderId = searchOrderId.trim();
+      }
+      if (searchBuyerName.trim()) {
+        params.searchBuyerName = searchBuyerName.trim();
+      }
+      if (searchSoldDate.trim()) {
+        params.searchSoldDate = searchSoldDate.trim();
+      }
+      if (searchMarketplace && searchMarketplace !== '') {
+        params.searchMarketplace = searchMarketplace;
+      }
+
       const { data } = await api.get('/ebay/stored-orders', { params });
       setOrders(data?.orders || []);
+      
+      // Update pagination metadata
+      if (data?.pagination) {
+        setTotalPages(data.pagination.totalPages);
+        setTotalOrders(data.pagination.totalOrders);
+      }
     } catch (e) {
       setOrders([]);
       setError(e?.response?.data?.error || 'Failed to load orders');
@@ -148,6 +151,8 @@ export default function FulfillmentDashboard() {
     setLoading(true);
     setError('');
     setPollResults(null);
+    setSnackbarOrderIds([]);
+    setUpdatedOrderDetails([]);
     try {
       const { data } = await api.post('/ebay/poll-all-sellers');
       setPollResults(data || null);
@@ -155,6 +160,22 @@ export default function FulfillmentDashboard() {
 
       // Show snackbar if there are new or updated orders
       if (data && (data.totalNewOrders > 0 || data.totalUpdatedOrders > 0)) {
+        // Extract new order IDs (simple strings)
+        const newOrderIds = data.pollResults
+          .filter(r => r.success && r.newOrders && r.newOrders.length > 0)
+          .flatMap(r => r.newOrders);
+        
+        // Extract updated order details (objects with orderId + changedFields)
+        const updatedDetails = data.pollResults
+          .filter(r => r.success && r.updatedOrders && r.updatedOrders.length > 0)
+          .flatMap(r => r.updatedOrders);
+        
+        const updatedOrderIds = updatedDetails.map(u => u.orderId);
+        
+        // Combine both lists (new orders first, then updated)
+        setSnackbarOrderIds([...newOrderIds, ...updatedOrderIds]);
+        setUpdatedOrderDetails(updatedDetails);
+        
         setSnackbarMsg(
           `Polling Complete! New Orders: ${data.totalNewOrders}, Updated Orders: ${data.totalUpdatedOrders}`
         );
@@ -167,6 +188,80 @@ export default function FulfillmentDashboard() {
       }
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to poll orders');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Poll for NEW orders only
+  async function pollNewOrders() {
+    setLoading(true);
+    setError('');
+    setPollResults(null);
+    setSnackbarOrderIds([]);
+    setUpdatedOrderDetails([]);
+    try {
+      const { data } = await api.post('/ebay/poll-new-orders');
+      setPollResults(data || null);
+      await loadStoredOrders();
+
+      if (data && data.totalNewOrders > 0) {
+        // Build summary by seller (don't show individual order IDs)
+        const sellerSummary = data.pollResults
+          .filter(r => r.success && r.newOrders && r.newOrders.length > 0)
+          .map(r => `${r.sellerName}: ${r.newOrders.length} new order${r.newOrders.length > 1 ? 's' : ''}`)
+          .join('\n');
+        
+        setSnackbarMsg(`Found ${data.totalNewOrders} new order${data.totalNewOrders > 1 ? 's' : ''}!\n\n${sellerSummary}`);
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+      } else if (data) {
+        setSnackbarMsg('No new orders found.');
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+      }
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Failed to poll new orders');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Poll for order UPDATES only
+  async function pollOrderUpdates() {
+    setLoading(true);
+    setError('');
+    setPollResults(null);
+    setSnackbarOrderIds([]);
+    setUpdatedOrderDetails([]);
+    try {
+      const { data } = await api.post('/ebay/poll-order-updates');
+      setPollResults(data || null);
+      await loadStoredOrders();
+
+      if (data && data.totalUpdatedOrders > 0) {
+        // Collect all updated order details (orderId + changedFields)
+        const updatedDetails = data.pollResults
+          .filter(r => r.success && r.updatedOrders && r.updatedOrders.length > 0)
+          .flatMap(r => r.updatedOrders); // Each is { orderId, changedFields }
+        
+        const orderIds = updatedDetails.map(u => u.orderId);
+        setSnackbarOrderIds(orderIds);
+        setUpdatedOrderDetails(updatedDetails); // Store full details
+        setSnackbarMsg(
+          `Updated ${data.totalUpdatedOrders} order${data.totalUpdatedOrders > 1 ? 's' : ''}!`
+        );
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+      } else if (data) {
+        setSnackbarOrderIds([]);
+        setUpdatedOrderDetails([]);
+        setSnackbarMsg('No order updates found.');
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+      }
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Failed to poll order updates');
     } finally {
       setLoading(false);
     }
@@ -291,6 +386,14 @@ export default function FulfillmentDashboard() {
     return `$${num.toFixed(2)}`;
   };
 
+  const formatFieldName = (fieldName) => {
+    // Convert camelCase to readable format
+    return fieldName
+      .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+      .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+      .trim();
+  };
+
   return (
     <Box>
       {/* HEADER SECTION */}
@@ -335,13 +438,52 @@ export default function FulfillmentDashboard() {
 
           <Button
             variant="contained"
+            color="primary"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
+            onClick={pollNewOrders}
+            disabled={loading}
+            sx={{ minWidth: 180 }}
+          >
+            {loading ? 'Polling...' : 'Poll New Orders'}
+          </Button>
+
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+            onClick={pollOrderUpdates}
+            disabled={loading}
+            sx={{ minWidth: 180 }}
+          >
+            {loading ? 'Updating...' : 'Poll Order Updates'}
+          </Button>
+
+          <Button
+            variant="outlined"
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={fetchOrders}
             disabled={loading}
             sx={{ minWidth: 160 }}
           >
-            {loading ? 'Polling...' : 'Poll New Orders'}
+            {loading ? 'Polling...' : 'Poll All (New + Updates)'}
           </Button>
+
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="marketplace-filter-label">Marketplace</InputLabel>
+            <Select
+              labelId="marketplace-filter-label"
+              value={searchMarketplace}
+              label="Marketplace"
+              onChange={(e) => setSearchMarketplace(e.target.value)}
+            >
+              <MenuItem value="">
+                <em>All</em>
+              </MenuItem>
+              <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+              <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+              <MenuItem value="EBAY_ENCA">EBAY_Canada</MenuItem>
+            </Select>
+          </FormControl>
         </Stack>
 
         {error && (
@@ -385,27 +527,14 @@ export default function FulfillmentDashboard() {
                 <TextField
                   size="small"
                   label="Sold Date"
+                  type="date"
                   value={searchSoldDate}
                   onChange={(e) => setSearchSoldDate(e.target.value)}
-                  placeholder="MM/DD/YYYY"
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
                   sx={{ flex: 1 }}
                 />
-                <FormControl size="small" sx={{ flex: 1, minWidth: 150 }}>
-                  <InputLabel id="marketplace-filter-label">Marketplace</InputLabel>
-                  <Select
-                    labelId="marketplace-filter-label"
-                    value={searchMarketplace}
-                    label="Marketplace"
-                    onChange={(e) => setSearchMarketplace(e.target.value)}
-                  >
-                    <MenuItem value="">
-                      <em>All</em>
-                    </MenuItem>
-                    <MenuItem value="EBAY_US">EBAY_US</MenuItem>
-                    <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
-                    <MenuItem value="EBAY_ENCA">EBAY_Canada</MenuItem>
-                  </Select>
-                </FormControl>
                 <Button
                   size="small"
                   variant="outlined"
@@ -413,7 +542,6 @@ export default function FulfillmentDashboard() {
                     setSearchOrderId('');
                     setSearchBuyerName('');
                     setSearchSoldDate('');
-                    setSearchMarketplace('');
                   }}
                   sx={{ minWidth: 100 }}
                 >
@@ -481,22 +609,16 @@ export default function FulfillmentDashboard() {
       </Paper>
 
       {/* TABLE SECTION */}
-      {loading && !filteredOrders.length ? (
+      {loading && !orders.length ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <CircularProgress />
           <Typography variant="body2" sx={{ mt: 2 }}>Loading orders...</Typography>
         </Paper>
-      ) : filteredOrders.length === 0 && orders.length === 0 ? (
+      ) : orders.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <ShoppingCartIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
           <Typography variant="body1" color="text.secondary">
             No orders found. Click "Poll New Orders" to fetch orders from all sellers.
-          </Typography>
-        </Paper>
-      ) : filteredOrders.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary">
-            No orders match your search criteria.
           </Typography>
         </Paper>
       ) : (
@@ -527,7 +649,7 @@ export default function FulfillmentDashboard() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredOrders.map((order, idx) => {
+              {orders.map((order, idx) => {
                 const currentAdFeeValue =
                   editingAdFee[order._id] !== undefined
                     ? editingAdFee[order._id]
@@ -541,7 +663,7 @@ export default function FulfillmentDashboard() {
                       '&:hover': { backgroundColor: 'action.selected' },
                     }}
                   >
-                    <TableCell>{idx + 1}</TableCell>
+                    <TableCell>{(currentPage - 1) * ordersPerPage + idx + 1}</TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
                         {order.seller?.user?.username ||
@@ -708,7 +830,7 @@ export default function FulfillmentDashboard() {
                     <TableCell align="right">
                       <Typography
                         variant="body2"
-                        sx={{ color: Number(order.discount) < 0 ? 'success.main' : 'text.primary' }}
+                        
                       >
                         {formatCurrency(order.discount)}
                       </Typography>
@@ -741,9 +863,15 @@ export default function FulfillmentDashboard() {
                         color={
                           order.cancelState === 'CANCELED' ? 'error' :
                           order.cancelState === 'CANCEL_REQUESTED' ? 'warning' :
+                          order.cancelState === 'IN_PROGRESS' ? 'warning' :
                           'success'
                         }
-                        sx={{ fontSize: '0.7rem' }}
+                        sx={{
+                          fontSize: '0.7rem',
+                          backgroundColor: order.cancelState === 'IN_PROGRESS' ? '#ffd700' : undefined,
+                          color: order.cancelState === 'IN_PROGRESS' ? '#000' : undefined,
+                          fontWeight: order.cancelState === 'IN_PROGRESS' ? 'bold' : 'normal'
+                        }}
                       />
                     </TableCell>
                     <TableCell>
@@ -854,10 +982,28 @@ export default function FulfillmentDashboard() {
         </TableContainer>
       )}
 
+      {/* Pagination Controls */}
+      {!loading && orders.length > 0 && totalPages > 1 && (
+        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Showing {orders.length > 0 ? (currentPage - 1) * ordersPerPage + 1 : 0} - {Math.min(currentPage * ordersPerPage, totalOrders)} of {totalOrders} orders
+          </Typography>
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(e, page) => setCurrentPage(page)}
+            color="primary"
+            showFirstButton
+            showLastButton
+            size="large"
+          />
+        </Box>
+      )}
+
       {/* Snackbar for polling results */}
       <Snackbar
         open={snackbarOpen}
-        autoHideDuration={4000}
+        autoHideDuration={10000}
         onClose={() => setSnackbarOpen(false)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
@@ -866,18 +1012,75 @@ export default function FulfillmentDashboard() {
           severity={snackbarSeverity}
           sx={{
             width: '100%',
-            fontSize: '1.25rem',
+            fontSize: '1.1rem',
             py: 2,
             px: 4,
             minWidth: 400,
-            justifyContent: 'center',
-            alignItems: 'center',
-            textAlign: 'center',
+            maxWidth: 800,
           }}
           elevation={6}
           variant="filled"
+          action={
+            snackbarOrderIds.length > 0 ? (
+              <IconButton
+                size="small"
+                aria-label="copy order IDs"
+                color="inherit"
+                onClick={() => {
+                  const orderIdsList = snackbarOrderIds.join(', ');
+                  if (navigator?.clipboard?.writeText) {
+                    navigator.clipboard.writeText(orderIdsList);
+                    // Show temporary feedback
+                    const originalMsg = snackbarMsg;
+                    setSnackbarMsg('Order IDs copied to clipboard!');
+                    setTimeout(() => setSnackbarMsg(originalMsg), 1500);
+                  }
+                }}
+                sx={{ ml: 2 }}
+              >
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            ) : null
+          }
         >
-          {snackbarMsg}
+          <Box>
+            <Typography variant="body1" sx={{ fontWeight: 'bold', mb: snackbarOrderIds.length > 0 ? 1 : 0 }}>
+              {snackbarMsg}
+            </Typography>
+            {snackbarOrderIds.length > 0 && (
+              <Typography variant="body2" sx={{ mt: 1, opacity: 0.9, fontSize: '0.9rem' }}>
+                Order IDs: {snackbarOrderIds.join(', ')}
+              </Typography>
+            )}
+            {updatedOrderDetails.length > 0 && (
+              <Box sx={{ mt: 1.5, maxHeight: 200, overflowY: 'auto', fontSize: '0.85rem' }}>
+                {updatedOrderDetails.map((detail, idx) => {
+                  const hasShippingChange = detail.changedFields.includes('shippingAddress');
+                  return (
+                    <Box 
+                      key={idx} 
+                      sx={{ 
+                        mb: 0.5, 
+                        opacity: 0.95,
+                        backgroundColor: hasShippingChange ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                        padding: hasShippingChange ? '4px 8px' : '0',
+                        borderRadius: hasShippingChange ? '4px' : '0',
+                        border: hasShippingChange ? '1px solid rgba(255, 255, 255, 0.3)' : 'none',
+                      }}
+                    >
+                      <Typography variant="caption" component="span" sx={{ fontWeight: 'bold', fontSize: '0.85rem' }}>
+                        {hasShippingChange && '🏠 '}{detail.orderId}:
+                      </Typography>
+                      {' '}
+                      <Typography variant="caption" component="span" sx={{ fontSize: '0.85rem', fontStyle: 'italic' }}>
+                        {detail.changedFields.map(formatFieldName).join(', ')}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+          </Box>
         </MuiAlert>
       </Snackbar>
     </Box>
