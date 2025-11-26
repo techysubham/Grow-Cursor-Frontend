@@ -63,6 +63,9 @@ import AboutMePage from '../pages/AboutMePage.jsx';
 import EmployeeDetailsPage from '../pages/admin/EmployeeDetailsPage.jsx';
 import BuyerChatPage from '../pages/admin/BuyerChatPage.jsx';
 
+import DashboardIcon from '@mui/icons-material/Dashboard'; // Add this icon
+import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboard.jsx';
+
 
 
 
@@ -182,6 +185,15 @@ export default function AdminLayout({ user, onLogout }) {
           </>
         )}
 
+        {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
+          <ListItem disablePadding>
+            <ListItemButton component={Link} to="/admin/compatibility-dashboard" onClick={() => setMobileOpen(false)}>
+              <ListItemIcon><DashboardIcon /></ListItemIcon>
+              <ListItemText primary="Compat. Dashboard" />
+            </ListItemButton>
+          </ListItem>
+        )}
+
         {/* Orders Dept Dropdown */}
         {isSuper && (
           <>
@@ -253,6 +265,8 @@ export default function AdminLayout({ user, onLogout }) {
         )}
 
 
+
+       
         
         
         {isProductAdmin  ? (
@@ -433,6 +447,11 @@ export default function AdminLayout({ user, onLogout }) {
           {isCompatibilityEditor && (
             <Route path="/compatibility-editor" element={<EditorDashboard />} />
           )}
+
+ {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
+            <Route path="/compatibility-dashboard" element={<CompatibilityDashboard />} />
+          )}
+
           {(isFulfillmentAdmin || isSuper) && (
             <>
               <Route path="/fulfillment" element={<FulfillmentDashboard />} />
