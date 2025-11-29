@@ -252,7 +252,7 @@ export default function FulfillmentDashboard() {
   // Search filters
   const [searchOrderId, setSearchOrderId] = useState('');
   const [searchBuyerName, setSearchBuyerName] = useState('');
-  const [searchSoldDate, setSearchSoldDate] = useState('');
+  //const [searchSoldDate, setSearchSoldDate] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState('');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
@@ -285,6 +285,16 @@ export default function FulfillmentDashboard() {
   const [messageBody, setMessageBody] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
 
+  const [searchStartDate, setSearchStartDate] = useState('');
+const [searchEndDate, setSearchEndDate] = useState('');
+  
+
+const [dateFilter, setDateFilter] = useState({
+    mode: 'none', // 'none' | 'single' | 'range'
+    single: '',
+    from: '',
+    to: ''
+  });
 
 
 
@@ -307,7 +317,7 @@ export default function FulfillmentDashboard() {
   useEffect(() => {
     loadStoredOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, searchOrderId, searchBuyerName, searchSoldDate, searchMarketplace]);
+  }, [currentPage, searchOrderId, searchBuyerName, searchMarketplace, dateFilter]);
 
   async function fetchSellers() {
     setError('');
@@ -322,30 +332,28 @@ export default function FulfillmentDashboard() {
   async function loadStoredOrders() {
     setLoading(true);
     setError('');
-    setPollResults(null);
+    
     try {
       const params = {
         page: currentPage,
         limit: ordersPerPage
       };
       
-      if (selectedSeller) {
-        params.sellerId = selectedSeller;
+      if (selectedSeller) params.sellerId = selectedSeller;
+      if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
+      if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
+      if (searchMarketplace) params.searchMarketplace = searchMarketplace;
+
+      // --- NEW DATE LOGIC START ---
+      if (dateFilter.mode === 'single' && dateFilter.single) {
+        // For single day, start and end are the same day
+        params.startDate = dateFilter.single;
+        params.endDate = dateFilter.single;
+      } else if (dateFilter.mode === 'range') {
+        if (dateFilter.from) params.startDate = dateFilter.from;
+        if (dateFilter.to) params.endDate = dateFilter.to;
       }
-      
-      // Add search filters to backend query
-      if (searchOrderId.trim()) {
-        params.searchOrderId = searchOrderId.trim();
-      }
-      if (searchBuyerName.trim()) {
-        params.searchBuyerName = searchBuyerName.trim();
-      }
-      if (searchSoldDate.trim()) {
-        params.searchSoldDate = searchSoldDate.trim();
-      }
-      if (searchMarketplace && searchMarketplace !== '') {
-        params.searchMarketplace = searchMarketplace;
-      }
+      // --- NEW DATE LOGIC END ---
 
       const { data } = await api.get('/ebay/stored-orders', { params });
       setOrders(data?.orders || []);
@@ -767,7 +775,7 @@ function NotesCell({ order, onSave, onNotify }) {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
-        timeZone: 'America/Los_Angeles',
+        timeZone: 'UTC',
       });
     } catch {
       return '-';
@@ -888,8 +896,9 @@ function NotesCell({ order, onSave, onNotify }) {
         )}
 
         {/* SEARCH FILTERS */}
-        {orders.length > 0 && (
-          <Box sx={{ mt: 2, p: 2, backgroundColor: 'action.hover', borderRadius: 1 }}>
+        
+          {/* SEARCH FILTERS - REMOVED THE CONDITIONAL CHECK */}
+        <Box sx={{ mt: 2, p: 2, backgroundColor: 'action.hover', borderRadius: 1 }}>
             <Box 
               sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
               onClick={() => setFiltersExpanded(!filtersExpanded)}
@@ -919,88 +928,79 @@ function NotesCell({ order, onSave, onNotify }) {
                   placeholder="Search by buyer name..."
                   sx={{ flex: 1 }}
                 />
-                <TextField
-                  size="small"
-                  label="Sold Date"
-                  type="date"
-                  value={searchSoldDate}
-                  onChange={(e) => setSearchSoldDate(e.target.value)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                  sx={{ flex: 1 }}
-                />
+                
+                {/* 1. DATE MODE SELECTOR */}
+                <FormControl size="small" sx={{ minWidth: 130 }}>
+                  <InputLabel id="date-mode-label">Date Mode</InputLabel>
+                  <Select
+                    labelId="date-mode-label"
+                    value={dateFilter.mode}
+                    label="Date Mode"
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, mode: e.target.value }))}
+                  >
+                    <MenuItem value="none">None</MenuItem>
+                    <MenuItem value="single">Single Day</MenuItem>
+                    <MenuItem value="range">Date Range</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* 2. SINGLE DATE INPUT */}
+                {dateFilter.mode === 'single' && (
+                  <TextField
+                    size="small"
+                    label="Date"
+                    type="date"
+                    value={dateFilter.single}
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, single: e.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ width: 150 }}
+                  />
+                )}
+
+                {/* 3. RANGE INPUTS */}
+                {dateFilter.mode === 'range' && (
+                  <>
+                    <TextField
+                      size="small"
+                      label="From"
+                      type="date"
+                      value={dateFilter.from}
+                      onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                      InputLabelProps={{ shrink: true }}
+                      sx={{ width: 150 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="To"
+                      type="date"
+                      value={dateFilter.to}
+                      onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
+                      InputLabelProps={{ shrink: true }}
+                      sx={{ width: 150 }}
+                    />
+                  </>
+                )}
+
+                {/* CLEAR BUTTON (Updated) */}
                 <Button
                   size="small"
                   variant="outlined"
                   onClick={() => {
                     setSearchOrderId('');
                     setSearchBuyerName('');
-                    setSearchSoldDate('');
+                    // Reset Date Filter
+                    setDateFilter({ mode: 'none', single: '', from: '', to: '' });
                   }}
-                  sx={{ minWidth: 100 }}
+                  sx={{ minWidth: 80 }}
                 >
                   Clear
                 </Button>
               </Stack>
             )}
-          </Box>
-        )}
+        </Box>
+        
 
-        {pollResults && (
-          <Alert
-            severity={
-              (pollResults.totalNewOrders > 0 || pollResults.totalUpdatedOrders > 0) ? 'success' : 'info'
-            }
-            sx={{ mt: 2 }}
-            onClose={() => setPollResults(null)}
-          >
-            {copiedText && (
-              <Typography variant="caption" color="success.main" sx={{ mb: 1, display: 'block' }}>
-                Copied!
-              </Typography>
-            )}
-            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
-              Polling Complete: {pollResults.totalPolled} seller account(s) polled
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              • New Orders: <strong>{pollResults.totalNewOrders}</strong>
-              <br />
-              • Updated Orders: <strong>{pollResults.totalUpdatedOrders}</strong>
-            </Typography>
-            {pollResults.pollResults && pollResults.pollResults.length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                {pollResults.pollResults.map((result, idx) => (
-                  <Box
-                    key={idx}
-                    sx={{ mb: 1, p: 1, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 1 }}
-                  >
-                    <Typography variant="body2" fontWeight="medium">
-                      {result.sellerName}:
-                    </Typography>
-                    {result.success ? (
-                      <Typography variant="caption" component="div">
-                        {result.newOrders?.length > 0 && (
-                          <div>✓ New: {result.newOrders.join(', ')}</div>
-                        )}
-                        {result.updatedOrders?.length > 0 && (
-                          <div>↻ Updated: {result.updatedOrders.join(', ')}</div>
-                        )}
-                        {(!result.newOrders?.length && !result.updatedOrders?.length) && (
-                          <div>No new or updated orders</div>
-                        )}
-                      </Typography>
-                    ) : (
-                      <Typography variant="caption" color="error">
-                        ✗ Error: {result.error}
-                      </Typography>
-                    )}
-                  </Box>
-                ))}
-              </Box>
-            )}
-          </Alert>
-        )}
+        
       </Paper>
 
       {/* TABLE SECTION */}
@@ -1078,17 +1078,78 @@ function NotesCell({ order, onSave, onNotify }) {
                     </TableCell>
                     <TableCell>{formatDate(order.dateSold)}</TableCell>
                     <TableCell>{formatDate(order.shipByDate)}</TableCell>
-                    <TableCell sx={{ maxWidth: 250, pr: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
-                        <Tooltip title={order.productName || order.lineItems?.[0]?.title || '-'} arrow>
-                          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {order.productName || order.lineItems?.[0]?.title || '-'}
-                          </Typography>
-                        </Tooltip>
-                        <IconButton size="small" onClick={() => handleCopy(order.productName || order.lineItems?.[0]?.title || '-') } aria-label="copy product name">
-                          <ContentCopyIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
+                    <TableCell sx={{ minWidth: 300, maxWidth: 400, pr: 1 }}>
+                      <Stack spacing={1} sx={{ py: 1 }}>
+                        {order.lineItems && order.lineItems.length > 0 ? (
+                          order.lineItems.map((item, i) => (
+                            <Box 
+                              key={i} 
+                              sx={{ 
+                                display: 'flex', 
+                                alignItems: 'flex-start', 
+                                gap: 1, 
+                                borderBottom: i < order.lineItems.length - 1 ? '1px dashed rgba(0,0,0,0.1)' : 'none',
+                                pb: i < order.lineItems.length - 1 ? 1 : 0
+                              }}
+                            >
+                              {/* 1. QUANTITY BADGE */}
+                              <Chip
+                                label={`x${item.quantity}`}
+                                size="small"
+                                color={item.quantity > 1 ? "warning" : "default"} 
+                                sx={{ 
+                                  height: 24, 
+                                  minWidth: 35, 
+                                  fontWeight: 'bold',
+                                  borderRadius: 1,
+                                  backgroundColor: item.quantity > 1 ? '#ed6c02' : '#e0e0e0',
+                                  color: item.quantity > 1 ? '#fff' : 'rgba(0,0,0,0.87)'
+                                }}
+                              />
+
+                              {/* 2. PRODUCT TITLE & ID */}
+                              <Box sx={{ flex: 1, overflow: 'hidden' }}>
+                                <Tooltip title={item.title} arrow placement="top">
+                                  <Typography 
+                                    variant="body2" 
+                                    sx={{ 
+                                      lineHeight: 1.2,
+                                      fontWeight: item.quantity > 1 ? '500' : '400',
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden'
+                                    }}
+                                  >
+                                    {item.title}
+                                  </Typography>
+                                </Tooltip>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                  ID: {item.legacyItemId} {item.sku ? `| SKU: ${item.sku}` : ''}
+                                </Typography>
+                              </Box>
+
+                              {/* 3. COPY BUTTON */}
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleCopy(item.title)} 
+                                aria-label="copy product name"
+                                sx={{ mt: -0.5 }}
+                              >
+                                <ContentCopyIcon fontSize="small" sx={{ fontSize: '1rem' }} />
+                              </IconButton>
+                            </Box>
+                          ))
+                        ) : (
+                          /* Fallback for old orders */
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip label="x1" size="small" />
+                            <Typography variant="body2">
+                              {order.productName || '-'}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Stack>
                     </TableCell>
                     <TableCell sx={{ maxWidth: 150, pr: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
@@ -1273,27 +1334,38 @@ function NotesCell({ order, onSave, onNotify }) {
                         }}
                       />
                     </TableCell>
+                    {/* --- REPLACEMENT FOR REFUNDS CELL --- */}
                     <TableCell>
                       {order.refunds && order.refunds.length > 0 ? (
-                        <Tooltip
-                          title={
-                            <Box>
-                              {order.refunds.map((refund, idx) => (
-                                <Typography key={idx} variant="caption" display="block">
-                                  {formatCurrency(refund.refundAmount?.value)} - {refund.refundStatus}
-                                </Typography>
-                              ))}
-                            </Box>
-                          }
-                          arrow
-                        >
-                          <Chip
-                            label={`${order.refunds.length} refund(s)`}
-                            size="small"
-                            color="warning"
-                            sx={{ fontSize: '0.7rem', cursor: 'pointer' }}
-                          />
-                        </Tooltip>
+                        <Stack spacing={0.5}>
+                          {order.refunds.map((refund, idx) => {
+                            // 1. Get Amount (Handle both data structures safely)
+                            const rawValue = refund.amount?.value || refund.refundAmount?.value || 0;
+                            const amount = Number(rawValue).toFixed(2);
+                            
+                            // 2. Determine Label & Color based on Order Status
+                            // If order says 'FULLY_REFUNDED', we label it Full. Otherwise Partial.
+                            const isFull = order.orderPaymentStatus === 'FULLY_REFUNDED';
+                            const typeLabel = isFull ? 'Full' : 'Partial';
+                            const color = isFull ? 'error' : 'warning'; // Red for Full, Orange for Partial
+
+                            return (
+                              <Chip
+                                key={idx}
+                                // Result: "Full: $28.17" or "Partial: $15.00"
+                                label={`${typeLabel}: $${amount}`}
+                                size="small"
+                                color={color}
+                                variant="outlined"
+                                sx={{ 
+                                  fontWeight: 'bold', 
+                                  fontSize: '0.75rem', 
+                                  height: 24 
+                                }}
+                              />
+                            );
+                          })}
+                        </Stack>
                       ) : (
                         <Typography variant="body2" color="text.secondary">-</Typography>
                       )}

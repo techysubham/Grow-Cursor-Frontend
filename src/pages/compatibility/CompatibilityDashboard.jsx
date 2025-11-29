@@ -4,13 +4,17 @@ import {
   Button, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, IconButton, TextField, Grid, Chip, Divider, FormControl, 
   InputLabel, Select, MenuItem, Snackbar, Alert, Pagination, OutlinedInput, Checkbox, ListItemText,
-  Autocomplete
+  Autocomplete, InputAdornment
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import api from '../../lib/api';
+
+// --- YOUR PREFERRED HELPERS (Strict Matching) ---
 
 // Helper: Group raw rows into readable text
 const groupFitmentData = (compatibilityList) => {
@@ -67,6 +71,9 @@ export default function CompatibilityDashboard() {
   const [totalItems, setTotalItems] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
+  // SEARCH STATE
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [openModal, setOpenModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [editCompatList, setEditCompatList] = useState([]);
@@ -107,16 +114,32 @@ export default function CompatibilityDashboard() {
     if (currentSellerId) loadListings();
   }, [currentSellerId, page]);
 
-  const loadListings = async () => {
+  const loadListings = async (customSearch = null) => {
     setLoading(true);
     try {
-      // Limit 50 to match your request
-      const { data } = await api.get('/ebay/listings', { params: { sellerId: currentSellerId, page, limit: 50 } }); 
+      const searchToSend = customSearch !== null ? customSearch : searchTerm;
+      const { data } = await api.get('/ebay/listings', { 
+        params: { 
+            sellerId: currentSellerId, 
+            page, 
+            limit: 50, 
+            search: searchToSend 
+        } 
+      }); 
       setListings(data.listings);
       setTotalPages(data.pagination.pages);
       setTotalItems(data.pagination.total);
     } catch (e) { showSnackbar('Failed to load listings', 'error'); } 
     finally { setLoading(false); }
+  };
+
+  const handleSearch = () => {
+      setPage(1); 
+      loadListings(searchTerm); 
+  };
+
+  const handleKeyPress = (e) => {
+      if (e.key === 'Enter') handleSearch();
   };
 
   const handleSync = async () => {
@@ -160,7 +183,6 @@ export default function CompatibilityDashboard() {
     finally { setLoadingModels(false); }
   };
 
-  // FIX: Dynamic Year Fetching to prevent "Invalid Vehicle" errors
   const fetchYears = async (makeVal, modelVal) => {
     setLoadingYears(true);
     setYearOptions([]);
@@ -174,7 +196,6 @@ export default function CompatibilityDashboard() {
                 { name: 'Model', value: modelVal }
             ]
         });
-        // Sort descending (2025, 2024...)
         setYearOptions(data.values.sort((a, b) => b - a));
     } catch (e) { console.error(e); } 
     finally { setLoadingYears(false); }
@@ -213,7 +234,6 @@ export default function CompatibilityDashboard() {
     setEditCompatList(updated);
   };
 
-  // FIX: Scroll Jump fixed by updating LOCAL state
   const handleSaveCompatibility = async () => {
     if (!selectedItem || !currentSellerId) return;
     try {
@@ -231,8 +251,6 @@ export default function CompatibilityDashboard() {
           showSnackbar('Changes saved to eBay successfully!', 'success');
       }
 
-      // DO NOT call loadListings() -> This prevents the scroll reset
-      // Update local listings state manually
       setListings(prevListings => 
         prevListings.map(item => 
           item.itemId === selectedItem.itemId 
@@ -253,13 +271,56 @@ export default function CompatibilityDashboard() {
 
   return (
     <Box sx={{ p: 3 }}>
-      {/* HEADER */}
+      {/* HEADER WITH SEARCH */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
         <Box>
             <Typography variant="h5">Compatibility Dashboard</Typography>
             <Typography variant="caption" color="textSecondary">Showing {listings.length} of {totalItems} Active Listings</Typography>
         </Box>
+        
         <Box display="flex" gap={2} alignItems="center">
+            {/* SEARCH BOX */}
+            <TextField 
+                size="small" 
+                placeholder="Search SKU, ID, Title..." 
+                value={searchTerm}
+                onChange={(e) => {
+                    const newValue = e.target.value;
+                    setSearchTerm(newValue);
+                    
+                    // FIX: If user deletes everything, reload the full list immediately
+                    if (newValue === '') {
+                        setPage(1);
+                        loadListings(''); // Pass empty string to fetch all
+                    }
+                }}
+                onKeyPress={handleKeyPress}
+                InputProps={{
+                    endAdornment: (
+                        <InputAdornment position="end">
+                            {searchTerm && (
+                                <IconButton 
+                                    onClick={() => {
+                                        setSearchTerm('');
+                                        setPage(1);
+                                        loadListings('');
+                                    }} 
+                                    edge="end" 
+                                    size="small"
+                                    sx={{ mr: 1 }}
+                                >
+                                    <ClearIcon fontSize="small" />
+                                </IconButton>
+                            )}
+                            <IconButton onClick={handleSearch} edge="end">
+                                <SearchIcon />
+                            </IconButton>
+                        </InputAdornment>
+                    )
+                }}
+                sx={{ width: 300, bgcolor: 'white' }}
+            />
+
             <FormControl size="small" sx={{ minWidth: 200 }}>
                 <InputLabel>Select Seller</InputLabel>
                 <Select value={currentSellerId} label="Select Seller" onChange={(e) => setCurrentSellerId(e.target.value)}>
@@ -301,7 +362,6 @@ export default function CompatibilityDashboard() {
                         <TableCell>{item.currency} {item.currentPrice}</TableCell>
                         <TableCell><Typography variant="body2" sx={{whiteSpace:'nowrap'}}>{formatDate(item.startTime)}</Typography></TableCell>
                         
-                        {/* FITMENT SUMMARY */}
                         <TableCell>
                             {fitmentSummary.length > 0 ? (
                                 <Box sx={{ maxHeight: 120, overflowY: 'auto', border: '1px solid #eee', borderRadius: 1, p: 1, bgcolor: '#fafafa' }}>
@@ -331,7 +391,7 @@ export default function CompatibilityDashboard() {
         </>
       )}
 
-      {/* MODAL */}
+      {/* EDIT MODAL */}
       <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="xl" fullWidth>
         <DialogTitle sx={{ borderBottom: '1px solid #eee' }}>Edit Compatibility: {selectedItem?.itemId}</DialogTitle>
         <DialogContent sx={{ p: 0, display: 'flex', height: '75vh' }}>
