@@ -869,16 +869,49 @@ function NotesCell({ order, onSave, onNotify }) {
   };
 
   // helpers
-  const formatDate = (dateStr) => {
+  const formatDate = (dateStr, marketplaceId) => {
     if (!dateStr) return '-';
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', {
+      
+      // Default to UTC
+      let timeZone = 'UTC';
+      let timeZoneLabel = 'UTC';
+
+      // Determine Timezone based on Marketplace
+      if (marketplaceId === 'EBAY_US') {
+        timeZone = 'America/Los_Angeles'; // Covers PST and PDT automatically
+        timeZoneLabel = 'PT';
+      } else if (marketplaceId === 'EBAY_CA' || marketplaceId === 'EBAY_ENCA') {
+        timeZone = 'America/New_York';    // Covers EST and EDT automatically
+        timeZoneLabel = 'ET';
+      } else if (marketplaceId === 'EBAY_AU') {
+        timeZone = 'Australia/Sydney';    // Covers AEST and AEDT automatically
+        timeZoneLabel = 'AET';
+      }
+
+      const formattedDate = date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
-        timeZone: 'UTC',
+        timeZone: timeZone,
       });
+
+      // Optional: Add the time if you want to be precise
+      const formattedTime = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: timeZone,
+      });
+
+      return (
+        <Stack spacing={0}>
+            <Typography variant="body2">{formattedDate}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                {formattedTime} ({timeZoneLabel})
+            </Typography>
+        </Stack>
+      );
     } catch {
       return '-';
     }
@@ -1178,8 +1211,8 @@ function NotesCell({ order, onSave, onNotify }) {
                         {order.orderId || order.legacyOrderId || '-'}
                       </Typography>
                     </TableCell>
-                    <TableCell>{formatDate(order.dateSold)}</TableCell>
-                    <TableCell>{formatDate(order.shipByDate)}</TableCell>
+                    <TableCell>{formatDate(order.dateSold, order.purchaseMarketplaceId)}</TableCell>
+                    <TableCell>{formatDate(order.shipByDate, order.purchaseMarketplaceId)}</TableCell>
                     <TableCell sx={{ minWidth: 300, maxWidth: 400, pr: 1 }}>
                       <Stack spacing={1} sx={{ py: 1 }}>
                         {order.lineItems && order.lineItems.length > 0 ? (

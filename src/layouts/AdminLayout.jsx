@@ -214,21 +214,11 @@ export default function AdminLayout({ user, onLogout }) {
                 <ListItemButton component={Link} to="/admin/awaiting-shipment" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="Awaiting Shipment" />
                 </ListItemButton>
-                <ListItemButton component={Link} to="/admin/conversation-tracking" onClick={() => setMobileOpen(false)}>
-                  <ListItemText primary="Conversation Tracking" />
-                </ListItemButton>
+                
                 <ListItemButton component={Link} to="/admin/cancelled-status" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="Cancelled Status" />
                 </ListItemButton>
-                <ListItemButton component={Link} to="/admin/return" onClick={() => setMobileOpen(false)}>
-                  <ListItemText primary="Return" />
-                </ListItemButton>
-                <ListItemButton component={Link} to="/admin/replace" onClick={() => setMobileOpen(false)}>
-                  <ListItemText primary="Replace" />
-                </ListItemButton>
-                <ListItemButton component={Link} to="/admin/inr" onClick={() => setMobileOpen(false)}>
-                  <ListItemText primary="INR" />
-                </ListItemButton>
+                
                 <ListItemButton component={Link} to="/admin/return-requested" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="Return Requests" />
                 </ListItemButton>
@@ -463,9 +453,6 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/awaiting-shipment" element={<AwaitingShipmentPage />} />
               <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
               <Route path="/cancelled-status" element={<CancelledStatusPage />} />
-              <Route path="/return" element={<ReturnPage />} />
-              <Route path="/replace" element={<ReplacePage />} />
-              <Route path="/inr" element={<INRPage />} />
               <Route path="/return-requested" element={<ReturnRequestedPage />} />
               <Route path="/message-received" element={<BuyerChatPage/>} />
               <Route path="/conversation-management" element={<ConversationManagementPage />} />
