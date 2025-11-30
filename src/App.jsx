@@ -28,6 +28,8 @@ function useAuth() {
     sessionStorage.setItem('auth_token', t);   // per-tab token
     setAuthToken(t);
     localStorage.setItem('user', JSON.stringify(u));
+    
+    // Navigation Logic
     if (u.role === 'lister') navigate('/lister');
     else if (u.role === 'advancelister') navigate('/lister');
     else if (u.role === 'trainee') navigate('/lister');
@@ -38,6 +40,8 @@ function useAuth() {
     else if (u.role === 'hradmin') navigate('/admin/employee-details');
     else if (u.role === 'hr') navigate('/admin/about-me');
     else if (u.role === 'operationhead') navigate('/admin/employee-details');
+    // For HOC and Compliance Manager, we send them to the general admin area
+    // AdminLayout will handle the specific redirect to /fulfillment
     else navigate('/admin');
   };
   const logout = () => {
@@ -77,7 +81,10 @@ export default function App() {
               user.role === 'fulfillmentadmin' ||
               user.role === 'hradmin' ||
               user.role === 'hr' ||
-              user.role === 'operationhead'
+              user.role === 'operationhead' ||
+              // --- FIX IS HERE: Add new roles to this check ---
+              user.role === 'hoc' ||
+              user.role === 'compliancemanager'
             ) ? (
               <AdminLayout user={user} onLogout={logout} />
             ) : (
@@ -104,5 +111,3 @@ export default function App() {
     </ThemeProvider>
   );
 }
-
-

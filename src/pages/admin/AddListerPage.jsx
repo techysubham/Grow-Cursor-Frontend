@@ -57,10 +57,10 @@ export default function AddListerPage() {
         newDepartment = 'Listing';
       }
 
-      // Department required for lister, listingadmin, compatibilityadmin, compatibilityeditor, superadmin
+      // Department required check
       const needsDepartment = (
         isSuperLike || isListingAdmin || isCompatibilityAdmin ||
-        ['lister', 'listingadmin', 'compatibilityadmin', 'compatibilityeditor'].includes(newRole)
+        ['lister', 'listingadmin', 'compatibilityadmin', 'compatibilityeditor', 'hoc', 'compliancemanager'].includes(newRole)
       );
       if (needsDepartment && !newDepartment) {
         setMsg('Department is required');
@@ -84,7 +84,9 @@ export default function AddListerPage() {
         hradmin: 'HR Admin',
         hr: 'HR',
         operationhead: 'Operation Head',
-        trainee: 'Trainee'
+        trainee: 'Trainee',
+        hoc: 'HOC',
+        compliancemanager: 'Compliance Manager'
       };
       setMsg(`${roleNames[newRole]} created`);
 
@@ -160,6 +162,8 @@ export default function AddListerPage() {
               <MenuItem value="advancelister">Advance Lister</MenuItem>
               <MenuItem value="trainee">Trainee</MenuItem>
               <MenuItem value="seller">Seller</MenuItem>
+              <MenuItem value="hoc">HOC</MenuItem>
+              <MenuItem value="compliancemanager">Compliance Manager</MenuItem>
             </Select>
           </FormControl>
         ) : isListingAdmin ? (
@@ -183,6 +187,7 @@ export default function AddListerPage() {
               <MenuItem value="HR">HR Department</MenuItem>
               <MenuItem value="Operations">Operations Department</MenuItem>
               <MenuItem value="Executives">Executives Department</MenuItem>
+              <MenuItem value="Compliance">Compliance Department</MenuItem>
             </Select>
           </FormControl>
         ) : null}

@@ -145,6 +145,8 @@ function ChatDialog({ open, onClose, order }) {
      itemTitle = `${itemTitle} (+ ${itemCount - 1} other${itemCount - 1 > 1 ? 's' : ''})`;
   }
 
+  
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       
@@ -340,6 +342,42 @@ function ChatDialog({ open, onClose, order }) {
   );
 }
 
+
+
+
+function EditableCell({ value, type = 'text', onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [tempValue, setTempValue] = useState(value || '');
+
+  useEffect(() => { setTempValue(value || ''); }, [value]);
+
+  const handleSave = () => { onSave(tempValue); setEditing(false); };
+
+  if (editing) {
+    return (
+      <Stack direction="row" spacing={0.5} alignItems="center">
+        <TextField 
+          size="small" type={type} value={tempValue} autoFocus
+          onChange={(e) => setTempValue(e.target.value)} 
+          sx={{ width: type === 'date' ? 130 : 80, '& input': { p: 0.5 } }} 
+        />
+        <Button size="small" variant="contained" onClick={handleSave} sx={{ minWidth: 30, p: 0.5 }}>✓</Button>
+        <Button size="small" onClick={() => setEditing(false)} sx={{ minWidth: 20, p: 0.5 }}>X</Button>
+      </Stack>
+    );
+  }
+
+  let display = value;
+  if (type === 'date' && value) display = new Date(value).toLocaleDateString();
+  else if (type === 'number' && value) display = `$${Number(value).toFixed(2)}`;
+
+  return (
+    <Box onClick={() => setEditing(true)} sx={{ cursor: 'pointer', minHeight: 24, borderBottom: '1px dashed transparent', '&:hover': { borderBottom: '1px dashed #ccc' } }}>
+      <Typography variant="body2" color={!display ? 'text.disabled' : 'text.primary'}>{display || '-'}</Typography>
+    </Box>
+  );
+}
+
 export default function FulfillmentDashboard() {
   const [sellers, setSellers] = useState([]);
   const [selectedSeller, setSelectedSeller] = useState('');
@@ -399,7 +437,27 @@ const [dateFilter, setDateFilter] = useState({
   });
 
 
-
+const updateManualField = async (orderId, field, value) => {
+  try {
+    await api.patch(`/ebay/orders/${orderId}/manual-fields`, { [field]: value });
+    
+    // Update local state immediately
+    setOrders(prev => prev.map(o => {
+        if (o._id === orderId) {
+            return { ...o, [field]: value };
+        }
+        return o;
+    }));
+    setSnackbarMsg('Updated successfully');
+    setSnackbarSeverity('success');
+    setSnackbarOpen(true);
+  } catch (e) {
+    console.error(e);
+    setSnackbarMsg('Failed to update');
+    setSnackbarSeverity('error');
+    setSnackbarOpen(true);
+  }
+};
 
 
 
@@ -996,15 +1054,7 @@ function NotesCell({ order, onSave, onNotify }) {
             {loading ? 'Updating...' : 'Poll Order Updates'}
           </Button>
 
-          <Button
-            variant="outlined"
-            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-            onClick={fetchOrders}
-            disabled={loading}
-            sx={{ minWidth: 160 }}
-          >
-            {loading ? 'Polling...' : 'Poll All (New + Updates)'}
-          </Button>
+          
 
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel id="marketplace-filter-label">Marketplace</InputLabel>
@@ -1174,9 +1224,11 @@ function NotesCell({ order, onSave, onNotify }) {
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cancel Status</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Refunds</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tracking Number</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Messaging Status</TableCell>
-                
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Amazon Acc</TableCell>
+<TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Arriving</TableCell>
+<TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Before Tax</TableCell>
+<TableCell sx={{ color: 'white', fontWeight: 'bold' }}>After Tax</TableCell>
+<TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Az OrderID</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Notes</TableCell>
            
                 <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Action</TableCell>
@@ -1521,36 +1573,52 @@ function NotesCell({ order, onSave, onNotify }) {
                         <Typography variant="body2" color="text.secondary">-</Typography>
                       )}
                     </TableCell>
-                    <TableCell sx={{ minWidth: 180 }}>
-                      <FormControl size="small" fullWidth>
-                        <Select
-                          value={order.messagingStatus || 'Not Yet Started'}
-                          onChange={(e) => handleMessagingStatusChange(order._id, e.target.value)}
-                          sx={{ fontSize: '0.875rem' }}
-                        >
-                          <MenuItem value="Not Yet Started">Not Yet Started</MenuItem>
-                          <MenuItem value="Ongoing Conversation">Ongoing Conversation</MenuItem>
-                          <MenuItem value="Resolved">Resolved</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </TableCell>
 
-                    {/* Item Status Column */}
-                    <TableCell sx={{ minWidth: 160 }}>
-                        <FormControl size="small" fullWidth>
-                          <Select
-                            value={order.itemStatus || 'None'}
-                            onChange={(e) => handleItemStatusChange(order._id, e.target.value)}
-                            sx={{ fontSize: '0.875rem' }}
-                          >
-                            <MenuItem value="None" sx={{ color: 'text.secondary' }}>None</MenuItem>
-                            <MenuItem value="Out of Stock" sx={{ color: 'error.main', fontWeight: 'bold' }}>Out of Stock</MenuItem>
-                            <MenuItem value="Delayed Delivery" sx={{ color: 'warning.main', fontWeight: 'bold' }}>Delayed Delivery</MenuItem>
-                            <MenuItem value="Label Created" sx={{ color: 'info.main', fontWeight: 'bold' }}>Label Created</MenuItem>
-                            <MenuItem value="Other">Other</MenuItem>
-                          </Select>
-                        </FormControl>
-                    </TableCell>
+
+{/* 1. Amazon Account */}
+<TableCell>
+  <AutoSaveTextField 
+    value={order.amazonAccount} 
+    onSave={(val) => updateManualField(order._id, 'amazonAccount', val)} 
+  />
+</TableCell>
+
+{/* 2. Arriving Date */}
+<TableCell>
+  <AutoSaveTextField 
+    
+    value={order.arrivingDate} 
+    onSave={(val) => updateManualField(order._id, 'arrivingDate', val)} 
+  />
+</TableCell>
+
+{/* 3. Before Tax */}
+<TableCell>
+  <AutoSaveTextField 
+    type="number"
+    value={order.beforeTax} 
+    onSave={(val) => updateManualField(order._id, 'beforeTax', val)} 
+  />
+</TableCell>
+
+{/* 4. After Tax */}
+<TableCell>
+  <AutoSaveTextField 
+    type="number"
+    value={order.afterTax} 
+    onSave={(val) => updateManualField(order._id, 'afterTax', val)} 
+  />
+</TableCell>
+
+{/* 5. Amazon Order ID */}
+<TableCell>
+  <AutoSaveTextField 
+    value={order.azOrderId} 
+    onSave={(val) => updateManualField(order._id, 'azOrderId', val)} 
+  />
+</TableCell>
+
+                    
 
                     <TableCell>
                         <NotesCell 
@@ -1691,5 +1759,55 @@ function NotesCell({ order, onSave, onNotify }) {
         </MuiAlert>
       </Snackbar>
     </Box>
+  );
+}
+
+
+// --- ADD AT BOTTOM OF FILE ---
+
+function AutoSaveTextField({ value, type = 'text', onSave }) {
+  // Format initial value for Date inputs (YYYY-MM-DD)
+  const formatVal = (val) => {
+    if (type === 'date' && val) return val.split('T')[0];
+    return val ?? '';
+  };
+
+  const [localValue, setLocalValue] = React.useState(formatVal(value));
+
+  // Sync with DB updates
+  React.useEffect(() => {
+    setLocalValue(formatVal(value));
+  }, [value, type]);
+
+  const handleBlur = () => {
+    // Only api call if value actually changed
+    if (localValue !== formatVal(value)) {
+      onSave(localValue);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.target.blur(); // Triggers save
+    }
+  };
+
+  return (
+    <TextField
+      size="small"
+      type={type}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      placeholder="-"
+      sx={{ 
+        backgroundColor: '#fff', 
+        borderRadius: 1,
+        minWidth: type === 'date' ? 130 : 80,
+        '& .MuiOutlinedInput-root': { paddingRight: 0 },
+        '& input': { padding: '6px 8px', fontSize: '0.85rem' }
+      }}
+    />
   );
 }

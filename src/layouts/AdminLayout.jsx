@@ -63,13 +63,10 @@ import AboutMePage from '../pages/AboutMePage.jsx';
 import EmployeeDetailsPage from '../pages/admin/EmployeeDetailsPage.jsx';
 import BuyerChatPage from '../pages/admin/BuyerChatPage.jsx';
 
-import DashboardIcon from '@mui/icons-material/Dashboard'; // Add this icon
+import DashboardIcon from '@mui/icons-material/Dashboard'; 
 import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboard.jsx';
 
 import ConversationManagementPage from '../pages/admin/ConversationManagementPage.jsx';
-
-
-
 
 const drawerWidth = 230;
 
@@ -82,6 +79,8 @@ export default function AdminLayout({ user, onLogout }) {
   const [ordersMenuOpen, setOrdersMenuOpen] = useState(false);
   const [manageMenuOpen, setManageMenuOpen] = useState(false);
   const navigate = useNavigate();
+
+  // --- ROLE DEFINITIONS ---
   const isSuper = user?.role === 'superadmin';
   const isProductAdmin = user?.role === 'productadmin';
   const isListingAdmin = user?.role === 'listingadmin';
@@ -91,6 +90,10 @@ export default function AdminLayout({ user, onLogout }) {
   const isHRAdmin = user?.role === 'hradmin';
   const isOperationHead = user?.role === 'operationhead';
   const isSeller = user?.role === 'seller';
+  
+  // New Roles
+  const isHOC = user?.role === 'hoc';
+  const isComplianceManager = user?.role === 'compliancemanager';
 
   const drawer = (
     <div>
@@ -106,7 +109,6 @@ export default function AdminLayout({ user, onLogout }) {
             </ListItemButton>
           </ListItem>
         )}
-
 
         {/* Product Research - visible to ProductAdmin or Superadmin */}
         {isProductAdmin || isSuper ? (
@@ -196,8 +198,8 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
-        {/* Orders Dept Dropdown */}
-        {isSuper && (
+        {/* Orders Dept Dropdown - UPDATED FOR HOC & COMPLIANCE MANAGER */}
+        {(isSuper || isFulfillmentAdmin || isHOC || isComplianceManager) && (
           <>
             <ListItem disablePadding>
               <ListItemButton onClick={() => setOrdersMenuOpen((open) => !open)} sx={{ justifyContent: 'space-between' }}>
@@ -226,8 +228,8 @@ export default function AdminLayout({ user, onLogout }) {
                   <ListItemText primary="Buyer Messages" />
                 </ListItemButton>
                 <ListItemButton component={Link} to="/admin/conversation-management" onClick={() => setMobileOpen(false)}>
-  <ListItemText primary="Conversation Mgmt" />
-</ListItemButton>
+                  <ListItemText primary="Conversation Mgmt" />
+                </ListItemButton>
               </List>
             </Collapse>
           </>
@@ -259,14 +261,8 @@ export default function AdminLayout({ user, onLogout }) {
           </>
         )}
 
-
-
-       
-        
-        
         {isProductAdmin  ? (
           <>
-            
             <ListItem disablePadding>
               <ListItemButton component={Link} to="/admin/categories" onClick={() => setMobileOpen(false)}>
                 <ListItemIcon><CategoryIcon /></ListItemIcon>
@@ -284,6 +280,7 @@ export default function AdminLayout({ user, onLogout }) {
             </ListItemButton>
           </ListItem>
         ) : null}
+        
         {( isCompatibilityAdmin) && (
           <>
             <ListItem disablePadding>
@@ -306,6 +303,7 @@ export default function AdminLayout({ user, onLogout }) {
             </ListItem>
           </>
         )}
+        
         {(isCompatibilityEditor) && (
           <ListItem disablePadding>
             <ListItemButton component={Link} to="/admin/compatibility-editor" onClick={() => setMobileOpen(false)}>
@@ -315,6 +313,7 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
+        {/* Legacy Fulfillment Admin Link (Optional, kept for safety if they prefer direct link) */}
         {(isFulfillmentAdmin) && (
           <>
             <ListItem disablePadding>
@@ -332,7 +331,7 @@ export default function AdminLayout({ user, onLogout }) {
           </>
         )}
 
-        {(isSuper || isHRAdmin || isOperationHead) ? (
+        {(isSuper || isHRAdmin || isOperationHead) && (
           <>
             <ListItem disablePadding>
               <ListItemButton component={Link} to="/admin/employee-details" onClick={() => setMobileOpen(false)}>
@@ -341,10 +340,7 @@ export default function AdminLayout({ user, onLogout }) {
               </ListItemButton>
             </ListItem>
           </>
-        ) : null}
-
-        
-       
+        )}
       </List>
     </div>
   );
@@ -386,7 +382,6 @@ export default function AdminLayout({ user, onLogout }) {
       <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${sidebarOpen ? drawerWidth : 56}px)` }, transition: 'width 0.2s' }}>
         <Toolbar />
         <Routes>
-          {/* About Me is accessible to all except superadmin */}
           {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
           {isProductAdmin || isSuper ? (
             <>
@@ -400,11 +395,9 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/listing" element={<ListingManagementPage />} />
               <Route path="/assignments" element={<AdminAssignmentsPage />} />
               <Route path="/task-list" element={<TaskListPage />} />
-              //<Route path="/stock-ledger" element={<StockLedgerPage />} />
               <Route path="/listing-sheet" element={<ListingSheetPage />} />
               <Route path="/store-wise-tasks" element={<StoreWiseTaskListPage />} />
               <Route path="/store-wise-tasks/details" element={<StoreTaskDetailPage />} />
-
             </>
           ) : null}
           {isSuper || isListingAdmin || isHRAdmin || isOperationHead ? (
@@ -443,11 +436,12 @@ export default function AdminLayout({ user, onLogout }) {
             <Route path="/compatibility-editor" element={<EditorDashboard />} />
           )}
 
- {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
+          {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
             <Route path="/compatibility-dashboard" element={<CompatibilityDashboard />} />
           )}
 
-          {(isFulfillmentAdmin || isSuper) && (
+          {/* UPDATED ROUTES FOR ORDERS DEPT */}
+          {(isFulfillmentAdmin || isSuper || isHOC || isComplianceManager) && (
             <>
               <Route path="/fulfillment" element={<FulfillmentDashboard />} />
               <Route path="/awaiting-shipment" element={<AwaitingShipmentPage />} />
@@ -458,7 +452,17 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/conversation-management" element={<ConversationManagementPage />} />
             </>
           )}
-          <Route path="*" element={<Navigate to={isProductAdmin || isSuper ? "/admin/research" : isListingAdmin ? "/admin/listing" : isCompatibilityAdmin ? "/admin/compatibility-tasks" : isCompatibilityEditor ? "/admin/compatibility-editor" : isFulfillmentAdmin ? "/admin/fulfillment" : isHRAdmin || isOperationHead ? "/admin/employee-details" : "/admin/about-me"} replace />} />
+          
+          {/* UPDATED DEFAULT REDIRECT */}
+          <Route path="*" element={<Navigate to={
+            isProductAdmin || isSuper ? "/admin/research" : 
+            isListingAdmin ? "/admin/listing" : 
+            isCompatibilityAdmin ? "/admin/compatibility-tasks" : 
+            isCompatibilityEditor ? "/admin/compatibility-editor" : 
+            (isFulfillmentAdmin || isHOC || isComplianceManager) ? "/admin/fulfillment" : 
+            isHRAdmin || isOperationHead ? "/admin/employee-details" : 
+            "/admin/about-me"
+          } replace />} />
         </Routes>
       </Box>
     </Box>
