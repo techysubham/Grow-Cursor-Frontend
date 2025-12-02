@@ -8,6 +8,7 @@ import ProductResearchPage from './pages/admin/ProductResearchPage.jsx';
 import AddListerPage from './pages/admin/AddListerPage.jsx';
 import ListingAnalyticsPage from './pages/admin/ListingAnalyticsPage.jsx';
 import ListerDashboard from './pages/lister/ListerDashboard.jsx';
+import RangeAnalyzerPage from './pages/admin/RangeAnalyzerPage.jsx';
 import SellerEbayPage from './pages/SellerProfilePage.jsx';
 import AboutMePage from './pages/AboutMePage.jsx';
 import ReturnRequestedPage from './pages/admin/ReturnRequestedPage.jsx';
@@ -95,6 +96,10 @@ export default function App() {
         <Route
           path="/lister"
           element={token && user && (user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee') ? <ListerDashboard user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/lister/range-analyzer"
+          element={token && user && (user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee') ? <RangeAnalyzerPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/seller-ebay"

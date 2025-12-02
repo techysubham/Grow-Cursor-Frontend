@@ -62,8 +62,10 @@ import ReturnRequestedPage from '../pages/admin/ReturnRequestedPage.jsx';
 import AboutMePage from '../pages/AboutMePage.jsx';
 import EmployeeDetailsPage from '../pages/admin/EmployeeDetailsPage.jsx';
 import BuyerChatPage from '../pages/admin/BuyerChatPage.jsx';
+import RangeAnalyzerPage from '../pages/admin/RangeAnalyzerPage.jsx';
 
 import DashboardIcon from '@mui/icons-material/Dashboard'; 
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboard.jsx';
 
 import ConversationManagementPage from '../pages/admin/ConversationManagementPage.jsx';
@@ -120,6 +122,16 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         ) : null}
 
+        {/* Range Analyzer - Direct access for superadmin and listingadmin */}
+        {(isSuper || isListingAdmin) && (
+          <ListItem disablePadding>
+            <ListItemButton component={Link} to="/admin/range-analyzer" onClick={() => setMobileOpen(false)}>
+              <ListItemIcon><AutoAwesomeIcon /></ListItemIcon>
+              <ListItemText primary="Range Analyzer" />
+            </ListItemButton>
+          </ListItem>
+        )}
+
         {/* Listing Dropdown with Monitoring Subdropdown */}
         {(isListingAdmin || isSuper) && (
           <>
@@ -157,6 +169,9 @@ export default function AdminLayout({ user, onLogout }) {
                     </ListItemButton>
                     <ListItemButton component={Link} to="/admin/store-wise-tasks" onClick={() => setMobileOpen(false)}>
                       <ListItemText primary="Store-Wise Tasks" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} to="/admin/range-analyzer" onClick={() => setMobileOpen(false)}>
+                      <ListItemText primary="Range Analyzer" />
                     </ListItemButton>
                   </List>
                 </Collapse>
@@ -385,6 +400,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/listing-sheet" element={<ListingSheetPage />} />
               <Route path="/store-wise-tasks" element={<StoreWiseTaskListPage />} />
               <Route path="/store-wise-tasks/details" element={<StoreTaskDetailPage />} />
+              <Route path="/range-analyzer" element={<RangeAnalyzerPage />} />
             </>
           ) : null}
           {isSuper || isListingAdmin || isHRAdmin || isOperationHead ? (
