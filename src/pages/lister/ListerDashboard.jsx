@@ -148,13 +148,15 @@ export default function ListerDashboard({ user, onLogout }) {
     try {
       // Detect search type based on category
       const categoryName = pasteAssignment.task?.category?.name || '';
+      const categoryId = pasteAssignment.task?.category?._id;
       const searchType = getSearchTypeForCategory(categoryName);
       
-      console.log(`[Analyze] Category: "${categoryName}" → Search Type: ${searchType}`);
+      console.log(`[Analyze] Category: "${categoryName}" (${categoryId}) → Search Type: ${searchType}`);
       
       const { data } = await api.post('/range-analysis/analyze', { 
         textToAnalyze: pasteText,
-        searchType: searchType
+        searchType: searchType,
+        categoryId: categoryId  // Pass categoryId to also search existing ranges
       });
       
       setAnalyzeResult(data);
