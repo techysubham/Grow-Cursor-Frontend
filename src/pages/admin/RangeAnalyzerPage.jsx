@@ -47,6 +47,15 @@ const RangeAnalyzerPage = () => {
   const [modelSearchTerm, setModelSearchTerm] = useState('');
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
+  
+  // State for device models (phones/tablets)
+  const [deviceModels, setDeviceModels] = useState([]);
+  const [deviceModelsLoading, setDeviceModelsLoading] = useState(false);
+  const [deviceSyncLoading, setDeviceSyncLoading] = useState(false);
+  const [deviceSyncMessage, setDeviceSyncMessage] = useState('');
+  
+  // Search type for analyzer
+  const [searchType, setSearchType] = useState('vehicles'); // 'vehicles' or 'devices'
 
   // Toggle row expansion
   const toggleRowExpand = (modelName) => {
@@ -64,6 +73,7 @@ const RangeAnalyzerPage = () => {
   // Fetch eBay vehicle models on mount
   useEffect(() => {
     fetchEbayModels();
+    fetchDeviceModels();
   }, []);
 
   const fetchEbayModels = async () => {
@@ -75,6 +85,18 @@ const RangeAnalyzerPage = () => {
       console.error('Failed to fetch eBay models:', err);
     } finally {
       setModelsLoading(false);
+    }
+  };
+  
+  const fetchDeviceModels = async () => {
+    setDeviceModelsLoading(true);
+    try {
+      const res = await api.get('/range-analysis/device-models');
+      setDeviceModels(res.data.models || []);
+    } catch (err) {
+      console.error('Failed to fetch device models:', err);
+    } finally {
+      setDeviceModelsLoading(false);
     }
   };
 
@@ -91,6 +113,20 @@ const RangeAnalyzerPage = () => {
       setSyncLoading(false);
     }
   };
+  
+  const handleSyncDeviceModels = async () => {
+    setDeviceSyncLoading(true);
+    setDeviceSyncMessage('Syncing Cell Phones & Tablets from eBay API...');
+    try {
+      const res = await api.post('/range-analysis/sync-device-models');
+      setDeviceSyncMessage(res.data.message);
+      await fetchDeviceModels(); // Refresh the list
+    } catch (err) {
+      setDeviceSyncMessage('Failed to sync: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setDeviceSyncLoading(false);
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!inputText.trim()) return;
@@ -101,11 +137,17 @@ const RangeAnalyzerPage = () => {
     setExpandedRows(new Set()); // Clear expanded rows
 
     try {
-      const response = await api.post('/range-analysis/analyze', { textToAnalyze: inputText });
+      const response = await api.post('/range-analysis/analyze', { 
+        textToAnalyze: inputText,
+        searchType: searchType 
+      });
       setResults(response.data);
     } catch (err) {
       if (err.response?.data?.needsSync) {
-        setError('No vehicle models in database. Click "Sync eBay Models" first!');
+        const syncTypeMsg = err.response?.data?.syncType === 'devices' 
+          ? 'No device models in database. Click "Sync Device Models" first!'
+          : 'No vehicle models in database. Click "Sync eBay Models" first!';
+        setError(syncTypeMsg);
       } else {
         setError(err.response?.data?.error || err.message || 'Failed to analyze');
       }
@@ -120,36 +162,55 @@ const RangeAnalyzerPage = () => {
     model.make.toLowerCase().includes(modelSearchTerm.toLowerCase()) ||
     model.model.toLowerCase().includes(modelSearchTerm.toLowerCase())
   );
+  
+  // Filter device models based on search term
+  const filteredDeviceModels = deviceModels.filter(model =>
+    model.fullName.toLowerCase().includes(modelSearchTerm.toLowerCase()) ||
+    (model.brand && model.brand.toLowerCase().includes(modelSearchTerm.toLowerCase()))
+  );
 
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <AutoAwesomeIcon color="primary" />
-        eBay Motors Model Analyzer
+        eBay Model Analyzer
       </Typography>
       
       <Typography variant="body1" sx={{ mb: 2, color: 'text.secondary' }}>
-        Analyze text against eBay vehicle models database. Detects known models and identifies NEW ones.
+        Analyze text against eBay models database. Supports Vehicle models (eBay Motors) and Device models (Cell Phones & Tablets).
       </Typography>
 
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
         <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)}>
           <Tab label="🤖 AI Analyzer" />
-          <Tab label={`� eBay Models (${ebayModels.length})`} />
+          <Tab label={`🚗 Vehicle Models (${ebayModels.length})`} />
+          <Tab label={`📱 Device Models (${deviceModels.length})`} />
         </Tabs>
       </Paper>
 
       {/* Tab 0: AI Analyzer */}
       {activeTab === 0 && (
         <>
-          {/* Sync Button */}
-          {ebayModels.length === 0 && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              No vehicle models in database. Click the button below to sync eBay models first.
-            </Alert>
-          )}
+          {/* Search Type Toggle */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Search In:</Typography>
+            <Button
+              variant={searchType === 'vehicles' ? 'contained' : 'outlined'}
+              onClick={() => setSearchType('vehicles')}
+              sx={{ mr: 1 }}
+            >
+              🚗 Vehicles ({ebayModels.length})
+            </Button>
+            <Button
+              variant={searchType === 'devices' ? 'contained' : 'outlined'}
+              onClick={() => setSearchType('devices')}
+            >
+              📱 Phones & Tablets ({deviceModels.length})
+            </Button>
+          </Box>
           
+          {/* Sync Buttons */}
           <Box sx={{ mb: 3 }}>
             <Button
               variant="outlined"
@@ -159,13 +220,37 @@ const RangeAnalyzerPage = () => {
               disabled={syncLoading}
               sx={{ mr: 2 }}
             >
-              {syncLoading ? 'Syncing...' : 'Sync eBay Models'}
+              {syncLoading ? 'Syncing...' : 'Sync Vehicle Models'}
             </Button>
-            <Chip label={`${ebayModels.length} models in database`} color="primary" />
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={deviceSyncLoading ? <CircularProgress size={16} /> : <SyncIcon />}
+              onClick={handleSyncDeviceModels}
+              disabled={deviceSyncLoading}
+              sx={{ mr: 2 }}
+            >
+              {deviceSyncLoading ? 'Syncing...' : 'Sync Device Models'}
+            </Button>
             {syncMessage && (
               <Alert severity="info" sx={{ mt: 1 }}>{syncMessage}</Alert>
             )}
+            {deviceSyncMessage && (
+              <Alert severity="info" sx={{ mt: 1 }}>{deviceSyncMessage}</Alert>
+            )}
           </Box>
+          
+          {/* Warning if no models */}
+          {searchType === 'vehicles' && ebayModels.length === 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              No vehicle models in database. Click "Sync Vehicle Models" first.
+            </Alert>
+          )}
+          {searchType === 'devices' && deviceModels.length === 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              No device models in database. Click "Sync Device Models" first.
+            </Alert>
+          )}
 
           <Paper sx={{ p: 3, mb: 3 }}>
             <TextField
@@ -176,17 +261,20 @@ const RangeAnalyzerPage = () => {
               variant="outlined"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Paste product listings or text to analyze for vehicle models..."
+              placeholder={searchType === 'devices' 
+                ? "Paste product listings to analyze for phone/tablet models...\nExample: Screen Protector for iPhone 15 Pro Max\nCase for Samsung Galaxy S24 Ultra"
+                : "Paste product listings to analyze for vehicle models...\nExample: Brake Pads for Honda Accord 2018-2022"
+              }
               sx={{ mb: 2 }}
             />
             <Button 
               variant="contained" 
               size="large" 
               onClick={handleAnalyze} 
-              disabled={loading || !inputText || ebayModels.length === 0}
+              disabled={loading || !inputText || (searchType === 'vehicles' ? ebayModels.length === 0 : deviceModels.length === 0)}
               startIcon={loading ? <CircularProgress size={20} color="inherit"/> : <AutoAwesomeIcon />}
             >
-              {loading ? 'Analyzing...' : 'Identify Models'}
+              {loading ? 'Analyzing...' : `Identify ${searchType === 'vehicles' ? 'Vehicle' : 'Device'} Models`}
             </Button>
           </Paper>
 
@@ -421,6 +509,117 @@ const RangeAnalyzerPage = () => {
                       <TableCell colSpan={4} align="center">
                         {ebayModels.length === 0 
                           ? 'No models in database. Click "Sync eBay" to load models.'
+                          : 'No models found matching your search.'
+                        }
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Paper>
+      )}
+
+      {/* Tab 2: Device Models List */}
+      {activeTab === 2 && (
+        <Paper sx={{ p: 3 }}>
+          <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search device models..."
+                value={modelSearchTerm}
+                onChange={(e) => setModelSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Button
+                variant="outlined"
+                startIcon={deviceModelsLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
+                onClick={fetchDeviceModels}
+                disabled={deviceModelsLoading}
+              >
+                Refresh
+              </Button>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={deviceSyncLoading ? <CircularProgress size={16} /> : <SyncIcon />}
+                onClick={handleSyncDeviceModels}
+                disabled={deviceSyncLoading}
+              >
+                Sync Devices
+              </Button>
+            </Grid>
+          </Grid>
+
+          {deviceSyncMessage && <Alert severity="info" sx={{ mb: 2 }}>{deviceSyncMessage}</Alert>}
+
+          <Divider sx={{ mb: 2 }} />
+
+          <Box sx={{ mb: 2 }}>
+            <Chip label={`Total: ${deviceModels.length} devices`} color="primary" sx={{ mr: 1 }} />
+            <Chip 
+              label={`Phones: ${deviceModels.filter(m => m.deviceType === 'cellphone').length}`} 
+              color="secondary" 
+              sx={{ mr: 1 }} 
+            />
+            <Chip 
+              label={`Tablets: ${deviceModels.filter(m => m.deviceType === 'tablet').length}`} 
+              color="info" 
+              sx={{ mr: 1 }}
+            />
+            {modelSearchTerm && (
+              <Chip label={`Showing: ${filteredDeviceModels.length} results`} color="warning" />
+            )}
+          </Box>
+
+          {deviceModelsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <TableContainer sx={{ maxHeight: 500 }}>
+              <Table stickyHeader size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>#</strong></TableCell>
+                    <TableCell><strong>Type</strong></TableCell>
+                    <TableCell><strong>Brand</strong></TableCell>
+                    <TableCell><strong>Full Name</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredDeviceModels.map((model, index) => (
+                    <TableRow key={model._id} hover>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={model.deviceType === 'cellphone' ? '📱 Phone' : '📱 Tablet'} 
+                          size="small"
+                          color={model.deviceType === 'cellphone' ? 'secondary' : 'info'}
+                        />
+                      </TableCell>
+                      <TableCell>{model.brand || '-'}</TableCell>
+                      <TableCell>{model.fullName}</TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredDeviceModels.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">
+                        {deviceModels.length === 0 
+                          ? 'No device models in database. Click "Sync Devices" to load models.'
                           : 'No models found matching your search.'
                         }
                       </TableCell>

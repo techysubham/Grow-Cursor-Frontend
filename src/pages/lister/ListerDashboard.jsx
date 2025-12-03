@@ -118,6 +118,25 @@ export default function ListerDashboard({ user, onLogout }) {
     setSelectedModels({});
   };
 
+  // Helper: Detect search type based on category name
+  const getSearchTypeForCategory = (categoryName) => {
+    if (!categoryName) return 'vehicles';
+    const lowerName = categoryName.toLowerCase();
+    
+    // Cell phones, tablets, accessories
+    if (lowerName.includes('cell phone') || 
+        lowerName.includes('cellphone') || 
+        lowerName.includes('phone') ||
+        lowerName.includes('tablet') ||
+        lowerName.includes('mobile') ||
+        lowerName.includes('smartphone')) {
+      return 'devices'; // Search both phones and tablets
+    }
+    
+    // Default to vehicles (eBay Motors)
+    return 'vehicles';
+  };
+
   // Analyze pasted text
   const handleAnalyze = async () => {
     if (!pasteText.trim() || !pasteAssignment) return;
@@ -127,8 +146,15 @@ export default function ListerDashboard({ user, onLogout }) {
     setSelectedModels({});
     
     try {
+      // Detect search type based on category
+      const categoryName = pasteAssignment.task?.category?.name || '';
+      const searchType = getSearchTypeForCategory(categoryName);
+      
+      console.log(`[Analyze] Category: "${categoryName}" → Search Type: ${searchType}`);
+      
       const { data } = await api.post('/range-analysis/analyze', { 
-        textToAnalyze: pasteText 
+        textToAnalyze: pasteText,
+        searchType: searchType
       });
       
       setAnalyzeResult(data);
@@ -534,12 +560,30 @@ export default function ListerDashboard({ user, onLogout }) {
         fullWidth
       >
         <DialogTitle>
-          🚗 Paste Listings - Auto Detect Car Models
+          {(() => {
+            const categoryName = pasteAssignment?.task?.category?.name || '';
+            const searchType = getSearchTypeForCategory(categoryName);
+            if (searchType === 'devices') {
+              return '📱 Paste Listings - Auto Detect Phone/Tablet Models';
+            }
+            return '🚗 Paste Listings - Auto Detect Car Models';
+          })()}
         </DialogTitle>
         <DialogContent dividers>
           {/* Instructions */}
           <Alert severity="info" sx={{ mb: 2 }}>
-            Paste your listing titles (one per line). The system will detect car models automatically.
+            {(() => {
+              const categoryName = pasteAssignment?.task?.category?.name || '';
+              const searchType = getSearchTypeForCategory(categoryName);
+              if (searchType === 'devices') {
+                return 'Paste your listing titles (one per line). The system will detect phone and tablet models automatically.';
+              }
+              return 'Paste your listing titles (one per line). The system will detect car models automatically.';
+            })()}
+            <br />
+            <Typography variant="caption" color="text.secondary">
+              Category: {pasteAssignment?.task?.category?.name || '-'}
+            </Typography>
           </Alert>
           
           {/* Text Area */}
@@ -551,7 +595,14 @@ export default function ListerDashboard({ user, onLogout }) {
             label="Paste listing titles here (one per line)"
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
-            placeholder={"Power Steering Pump for Honda CR-V 2005-2011 Accord 2006-2007\nBrake Pads for Toyota Camry 2018-2022\n..."}
+            placeholder={(() => {
+              const categoryName = pasteAssignment?.task?.category?.name || '';
+              const searchType = getSearchTypeForCategory(categoryName);
+              if (searchType === 'devices') {
+                return "Screen Protector for iPhone 15 Pro Max\nCase for Samsung Galaxy S24 Ultra\nCharger for iPad Pro 12.9\n...";
+              }
+              return "Power Steering Pump for Honda CR-V 2005-2011 Accord 2006-2007\nBrake Pads for Toyota Camry 2018-2022\n...";
+            })()}
             sx={{ mb: 2 }}
             disabled={analyzing}
           />
