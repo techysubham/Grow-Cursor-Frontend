@@ -13,6 +13,7 @@ import SellerEbayPage from './pages/SellerProfilePage.jsx';
 import AboutMePage from './pages/AboutMePage.jsx';
 import ReturnRequestedPage from './pages/admin/ReturnRequestedPage.jsx';
 import MessageReceivedPage from './pages/admin/MessageReceivedPage.jsx';
+import IdeasPage from './pages/IdeasPage.jsx';
 
 import { setAuthToken } from './lib/api'
 
@@ -66,6 +67,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage onLogin={login} />} />
+        
+        {/* PUBLIC ROUTE - No authentication required */}
+        <Route path="/ideas" element={<IdeasPage />} />
+        
         <Route
           path="/about-me"
           element={token && user ? <AboutMePage /> : <Navigate to="/login" replace />}

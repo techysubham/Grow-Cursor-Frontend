@@ -18,6 +18,7 @@ import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import SendIcon from '@mui/icons-material/Send';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import api from '../../lib/api.js';
 
 // Simple helper to calculate completion percentage
@@ -509,7 +510,7 @@ export default function ListerDashboard({ user, onLogout }) {
             Lister Dashboard
           </Typography>
           {user && <Chip icon={<PersonIcon />} label={user.username} size="small" sx={{ mr: 1 }} />}
-          <Button component={Link} to="/lister/range-analyzer" size="small" sx={{ mr: 1 }} startIcon={<AutoAwesomeIcon />}>Range Analyzer</Button>
+          <Button component={Link} to="/ideas" size="small" sx={{ mr: 1 }} startIcon={<LightbulbIcon />}>Ideas & Issues</Button>
           <Button component={Link} to="/about-me" size="small" sx={{ mr: 1 }}>About</Button>
           <Button onClick={onLogout} variant="outlined" size="small" color="error">Logout</Button>
         </Toolbar>

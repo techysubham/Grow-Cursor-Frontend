@@ -71,6 +71,9 @@ import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboar
 
 import ConversationManagementPage from '../pages/admin/ConversationManagementPage.jsx';
 import ManageAmazonAccountsPage from '../pages/admin/ManageAmazonAccountsPage.jsx';
+import IdeasPage from '../pages/IdeasPage.jsx';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+
 const drawerWidth = 230;
 
 export default function AdminLayout({ user, onLogout }) {
@@ -103,6 +106,14 @@ export default function AdminLayout({ user, onLogout }) {
       <Toolbar />
       <Divider />
       <List>
+        {/* Ideas & Issues - visible to ALL users */}
+        <ListItem disablePadding>
+          <ListItemButton component={Link} to="/admin/ideas" onClick={() => setMobileOpen(false)}>
+            <ListItemIcon><LightbulbIcon /></ListItemIcon>
+            <ListItemText primary="Ideas & Issues" />
+          </ListItemButton>
+        </ListItem>
+
         {/* About Me - visible to all users except superadmin */}
         {!isSuper && (
           <ListItem disablePadding>
@@ -388,6 +399,9 @@ export default function AdminLayout({ user, onLogout }) {
       <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${sidebarOpen ? drawerWidth : 56}px)` }, transition: 'width 0.2s' }}>
         <Toolbar />
         <Routes>
+          {/* Ideas & Issues - accessible to ALL roles */}
+          <Route path="/ideas" element={<IdeasPage />} />
+          
           {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
           {isProductAdmin || isSuper ? (
             <>

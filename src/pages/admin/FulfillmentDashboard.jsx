@@ -386,7 +386,6 @@ export default function FulfillmentDashboard() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [editingAdFee, setEditingAdFee] = useState({});
   const [pollResults, setPollResults] = useState(null);
   const [copied, setCopied] = useState(false);
   const [copiedText, setCopiedText] = useState('');
@@ -427,6 +426,10 @@ export default function FulfillmentDashboard() {
 
   // Editing messaging status
   const [editingMessagingStatus, setEditingMessagingStatus] = useState({});
+
+  // Backfill Ad Fees state
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillResults, setBackfillResults] = useState(null);
 
   // Editing item status
   const [editingItemStatus, setEditingItemStatus] = useState({});
@@ -938,39 +941,6 @@ function NotesCell({ order, onSave, onNotify }) {
     }
   }
 
-  // Update ad fee general in database
-  const updateAdFeeGeneral = async (orderId, value) => {
-    try {
-      await api.patch(`/ebay/orders/${orderId}/ad-fee-general`, { adFeeGeneral: value });
-      setOrders(prev =>
-        prev.map(order => (order._id === orderId ? { ...order, adFeeGeneral: value } : order)),
-      );
-    } catch (err) {
-      // keep previous value in UI; just notify
-      // eslint-disable-next-line no-alert
-      alert('Failed to update ad fee general');
-    }
-  };
-
-  const handleAdFeeChange = (orderId, value) => {
-    setEditingAdFee(prev => ({ ...prev, [orderId]: value }));
-  };
-
-  const handleAdFeeBlur = (orderId) => {
-    const value = editingAdFee[orderId];
-    if (value !== undefined && value !== '') {
-      const numValue = parseFloat(value);
-      if (!Number.isNaN(numValue)) {
-        updateAdFeeGeneral(orderId, numValue);
-      }
-    }
-    setEditingAdFee(prev => {
-      const n = { ...prev };
-      delete n[orderId];
-      return n;
-    });
-  };
-
   const handleCopy = (text) => {
     const val = text || '-';
     if (val === '-') return;
@@ -978,6 +948,69 @@ function NotesCell({ order, onSave, onNotify }) {
       navigator.clipboard.writeText(val);
       setCopiedText(val);
       setTimeout(() => setCopiedText(''), 1200);
+    }
+  };
+
+  // Backfill Ad Fees for selected seller
+  const backfillAdFees = async () => {
+    if (!selectedSeller) {
+      setSnackbarMsg('Please select a seller first');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    setBackfillLoading(true);
+    setBackfillResults(null);
+    setError('');
+
+    try {
+      // First get count to show in snackbar
+      const countRes = await api.get('/ebay/backfill-ad-fees/count', {
+        params: { 
+          sellerId: selectedSeller,
+          sinceDate: '2025-11-01T00:00:00.000Z'
+        }
+      });
+      
+      const { needsBackfill, totalOrders: total } = countRes.data;
+      
+      if (needsBackfill === 0) {
+        setSnackbarMsg(`All ${total} orders already have ad fees!`);
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+        setBackfillLoading(false);
+        return;
+      }
+
+      setSnackbarMsg(`Starting backfill for ${needsBackfill} orders (out of ${total})...`);
+      setSnackbarSeverity('info');
+      setSnackbarOpen(true);
+
+      // Now run the backfill
+      const res = await api.post('/ebay/backfill-ad-fees', {
+        sellerId: selectedSeller,
+        sinceDate: '2025-11-01T00:00:00.000Z',
+        skipAlreadySet: true
+      });
+
+      setBackfillResults(res.data.results);
+      
+      // Refresh orders to show updated ad fees
+      await fetchOrders();
+
+      setSnackbarMsg(res.data.message);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+
+    } catch (e) {
+      console.error('Backfill error:', e);
+      setError(e?.response?.data?.error || 'Failed to backfill ad fees');
+      setSnackbarMsg('Failed to backfill ad fees');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setBackfillLoading(false);
     }
   };
 
@@ -1204,7 +1237,20 @@ function NotesCell({ order, onSave, onNotify }) {
             {loading ? 'Updating...' : 'Poll Order Updates'}
           </Button>
 
-          
+          <Tooltip title={selectedSeller ? "Fetch ad fees from eBay for all orders" : "Select a seller first"}>
+            <span>
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={backfillLoading ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
+                onClick={backfillAdFees}
+                disabled={backfillLoading || !selectedSeller}
+                sx={{ minWidth: 180 }}
+              >
+                {backfillLoading ? 'Fetching Ad Fees...' : 'Backfill Ad Fees'}
+              </Button>
+            </span>
+          </Tooltip>
 
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel id="marketplace-filter-label">Marketplace</InputLabel>
@@ -1227,6 +1273,26 @@ function NotesCell({ order, onSave, onNotify }) {
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
+          </Alert>
+        )}
+
+        {/* Backfill Results Display */}
+        {backfillResults && (
+          <Alert 
+            severity="info" 
+            sx={{ mt: 2 }}
+            onClose={() => setBackfillResults(null)}
+          >
+            <Typography variant="subtitle2" fontWeight="bold">Ad Fee Backfill Results:</Typography>
+            <Typography variant="body2">
+              • Total processed: {backfillResults.total} orders<br/>
+              • ✅ Updated with ad fees: {backfillResults.success}<br/>
+              • ⏭️ No ad fee found: {backfillResults.skipped}<br/>
+              • ❌ Failed: {backfillResults.failed}
+              {backfillResults.errors?.length > 0 && (
+                <><br/>• First errors: {backfillResults.errors.slice(0, 3).map(e => e.orderId).join(', ')}</>
+              )}
+            </Typography>
           </Alert>
         )}
 
@@ -1381,11 +1447,6 @@ function NotesCell({ order, onSave, onNotify }) {
             </TableHead>
             <TableBody>
               {orders.map((order, idx) => {
-                const currentAdFeeValue =
-                  editingAdFee[order._id] !== undefined
-                    ? editingAdFee[order._id]
-                    : (order.adFeeGeneral ?? '');
-
                 return (
                   <TableRow
                     key={order._id || idx}
@@ -1629,24 +1690,15 @@ function NotesCell({ order, onSave, onNotify }) {
                     </TableCell>
                     <TableCell align="right">{formatCurrency(order.transactionFees)}</TableCell>
                     <TableCell align="right">
-                      <TextField
-                        size="small"
-                        type="number"
-                        value={currentAdFeeValue}
-                        onChange={(e) => handleAdFeeChange(order._id, e.target.value)}
-                        onBlur={() => handleAdFeeBlur(order._id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.currentTarget.blur();
-                          }
+                      <Typography
+                        variant="body2"
+                        sx={{ 
+                          fontWeight: order.adFeeGeneral ? 'medium' : 'normal',
+                          color: order.adFeeGeneral ? 'error.main' : 'text.secondary'
                         }}
-                        inputProps={{
-                          step: '0.01',
-                          min: '0',
-                          style: { textAlign: 'right' },
-                        }}
-                        sx={{ width: 100 }}
-                      />
+                      >
+                        {order.adFeeGeneral ? formatCurrency(order.adFeeGeneral) : '-'}
+                      </Typography>
                     </TableCell>
                     <TableCell>
                       <Chip
