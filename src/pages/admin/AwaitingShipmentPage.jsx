@@ -213,8 +213,16 @@ export default function AwaitingShipmentPage() {
   };
 
   return (
-    <Box>
-      <Paper sx={{ p: 2, mb: 2 }}>
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      height: 'calc(100vh - 100px)',
+      overflow: 'hidden',
+      width: '100%',
+      maxWidth: '100%',
+      p: 3
+    }}>
+      <Paper sx={{ p: 2, mb: 2, flexShrink: 0 }}>
         {/* HEADER - Refresh button removed as requested */}
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
           <Stack direction="row" spacing={2} alignItems="center">
@@ -272,35 +280,61 @@ export default function AwaitingShipmentPage() {
         {error && (
           <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
         )}
+      </Paper>
 
-        {loading ? (
-          <Box sx={{ textAlign: 'center', p: 4 }}>
-            <CircularProgress />
-            <Typography variant="body2" sx={{ mt: 2 }}>Loading orders...</Typography>
-          </Box>
-        ) : orders.length === 0 ? (
-          <Box sx={{ textAlign: 'center', p: 4 }}>
-            <LocalShippingIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1, opacity: 0.5 }} />
-            <Typography variant="body1" color="text.secondary">
-              No orders found matching criteria.
-            </Typography>
-          </Box>
-        ) : (
-          <>
-            <TableContainer component={Paper}>
-                <Table size="small" sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}>
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
+          <CircularProgress />
+        </Box>
+      ) : orders.length === 0 ? (
+        <Box sx={{ textAlign: 'center', p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+          <LocalShippingIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1, opacity: 0.5 }} />
+          <Typography variant="body1" color="text.secondary">
+            No orders found matching criteria.
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          <TableContainer 
+            component={Paper}
+            sx={{ 
+              flexGrow: 1, 
+              overflow: 'auto',
+              width: '100%',
+              '&::-webkit-scrollbar': {
+                width: '8px',
+                height: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: '#f1f1f1',
+                borderRadius: '10px',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: '#888',
+                borderRadius: '10px',
+                '&:hover': {
+                  backgroundColor: '#555',
+                },
+              },
+            }}
+            >
+                <Table 
+                  size="small" 
+                  stickyHeader
+                  sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
+                >
                 <TableHead>
-                    <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Seller</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Order ID</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Date Sold</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Ship By</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Product Name</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Buyer Name</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Zipcode</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Shipping Address</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Manual Tracking</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Notes</TableCell>
+                    <TableRow>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Date Sold</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Zipcode</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Manual Tracking</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
@@ -446,22 +480,32 @@ export default function AwaitingShipmentPage() {
                 </Table>
             </TableContainer>
 
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                    Showing {orders.length} orders (Page {page} of {totalPages})
-                </Typography>
-                <Pagination
-                    count={totalPages}
-                    page={page}
-                    onChange={(e, value) => setPage(value)}
-                    color="primary"
-                    showFirstButton
-                    showLastButton
-                />
-            </Box>
-          </>
-        )}
-      </Paper>
+          <Paper sx={{ 
+            py: 1, 
+            px: 2,
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            gap: 2,
+            flexShrink: 0,
+            mt: 2
+          }}>
+            <Typography variant="body2" color="text.secondary" fontSize="0.875rem">
+              Showing {orders.length} orders (Page {page} of {totalPages})
+            </Typography>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(e, value) => setPage(value)}
+              color="primary"
+              showFirstButton
+              showLastButton
+              size="small"
+            />
+          </Paper>
+        </>
+      )}
+      
       <Snackbar open={snack.open} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity={snack.severity} sx={{ width: '100%' }}>
           {snack.message}

@@ -216,8 +216,16 @@ export default function ReturnRequestedPage() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Stack direction="row" alignItems="center" spacing={2} mb={3}>
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      height: 'calc(100vh - 100px)',
+      overflow: 'hidden',
+      width: '100%',
+      maxWidth: '100%',
+      p: 3
+    }}>
+      <Stack direction="row" alignItems="center" spacing={2} mb={3} sx={{ flexShrink: 0 }}>
         <AssignmentReturnIcon sx={{ fontSize: 32, color: 'primary.main' }} />
         <Typography variant="h4">Return Requests</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
@@ -339,20 +347,46 @@ export default function ReturnRequestedPage() {
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer component={Paper}>
-          <Table size="small">
+        <TableContainer 
+          component={Paper}
+          sx={{ 
+            flexGrow: 1, 
+            overflow: 'auto',
+            maxHeight: 'calc(100% - 50px)',
+            width: '100%',
+            '&::-webkit-scrollbar': {
+              width: '8px',
+              height: '8px',
+            },
+            '&::-webkit-scrollbar-track': {
+              backgroundColor: '#f1f1f1',
+              borderRadius: '10px',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: '#888',
+              borderRadius: '10px',
+              '&:hover': {
+                backgroundColor: '#555',
+              },
+            },
+          }}
+        >
+          <Table 
+            size="small"
+            stickyHeader
+          >
             <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell><strong>Return ID</strong></TableCell>
-                <TableCell><strong>Order ID</strong></TableCell>
-                <TableCell><strong>Seller</strong></TableCell>
-                <TableCell><strong>Buyer</strong></TableCell>
-                <TableCell><strong>Item</strong></TableCell>
-                <TableCell><strong>Reason</strong></TableCell>
-                <TableCell><strong>Status</strong></TableCell>
-                <TableCell><strong>Refund Amount</strong></TableCell>
-                <TableCell><strong>Created Date (PST)</strong></TableCell>
-                <TableCell><strong>Response Due (PST)</strong></TableCell>
+              <TableRow>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Return ID</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Order ID</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Seller</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Buyer</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Item</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Reason</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Status</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Created Date (PST)</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Response Due (PST)</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
