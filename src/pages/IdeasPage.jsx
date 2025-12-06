@@ -55,7 +55,8 @@ export default function IdeasPage() {
     description: '',
     type: 'idea',
     priority: 'medium',
-    createdBy: ''
+    createdBy: '',
+    completeByDate: ''
   });
 
   useEffect(() => {
@@ -99,7 +100,8 @@ export default function IdeasPage() {
         description: '',
         type: 'idea',
         priority: 'medium',
-        createdBy: ''
+        createdBy: '',
+        completeByDate: ''
       });
       setShowForm(false);
       setPage(1);
@@ -276,6 +278,7 @@ export default function IdeasPage() {
                   <TableCell><strong>Type</strong></TableCell>
                   <TableCell><strong>Priority</strong></TableCell>
                   <TableCell><strong>Status</strong></TableCell>
+                  <TableCell><strong>Complete By</strong></TableCell>
                   <TableCell><strong>Created By</strong></TableCell>
                   <TableCell><strong>Actions</strong></TableCell>
                 </TableRow>
@@ -373,6 +376,21 @@ export default function IdeasPage() {
                       </Select>
                     </FormControl>
                   </TableCell>
+                  <TableCell sx={{ minWidth: 120 }}>
+                    {idea.completeByDate ? (
+                      <Typography variant="body2" color="text.secondary">
+                        {new Date(idea.completeByDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.disabled">
+                        -
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Typography variant="body2">
                       {idea.createdBy}
@@ -469,6 +487,17 @@ export default function IdeasPage() {
                   <MenuItem value="high">High</MenuItem>
                 </Select>
               </FormControl>
+
+              <TextField
+                label="Complete By Date (Optional)"
+                type="date"
+                value={formData.completeByDate}
+                onChange={(e) => setFormData({ ...formData, completeByDate: e.target.value })}
+                fullWidth
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
             </Stack>
           </DialogContent>
           <DialogActions>

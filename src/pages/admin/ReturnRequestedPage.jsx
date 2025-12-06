@@ -21,6 +21,7 @@ import {
   Select,
   MenuItem,
   Snackbar,
+  Pagination,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -34,6 +35,12 @@ export default function ReturnRequestedPage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
+  
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalReturns, setTotalReturns] = useState(0);
+  const limit = 50; // Items per page
   
   // Snackbar state for sync results
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -59,7 +66,7 @@ export default function ReturnRequestedPage() {
     fetchSellers();
   }, []);
 
-  // Load returns when filters change
+  // Load returns when filters or page changes
   useEffect(() => {
     if (!hasFetchedInitialData.current) {
       hasFetchedInitialData.current = true;
@@ -67,21 +74,36 @@ export default function ReturnRequestedPage() {
       return;
     }
     loadStoredReturns();
+  }, [statusFilter, sellerFilter, reasonFilter, page]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (hasFetchedInitialData.current) {
+      setPage(1);
+    }
   }, [statusFilter, sellerFilter, reasonFilter]);
 
   async function loadStoredReturns() {
     setLoading(true);
     setError('');
     try {
-      const params = {};
+      const params = {
+        page: page,
+        limit: limit
+      };
       if (statusFilter) params.status = statusFilter;
       if (sellerFilter) params.sellerId = sellerFilter;
       if (reasonFilter) params.reason = reasonFilter;
       
       const res = await api.get('/ebay/stored-returns', { params });
       const returnData = res.data.returns || [];
-      console.log(`Loaded ${returnData.length} returns from database`);
+      const pagination = res.data.pagination || {};
+      
+      console.log(`Loaded ${returnData.length} returns from database (Page ${pagination.currentPage}/${pagination.totalPages})`);
+      
       setReturns(returnData);
+      setTotalPages(pagination.totalPages || 1);
+      setTotalReturns(pagination.totalReturns || 0);
     } catch (e) {
       console.error('Failed to load returns:', e);
       setError(e.response?.data?.error || e.message);
@@ -191,7 +213,8 @@ export default function ReturnRequestedPage() {
   const getStatusColor = (status) => {
     if (!status) return 'default';
     const s = status.toUpperCase();
-    if (s === 'RETURN_REQUESTED') return 'warning';
+    if (s === 'RETURN_REQUESTED') return 'error';
+    if (s === 'ITEM_SHIPPED') return 'warning';
     if (s === 'ITEM_READY_TO_SHIP' || s === 'RETURN_SHIPPED') return 'info';
     if (s === 'CLOSED' || s === 'REFUND_ISSUED') return 'success';
     if (s === 'CANCELLED' || s === 'DENIED') return 'error';
@@ -228,9 +251,12 @@ export default function ReturnRequestedPage() {
       <Stack direction="row" alignItems="center" spacing={2} mb={3} sx={{ flexShrink: 0 }}>
         <AssignmentReturnIcon sx={{ fontSize: 32, color: 'primary.main' }} />
         <Typography variant="h4">Return Requests</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
-          Total: <strong>{returns.length}</strong> returns
-        </Typography>
+        <Chip 
+          label={`${totalReturns} total returns`} 
+          color="info" 
+          variant="outlined"
+          sx={{ ml: 'auto' }}
+        />
       </Stack>
 
       {error && (
@@ -378,6 +404,8 @@ export default function ReturnRequestedPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Return ID</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Created Date (PST)</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Response Due (PST)</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Order ID</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Seller</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Buyer</strong></TableCell>
@@ -385,8 +413,6 @@ export default function ReturnRequestedPage() {
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Reason</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Status</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Created Date (PST)</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Response Due (PST)</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -409,6 +435,49 @@ export default function ReturnRequestedPage() {
                         <IconButton size="small" onClick={() => handleCopy(ret.returnId)}>
                           <ContentCopyIcon sx={{ fontSize: 14 }} />
                         </IconButton>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontSize="0.75rem">
+                        {formatDate(ret.creationDate)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Typography 
+                          variant="body2" 
+                          fontSize="0.75rem"
+                          color={isResponseOverdue(ret.responseDate) ? 'error' : 'inherit'}
+                          fontWeight={isResponseOverdue(ret.responseDate) || isResponseUrgent(ret.responseDate) ? 'bold' : 'normal'}
+                        >
+                          {formatDate(ret.responseDate)}
+                        </Typography>
+                        {isResponseOverdue(ret.responseDate) && (
+                          <Chip 
+                            label="OVERDUE" 
+                            size="small" 
+                            sx={{ 
+                              fontSize: '0.6rem', 
+                              height: 18,
+                              backgroundColor: '#fbdbc4ff',
+                              color: 'black',
+                              fontWeight: 'bold'
+                            }} 
+                          />
+                        )}
+                        {!isResponseOverdue(ret.responseDate) && isResponseUrgent(ret.responseDate) && (
+                          <Chip 
+                            label="URGENT" 
+                            size="small" 
+                            sx={{ 
+                              fontSize: '0.6rem', 
+                              height: 18,
+                              backgroundColor: '#dc3545',
+                              color: 'white',
+                              fontWeight: 'bold'
+                            }} 
+                          />
+                        )}
                       </Stack>
                     </TableCell>
                     <TableCell>
@@ -467,45 +536,29 @@ export default function ReturnRequestedPage() {
                           : '-'}
                       </Typography>
                     </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontSize="0.75rem">
-                        {formatDate(ret.creationDate)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <Typography 
-                          variant="body2" 
-                          fontSize="0.75rem"
-                          color={isResponseOverdue(ret.responseDate) ? 'error' : 'inherit'}
-                          fontWeight={isResponseOverdue(ret.responseDate) || isResponseUrgent(ret.responseDate) ? 'bold' : 'normal'}
-                        >
-                          {formatDate(ret.responseDate)}
-                        </Typography>
-                        {isResponseOverdue(ret.responseDate) && (
-                          <Chip 
-                            label="OVERDUE" 
-                            color="error" 
-                            size="small" 
-                            sx={{ fontSize: '0.6rem', height: 18 }} 
-                          />
-                        )}
-                        {!isResponseOverdue(ret.responseDate) && isResponseUrgent(ret.responseDate) && (
-                          <Chip 
-                            label="URGENT" 
-                            color="warning" 
-                            size="small" 
-                            sx={{ fontSize: '0.6rem', height: 18 }} 
-                          />
-                        )}
-                      </Stack>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+      
+      {/* Pagination Controls */}
+      {!loading && returns.length > 0 && totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, mt: 2, py: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, totalReturns)} of {totalReturns} returns
+          </Typography>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(e, value) => setPage(value)}
+            color="primary"
+            showFirstButton
+            showLastButton
+          />
+        </Box>
       )}
     </Box>
   );

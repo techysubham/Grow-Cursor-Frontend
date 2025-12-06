@@ -48,6 +48,7 @@ export default function AwaitingShipmentPage() {
   const [selectedSeller, setSelectedSeller] = useState('');
   const [searchOrderId, setSearchOrderId] = useState('');
   const [searchBuyerName, setSearchBuyerName] = useState('');
+  const [searchMarketplace, setSearchMarketplace] = useState('');
   
   // Debounced Values
   const [debouncedOrderId, setDebouncedOrderId] = useState('');
@@ -92,7 +93,7 @@ export default function AwaitingShipmentPage() {
   useEffect(() => {
     fetchAwaitingOrders();
     // eslint-disable-next-line
-  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller]);
+  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace]);
 
   // Handlers
   const handleSellerChange = (e) => {
@@ -106,6 +107,7 @@ export default function AwaitingShipmentPage() {
     setDebouncedOrderId('');
     setDebouncedBuyerName('');
     setSelectedSeller('');
+    setSearchMarketplace('');
     setPage(1);
   };
 
@@ -123,6 +125,7 @@ export default function AwaitingShipmentPage() {
       if (debouncedOrderId) params.searchOrderId = debouncedOrderId;
       if (debouncedBuyerName) params.searchBuyerName = debouncedBuyerName;
       if (selectedSeller) params.sellerId = selectedSeller;
+      if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       
       // SMART CHECK: If params haven't changed since last fetch, STOP.
       const paramsString = JSON.stringify(params);
@@ -273,6 +276,25 @@ export default function AwaitingShipmentPage() {
                   placeholder="Search Buyer..."
                 />
 
+                {/* 4. MARKETPLACE FILTER */}
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                    <InputLabel id="marketplace-select-label">Marketplace</InputLabel>
+                    <Select
+                        labelId="marketplace-select-label"
+                        value={searchMarketplace}
+                        label="Marketplace"
+                        onChange={(e) => {
+                            setSearchMarketplace(e.target.value);
+                            setPage(1);
+                        }}
+                    >
+                        <MenuItem value=""><em>All</em></MenuItem>
+                        <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+                        <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+                        <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+                    </Select>
+                </FormControl>
+
                 <Button variant="outlined" onClick={handleClearFilters} size="small">Clear</Button>
             </Stack>
         </Box>
@@ -327,6 +349,7 @@ export default function AwaitingShipmentPage() {
                     <TableRow>
                     <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
                     <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
                     <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Date Sold</TableCell>
                     <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>
                     <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
@@ -347,6 +370,19 @@ export default function AwaitingShipmentPage() {
                         <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
                             {order.orderId || order.legacyOrderId || '-'}
                         </Typography>
+                        </TableCell>
+                        <TableCell>
+                        <Chip 
+                            label={order.purchaseMarketplaceId || 'Unknown'} 
+                            size="small" 
+                            variant="outlined"
+                            color={
+                                order.purchaseMarketplaceId === 'EBAY_US' ? 'primary' :
+                                order.purchaseMarketplaceId === 'EBAY_CA' || order.purchaseMarketplaceId === 'EBAY_ENCA' ? 'secondary' :
+                                order.purchaseMarketplaceId === 'EBAY_AU' ? 'success' :
+                                'default'
+                            }
+                        />
                         </TableCell>
                         <TableCell>
                             {formatDate(order.dateSold, order.purchaseMarketplaceId)}

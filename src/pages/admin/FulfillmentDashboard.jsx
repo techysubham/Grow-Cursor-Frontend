@@ -24,7 +24,13 @@ import {
   TextField,
   Tooltip,
   IconButton,
-  Pagination,Link,
+  Pagination,
+  Link,
+  Checkbox,
+  FormControlLabel,
+  Popover,
+  List,
+  ListItem
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
@@ -40,6 +46,8 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 
 import PersonIcon from '@mui/icons-material/Person'; // <--- Add this
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'; // <--- Add this
@@ -453,6 +461,47 @@ const [searchEndDate, setSearchEndDate] = useState('');
 
  const [amazonAccounts, setAmazonAccounts] = useState([]);
   
+  // Column visibility state - persisted in sessionStorage
+  const DEFAULT_VISIBLE_COLUMNS = [
+    'seller', 'orderId', 'dateSold', 'shipBy', 'productName', 
+    'buyerName', 'shippingAddress', 'marketplace', 'subtotal', 
+    'shipping', 'salesTax', 'discount', 'transactionFees', 
+    'adFeeGeneral', 'cancelStatus', 'refunds', 'trackingNumber',
+    'amazonAccount', 'arriving', 'beforeTax', 'estimatedTax',
+    'azOrderId', 'notes', 'messagingStatus'
+  ];
+  
+  const ALL_COLUMNS = [
+    { id: 'seller', label: 'Seller' },
+    { id: 'orderId', label: 'Order ID' },
+    { id: 'dateSold', label: 'Date Sold' },
+    { id: 'shipBy', label: 'Ship By' },
+    { id: 'productName', label: 'Product Name' },
+    { id: 'buyerName', label: 'Buyer Name' },
+    { id: 'shippingAddress', label: 'Shipping Address' },
+    { id: 'marketplace', label: 'Marketplace' },
+    { id: 'subtotal', label: 'Subtotal' },
+    { id: 'shipping', label: 'Shipping' },
+    { id: 'salesTax', label: 'Sales Tax' },
+    { id: 'discount', label: 'Discount' },
+    { id: 'transactionFees', label: 'Transaction Fees' },
+    { id: 'adFeeGeneral', label: 'Ad Fee General' },
+    { id: 'cancelStatus', label: 'Cancel Status' },
+    { id: 'refunds', label: 'Refunds' },
+    { id: 'trackingNumber', label: 'Tracking Number' },
+    { id: 'amazonAccount', label: 'Amazon Acc' },
+    { id: 'arriving', label: 'Arriving' },
+    { id: 'beforeTax', label: 'Before Tax' },
+    { id: 'estimatedTax', label: 'Estimated Tax' },
+    { id: 'azOrderId', label: 'Az OrderID' },
+    { id: 'notes', label: 'Notes' },
+    { id: 'messagingStatus', label: 'Messaging' }
+  ];
+  
+  const [visibleColumns, setVisibleColumns] = useState(() => 
+    getInitialState('visibleColumns', DEFAULT_VISIBLE_COLUMNS)
+  );
+  const [columnSelectorOpen, setColumnSelectorOpen] = useState(false);
 
 const [dateFilter, setDateFilter] = useState(() => getInitialState('dateFilter', {
     mode: 'none', // 'none' | 'single' | 'range'
@@ -470,14 +519,15 @@ const [dateFilter, setDateFilter] = useState(() => getInitialState('dateFilter',
       searchMarketplace,
       filtersExpanded,
       currentPage,
-      dateFilter
+      dateFilter,
+      visibleColumns
     };
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, visibleColumns]);
 
 
 const updateManualField = async (orderId, field, value) => {
@@ -1275,7 +1325,70 @@ function NotesCell({ order, onSave, onNotify }) {
               <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
             </Select>
           </FormControl>
+
+          {/* Column Selector Button */}
+          <Tooltip title="Select Columns">
+            <IconButton
+              color="primary"
+              onClick={(e) => setColumnSelectorOpen(e.currentTarget)}
+              size="small"
+            >
+              <ViewColumnIcon />
+            </IconButton>
+          </Tooltip>
         </Stack>
+
+        {/* Column Selector Popover */}
+        <Popover
+          open={Boolean(columnSelectorOpen)}
+          anchorEl={columnSelectorOpen}
+          onClose={() => setColumnSelectorOpen(null)}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'right',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'right',
+          }}
+        >
+          <Box sx={{ p: 2, minWidth: 250 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+              Select Columns to Display
+            </Typography>
+            <List dense>
+              {ALL_COLUMNS.map((col) => (
+                <ListItem key={col.id} disablePadding>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={visibleColumns.includes(col.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setVisibleColumns([...visibleColumns, col.id]);
+                          } else {
+                            setVisibleColumns(visibleColumns.filter(id => id !== col.id));
+                          }
+                        }}
+                        size="small"
+                      />
+                    }
+                    label={col.label}
+                  />
+                </ListItem>
+              ))}
+            </List>
+            <Button
+              fullWidth
+              variant="outlined"
+              size="small"
+              onClick={() => setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)}
+              sx={{ mt: 1 }}
+            >
+              Reset to Default
+            </Button>
+          </Box>
+        </Popover>
 
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
@@ -1453,31 +1566,31 @@ function NotesCell({ order, onSave, onNotify }) {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>SL No</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Date Sold</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Subtotal</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Shipping</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Sales Tax</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Discount</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Transaction Fees</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Ad Fee General</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Cancel Status</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Refunds</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Tracking Number</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Acc</TableCell>
-<TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Arriving</TableCell>
-<TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Before Tax</TableCell>
-<TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Estimated Tax</TableCell>
-<TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Az OrderID</TableCell>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
-           
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Action</TableCell>
+                {visibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>}
+                {visibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>}
+                {visibleColumns.includes('dateSold') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Date Sold</TableCell>}
+                {visibleColumns.includes('shipBy') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>}
+                {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>}
+                {visibleColumns.includes('buyerName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>}
+                {visibleColumns.includes('shippingAddress') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>}
+                {visibleColumns.includes('marketplace') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>}
+                {visibleColumns.includes('subtotal') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Subtotal</TableCell>}
+                {visibleColumns.includes('shipping') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Shipping</TableCell>}
+                {visibleColumns.includes('salesTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Sales Tax</TableCell>}
+                {visibleColumns.includes('discount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Discount</TableCell>}
+                {visibleColumns.includes('transactionFees') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Transaction Fees</TableCell>}
+                {visibleColumns.includes('adFeeGeneral') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Ad Fee General</TableCell>}
+                {visibleColumns.includes('cancelStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Cancel Status</TableCell>}
+                {visibleColumns.includes('refunds') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Refunds</TableCell>}
+                {visibleColumns.includes('trackingNumber') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Tracking Number</TableCell>}
+                {visibleColumns.includes('amazonAccount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Acc</TableCell>}
+                {visibleColumns.includes('arriving') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Arriving</TableCell>}
+                {visibleColumns.includes('beforeTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Before Tax</TableCell>}
+                {visibleColumns.includes('estimatedTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Estimated Tax</TableCell>}
+                {visibleColumns.includes('azOrderId') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Az OrderID</TableCell>}
+                {visibleColumns.includes('notes') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>}
+                {visibleColumns.includes('messagingStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Messaging</TableCell>}
+                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1491,6 +1604,7 @@ function NotesCell({ order, onSave, onNotify }) {
                     }}
                   >
                     <TableCell>{(currentPage - 1) * ordersPerPage + idx + 1}</TableCell>
+                    {visibleColumns.includes('seller') && (
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
                         {order.seller?.user?.username ||
@@ -1499,13 +1613,17 @@ function NotesCell({ order, onSave, onNotify }) {
                           '-'}
                       </Typography>
                     </TableCell>
+                    )}
+                    {visibleColumns.includes('orderId') && (
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
                         {order.orderId || order.legacyOrderId || '-'}
                       </Typography>
                     </TableCell>
-                    <TableCell>{formatDate(order.dateSold, order.purchaseMarketplaceId)}</TableCell>
-                    <TableCell>{formatDate(order.shipByDate, order.purchaseMarketplaceId)}</TableCell>
+                    )}
+                    {visibleColumns.includes('dateSold') && <TableCell>{formatDate(order.dateSold, order.purchaseMarketplaceId)}</TableCell>}
+                    {visibleColumns.includes('shipBy') && <TableCell>{formatDate(order.shipByDate, order.purchaseMarketplaceId)}</TableCell>}
+                    {visibleColumns.includes('productName') && (
                     <TableCell sx={{ minWidth: 300, maxWidth: 400, pr: 1 }}>
                       <Stack spacing={1} sx={{ py: 1 }}>
                         {order.lineItems && order.lineItems.length > 0 ? (
@@ -1579,6 +1697,8 @@ function NotesCell({ order, onSave, onNotify }) {
                         )}
                       </Stack>
                     </TableCell>
+                    )}
+                    {visibleColumns.includes('buyerName') && (
                     <TableCell sx={{ maxWidth: 150, pr: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
                         <Tooltip title={order.buyer?.buyerRegistrationAddress?.fullName || '-'} arrow>
@@ -1591,6 +1711,8 @@ function NotesCell({ order, onSave, onNotify }) {
                         </IconButton>
                       </Box>
                     </TableCell>
+                    )}
+                    {visibleColumns.includes('shippingAddress') && (
                     <TableCell sx={{ maxWidth: 300 }}>
                       {expandedShipping[order._id] ? (
                         <Stack spacing={0.5}>
@@ -1703,18 +1825,24 @@ function NotesCell({ order, onSave, onNotify }) {
                         </Button>
                       )}
                     </TableCell>
+                    )}
+                    {visibleColumns.includes('marketplace') && (
                     <TableCell>
                       <Typography variant="body2">
                         {order.purchaseMarketplaceId || '-'}
                       </Typography>
                     </TableCell>
+                    )}
+                    {visibleColumns.includes('subtotal') && (
                     <TableCell align="right">
                       <Typography variant="body2" fontWeight="medium">
                         {formatCurrency(order.subtotal)}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right">{formatCurrency(order.shipping)}</TableCell>
-                    <TableCell align="right">{formatCurrency(order.salesTax)}</TableCell>
+                    )}
+                    {visibleColumns.includes('shipping') && <TableCell align="right">{formatCurrency(order.shipping)}</TableCell>}
+                    {visibleColumns.includes('salesTax') && <TableCell align="right">{formatCurrency(order.salesTax)}</TableCell>}
+                    {visibleColumns.includes('discount') && (
                     <TableCell align="right">
                       <Typography
                         variant="body2"
@@ -1723,7 +1851,9 @@ function NotesCell({ order, onSave, onNotify }) {
                         {formatCurrency(order.discount)}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right">{formatCurrency(order.transactionFees)}</TableCell>
+                    )}
+                    {visibleColumns.includes('transactionFees') && <TableCell align="right">{formatCurrency(order.transactionFees)}</TableCell>}
+                    {visibleColumns.includes('adFeeGeneral') && (
                     <TableCell align="right">
                       <Typography
                         variant="body2"
@@ -1735,6 +1865,8 @@ function NotesCell({ order, onSave, onNotify }) {
                         {order.adFeeGeneral ? formatCurrency(order.adFeeGeneral) : '-'}
                       </Typography>
                     </TableCell>
+                    )}
+                    {visibleColumns.includes('cancelStatus') && (
                     <TableCell>
                       <Chip
                         label={order.cancelState || 'NONE_REQUESTED'}
@@ -1753,7 +1885,9 @@ function NotesCell({ order, onSave, onNotify }) {
                         }}
                       />
                     </TableCell>
+                    )}
                     {/* --- REPLACEMENT FOR REFUNDS CELL --- */}
+                    {visibleColumns.includes('refunds') && (
                     <TableCell>
                       {order.refunds && order.refunds.length > 0 ? (
                         <Stack spacing={0.5}>
@@ -1789,6 +1923,8 @@ function NotesCell({ order, onSave, onNotify }) {
                         <Typography variant="body2" color="text.secondary">-</Typography>
                       )}
                     </TableCell>
+                    )}
+                    {visibleColumns.includes('trackingNumber') && (
                     <TableCell sx={{ maxWidth: 150, pr: 1 }}>
                       {order.trackingNumber ? (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
@@ -1805,9 +1941,10 @@ function NotesCell({ order, onSave, onNotify }) {
                         <Typography variant="body2" color="text.secondary">-</Typography>
                       )}
                     </TableCell>
-
+                    )}
 
 {/* 1. Amazon Account */}
+{visibleColumns.includes('amazonAccount') && (
 <TableCell>
   <AutoSaveSelect
     value={order.amazonAccount}
@@ -1815,8 +1952,10 @@ function NotesCell({ order, onSave, onNotify }) {
     onSave={(val) => updateManualField(order._id, 'amazonAccount', val)}
   />
 </TableCell>
+)}
 
 {/* 2. Arriving Date */}
+{visibleColumns.includes('arriving') && (
 <TableCell>
   <AutoSaveTextField 
     
@@ -1824,8 +1963,10 @@ function NotesCell({ order, onSave, onNotify }) {
     onSave={(val) => updateManualField(order._id, 'arrivingDate', val)} 
   />
 </TableCell>
+)}
 
 {/* 3. Before Tax */}
+{visibleColumns.includes('beforeTax') && (
 <TableCell>
   <AutoSaveTextField 
     type="number"
@@ -1833,8 +1974,10 @@ function NotesCell({ order, onSave, onNotify }) {
     onSave={(val) => updateManualField(order._id, 'beforeTax', val)} 
   />
 </TableCell>
+)}
 
 {/* 4. Estimated Tax */}
+{visibleColumns.includes('estimatedTax') && (
 <TableCell>
   <AutoSaveTextField 
     type="number"
@@ -1842,17 +1985,20 @@ function NotesCell({ order, onSave, onNotify }) {
     onSave={(val) => updateManualField(order._id, 'estimatedTax', val)} 
   />
 </TableCell>
+)}
 
 {/* 5. Amazon Order ID */}
+{visibleColumns.includes('azOrderId') && (
 <TableCell>
   <AutoSaveTextField 
     value={order.azOrderId} 
     onSave={(val) => updateManualField(order._id, 'azOrderId', val)} 
   />
 </TableCell>
+)}
 
                     
-
+{visibleColumns.includes('notes') && (
                     <TableCell>
                         <NotesCell 
                             order={order} 
@@ -1860,6 +2006,8 @@ function NotesCell({ order, onSave, onNotify }) {
                             onNotify={showNotification}
                         />
                     </TableCell>
+)}
+{visibleColumns.includes('messagingStatus') && (
                       <TableCell align="center">
                       <Tooltip title="Message Buyer">
                         <IconButton 
@@ -1870,6 +2018,7 @@ function NotesCell({ order, onSave, onNotify }) {
                         </IconButton>
                       </Tooltip>
                     </TableCell>
+)}
 
                   </TableRow>
                 );

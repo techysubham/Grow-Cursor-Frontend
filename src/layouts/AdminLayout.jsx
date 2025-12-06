@@ -52,6 +52,7 @@ import ProgressTrackingPage from '../pages/compatibility/ProgressTrackingPage.js
 
 import FulfillmentDashboard from '../pages/admin/FulfillmentDashboard.jsx';
 import AwaitingShipmentPage from '../pages/admin/AwaitingShipmentPage.jsx';
+import FulfillmentNotesPage from '../pages/admin/FulfillmentNotesPage.jsx';
 import ConversationTrackingPage from '../pages/admin/ConversationTrackingPage.jsx';
 import CancelledStatusPage from '../pages/admin/CancelledStatusPage.jsx';
 import ReturnPage from '../pages/admin/ReturnPage.jsx';
@@ -242,6 +243,9 @@ export default function AdminLayout({ user, onLogout }) {
                 </ListItemButton>
                 <ListItemButton component={Link} to="/admin/awaiting-shipment" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="Awaiting Shipment" />
+                </ListItemButton>
+                <ListItemButton component={Link} to="/admin/fulfillment-notes" onClick={() => setMobileOpen(false)}>
+                  <ListItemText primary="Fulfillment Notes" />
                 </ListItemButton>
                 
                 <ListItemButton component={Link} to="/admin/cancelled-status" onClick={() => setMobileOpen(false)}>
@@ -466,6 +470,7 @@ export default function AdminLayout({ user, onLogout }) {
             <>
               <Route path="/fulfillment" element={<FulfillmentDashboard />} />
               <Route path="/awaiting-shipment" element={<AwaitingShipmentPage />} />
+              <Route path="/fulfillment-notes" element={<FulfillmentNotesPage />} />
               <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
               <Route path="/cancelled-status" element={<CancelledStatusPage />} />
               <Route path="/return-requested" element={<ReturnRequestedPage />} />
