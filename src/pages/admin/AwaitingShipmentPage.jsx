@@ -555,6 +555,7 @@ export default function AwaitingShipmentPage() {
 function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
   const [editing, setEditing] = React.useState(false);
   const [value, setValue] = React.useState(order.manualTrackingNumber || '');
+  const [carrier, setCarrier] = React.useState('USPS');
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
 
@@ -569,27 +570,39 @@ function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
 
   const cancel = () => {
     setValue(order.manualTrackingNumber || '');
+    setCarrier('USPS');
     setEditing(false);
     setError('');
   };
 
   const save = async () => {
+    if (!value.trim()) {
+      setError('Tracking number is required');
+      return;
+    }
+
     setSaving(true);
     setError('');
+    
     try {
-      const { data } = await api.patch(`/ebay/orders/${order._id}/manual-tracking`, { manualTrackingNumber: value });
+      // Upload tracking to eBay (this will also update the database)
+      const { data } = await api.post(`/ebay/orders/${order._id}/upload-tracking`, { 
+        trackingNumber: value.trim(),
+        shippingCarrier: carrier
+      });
+      
       if (data?.success) {
-        onSaved(value);
+        onSaved(value.trim());
         setEditing(false);
-        onNotify?.('success', 'Manual tracking saved');
+        onNotify?.('success', `✅ Tracking uploaded to eBay via ${carrier}! Order marked as shipped.`);
       } else {
-        setError('Failed to save');
-        onNotify?.('error', 'Failed to save manual tracking');
+        setError('Failed to upload');
+        onNotify?.('error', 'Failed to upload tracking to eBay');
       }
     } catch (e) {
-      const msg = e?.response?.data?.error || 'Save failed';
+      const msg = e?.response?.data?.error || 'Upload failed';
       setError(msg);
-      onNotify?.('error', msg);
+      onNotify?.('error', `Failed to upload tracking: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -598,11 +611,52 @@ function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
   return (
     <div>
       {editing ? (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input value={value} onChange={e => setValue(e.target.value)} style={{ padding: 6, minWidth: 160 }} />
-          <Button size="small" variant="contained" onClick={save} disabled={saving}>Save</Button>
-          <Button size="small" onClick={cancel} disabled={saving}>Cancel</Button>
-          {error && <Typography variant="caption" color="error">{error}</Typography>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 280 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input 
+              value={value} 
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="Tracking Number"
+              style={{ 
+                padding: 6, 
+                minWidth: 160,
+                border: '1px solid #ccc',
+                borderRadius: 4
+              }} 
+            />
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={carrier}
+                onChange={(e) => setCarrier(e.target.value)}
+                displayEmpty
+              >
+                <MenuItem value="USPS">USPS</MenuItem>
+                <MenuItem value="UPS">UPS</MenuItem>
+                <MenuItem value="FEDEX">FedEx</MenuItem>
+                <MenuItem value="DHL">DHL</MenuItem>
+                <MenuItem value="AUSTRALIA_POST">Australia Post</MenuItem>
+                <MenuItem value="OTHER">Other</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+          
+          {error && (
+            <Alert severity="error" sx={{ py: 0, px: 1, fontSize: '0.75rem' }}>
+              {error}
+            </Alert>
+          )}
+          
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Button 
+              size="small" 
+              variant="contained" 
+              onClick={save} 
+              disabled={saving || !value.trim()}
+            >
+              {saving ? 'Uploading...' : 'Upload to eBay'}
+            </Button>
+            <Button size="small" onClick={cancel} disabled={saving}>Cancel</Button>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
