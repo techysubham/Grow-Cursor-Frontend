@@ -24,12 +24,193 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Popover,
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import EditIcon from '@mui/icons-material/Edit';
+import AddIcon from '@mui/icons-material/Add';
 import api from '../../lib/api';
+
+// ... (Rest of the file remains unchanged until ManualTrackingCell)
+
+function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [value, setValue] = useState(order.manualTrackingNumber || '');
+  const [carrier, setCarrier] = useState('USPS');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  // Sync state when order changes, but only if not currently editing
+  useEffect(() => {
+    if (!anchorEl) {
+      setValue(order.manualTrackingNumber || '');
+    }
+  }, [order.manualTrackingNumber, anchorEl]);
+
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+    setError('');
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+    setError('');
+    // Reset value on close if not saved
+    setValue(order.manualTrackingNumber || '');
+    setCarrier('USPS');
+  };
+
+  const open = Boolean(anchorEl);
+  const id = open ? `manual-tracking-popover-${order._id}` : undefined;
+
+  const save = async () => {
+    if (!value.trim()) {
+      setError('Tracking number is required');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      // Upload tracking to eBay (this will also update the database)
+      const { data } = await api.post(`/ebay/orders/${order._id}/upload-tracking`, {
+        trackingNumber: value.trim(),
+        shippingCarrier: carrier
+      });
+
+      if (data?.success) {
+        onSaved(value.trim());
+        handleClose();
+        onNotify?.('success', `✅ Tracking uploaded via ${carrier}!`);
+      } else {
+        setError('Failed to upload');
+        onNotify?.('error', 'Failed to upload tracking to eBay');
+      }
+    } catch (e) {
+      const errorMsg = e?.response?.data?.error || 'Upload failed';
+      // Check for error types to give better feedback
+      if (e?.response?.data?.errorType === 'TRACKING_NOT_APPLIED') {
+        setError('Verification Failed: Tracking not found on order.');
+      } else {
+        setError(errorMsg);
+      }
+      onNotify?.('error', `Failed: ${errorMsg}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* VIEW MODE */}
+      <Stack direction="row" alignItems="center" spacing={1}>
+        {order.manualTrackingNumber ? (
+          <>
+            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+              {order.manualTrackingNumber}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => onCopy?.(order.manualTrackingNumber)}
+              aria-label="copy tracking"
+            >
+              <ContentCopyIcon fontSize="small" sx={{ fontSize: 14 }} />
+            </IconButton>
+            <IconButton size="small" onClick={handleClick} aria-label="edit tracking">
+              <EditIcon fontSize="small" sx={{ fontSize: 16 }} />
+            </IconButton>
+          </>
+        ) : (
+          <Button
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={handleClick}
+            sx={{ textTransform: 'none', color: 'text.secondary', fontWeight: 400 }}
+          >
+            Add Tracking
+          </Button>
+        )}
+      </Stack>
+
+      {/* EDIT POPOVER */}
+      <Popover
+        id={id}
+        open={open}
+        anchorEl={anchorEl}
+        onClose={handleClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        PaperProps={{
+          sx: { p: 2, width: 320, mt: 1 }
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+          Upload Tracking to eBay
+        </Typography>
+
+        <Stack spacing={2}>
+          <TextField
+            label="Tracking Number"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            autoFocus
+            placeholder="e.g. 9400..."
+          />
+
+          <FormControl size="small" fullWidth>
+            <InputLabel>Carrier</InputLabel>
+            <Select
+              value={carrier}
+              label="Carrier"
+              onChange={(e) => setCarrier(e.target.value)}
+            >
+              <MenuItem value="USPS">USPS</MenuItem>
+              <MenuItem value="UPS">UPS</MenuItem>
+              <MenuItem value="FEDEX">FedEx</MenuItem>
+              <MenuItem value="DHL">DHL</MenuItem>
+              <MenuItem value="AUSTRALIA_POST">Australia Post</MenuItem>
+              <MenuItem value="OTHER">Other</MenuItem>
+            </Select>
+          </FormControl>
+
+          {error && (
+            <Alert severity="error" sx={{ fontSize: '0.75rem', py: 0 }}>
+              {error}
+            </Alert>
+          )}
+
+          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ pt: 1 }}>
+            <Button onClick={handleClose} disabled={saving} size="small" color="inherit">
+              Cancel
+            </Button>
+            <Button
+              onClick={save}
+              disabled={saving || !value.trim()}
+              variant="contained"
+              size="small"
+              disableElevation
+            >
+              {saving ? 'Uploading...' : 'Upload'}
+            </Button>
+          </Stack>
+        </Stack>
+      </Popover>
+    </div>
+  );
+}
 
 export default function AwaitingShipmentPage() {
   const [orders, setOrders] = useState([]);
@@ -37,7 +218,7 @@ export default function AwaitingShipmentPage() {
   const [error, setError] = useState('');
   const [expandedShipping, setExpandedShipping] = useState({});
   const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
-  
+
   // Pagination State
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -49,7 +230,7 @@ export default function AwaitingShipmentPage() {
   const [searchOrderId, setSearchOrderId] = useState('');
   const [searchBuyerName, setSearchBuyerName] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState('');
-  
+
   // Debounced Values
   const [debouncedOrderId, setDebouncedOrderId] = useState('');
   const [debouncedBuyerName, setDebouncedBuyerName] = useState('');
@@ -113,26 +294,26 @@ export default function AwaitingShipmentPage() {
 
   async function fetchAwaitingOrders() {
     setError('');
-    
+
     try {
       // Build Params Object
-      const params = { 
-          awaitingShipment: true, 
-          page: page,
-          limit: 50
+      const params = {
+        awaitingShipment: true,
+        page: page,
+        limit: 50
       };
 
       if (debouncedOrderId) params.searchOrderId = debouncedOrderId;
       if (debouncedBuyerName) params.searchBuyerName = debouncedBuyerName;
       if (selectedSeller) params.sellerId = selectedSeller;
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
-      
+
       // SMART CHECK: If params haven't changed since last fetch, STOP.
       const paramsString = JSON.stringify(params);
       if (paramsString === lastFetchedParams.current) {
-         return; // Skip fetch, prevent loading spinner
+        return; // Skip fetch, prevent loading spinner
       }
-      
+
       // Update ref and proceed
       lastFetchedParams.current = paramsString;
       setLoading(true);
@@ -140,10 +321,10 @@ export default function AwaitingShipmentPage() {
       const { data } = await api.get('/ebay/stored-orders', { params });
 
       setOrders(data?.orders || []);
-      
+
       if (data?.pagination) {
-          setTotalPages(data.pagination.totalPages);
-          setTotalOrders(data.pagination.totalOrders);
+        setTotalPages(data.pagination.totalPages);
+        setTotalOrders(data.pagination.totalOrders);
       }
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to load awaiting shipment orders');
@@ -204,10 +385,10 @@ export default function AwaitingShipmentPage() {
 
       return (
         <Stack spacing={0}>
-            <Typography variant="body2">{formattedDate}</Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                {formattedTime} ({timeZoneLabel})
-            </Typography>
+          <Typography variant="body2">{formattedDate}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+            {formattedTime} ({timeZoneLabel})
+          </Typography>
         </Stack>
       );
     } catch {
@@ -216,9 +397,9 @@ export default function AwaitingShipmentPage() {
   };
 
   return (
-    <Box sx={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
+    <Box sx={{
+      display: 'flex',
+      flexDirection: 'column',
       height: 'calc(100vh - 100px)',
       overflow: 'hidden',
       width: '100%',
@@ -238,65 +419,65 @@ export default function AwaitingShipmentPage() {
 
         {/* --- FILTERS SECTION --- */}
         <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-                
-                {/* 1. SELLER FILTER */}
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                    <InputLabel id="seller-select-label">Select Seller</InputLabel>
-                    <Select
-                        labelId="seller-select-label"
-                        value={selectedSeller}
-                        label="Select Seller"
-                        onChange={handleSellerChange}
-                    >
-                        <MenuItem value=""><em>All Sellers</em></MenuItem>
-                        {sellers.map((s) => (
-                            <MenuItem key={s._id} value={s._id}>
-                                {s.user?.username || s.user?.email || s._id}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
 
-                {/* 2. ORDER ID (Auto-debounced) */}
-                <TextField
-                  size="small"
-                  label="Order ID"
-                  value={searchOrderId}
-                  onChange={(e) => setSearchOrderId(e.target.value)}
-                  placeholder="Search ID..."
-                />
+            {/* 1. SELLER FILTER */}
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel id="seller-select-label">Select Seller</InputLabel>
+              <Select
+                labelId="seller-select-label"
+                value={selectedSeller}
+                label="Select Seller"
+                onChange={handleSellerChange}
+              >
+                <MenuItem value=""><em>All Sellers</em></MenuItem>
+                {sellers.map((s) => (
+                  <MenuItem key={s._id} value={s._id}>
+                    {s.user?.username || s.user?.email || s._id}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-                {/* 3. BUYER NAME (Auto-debounced) */}
-                <TextField
-                  size="small"
-                  label="Buyer Name"
-                  value={searchBuyerName}
-                  onChange={(e) => setSearchBuyerName(e.target.value)}
-                  placeholder="Search Buyer..."
-                />
+            {/* 2. ORDER ID (Auto-debounced) */}
+            <TextField
+              size="small"
+              label="Order ID"
+              value={searchOrderId}
+              onChange={(e) => setSearchOrderId(e.target.value)}
+              placeholder="Search ID..."
+            />
 
-                {/* 4. MARKETPLACE FILTER */}
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel id="marketplace-select-label">Marketplace</InputLabel>
-                    <Select
-                        labelId="marketplace-select-label"
-                        value={searchMarketplace}
-                        label="Marketplace"
-                        onChange={(e) => {
-                            setSearchMarketplace(e.target.value);
-                            setPage(1);
-                        }}
-                    >
-                        <MenuItem value=""><em>All</em></MenuItem>
-                        <MenuItem value="EBAY_US">EBAY_US</MenuItem>
-                        <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
-                        <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
-                    </Select>
-                </FormControl>
+            {/* 3. BUYER NAME (Auto-debounced) */}
+            <TextField
+              size="small"
+              label="Buyer Name"
+              value={searchBuyerName}
+              onChange={(e) => setSearchBuyerName(e.target.value)}
+              placeholder="Search Buyer..."
+            />
 
-                <Button variant="outlined" onClick={handleClearFilters} size="small">Clear</Button>
-            </Stack>
+            {/* 4. MARKETPLACE FILTER */}
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel id="marketplace-select-label">Marketplace</InputLabel>
+              <Select
+                labelId="marketplace-select-label"
+                value={searchMarketplace}
+                label="Marketplace"
+                onChange={(e) => {
+                  setSearchMarketplace(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <MenuItem value=""><em>All</em></MenuItem>
+                <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+                <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+                <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Button variant="outlined" onClick={handleClearFilters} size="small">Clear</Button>
+          </Stack>
         </Box>
 
         {error && (
@@ -317,10 +498,10 @@ export default function AwaitingShipmentPage() {
         </Box>
       ) : (
         <>
-          <TableContainer 
+          <TableContainer
             component={Paper}
-            sx={{ 
-              flexGrow: 1, 
+            sx={{
+              flexGrow: 1,
               overflow: 'auto',
               width: '100%',
               '&::-webkit-scrollbar': {
@@ -339,189 +520,189 @@ export default function AwaitingShipmentPage() {
                 },
               },
             }}
+          >
+            <Table
+              size="small"
+              stickyHeader
+              sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
             >
-                <Table 
-                  size="small" 
-                  stickyHeader
-                  sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
-                >
-                <TableHead>
-                    <TableRow>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Date Sold</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Zipcode</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Manual Tracking</TableCell>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {orders.map((order, idx) => (
-                    <TableRow key={order._id || idx}>
-                        <TableCell>
-                        {order.seller?.user?.username || order.seller?.user?.email || order.sellerId || '-'}
-                        </TableCell>
-                        <TableCell>
-                        <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
-                            {order.orderId || order.legacyOrderId || '-'}
-                        </Typography>
-                        </TableCell>
-                        <TableCell>
-                        <Chip 
-                            label={order.purchaseMarketplaceId || 'Unknown'} 
-                            size="small" 
-                            variant="outlined"
-                            color={
-                                order.purchaseMarketplaceId === 'EBAY_US' ? 'primary' :
-                                order.purchaseMarketplaceId === 'EBAY_CA' || order.purchaseMarketplaceId === 'EBAY_ENCA' ? 'secondary' :
-                                order.purchaseMarketplaceId === 'EBAY_AU' ? 'success' :
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Date Sold</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Zipcode</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Manual Tracking</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {orders.map((order, idx) => (
+                  <TableRow key={order._id || idx}>
+                    <TableCell>
+                      {order.seller?.user?.username || order.seller?.user?.email || order.sellerId || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
+                        {order.orderId || order.legacyOrderId || '-'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={order.purchaseMarketplaceId || 'Unknown'}
+                        size="small"
+                        variant="outlined"
+                        color={
+                          order.purchaseMarketplaceId === 'EBAY_US' ? 'primary' :
+                            order.purchaseMarketplaceId === 'EBAY_CA' || order.purchaseMarketplaceId === 'EBAY_ENCA' ? 'secondary' :
+                              order.purchaseMarketplaceId === 'EBAY_AU' ? 'success' :
                                 'default'
-                            }
-                        />
-                        </TableCell>
-                        <TableCell>
-                            {formatDate(order.dateSold, order.purchaseMarketplaceId)}
-                        </TableCell>
-                        <TableCell>
-                            {formatDate(order.shipByDate || order.lineItems?.[0]?.lineItemFulfillmentInstructions?.shipByDate, order.purchaseMarketplaceId)}
-                        </TableCell>
-                        <TableCell>
-                        <Tooltip title={order.productName || order.lineItems?.[0]?.title || '-'} arrow>
-                            <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
-                            {order.productName || order.lineItems?.[0]?.title || '-'}
-                            </Typography>
-                        </Tooltip>
-                        <IconButton size="small" onClick={() => handleCopy(order.productName || order.lineItems?.[0]?.title || '-') } aria-label="copy product name">
-                            <ContentCopyIcon fontSize="small" />
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {formatDate(order.dateSold, order.purchaseMarketplaceId)}
+                    </TableCell>
+                    <TableCell>
+                      {formatDate(order.shipByDate || order.lineItems?.[0]?.lineItemFulfillmentInstructions?.shipByDate, order.purchaseMarketplaceId)}
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={order.productName || order.lineItems?.[0]?.title || '-'} arrow>
+                        <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+                          {order.productName || order.lineItems?.[0]?.title || '-'}
+                        </Typography>
+                      </Tooltip>
+                      <IconButton size="small" onClick={() => handleCopy(order.productName || order.lineItems?.[0]?.title || '-')} aria-label="copy product name">
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={order.buyer?.buyerRegistrationAddress?.fullName || '-'} arrow>
+                        <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
+                          {order.buyer?.buyerRegistrationAddress?.fullName || '-'}
+                        </Typography>
+                      </Tooltip>
+                      <IconButton size="small" onClick={() => handleCopy(order.buyer?.buyerRegistrationAddress?.fullName || '-')} aria-label="copy buyer name">
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Typography variant="body2">{order.shippingPostalCode || order.buyer?.buyerRegistrationAddress?.postalCode || '-'}</Typography>
+                        <IconButton size="small" onClick={() => handleCopy(order.shippingPostalCode || order.buyer?.buyerRegistrationAddress?.postalCode || '-')} aria-label="copy postal code">
+                          <ContentCopyIcon fontSize="small" />
                         </IconButton>
-                        </TableCell>
-                        <TableCell>
-                        <Tooltip title={order.buyer?.buyerRegistrationAddress?.fullName || '-'} arrow>
-                            <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
-                            {order.buyer?.buyerRegistrationAddress?.fullName || '-'}
-                            </Typography>
-                        </Tooltip>
-                        <IconButton size="small" onClick={() => handleCopy(order.buyer?.buyerRegistrationAddress?.fullName || '-') } aria-label="copy buyer name">
-                            <ContentCopyIcon fontSize="small" />
-                        </IconButton>
-                        </TableCell>
-                        <TableCell>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Typography variant="body2">{order.shippingPostalCode || order.buyer?.buyerRegistrationAddress?.postalCode || '-'}</Typography>
-                            <IconButton size="small" onClick={() => handleCopy(order.shippingPostalCode || order.buyer?.buyerRegistrationAddress?.postalCode || '-') } aria-label="copy postal code">
-                            <ContentCopyIcon fontSize="small" />
+                      </div>
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 300 }}>
+                      {expandedShipping[order._id] ? (
+                        <Stack spacing={0.5}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Tooltip title={order.shippingFullName || '-'} arrow>
+                              <Typography variant="body2" fontWeight="medium" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                {order.shippingFullName || '-'}
+                              </Typography>
+                            </Tooltip>
+                            <IconButton size="small" onClick={() => handleCopy(order.shippingFullName)}>
+                              <ContentCopyIcon fontSize="small" />
                             </IconButton>
-                        </div>
-                        </TableCell>
-                        <TableCell sx={{ maxWidth: 300 }}>
-                        {expandedShipping[order._id] ? (
-                            <Stack spacing={0.5}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingFullName || '-'} arrow>
-                                <Typography variant="body2" fontWeight="medium" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingFullName || '-'}
-                                </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingFullName)}>
-                                <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingAddressLine1 || '-'} arrow>
-                                <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingAddressLine1 || '-'}
-                                </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingAddressLine1)}>
-                                <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingCity || '-'} arrow>
-                                <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingCity || '-'}
-                                </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingCity)}>
-                                <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingState || '-'} arrow>
-                                <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingState || '-'}
-                                </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingState)}>
-                                <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingPostalCode || '-'} arrow>
-                                <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingPostalCode || '-'}
-                                </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingPostalCode)}>
-                                <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                            </Box>
-                             <Button 
-                                size="small" 
-                                onClick={() => toggleShippingExpanded(order._id)}
-                                startIcon={<ExpandLessIcon />}
-                                sx={{ mt: 0.5 }}
-                            >
-                                Collapse
-                            </Button>
-                            </Stack>
-                        ) : (
-                            <Button 
-                            size="small" 
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Tooltip title={order.shippingAddressLine1 || '-'} arrow>
+                              <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                {order.shippingAddressLine1 || '-'}
+                              </Typography>
+                            </Tooltip>
+                            <IconButton size="small" onClick={() => handleCopy(order.shippingAddressLine1)}>
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Tooltip title={order.shippingCity || '-'} arrow>
+                              <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                {order.shippingCity || '-'}
+                              </Typography>
+                            </Tooltip>
+                            <IconButton size="small" onClick={() => handleCopy(order.shippingCity)}>
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Tooltip title={order.shippingState || '-'} arrow>
+                              <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                {order.shippingState || '-'}
+                              </Typography>
+                            </Tooltip>
+                            <IconButton size="small" onClick={() => handleCopy(order.shippingState)}>
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Tooltip title={order.shippingPostalCode || '-'} arrow>
+                              <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                {order.shippingPostalCode || '-'}
+                              </Typography>
+                            </Tooltip>
+                            <IconButton size="small" onClick={() => handleCopy(order.shippingPostalCode)}>
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <Button
+                            size="small"
                             onClick={() => toggleShippingExpanded(order._id)}
-                            endIcon={<ExpandMoreIcon />}
-                            sx={{ textTransform: 'none' }}
-                            >
-                            {order.shippingFullName || 'View Address'}
-                            </Button>
-                        )}
-                        </TableCell>
-                        <TableCell>
-                        <ManualTrackingCell
-                            order={order}
-                            onSaved={(newVal) => {
-                            setOrders(prev => prev.map(o => (o._id === order._id ? { ...o, manualTrackingNumber: newVal } : o)));
-                            }}
-                            onCopy={handleCopy}
-                            onNotify={showSnack}
-                        />
-                        </TableCell>
-                        <TableCell sx={{ minWidth: 200 }}>
-                        <NotesCell
-                            order={order}
-                            onSaved={(newNotes) => {
-                            setOrders(prev => prev.map(o => (o._id === order._id ? { ...o, notes: newNotes } : o)));
-                            }}
-                            onNotify={showSnack}
-                        />
-                        </TableCell>
-                    </TableRow>
-                    ))}
-                </TableBody>
-                </Table>
-            </TableContainer>
+                            startIcon={<ExpandLessIcon />}
+                            sx={{ mt: 0.5 }}
+                          >
+                            Collapse
+                          </Button>
+                        </Stack>
+                      ) : (
+                        <Button
+                          size="small"
+                          onClick={() => toggleShippingExpanded(order._id)}
+                          endIcon={<ExpandMoreIcon />}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          {order.shippingFullName || 'View Address'}
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <ManualTrackingCell
+                        order={order}
+                        onSaved={(newVal) => {
+                          setOrders(prev => prev.map(o => (o._id === order._id ? { ...o, manualTrackingNumber: newVal } : o)));
+                        }}
+                        onCopy={handleCopy}
+                        onNotify={showSnack}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 200 }}>
+                      <NotesCell
+                        order={order}
+                        onSaved={(newNotes) => {
+                          setOrders(prev => prev.map(o => (o._id === order._id ? { ...o, notes: newNotes } : o)));
+                        }}
+                        onNotify={showSnack}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
-          <Paper sx={{ 
-            py: 1, 
+          <Paper sx={{
+            py: 1,
             px: 2,
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
             gap: 2,
             flexShrink: 0,
             mt: 2
@@ -541,7 +722,7 @@ export default function AwaitingShipmentPage() {
           </Paper>
         </>
       )}
-      
+
       <Snackbar open={snack.open} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity={snack.severity} sx={{ width: '100%' }}>
           {snack.message}
@@ -552,124 +733,8 @@ export default function AwaitingShipmentPage() {
 }
 
 // ... Helper Components ...
-function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
-  const [editing, setEditing] = React.useState(false);
-  const [value, setValue] = React.useState(order.manualTrackingNumber || '');
-  const [carrier, setCarrier] = React.useState('USPS');
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState('');
+// ManualTrackingCell has been moved up
 
-  useEffect(() => {
-    setValue(order.manualTrackingNumber || '');
-  }, [order.manualTrackingNumber]);
-
-  const startEdit = () => {
-    setError('');
-    setEditing(true);
-  };
-
-  const cancel = () => {
-    setValue(order.manualTrackingNumber || '');
-    setCarrier('USPS');
-    setEditing(false);
-    setError('');
-  };
-
-  const save = async () => {
-    if (!value.trim()) {
-      setError('Tracking number is required');
-      return;
-    }
-
-    setSaving(true);
-    setError('');
-    
-    try {
-      // Upload tracking to eBay (this will also update the database)
-      const { data } = await api.post(`/ebay/orders/${order._id}/upload-tracking`, { 
-        trackingNumber: value.trim(),
-        shippingCarrier: carrier
-      });
-      
-      if (data?.success) {
-        onSaved(value.trim());
-        setEditing(false);
-        onNotify?.('success', `✅ Tracking uploaded to eBay via ${carrier}! Order marked as shipped.`);
-      } else {
-        setError('Failed to upload');
-        onNotify?.('error', 'Failed to upload tracking to eBay');
-      }
-    } catch (e) {
-      const msg = e?.response?.data?.error || 'Upload failed';
-      setError(msg);
-      onNotify?.('error', `Failed to upload tracking: ${msg}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div>
-      {editing ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 280 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input 
-              value={value} 
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Tracking Number"
-              style={{ 
-                padding: 6, 
-                minWidth: 160,
-                border: '1px solid #ccc',
-                borderRadius: 4
-              }} 
-            />
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <Select
-                value={carrier}
-                onChange={(e) => setCarrier(e.target.value)}
-                displayEmpty
-              >
-                <MenuItem value="USPS">USPS</MenuItem>
-                <MenuItem value="UPS">UPS</MenuItem>
-                <MenuItem value="FEDEX">FedEx</MenuItem>
-                <MenuItem value="DHL">DHL</MenuItem>
-                <MenuItem value="AUSTRALIA_POST">Australia Post</MenuItem>
-                <MenuItem value="OTHER">Other</MenuItem>
-              </Select>
-            </FormControl>
-          </div>
-          
-          {error && (
-            <Alert severity="error" sx={{ py: 0, px: 1, fontSize: '0.75rem' }}>
-              {error}
-            </Alert>
-          )}
-          
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Button 
-              size="small" 
-              variant="contained" 
-              onClick={save} 
-              disabled={saving || !value.trim()}
-            >
-              {saving ? 'Uploading...' : 'Upload to eBay'}
-            </Button>
-            <Button size="small" onClick={cancel} disabled={saving}>Cancel</Button>
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Typography variant="body2">{order.manualTrackingNumber || '-'}</Typography>
-          <IconButton size="small" onClick={() => onCopy?.(order.manualTrackingNumber || '-') } aria-label="copy manual tracking">
-            <ContentCopyIcon fontSize="small" />
-          </IconButton>
-          <Button size="small" onClick={startEdit}>Edit</Button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function NotesCell({ order, onSaved, onNotify }) {
   const [editing, setEditing] = React.useState(false);
@@ -718,9 +783,9 @@ function NotesCell({ order, onSaved, onNotify }) {
     <div>
       {editing ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <textarea 
-            value={value} 
-            onChange={e => setValue(e.target.value)} 
+          <textarea
+            value={value}
+            onChange={e => setValue(e.target.value)}
             style={{ padding: 6, minWidth: 180, minHeight: 60, resize: 'vertical' }}
             placeholder="Enter notes..."
           />
