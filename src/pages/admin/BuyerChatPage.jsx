@@ -815,23 +815,23 @@ export default function BuyerChatPage() {
                         {/* IMAGES */}
                         {msg.mediaUrls && msg.mediaUrls.length > 0 && (
                           <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            {msg.mediaUrls.map((url, idx) => (
-                              <Box
-                                key={idx}
-                                component="img"
-                                src={url}
-                                alt="Attachment"
-                                sx={{
-                                  width: 100,
-                                  height: 100,
-                                  objectFit: 'cover',
-                                  borderRadius: 1,
-                                  cursor: 'pointer',
-                                  border: '1px solid #ccc'
-                                }}
-                                onClick={() => window.open(url, '_blank')}
-                              />
-                            ))}
+                            {msg.mediaUrls.map((url, idx) => {
+                              const fileName = url.split('/').pop() || 'Attachment';
+                              return (
+                                <Chip
+                                  key={idx}
+                                  icon={<AttachFileIcon />}
+                                  label={fileName}
+                                  onClick={() => window.open(url, '_blank')}
+                                  sx={{
+                                    cursor: 'pointer',
+                                    bgcolor: msg.sender === 'SELLER' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                                    color: 'inherit',
+                                    maxWidth: 200
+                                  }}
+                                />
+                              );
+                            })}
                           </Box>
                         )}
                       </Paper>
@@ -878,14 +878,17 @@ export default function BuyerChatPage() {
                       ref={fileInputRef}
                       onChange={handleFileSelect}
                     />
-                    <IconButton onClick={() => fileInputRef.current?.click()} disabled={uploading || sending}>
+                    <IconButton
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading || sending}
+                      sx={{ alignSelf: 'flex-end', mb: 0.5 }}
+                    >
                       {uploading ? <CircularProgress size={24} /> : <AttachFileIcon />}
                     </IconButton>
 
                     <TextField
                       fullWidth
                       multiline
-                      maxRows={3}
                       placeholder="Type a message..."
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
@@ -899,7 +902,7 @@ export default function BuyerChatPage() {
                     />
                     <Button
                       variant="contained"
-                      sx={{ px: 3 }}
+                      sx={{ px: 3, alignSelf: 'flex-end', mb: 0.5 }}
                       endIcon={sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
                       onClick={handleSendMessage}
                       disabled={sending || (!newMessage.trim() && attachments.length === 0)}
