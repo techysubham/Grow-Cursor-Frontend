@@ -51,6 +51,7 @@ import EditorDashboard from '../pages/compatibility/EditorDashboard.jsx';
 import ProgressTrackingPage from '../pages/compatibility/ProgressTrackingPage.jsx';
 
 import FulfillmentDashboard from '../pages/admin/FulfillmentDashboard.jsx';
+import AllOrdersSheetPage from '../pages/admin/AllOrdersSheetPage.jsx';
 import AwaitingShipmentPage from '../pages/admin/AwaitingShipmentPage.jsx';
 import FulfillmentNotesPage from '../pages/admin/FulfillmentNotesPage.jsx';
 import ConversationTrackingPage from '../pages/admin/ConversationTrackingPage.jsx';
@@ -246,6 +247,9 @@ export default function AdminLayout({ user, onLogout }) {
                 </ListItemButton>
                 <ListItemButton component={Link} to="/admin/fulfillment" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="All Orders" />
+                </ListItemButton>
+                <ListItemButton component={Link} to="/admin/all-orders-sheet" onClick={() => setMobileOpen(false)}>
+                  <ListItemText primary="All Orders Sheet (USD)" />
                 </ListItemButton>
                 <ListItemButton component={Link} to="/admin/awaiting-shipment" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="Awaiting Shipment" />
@@ -479,6 +483,7 @@ export default function AdminLayout({ user, onLogout }) {
             <>
               <Route path="/order-analytics" element={<OrderAnalyticsPage />} />
               <Route path="/fulfillment" element={<FulfillmentDashboard />} />
+              <Route path="/all-orders-sheet" element={<AllOrdersSheetPage />} />
               <Route path="/awaiting-shipment" element={<AwaitingShipmentPage />} />
               <Route path="/fulfillment-notes" element={<FulfillmentNotesPage />} />
               <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
