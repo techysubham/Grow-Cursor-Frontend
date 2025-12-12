@@ -1067,7 +1067,10 @@ export default function FulfillmentDashboard() {
 
     if (isEditing) {
       return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 200 }}>
+        <Box
+          onClick={(e) => e.stopPropagation()}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 200 }}
+        >
           <TextField
             fullWidth
             multiline
@@ -1104,7 +1107,10 @@ export default function FulfillmentDashboard() {
 
     return (
       <Box
-        onClick={() => setIsEditing(true)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsEditing(true);
+        }}
         sx={{
           cursor: 'pointer',
           minHeight: 30,
@@ -1873,19 +1879,9 @@ export default function FulfillmentDashboard() {
                 return (
                   <TableRow
                     key={order._id || idx}
-                    onClick={() => setSelectedRowId(isSelected ? null : order._id)}
                     sx={{
-                      cursor: 'pointer',
                       '&:nth-of-type(odd)': { backgroundColor: 'action.hover' },
                       '&:hover': { backgroundColor: 'action.selected' },
-                      ...(isSelected && {
-                        outline: '3px solid',
-                        outlineColor: 'primary.main',
-                        outlineOffset: '-3px',
-                        backgroundColor: 'rgba(25, 118, 210, 0.08)',
-                        position: 'relative',
-                        zIndex: 1,
-                      }),
                     }}
                   >
                     <TableCell>{(currentPage - 1) * ordersPerPage + idx + 1}</TableCell>
