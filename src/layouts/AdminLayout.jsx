@@ -73,11 +73,15 @@ import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboar
 
 import ConversationManagementPage from '../pages/admin/ConversationManagementPage.jsx';
 import ManageAmazonAccountsPage from '../pages/admin/ManageAmazonAccountsPage.jsx';
+import InternalMessagesPage from '../pages/admin/InternalMessagesPage.jsx';
+import InternalMessagesAdminPage from '../pages/admin/InternalMessagesAdminPage.jsx';
 import ManageCreditCardsPage from '../pages/admin/ManageCreditCardsPage.jsx';
 import IdeasPage from '../pages/IdeasPage.jsx';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import ChatIcon from '@mui/icons-material/Chat';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 
 const drawerWidth = 230;
 
@@ -125,6 +129,24 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItemButton component={Link} to="/admin/about-me" onClick={() => setMobileOpen(false)}>
               <ListItemIcon><SupervisorAccountIcon /></ListItemIcon>
               <ListItemText primary="About Me" />
+            </ListItemButton>
+          </ListItem>
+        )}
+
+        {/* Internal Messages - visible to ALL users */}
+        <ListItem disablePadding>
+          <ListItemButton component={Link} to="/admin/internal-messages" onClick={() => setMobileOpen(false)}>
+            <ListItemIcon><ChatIcon /></ListItemIcon>
+            <ListItemText primary="Team Chat" />
+          </ListItemButton>
+        </ListItem>
+
+        {/* Internal Messages Admin - visible to superadmin only */}
+        {isSuper && (
+          <ListItem disablePadding>
+            <ListItemButton component={Link} to="/admin/internal-messages-admin" onClick={() => setMobileOpen(false)}>
+              <ListItemIcon><AdminPanelSettingsIcon /></ListItemIcon>
+              <ListItemText primary="View All Messages" />
             </ListItemButton>
           </ListItem>
         )}
@@ -391,6 +413,9 @@ export default function AdminLayout({ user, onLogout }) {
             {sidebarOpen ? <ExpandLess /> : <ExpandMore />}
           </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>Admin Dashboard</Typography>
+          <Button color="inherit" startIcon={<ChatIcon />} onClick={() => navigate('/admin/internal-messages')} sx={{ mr: 1 }}>
+            Team Chat
+          </Button>
           <Typography variant="body2" sx={{ mr: 2 }}>{user?.username} ({user?.role})</Typography>
           <Button color="inherit" onClick={onLogout}>Logout</Button>
         </Toolbar>
@@ -495,6 +520,14 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/amazon-accounts" element={<ManageAmazonAccountsPage />} />
               <Route path="/credit-cards" element={<ManageCreditCardsPage />} />
             </>
+          )}
+
+          {/* Internal Messages - accessible to ALL authenticated users */}
+          <Route path="/internal-messages" element={<InternalMessagesPage />} />
+          
+          {/* Internal Messages Admin - accessible to superadmin only */}
+          {isSuper && (
+            <Route path="/internal-messages-admin" element={<InternalMessagesAdminPage />} />
           )}
           
           {/* UPDATED DEFAULT REDIRECT */}

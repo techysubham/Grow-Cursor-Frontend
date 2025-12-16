@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-import { AppBar, Toolbar, IconButton, Box, Paper, Typography, Grid, TextField, MenuItem, Button, Stack, Snackbar, Alert } from '@mui/material';
+import { AppBar, Toolbar, IconButton, Box, Paper, Typography, Grid, TextField, MenuItem, Button, Stack, Snackbar, Alert, Tabs, Tab } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PersonIcon from '@mui/icons-material/Person';
+import ChatIcon from '@mui/icons-material/Chat';
 import { useLocation, useNavigate } from 'react-router-dom';
+import InternalMessagesPage from './admin/InternalMessagesPage.jsx';
 import { getMyProfile, updateMyProfile } from '../lib/api.js';
 
 export default function AboutMePage() {
@@ -12,6 +15,7 @@ export default function AboutMePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [currentTab, setCurrentTab] = useState(0);
   const [form, setForm] = useState({
     name: '',
     phoneNumber: '',
@@ -119,7 +123,7 @@ export default function AboutMePage() {
   const isInAdminLayout = location.pathname.startsWith('/admin/');
 
   return (
-    <Box maxWidth="900px" mx="auto">
+    <Box maxWidth="1200px" mx="auto">
       {!isInAdminLayout && (
         <AppBar position="static" color="default" elevation={1}>
           <Toolbar>
@@ -130,13 +134,24 @@ export default function AboutMePage() {
           </Toolbar>
         </AppBar>
       )}
-      <Paper sx={{ p: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-          <Typography variant="h6">About Me</Typography>
-          <Button onClick={onSubmit} variant="contained" disabled={saving || uploading.profilePic || uploading.aadhar || uploading.pan}>
-            {(uploading.profilePic || uploading.aadhar || uploading.pan) ? 'Uploading...' : 'Save'}
-          </Button>
-        </Stack>
+      
+      {/* Tabs for Profile and Chat */}
+      <Paper sx={{ mb: 2 }}>
+        <Tabs value={currentTab} onChange={(e, newValue) => setCurrentTab(newValue)} variant="fullWidth">
+          <Tab icon={<PersonIcon />} label="My Profile" />
+          <Tab icon={<ChatIcon />} label="Team Chat" />
+        </Tabs>
+      </Paper>
+
+      {/* Tab Content */}
+      {currentTab === 0 && (
+        <Paper sx={{ p: 3 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="h6">My Profile</Typography>
+            <Button onClick={onSubmit} variant="contained" disabled={saving || uploading.profilePic || uploading.aadhar || uploading.pan}>
+              {(uploading.profilePic || uploading.aadhar || uploading.pan) ? 'Uploading...' : 'Save'}
+            </Button>
+          </Stack>
         <Box component="form" onSubmit={onSubmit}>
           <Grid container spacing={2}>
             {/* Profile Photo Upload */}
@@ -231,7 +246,16 @@ export default function AboutMePage() {
             </Grid>
           </Grid>
         </Box>
-      </Paper>
+        </Paper>
+      )}
+
+      {/* Tab 2: Team Chat */}
+      {currentTab === 1 && (
+        <Box sx={{ height: '75vh' }}>
+          <InternalMessagesPage />
+        </Box>
+      )}
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

@@ -93,22 +93,40 @@ export default function SellerProfilePage() {
     <div style={{ maxWidth: 600, margin: '2rem auto', padding: 24, background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h2 style={{ margin: 0 }}>Seller Profile</h2>
-        <button 
-          type="button" 
-          onClick={handleLogout}
-          style={{ 
-            background: '#dc3545', 
-            color: '#fff', 
-            padding: '8px 16px', 
-            borderRadius: 6, 
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 'bold',
-            cursor: 'pointer'
-          }}
-        >
-          Logout
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button 
+            type="button" 
+            onClick={() => navigate('/about-me')}
+            style={{ 
+              background: '#0064d2', 
+              color: '#fff', 
+              padding: '8px 16px', 
+              borderRadius: 6, 
+              border: 'none',
+              fontSize: 14,
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            💬 Team Chat
+          </button>
+          <button 
+            type="button" 
+            onClick={handleLogout}
+            style={{ 
+              background: '#dc3545', 
+              color: '#fff', 
+              padding: '8px 16px', 
+              borderRadius: 6, 
+              border: 'none',
+              fontSize: 14,
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            Logout
+          </button>
+        </div>
       </div>
       
       {successMessage && <div style={{ color: 'green', marginBottom: 16, padding: 12, background: '#d4edda', borderRadius: 4, border: '1px solid #c3e6cb' }}>{successMessage}</div>}
