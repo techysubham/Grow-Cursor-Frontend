@@ -439,16 +439,42 @@ export default function CompatibilityDashboard() {
                         value={selectedYears}
                         onChange={(e) => setSelectedYears(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
                         input={<OutlinedInput label="Years" />}
-                        renderValue={(selected) => selected.join(', ')}
+                        renderValue={(selected) => {
+                          if (selected.length === 0) return '';
+                          if (selected.length === 1) return selected[0];
+                          if (selected.length <= 3) return selected.join(', ');
+                          return `${selected.length} years selected`;
+                        }}
                         MenuProps={{ PaperProps: { style: { maxHeight: 300 } } }}
                     >
-                        {loadingYears ? <MenuItem disabled>Loading...</MenuItem> : 
-                         yearOptions.map((year) => (
-                            <MenuItem key={year} value={year}>
+                        {loadingYears ? <MenuItem disabled>Loading...</MenuItem> : (
+                          <>
+                            <MenuItem 
+                              value="SELECT_ALL" 
+                              onClick={() => {
+                                if (selectedYears.length === yearOptions.length) {
+                                  setSelectedYears([]);
+                                } else {
+                                  setSelectedYears([...yearOptions]);
+                                }
+                              }}
+                            >
+                              <Checkbox 
+                                checked={yearOptions.length > 0 && selectedYears.length === yearOptions.length}
+                                indeterminate={selectedYears.length > 0 && selectedYears.length < yearOptions.length}
+                                size="small" 
+                              />
+                              <ListItemText primary="Select All" sx={{ fontWeight: 'bold' }} />
+                            </MenuItem>
+                            <Divider />
+                            {yearOptions.map((year) => (
+                              <MenuItem key={year} value={year}>
                                 <Checkbox checked={selectedYears.indexOf(year) > -1} size="small" />
                                 <ListItemText primary={year} />
-                            </MenuItem>
-                        ))}
+                              </MenuItem>
+                            ))}
+                          </>
+                        )}
                     </Select>
                 </FormControl>
               </Grid>
