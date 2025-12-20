@@ -191,20 +191,19 @@ export default function InternalMessagesPage() {
 
     setUploading(true);
     try {
-      const uploadedFiles = [];
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+      });
 
-        const { data } = await api.post('/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+      const { data } = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
 
-        uploadedFiles.push({
-          name: file.name,
-          url: data.url
-        });
-      }
+      const uploadedFiles = data.urls.map((url, idx) => ({
+        name: files[idx].name,
+        url: url
+      }));
 
       setAttachments([...attachments, ...uploadedFiles]);
     } catch (err) {
