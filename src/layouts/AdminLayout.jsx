@@ -46,6 +46,7 @@ import TaskListPage from '../pages/admin/TaskListPage.jsx';
 import StockLedgerPage from '../pages/admin/StockLedgerPage.jsx';
 import StoreWiseTaskListPage from '../pages/admin/StoreWiseTaskListPage.jsx';
 import StoreTaskDetailPage from '../pages/admin/StoreTaskDetailPage.jsx';
+import StoreDailyTasksPage from '../pages/admin/StoreDailyTasksPage.jsx';
 import AdminTaskList from '../pages/compatibility/AdminTaskList.jsx';
 import EditorDashboard from '../pages/compatibility/EditorDashboard.jsx';
 import ProgressTrackingPage from '../pages/compatibility/ProgressTrackingPage.jsx';
@@ -67,7 +68,7 @@ import EmployeeDetailsPage from '../pages/admin/EmployeeDetailsPage.jsx';
 import BuyerChatPage from '../pages/admin/BuyerChatPage.jsx';
 import RangeAnalyzerPage from '../pages/admin/RangeAnalyzerPage.jsx';
 
-import DashboardIcon from '@mui/icons-material/Dashboard'; 
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboard.jsx';
 
@@ -105,7 +106,7 @@ export default function AdminLayout({ user, onLogout }) {
   const isHRAdmin = user?.role === 'hradmin';
   const isOperationHead = user?.role === 'operationhead';
   const isSeller = user?.role === 'seller';
-  
+
   // New Roles
   const isHOC = user?.role === 'hoc';
   const isComplianceManager = user?.role === 'compliancemanager';
@@ -202,19 +203,22 @@ export default function AdminLayout({ user, onLogout }) {
                     <ListItemButton component={Link} to="/admin/listings-summary" onClick={() => setMobileOpen(false)}>
                       <ListItemText primary="Listings Summary" />
                     </ListItemButton>
-                   
+
                     <ListItemButton component={Link} to="/admin/listing-sheet" onClick={() => setMobileOpen(false)}>
                       <ListItemText primary="Listing Sheet" />
                     </ListItemButton>
                     <ListItemButton component={Link} to="/admin/store-wise-tasks" onClick={() => setMobileOpen(false)}>
                       <ListItemText primary="Store-Wise Tasks" />
                     </ListItemButton>
+                    <ListItemButton component={Link} to="/admin/store-daily-tasks" onClick={() => setMobileOpen(false)}>
+                      <ListItemText primary="Store Daily Tasks" />
+                    </ListItemButton>
                     <ListItemButton component={Link} to="/admin/range-analyzer" onClick={() => setMobileOpen(false)}>
                       <ListItemText primary="Range Analyzer" />
                     </ListItemButton>
                   </List>
                 </Collapse>
-                
+
               </List>
             </Collapse>
           </>
@@ -279,11 +283,11 @@ export default function AdminLayout({ user, onLogout }) {
                 <ListItemButton component={Link} to="/admin/fulfillment-notes" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="Fulfillment Notes" />
                 </ListItemButton>
-                
+
                 <ListItemButton component={Link} to="/admin/cancelled-status" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="Cancelled Status" />
                 </ListItemButton>
-                
+
                 <ListItemButton component={Link} to="/admin/return-requested" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="Return Requests" />
                 </ListItemButton>
@@ -333,7 +337,7 @@ export default function AdminLayout({ user, onLogout }) {
           </>
         )}
 
-        {isProductAdmin  ? (
+        {isProductAdmin ? (
           <>
             <ListItem disablePadding>
               <ListItemButton component={Link} to="/admin/categories" onClick={() => setMobileOpen(false)}>
@@ -343,7 +347,7 @@ export default function AdminLayout({ user, onLogout }) {
             </ListItem>
           </>
         ) : null}
-       
+
         {isSuper || isListingAdmin || isHRAdmin || isOperationHead ? (
           <ListItem disablePadding>
             <ListItemButton component={Link} to="/admin/add-user" onClick={() => setMobileOpen(false)}>
@@ -352,8 +356,8 @@ export default function AdminLayout({ user, onLogout }) {
             </ListItemButton>
           </ListItem>
         ) : null}
-        
-        {( isCompatibilityAdmin) && (
+
+        {(isCompatibilityAdmin) && (
           <>
             <ListItem disablePadding>
               <ListItemButton component={Link} to="/admin/add-compatibility-editor" onClick={() => setMobileOpen(false)}>
@@ -375,7 +379,7 @@ export default function AdminLayout({ user, onLogout }) {
             </ListItem>
           </>
         )}
-        
+
         {(isCompatibilityEditor) && (
           <ListItem disablePadding>
             <ListItemButton component={Link} to="/admin/compatibility-editor" onClick={() => setMobileOpen(false)}>
@@ -385,7 +389,7 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
-       
+
 
         {(isSuper || isHRAdmin || isOperationHead) && (
           <>
@@ -443,7 +447,7 @@ export default function AdminLayout({ user, onLogout }) {
         <Routes>
           {/* Ideas & Issues - accessible to ALL roles */}
           <Route path="/ideas" element={<IdeasPage />} />
-          
+
           {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
           {isProductAdmin || isSuper ? (
             <>
@@ -460,6 +464,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/listing-sheet" element={<ListingSheetPage />} />
               <Route path="/store-wise-tasks" element={<StoreWiseTaskListPage />} />
               <Route path="/store-wise-tasks/details" element={<StoreTaskDetailPage />} />
+              <Route path="/store-daily-tasks" element={<StoreDailyTasksPage />} />
               <Route path="/range-analyzer" element={<RangeAnalyzerPage />} />
             </>
           ) : null}
@@ -515,7 +520,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/cancelled-status" element={<CancelledStatusPage />} />
               <Route path="/return-requested" element={<ReturnRequestedPage />} />
               <Route path="/disputes" element={<DisputesPage />} />
-              <Route path="/message-received" element={<BuyerChatPage/>} />
+              <Route path="/message-received" element={<BuyerChatPage />} />
               <Route path="/conversation-management" element={<ConversationManagementPage />} />
               <Route path="/amazon-accounts" element={<ManageAmazonAccountsPage />} />
               <Route path="/credit-cards" element={<ManageCreditCardsPage />} />
@@ -524,21 +529,21 @@ export default function AdminLayout({ user, onLogout }) {
 
           {/* Internal Messages - accessible to ALL authenticated users */}
           <Route path="/internal-messages" element={<InternalMessagesPage />} />
-          
+
           {/* Internal Messages Admin - accessible to superadmin only */}
           {isSuper && (
             <Route path="/internal-messages-admin" element={<InternalMessagesAdminPage />} />
           )}
-          
+
           {/* UPDATED DEFAULT REDIRECT */}
           <Route path="*" element={<Navigate to={
-            isProductAdmin || isSuper ? "/admin/research" : 
-            isListingAdmin ? "/admin/listing" : 
-            isCompatibilityAdmin ? "/admin/compatibility-tasks" : 
-            isCompatibilityEditor ? "/admin/compatibility-editor" : 
-            (isFulfillmentAdmin || isHOC || isComplianceManager) ? "/admin/fulfillment" : 
-            isHRAdmin || isOperationHead ? "/admin/employee-details" : 
-            "/admin/about-me"
+            isProductAdmin || isSuper ? "/admin/research" :
+              isListingAdmin ? "/admin/listing" :
+                isCompatibilityAdmin ? "/admin/compatibility-tasks" :
+                  isCompatibilityEditor ? "/admin/compatibility-editor" :
+                    (isFulfillmentAdmin || isHOC || isComplianceManager) ? "/admin/fulfillment" :
+                      isHRAdmin || isOperationHead ? "/admin/employee-details" :
+                        "/admin/about-me"
           } replace />} />
         </Routes>
       </Box>
