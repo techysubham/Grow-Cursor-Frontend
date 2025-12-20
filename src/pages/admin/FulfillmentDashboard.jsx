@@ -538,6 +538,10 @@ export default function FulfillmentDashboard() {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState([]);
   const [imageCount, setImageCount] = useState(0); // Total image count
+  
+  // Earnings breakdown modal
+  const [earningsDialogOpen, setEarningsDialogOpen] = useState(false);
+  const [selectedOrderForEarnings, setSelectedOrderForEarnings] = useState(null);
 
   // Session storage key for persisting state
   const STORAGE_KEY = 'fulfillment_dashboard_state';
@@ -562,6 +566,7 @@ export default function FulfillmentDashboard() {
   const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
   //const [searchSoldDate, setSearchSoldDate] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
+  const [searchPaymentStatus, setSearchPaymentStatus] = useState(() => getInitialState('searchPaymentStatus', ''));
   const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
 
   // Pagination state - restored from sessionStorage
@@ -590,7 +595,8 @@ export default function FulfillmentDashboard() {
   const [snackbarOrderIds, setSnackbarOrderIds] = useState([]); // Store order IDs for copying
   const [updatedOrderDetails, setUpdatedOrderDetails] = useState([]); // Store { orderId, changedFields }
 
-
+  // Editing order earnings for PARTIALLY_REFUNDED orders
+  const [editingOrderEarnings, setEditingOrderEarnings] = useState({}); // { orderId: value }
 
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [selectedOrderForMessage, setSelectedOrderForMessage] = useState(null);
@@ -609,7 +615,7 @@ export default function FulfillmentDashboard() {
     'seller', 'orderId', 'dateSold', 'shipBy', 'deliveryDate', 'productName',
     'buyerName', 'shippingAddress', 'marketplace', 'subtotal',
     'shipping', 'salesTax', 'discount', 'transactionFees',
-    'adFeeGeneral', 'cancelStatus', 'refunds', 'trackingNumber',
+    'adFeeGeneral', 'cancelStatus', 'refunds', 'orderEarnings', 'trackingNumber',
     'amazonAccount', 'arriving', 'beforeTax', 'estimatedTax',
     'azOrderId', 'amazonRefund', 'cardName', 'notes', 'messagingStatus'
   ];
@@ -632,6 +638,11 @@ export default function FulfillmentDashboard() {
     { id: 'adFeeGeneral', label: 'Ad Fee General' },
     { id: 'cancelStatus', label: 'Cancel Status' },
     { id: 'refunds', label: 'Refunds' },
+    { id: 'refundItemAmount', label: 'Refund Item' },
+    { id: 'refundTaxAmount', label: 'Refund Tax' },
+    { id: 'refundTotalToBuyer', label: 'Refund Total' },
+    { id: 'orderTotalAfterRefund', label: 'Order Total (After Refund)' },
+    { id: 'orderEarnings', label: 'Order Earnings' },
     { id: 'trackingNumber', label: 'Tracking Number' },
     { id: 'amazonAccount', label: 'Amazon Acc' },
     { id: 'arriving', label: 'Arriving' },
@@ -663,6 +674,7 @@ export default function FulfillmentDashboard() {
       searchOrderId,
       searchBuyerName,
       searchMarketplace,
+      searchPaymentStatus,
       filtersExpanded,
       currentPage,
       dateFilter,
@@ -673,7 +685,7 @@ export default function FulfillmentDashboard() {
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, visibleColumns]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, searchPaymentStatus, filtersExpanded, currentPage, dateFilter, visibleColumns]);
 
 
   const updateManualField = async (orderId, field, value) => {
@@ -708,6 +720,7 @@ export default function FulfillmentDashboard() {
     searchOrderId,
     searchBuyerName,
     searchMarketplace,
+    searchPaymentStatus,
     dateFilter
   });
 
@@ -748,6 +761,7 @@ export default function FulfillmentDashboard() {
       prevFilters.current.searchOrderId !== searchOrderId ||
       prevFilters.current.searchBuyerName !== searchBuyerName ||
       prevFilters.current.searchMarketplace !== searchMarketplace ||
+      prevFilters.current.searchPaymentStatus !== searchPaymentStatus ||
       JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter);
 
     // Update prev filters
@@ -756,6 +770,7 @@ export default function FulfillmentDashboard() {
       searchOrderId,
       searchBuyerName,
       searchMarketplace,
+      searchPaymentStatus,
       dateFilter
     };
 
@@ -773,7 +788,51 @@ export default function FulfillmentDashboard() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, searchPaymentStatus, dateFilter]);
+
+  // Handle order earnings change (update local state)
+  const handleOrderEarningsChange = (orderId, orderIdStr, value) => {
+    setEditingOrderEarnings(prev => ({
+      ...prev,
+      [orderId]: value
+    }));
+    
+    // Update orders state immediately for UI feedback
+    setOrders(prev => prev.map(order => 
+      order._id === orderId 
+        ? { ...order, orderEarnings: parseFloat(value) || 0 }
+        : order
+    ));
+  };
+
+  // Handle order earnings save (persist to backend)
+  const handleOrderEarningsSave = async (orderId, orderIdStr) => {
+    const newValue = editingOrderEarnings[orderId];
+    if (newValue === undefined) return;
+
+    try {
+      await api.post(`/ebay/orders/${orderIdStr}/update-earnings`, {
+        orderEarnings: parseFloat(newValue)
+      });
+
+      // Clear editing state
+      setEditingOrderEarnings(prev => {
+        const newState = { ...prev };
+        delete newState[orderId];
+        return newState;
+      });
+
+      // Show success message
+      setSnackbarMsg(`Order earnings updated for ${orderIdStr}`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (err) {
+      console.error('Error updating order earnings:', err);
+      setSnackbarMsg(`Failed to update order earnings: ${err.response?.data?.error || err.message}`);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
 
   async function fetchSellers() {
     setError('');
@@ -799,6 +858,7 @@ export default function FulfillmentDashboard() {
       if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
+      if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
 
       // --- NEW DATE LOGIC START ---
       if (dateFilter.mode === 'single' && dateFilter.single) {
@@ -1458,6 +1518,117 @@ export default function FulfillmentDashboard() {
       .trim();
   };
 
+  // Earnings Breakdown Modal Component
+  const EarningsBreakdownModal = ({ open, order, onClose }) => {
+    if (!order) return null;
+
+    const formatCurrency = (value) => {
+      if (value == null || value === '') return '-';
+      const num = parseFloat(value);
+      return isNaN(num) ? '-' : `$${num.toFixed(2)}`;
+    };
+
+    return (
+      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ backgroundColor: 'primary.main', color: 'white', pb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">Order Earnings Breakdown</Typography>
+            <IconButton onClick={onClose} sx={{ color: 'white' }} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+            Order ID: {order.orderId}
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {/* What Your Buyer Paid */}
+          <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>
+            What your buyer paid
+          </Typography>
+          <Stack spacing={1} sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography>Subtotal</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.subtotalUSD || order.subtotal)}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography>Shipping</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.shippingUSD || order.shipping)}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography>Sales tax*</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.salesTaxUSD || order.salesTax)}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography>Discount</Typography>
+              <Typography fontWeight="medium" color="success.main">{formatCurrency(order.discountUSD || order.discount)}</Typography>
+            </Box>
+            {order.refundTotalToBuyerUSD > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography>Refund</Typography>
+                <Typography fontWeight="medium" color="error.main">-{formatCurrency(order.refundTotalToBuyerUSD || order.refundTotalToBuyer)}</Typography>
+              </Box>
+            )}
+            <Divider sx={{ my: 1 }} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography fontWeight="bold">Order total**</Typography>
+              <Typography fontWeight="bold">{formatCurrency(order.orderTotalAfterRefund)}</Typography>
+            </Box>
+          </Stack>
+
+          {/* What You Earned */}
+          <Typography variant="h6" sx={{ mb: 2, color: 'success.main' }}>
+            What you earned
+          </Typography>
+          <Stack spacing={1}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography>Order total</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.orderTotalAfterRefund)}</Typography>
+            </Box>
+            {order.ebayPaidTaxRefundUSD > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography>Refund (eBay paid)</Typography>
+                <Typography fontWeight="medium" color="success.main">{formatCurrency(order.ebayPaidTaxRefundUSD || order.ebayPaidTaxRefund)}</Typography>
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 2 }}>
+              <Typography variant="body2" color="text.secondary">eBay collected from buyer</Typography>
+              <Box />
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 4 }}>
+              <Typography variant="body2">Sales tax</Typography>
+              <Typography variant="body2" color="error.main">-{formatCurrency(order.salesTaxUSD || order.salesTax)}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 2 }}>
+              <Typography variant="body2" color="text.secondary">Selling costs</Typography>
+              <Box />
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 4 }}>
+              <Typography variant="body2">Transaction fees</Typography>
+              <Typography variant="body2" color="error.main">-{formatCurrency(order.transactionFeesUSD || order.transactionFees)}</Typography>
+            </Box>
+            {order.adFeeGeneralUSD > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 4 }}>
+                <Typography variant="body2">Ad Fee General</Typography>
+                <Typography variant="body2" color="error.main">-{formatCurrency(order.adFeeGeneralUSD || order.adFeeGeneral)}</Typography>
+              </Box>
+            )}
+            <Divider sx={{ my: 1 }} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography fontWeight="bold" color="success.main">Order earnings</Typography>
+              <Typography fontWeight="bold" color={order.orderEarnings >= 0 ? 'success.main' : 'error.main'}>
+                {formatCurrency(order.orderEarnings)}
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose} variant="contained">Close</Button>
+        </DialogActions>
+      </Dialog>
+    );
+  };
+
   return (
     <Box sx={{
       display: 'flex',
@@ -1600,6 +1771,22 @@ export default function FulfillmentDashboard() {
               <MenuItem value="EBAY_US">EBAY_US</MenuItem>
               <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
               <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel id="payment-status-filter-label">Payment Status</InputLabel>
+            <Select
+              labelId="payment-status-filter-label"
+              value={searchPaymentStatus}
+              label="Payment Status"
+              onChange={(e) => setSearchPaymentStatus(e.target.value)}
+            >
+              <MenuItem value="">
+                <em>All</em>
+              </MenuItem>
+              <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
+              <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
             </Select>
           </FormControl>
 
@@ -1786,6 +1973,7 @@ export default function FulfillmentDashboard() {
                 onClick={() => {
                   setSearchOrderId('');
                   setSearchBuyerName('');
+                  setSearchPaymentStatus('');
                   // Reset Date Filter
                   setDateFilter({ mode: 'none', single: '', from: '', to: '' });
                 }}
@@ -1860,6 +2048,11 @@ export default function FulfillmentDashboard() {
                 {visibleColumns.includes('adFeeGeneral') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Ad Fee General</TableCell>}
                 {visibleColumns.includes('cancelStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Cancel Status</TableCell>}
                 {visibleColumns.includes('refunds') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Refunds</TableCell>}
+                {visibleColumns.includes('refundItemAmount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Item</TableCell>}
+                {visibleColumns.includes('refundTaxAmount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Tax</TableCell>}
+                {visibleColumns.includes('refundTotalToBuyer') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Total</TableCell>}
+                {visibleColumns.includes('orderTotalAfterRefund') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Order Total</TableCell>}
+                {visibleColumns.includes('orderEarnings') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Earnings</TableCell>}
                 {visibleColumns.includes('trackingNumber') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Tracking Number</TableCell>}
                 {visibleColumns.includes('amazonAccount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Acc</TableCell>}
                 {visibleColumns.includes('arriving') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Arriving</TableCell>}
@@ -2199,37 +2392,52 @@ export default function FulfillmentDashboard() {
                       </TableCell>
                     )}
                     {visibleColumns.includes('subtotal') && (
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight="medium">
-                          {formatCurrency(order.subtotal)}
-                        </Typography>
-                      </TableCell>
+                      order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight="medium">
+                            {formatCurrency(order.subtotal)}
+                          </Typography>
+                        </TableCell>
+                      ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                     )}
-                    {visibleColumns.includes('shipping') && <TableCell align="right">{formatCurrency(order.shipping)}</TableCell>}
-                    {visibleColumns.includes('salesTax') && <TableCell align="right">{formatCurrency(order.salesTax)}</TableCell>}
+                    {visibleColumns.includes('shipping') && (
+                      order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                        <TableCell align="right">{formatCurrency(order.shipping)}</TableCell>
+                      ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
+                    )}
+                    {visibleColumns.includes('salesTax') && (
+                      order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                        <TableCell align="right">{formatCurrency(order.salesTax)}</TableCell>
+                      ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
+                    )}
                     {visibleColumns.includes('discount') && (
-                      <TableCell align="right">
-                        <Typography
-                          variant="body2"
-
-                        >
-                          {formatCurrency(order.discount)}
-                        </Typography>
-                      </TableCell>
+                      order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                        <TableCell align="right">
+                          <Typography variant="body2">
+                            {formatCurrency(order.discount)}
+                          </Typography>
+                        </TableCell>
+                      ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                     )}
-                    {visibleColumns.includes('transactionFees') && <TableCell align="right">{formatCurrency(order.transactionFees)}</TableCell>}
+                    {visibleColumns.includes('transactionFees') && (
+                      order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                        <TableCell align="right">{formatCurrency(order.transactionFees)}</TableCell>
+                      ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
+                    )}
                     {visibleColumns.includes('adFeeGeneral') && (
-                      <TableCell align="right">
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: order.adFeeGeneral ? 'medium' : 'normal',
-                            color: order.adFeeGeneral ? 'error.main' : 'text.secondary'
-                          }}
-                        >
-                          {order.adFeeGeneral ? formatCurrency(order.adFeeGeneral) : '-'}
-                        </Typography>
-                      </TableCell>
+                      order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                        <TableCell align="right">
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: order.adFeeGeneral ? 'medium' : 'normal',
+                              color: order.adFeeGeneral ? 'error.main' : 'text.secondary'
+                            }}
+                          >
+                            {order.adFeeGeneral ? formatCurrency(order.adFeeGeneral) : '-'}
+                          </Typography>
+                        </TableCell>
+                      ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                     )}
                     {visibleColumns.includes('cancelStatus') && (
                       <TableCell>
@@ -2284,6 +2492,92 @@ export default function FulfillmentDashboard() {
                               );
                             })}
                           </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">-</Typography>
+                        )}
+                      </TableCell>
+                    )}
+                    {/* --- NEW: Refund Breakdown Columns --- */}
+                    {visibleColumns.includes('refundItemAmount') && (
+                      <TableCell align="right">
+                        {order.refundItemAmount ? (
+                          <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 'medium' }}>
+                            {formatCurrency(order.refundItemAmount)}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">-</Typography>
+                        )}
+                      </TableCell>
+                    )}
+                    {visibleColumns.includes('refundTaxAmount') && (
+                      <TableCell align="right">
+                        {order.refundTaxAmount ? (
+                          <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 'medium' }}>
+                            {formatCurrency(order.refundTaxAmount)}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">-</Typography>
+                        )}
+                      </TableCell>
+                    )}
+                    {visibleColumns.includes('refundTotalToBuyer') && (
+                      <TableCell align="right">
+                        {order.refundTotalToBuyer ? (
+                          <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 'bold' }}>
+                            {formatCurrency(order.refundTotalToBuyer)}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">-</Typography>
+                        )}
+                      </TableCell>
+                    )}
+                    {visibleColumns.includes('orderTotalAfterRefund') && (
+                      <TableCell align="right">
+                        {order.orderTotalAfterRefund != null ? (
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              color: order.orderTotalAfterRefund >= 0 ? 'text.primary' : 'error.main',
+                              fontWeight: 'medium' 
+                            }}
+                          >
+                            {formatCurrency(order.orderTotalAfterRefund)}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">-</Typography>
+                        )}
+                      </TableCell>
+                    )}
+                    {visibleColumns.includes('orderEarnings') && (
+                      <TableCell align="right">
+                        {order.orderPaymentStatus === 'PARTIALLY_REFUNDED' ? (
+                          <TextField
+                            size="small"
+                            type="number"
+                            value={order.orderEarnings || ''}
+                            onChange={(e) => handleOrderEarningsChange(order._id, order.orderId, e.target.value)}
+                            onBlur={() => handleOrderEarningsSave(order._id, order.orderId)}
+                            sx={{ 
+                              width: 100,
+                              '& .MuiInputBase-input': {
+                                textAlign: 'right',
+                                fontSize: '0.875rem',
+                                color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
+                                fontWeight: 'bold'
+                              }
+                            }}
+                            inputProps={{ step: '0.01' }}
+                          />
+                        ) : order.orderEarnings != null ? (
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
+                              fontWeight: 'bold' 
+                            }}
+                          >
+                            {formatCurrency(order.orderEarnings)}
+                          </Typography>
                         ) : (
                           <Typography variant="body2" color="text.secondary">-</Typography>
                         )}
@@ -2467,14 +2761,29 @@ export default function FulfillmentDashboard() {
                     )}
                     {visibleColumns.includes('messagingStatus') && (
                       <TableCell align="center">
-                        <Tooltip title="Message Buyer">
-                          <IconButton
-                            color="primary"
-                            onClick={() => handleOpenMessageDialog(order)}
-                          >
-                            <ChatIcon />
-                          </IconButton>
-                        </Tooltip>
+                        <Stack direction="row" spacing={0.5} justifyContent="center">
+                          <Tooltip title="View Earnings Breakdown">
+                            <IconButton
+                              color="success"
+                              size="small"
+                              onClick={() => {
+                                setSelectedOrderForEarnings(order);
+                                setEarningsDialogOpen(true);
+                              }}
+                            >
+                              <ShoppingCartIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Message Buyer">
+                            <IconButton
+                              color="primary"
+                              size="small"
+                              onClick={() => handleOpenMessageDialog(order)}
+                            >
+                              <ChatIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
                       </TableCell>
                     )}
 
@@ -2520,6 +2829,13 @@ export default function FulfillmentDashboard() {
         open={messageModalOpen}
         onClose={handleCloseMessageDialog}
         order={selectedOrderForMessage}
+      />
+
+      {/* Earnings Breakdown Dialog */}
+      <EarningsBreakdownModal
+        open={earningsDialogOpen}
+        order={selectedOrderForEarnings}
+        onClose={() => setEarningsDialogOpen(false)}
       />
 
       {/* Image Viewer Dialog */}
