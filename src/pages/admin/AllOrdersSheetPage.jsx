@@ -272,15 +272,14 @@ export default function AllOrdersSheetPage() {
         'Date Sold',
         'Product Name',
         'Marketplace',
-        // eBay Side (13 columns)
+        // eBay Side (12 columns - removed Refunds)
         'Subtotal',
         'Shipping',
         'Sales Tax',
         'Discount',
         'Transaction Fees',
         'Ad Fee',
-        'Refunds',
-        'Total',
+        'Earnings',
         'TDS',
         'T.ID',
         'NET',
@@ -317,35 +316,27 @@ export default function AllOrdersSheetPage() {
         const salesTax = showZero ? 0 : (parseFloat(order.salesTaxUSD) || 0);
         const transactionFees = showZero ? 0 : (parseFloat(order.transactionFeesUSD) || 0);
         const adFeeGeneral = showZero ? 0 : (parseFloat(order.adFeeGeneral) || 0);
-        const refunds = showZero ? 0 : (parseFloat(order.refundTotalUSD) || 0);
         const discount = showZero ? 0 : (parseFloat(order.discountUSD) || 0);
         const shipping = showZero ? 0 : (parseFloat(order.shippingUSD) || 0);
         
-        const total = subtotal + salesTax;
-        const tds = showZero ? 0 : (total * 0.01);
-        const tid = showZero ? 0 : 0.24;
-        
-        let net;
-        if (isCancelled) {
-          net = 0;
-        } else if (isPartiallyRefunded) {
-          net = 1; // Fixed $1 for partially refunded
-        } else {
-          net = subtotal - transactionFees - adFeeGeneral - refunds - tds - tid + discount;
-        }
+        // Use DB fields for financial calculations
+        const earnings = parseFloat(order.orderEarnings) || 0;
+        const tds = parseFloat(order.tds) || 0;
+        const tid = parseFloat(order.tid) || 0;
+        const net = parseFloat(order.net) || 0;
 
-        const exchangeRate = order.exchangeRate || 82;
-        const pBalanceINR = net * exchangeRate;
+        const exchangeRate = order.ebayExchangeRate || 85;
+        const pBalanceINR = parseFloat(order.pBalanceINR) || 0;
 
-        // For cancelled orders, Amazon values are also zero
+        // Use DB fields for Amazon financial calculations
         const beforeTax = isCancelled ? 0 : (parseFloat(order.beforeTaxUSD) || 0);
         const estimatedTax = isCancelled ? 0 : (parseFloat(order.estimatedTaxUSD) || 0);
-        const amazonTotal = beforeTax + estimatedTax;
+        const amazonTotal = parseFloat(order.amazonTotal) || 0;
         const amazonExchangeRate = order.amazonExchangeRate || 87;
-        const aTotalInr = amazonTotal * amazonExchangeRate;
-        const marketplaceFee = aTotalInr * 0.04;
-        const igst = marketplaceFee * 0.18;
-        const totalCC = marketplaceFee + igst;
+        const aTotalInr = parseFloat(order.amazonTotalINR) || 0;
+        const marketplaceFee = parseFloat(order.marketplaceFee) || 0;
+        const igst = parseFloat(order.igst) || 0;
+        const totalCC = parseFloat(order.totalCC) || 0;
         const profit = pBalanceINR - aTotalInr - totalCC;
 
         return [
@@ -362,12 +353,11 @@ export default function AllOrdersSheetPage() {
           discount.toFixed(2),
           transactionFees.toFixed(2),
           adFeeGeneral.toFixed(2),
-          refunds.toFixed(2),
-          total.toFixed(2),
+          earnings.toFixed(2),
           tds.toFixed(2),
           tid.toFixed(2),
           net.toFixed(2),
-          exchangeRate,
+          exchangeRate.toFixed(5),
           pBalanceINR.toFixed(2),
           beforeTax.toFixed(2),
           estimatedTax.toFixed(2),
@@ -860,13 +850,13 @@ export default function AllOrdersSheetPage() {
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Date Sold</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Product Name</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Marketplace</TableCell>
-                <TableCell colSpan={13} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderBottom: '2px solid #ffb74d', borderRight: '2px solid #90caf9' }}>eBay Side</TableCell>
+                <TableCell colSpan={12} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderBottom: '2px solid #ffb74d', borderRight: '2px solid #90caf9' }}>eBay Side</TableCell>
                 <TableCell colSpan={5} align="center" sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', borderBottom: '2px solid #81c784', borderRight: '2px solid #90caf9' }}>Amazon Side</TableCell>
                 <TableCell colSpan={3} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fce4ec', borderBottom: '2px solid #f48fb1', borderRight: '2px solid #90caf9' }}>Credit Card</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#fff9c4', borderRight: '2px solid #90caf9' }} align="right">PROFIT (INR)</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Amazon Acc</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#fff9c4', borderRight: '2px solid #90caf9' }} align="right">PROFIT<br />(INR)</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Amazon<br />Acc</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Order ID</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Buyer Name</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Buyer<br />Name</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd' }}>Arriving</TableCell>
               </TableRow>
               {/* Second row: eBay Side and Amazon Side column headers */}
@@ -889,19 +879,16 @@ export default function AllOrdersSheetPage() {
                 <Tooltip title="eBay advertising fees" arrow placement="top">
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Ad Fee</TableCell>
                 </Tooltip>
-                <Tooltip title="Total refunded amount" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Refunds</TableCell>
+                <Tooltip title="Earnings = Subtotal + Discount - Sales Tax - Transaction Fees - Ad Fee - Shipping" arrow placement="top">
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Earnings</TableCell>
                 </Tooltip>
-                <Tooltip title="Total = Subtotal + Sales Tax" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Total</TableCell>
-                </Tooltip>
-                <Tooltip title="TDS = Total × 1%" arrow placement="top">
+                <Tooltip title="TDS = Earnings × 1%" arrow placement="top">
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">TDS</TableCell>
                 </Tooltip>
                 <Tooltip title="T.ID = $0.24 (fixed transaction ID fee)" arrow placement="top">
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">T.ID</TableCell>
                 </Tooltip>
-                <Tooltip title="NET = Subtotal - Transaction Fees - Ad Fee - Refunds - TDS - T.ID + Discount" arrow placement="top">
+                <Tooltip title="NET = Earnings - TDS - T.ID" arrow placement="top">
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">NET</TableCell>
                 </Tooltip>
                 <Tooltip title="Exchange Rate (USD to INR) based on order date" arrow placement="top">
@@ -1019,78 +1006,21 @@ export default function AllOrdersSheetPage() {
                         <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.discountUSD)}</TableCell>
                         <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.transactionFeesUSD)}</TableCell>
                         <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.adFeeGeneral)}</TableCell>
-                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.refundTotalUSD)}</TableCell>
                       </>
                     );
                   })()}
-                  {/* Total, TDS, T.ID, NET, Exchange Rate, P.Balance */}
+                  {/* Earnings (from DB), TDS, T.ID, NET, Exchange Rate, P.Balance */}
                   <TableCell align="right">
-                    {(() => {
-                      const isCancelled = order.cancelState === 'CANCELED' || 
-                                         order.cancelState === 'CANCELLED' || 
-                                         order.cancelStatus?.cancelState === 'CANCELED' ||
-                                         order.cancelStatus?.cancelState === 'CANCELLED';
-                      const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
-                      if (isCancelled || isPartiallyRefunded) return '$0.00';
-                      
-                      const subtotal = parseFloat(order.subtotalUSD) || 0;
-                      const salesTax = parseFloat(order.salesTaxUSD) || 0;
-                      const total = subtotal + salesTax;
-                      return formatCurrency(total);
-                    })()}
+                    {formatCurrency(order.orderEarnings)}
                   </TableCell>
                   <TableCell align="right">
-                    {(() => {
-                      const isCancelled = order.cancelState === 'CANCELED' || 
-                                         order.cancelState === 'CANCELLED' || 
-                                         order.cancelStatus?.cancelState === 'CANCELED' ||
-                                         order.cancelStatus?.cancelState === 'CANCELLED';
-                      const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
-                      if (isCancelled || isPartiallyRefunded) return '$0.00';
-                      
-                      const subtotal = parseFloat(order.subtotalUSD) || 0;
-                      const salesTax = parseFloat(order.salesTaxUSD) || 0;
-                      const total = subtotal + salesTax;
-                      const tds = total * 0.01; // 1% of Total
-                      return formatCurrency(tds);
-                    })()}
+                    {formatCurrency(order.tds)}
                   </TableCell>
                   <TableCell align="right">
-                    {(() => {
-                      const isCancelled = order.cancelState === 'CANCELED' || 
-                                         order.cancelState === 'CANCELLED' || 
-                                         order.cancelStatus?.cancelState === 'CANCELED' ||
-                                         order.cancelStatus?.cancelState === 'CANCELLED';
-                      const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
-                      return (isCancelled || isPartiallyRefunded) ? '$0.00' : formatCurrency(0.24);
-                    })()}
+                    {formatCurrency(order.tid)}
                   </TableCell>
                   <TableCell align="right">
-                    {(() => {
-                      const isCancelled = order.cancelState === 'CANCELED' || 
-                                         order.cancelState === 'CANCELLED' || 
-                                         order.cancelStatus?.cancelState === 'CANCELED' ||
-                                         order.cancelStatus?.cancelState === 'CANCELLED';
-                      const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
-                      
-                      if (isCancelled) return '$0.00';
-                      if (isPartiallyRefunded) return '$1.00';
-                      
-                      const subtotal = parseFloat(order.subtotalUSD) || 0;
-                      const salesTax = parseFloat(order.salesTaxUSD) || 0;
-                      const transactionFees = parseFloat(order.transactionFeesUSD) || 0;
-                      const adFeeGeneral = parseFloat(order.adFeeGeneral) || 0;
-                      const refunds = parseFloat(order.refundTotalUSD) || 0;
-                      const discount = parseFloat(order.discountUSD) || 0;
-                      
-                      const total = subtotal + salesTax;
-                      const tds = total * 0.01;
-                      const tid = 0.24;
-                      
-                      // NET = Subtotal - Transaction Fees - Ad Fee - Refunds - TDS - T.ID + Discount
-                      const net = subtotal - transactionFees - adFeeGeneral - refunds - tds - tid + discount;
-                      return formatCurrency(net);
-                    })()}
+                    {formatCurrency(order.net)}
                   </TableCell>
                   <TableCell align="right">
                     {(() => {
@@ -1100,9 +1030,12 @@ export default function AllOrdersSheetPage() {
                                          order.cancelStatus?.cancelState === 'CANCELLED';
                       if (isCancelled) return '-';
                       
+                      // Show manually set eBay exchange rate from DB
+                      const rate = order.ebayExchangeRate || 85;
+                      
                       return (
                         <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          {order.exchangeRate || 82}
+                          {rate}
                         </Typography>
                       );
                     })()}
@@ -1113,29 +1046,12 @@ export default function AllOrdersSheetPage() {
                                          order.cancelState === 'CANCELLED' || 
                                          order.cancelStatus?.cancelState === 'CANCELED' ||
                                          order.cancelStatus?.cancelState === 'CANCELLED';
-                      const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
                       
                       if (isCancelled) return '₹0.00';
                       
-                      // For partially refunded: P.Balance = $1 × Exchange Rate
-                      if (isPartiallyRefunded) {
-                        const exchangeRate = order.exchangeRate || 82;
-                        const pBalance = 1 * exchangeRate;
-                        return (
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              fontWeight: 'bold', 
-                              color: 'success.main'
-                            }}
-                          >
-                            ₹{pBalance.toFixed(2)}
-                          </Typography>
-                        );
-                      }
-                      
-                      const pBalance = parseFloat(order.pBalance);
-                      if (order.pBalance == null || isNaN(pBalance)) return '-';
+                      // Use pBalanceINR from DB
+                      const pBalance = order.pBalanceINR;
+                      if (pBalance == null) return '-';
                       
                       return (
                         <Typography 
@@ -1145,7 +1061,7 @@ export default function AllOrdersSheetPage() {
                             color: pBalance < 0 ? 'error.main' : 'success.main'
                           }}
                         >
-                          ₹{pBalance.toFixed(2)}
+                          ₹{parseFloat(pBalance).toFixed(2)}
                         </Typography>
                       );
                     })()}
@@ -1177,10 +1093,8 @@ export default function AllOrdersSheetPage() {
                                          order.cancelStatus?.cancelState === 'CANCELLED';
                       if (isCancelled) return '$0.00';
                       
-                      const beforeTax = parseFloat(order.beforeTaxUSD) || 0;
-                      const estimatedTax = parseFloat(order.estimatedTaxUSD) || 0;
-                      const amazonTotal = beforeTax + estimatedTax;
-                      return formatCurrency(amazonTotal);
+                      // Use amazonTotal from DB
+                      return formatCurrency(order.amazonTotal);
                     })()}
                   </TableCell>
                   <TableCell align="right">
@@ -1206,11 +1120,8 @@ export default function AllOrdersSheetPage() {
                                          order.cancelStatus?.cancelState === 'CANCELLED';
                       if (isCancelled) return '₹0.00';
                       
-                      const beforeTax = parseFloat(order.beforeTaxUSD) || 0;
-                      const estimatedTax = parseFloat(order.estimatedTaxUSD) || 0;
-                      const amazonTotal = beforeTax + estimatedTax;
-                      const amazonExchangeRate = order.amazonExchangeRate || 87;
-                      const aTotalInr = amazonTotal * amazonExchangeRate;
+                      // Use amazonTotalINR from DB
+                      const aTotalInr = parseFloat(order.amazonTotalINR) || 0;
                       
                       return (
                         <Typography 
@@ -1234,12 +1145,8 @@ export default function AllOrdersSheetPage() {
                                          order.cancelStatus?.cancelState === 'CANCELLED';
                       if (isCancelled) return '₹0.00';
                       
-                      const beforeTax = parseFloat(order.beforeTaxUSD) || 0;
-                      const estimatedTax = parseFloat(order.estimatedTaxUSD) || 0;
-                      const amazonTotal = beforeTax + estimatedTax;
-                      const amazonExchangeRate = order.amazonExchangeRate || 87;
-                      const aTotalInr = amazonTotal * amazonExchangeRate;
-                      const marketplaceFee = aTotalInr * 0.04; // 4% of A_total-inr
+                      // Use marketplaceFee from DB
+                      const marketplaceFee = parseFloat(order.marketplaceFee) || 0;
                       return '₹' + marketplaceFee.toFixed(2);
                     })()}
                   </TableCell>
@@ -1251,13 +1158,8 @@ export default function AllOrdersSheetPage() {
                                          order.cancelStatus?.cancelState === 'CANCELLED';
                       if (isCancelled) return '₹0.00';
                       
-                      const beforeTax = parseFloat(order.beforeTaxUSD) || 0;
-                      const estimatedTax = parseFloat(order.estimatedTaxUSD) || 0;
-                      const amazonTotal = beforeTax + estimatedTax;
-                      const amazonExchangeRate = order.amazonExchangeRate || 87;
-                      const aTotalInr = amazonTotal * amazonExchangeRate;
-                      const marketplaceFee = aTotalInr * 0.04;
-                      const igst = marketplaceFee * 0.18; // 18% of marketplace fee
+                      // Use igst from DB
+                      const igst = parseFloat(order.igst) || 0;
                       return '₹' + igst.toFixed(2);
                     })()}
                   </TableCell>
@@ -1269,14 +1171,8 @@ export default function AllOrdersSheetPage() {
                                          order.cancelStatus?.cancelState === 'CANCELLED';
                       if (isCancelled) return '₹0.00';
                       
-                      const beforeTax = parseFloat(order.beforeTaxUSD) || 0;
-                      const estimatedTax = parseFloat(order.estimatedTaxUSD) || 0;
-                      const amazonTotal = beforeTax + estimatedTax;
-                      const amazonExchangeRate = order.amazonExchangeRate || 87;
-                      const aTotalInr = amazonTotal * amazonExchangeRate;
-                      const marketplaceFee = aTotalInr * 0.04;
-                      const igst = marketplaceFee * 0.18;
-                      const totalCC = marketplaceFee + igst; // Total_CC = Marketplace Fee + IGST
+                      // Use totalCC from DB
+                      const totalCC = parseFloat(order.totalCC) || 0;
                       return '₹' + totalCC.toFixed(2);
                     })()}
                   </TableCell>
@@ -1289,26 +1185,11 @@ export default function AllOrdersSheetPage() {
                                          order.cancelStatus?.cancelState === 'CANCELLED';
                       const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
                       
-                      // Calculate P.Balance based on status
-                      let pBalance;
-                      if (isCancelled) {
-                        pBalance = 0;
-                      } else if (isPartiallyRefunded) {
-                        const exchangeRate = order.exchangeRate || 82;
-                        pBalance = 1 * exchangeRate; // $1 × Exchange Rate
-                      } else {
-                        pBalance = parseFloat(order.pBalance) || 0;
-                      }
-                      
-                      const beforeTax = parseFloat(order.beforeTaxUSD) || 0;
-                      const estimatedTax = parseFloat(order.estimatedTaxUSD) || 0;
-                      const amazonTotal = beforeTax + estimatedTax;
-                      const amazonExchangeRate = order.amazonExchangeRate || 87;
-                      const aTotalInr = amazonTotal * amazonExchangeRate;
-                      const marketplaceFee = aTotalInr * 0.04;
-                      const igst = marketplaceFee * 0.18;
-                      const totalCC = marketplaceFee + igst;
-                      const profit = pBalance - aTotalInr - totalCC; // PROFIT = P.Balance - A_total-inr - Total_CC
+                      // Use all values from DB
+                      const pBalance = parseFloat(order.pBalanceINR) || 0;
+                      const aTotalInr = parseFloat(order.amazonTotalINR) || 0;
+                      const totalCC = parseFloat(order.totalCC) || 0;
+                      const profit = pBalance - aTotalInr - totalCC;
                       
                       return (
                         <Typography 

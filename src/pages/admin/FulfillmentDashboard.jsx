@@ -690,11 +690,16 @@ export default function FulfillmentDashboard() {
 
   const updateManualField = async (orderId, field, value) => {
     try {
-      await api.patch(`/ebay/orders/${orderId}/manual-fields`, { [field]: value });
+      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { [field]: value });
 
-      // Update local state immediately
+      // Update local state with the full order data (includes recalculated Amazon financials)
       setOrders(prev => prev.map(o => {
         if (o._id === orderId) {
+          // If beforeTax or estimatedTax was updated, use the full order response which includes recalculated values
+          if (field === 'beforeTax' || field === 'estimatedTax') {
+            return data.order; // Full order with recalculated amazonTotal, amazonTotalINR, marketplaceFee, igst, totalCC
+          }
+          // For other fields, just update that field
           return { ...o, [field]: value };
         }
         return o;
@@ -811,9 +816,24 @@ export default function FulfillmentDashboard() {
     if (newValue === undefined) return;
 
     try {
-      await api.post(`/ebay/orders/${orderIdStr}/update-earnings`, {
+      const { data } = await api.post(`/ebay/orders/${orderIdStr}/update-earnings`, {
         orderEarnings: parseFloat(newValue)
       });
+
+      // Update orders state with recalculated financial fields
+      setOrders(prev => prev.map(order => 
+        order._id === orderId 
+          ? { 
+              ...order, 
+              orderEarnings: data.orderEarnings,
+              tds: data.tds,
+              tid: data.tid,
+              net: data.net,
+              pBalanceINR: data.pBalanceINR,
+              ebayExchangeRate: data.ebayExchangeRate
+            }
+          : order
+      ));
 
       // Clear editing state
       setEditingOrderEarnings(prev => {
@@ -1286,6 +1306,43 @@ export default function FulfillmentDashboard() {
       navigator.clipboard.writeText(val);
       setCopiedText(val);
       setTimeout(() => setCopiedText(''), 1200);
+    }
+  };
+
+  // Handle Amazon refund received - zero out Amazon costs
+  const handleAmazonRefundReceived = async (order) => {
+    const confirmed = window.confirm(`Have you received the refund from Amazon for order ${order.orderId}?\n\nThis will set Before Tax and Estimated Tax to $0 and recalculate all dependent values.`);
+    
+    if (!confirmed) return;
+
+    try {
+      const { data } = await api.post(`/ebay/orders/${order.orderId}/amazon-refund-received`);
+      
+      // Update orders state with zeroed Amazon values
+      setOrders(prev => prev.map(o => 
+        o._id === order._id 
+          ? { 
+              ...o, 
+              beforeTaxUSD: data.beforeTaxUSD,
+              estimatedTaxUSD: data.estimatedTaxUSD,
+              amazonTotal: data.amazonTotal,
+              amazonTotalINR: data.amazonTotalINR,
+              marketplaceFee: data.marketplaceFee,
+              igst: data.igst,
+              totalCC: data.totalCC,
+              amazonExchangeRate: data.amazonExchangeRate
+            }
+          : o
+      ));
+
+      setSnackbarMsg(`Amazon refund marked as received for order ${order.orderId}`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (err) {
+      console.error('Error marking Amazon refund received:', err);
+      setSnackbarMsg(`Failed to update: ${err.response?.data?.error || err.message}`);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
     }
   };
 
@@ -2708,8 +2765,8 @@ export default function FulfillmentDashboard() {
 
                     {/* 6. Amazon Refund */}
                     {visibleColumns.includes('amazonRefund') && (
-                      <TableCell sx={{ minWidth: 150 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <TableCell sx={{ minWidth: 200 }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
                           <AutoSaveTextField
                             value={order.amazonRefund}
                             type="number"
@@ -2724,7 +2781,18 @@ export default function FulfillmentDashboard() {
                           >
                             <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
                           </IconButton>
-                        </Box>
+                          {order.beforeTaxUSD > 0 && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              onClick={() => handleAmazonRefundReceived(order)}
+                              sx={{ minWidth: 90, fontSize: '0.7rem', py: 0.5 }}
+                            >
+                              Received
+                            </Button>
+                          )}
+                        </Stack>
                       </TableCell>
                     )}
 

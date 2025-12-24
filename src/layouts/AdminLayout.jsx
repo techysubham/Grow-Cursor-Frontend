@@ -82,6 +82,7 @@ import ManageCreditCardsPage from '../pages/admin/ManageCreditCardsPage.jsx';
 import IdeasPage from '../pages/IdeasPage.jsx';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
+import SellerAnalyticsPage from '../pages/admin/SellerAnalyticsPage.jsx';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ChatIcon from '@mui/icons-material/Chat';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -275,6 +276,9 @@ export default function AdminLayout({ user, onLogout }) {
               <List component="div" disablePadding sx={{ pl: 4 }}>
                 <ListItemButton component={Link} to="/admin/order-analytics" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="Order Analytics" />
+                </ListItemButton>
+                <ListItemButton component={Link} to="/admin/seller-analytics" onClick={() => setMobileOpen(false)}>
+                  <ListItemText primary="Seller Analytics" />
                 </ListItemButton>
                 <ListItemButton component={Link} to="/admin/fulfillment" onClick={() => setMobileOpen(false)}>
                   <ListItemText primary="All Orders" />
@@ -519,6 +523,7 @@ export default function AdminLayout({ user, onLogout }) {
           {(isFulfillmentAdmin || isSuper || isHOC || isComplianceManager) && (
             <>
               <Route path="/order-analytics" element={<OrderAnalyticsPage />} />
+              <Route path="/seller-analytics" element={<SellerAnalyticsPage />} />
               <Route path="/fulfillment" element={<FulfillmentDashboard />} />
               <Route path="/all-orders-sheet" element={<AllOrdersSheetPage />} />
               <Route path="/awaiting-shipment" element={<AwaitingShipmentPage />} />
