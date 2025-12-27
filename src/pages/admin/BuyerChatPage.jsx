@@ -48,6 +48,7 @@ export default function BuyerChatPage() {
   const [searchError, setSearchError] = useState('');
   const [sellers, setSellers] = useState([]);
   const [selectedSeller, setSelectedSeller] = useState(() => getInitialState('selectedSeller', ''));
+  const [filterType, setFilterType] = useState(() => getInitialState('filterType', 'ALL'));
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingThreads, setLoadingThreads] = useState(false);
@@ -75,7 +76,8 @@ export default function BuyerChatPage() {
     const stateToSave = {
       selectedThread,
       searchQuery,
-      selectedSeller
+      selectedSeller,
+      filterType
     };
     try {
       sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(stateToSave));
@@ -174,6 +176,7 @@ export default function BuyerChatPage() {
   // Track previous values to detect actual changes
   const prevSearchQuery = useRef(searchQuery);
   const prevSelectedSeller = useRef(selectedSeller);
+  const prevFilterType = useRef(filterType);
   const isFirstRender = useRef(true);
 
   useEffect(() => {
@@ -184,9 +187,10 @@ export default function BuyerChatPage() {
     }
 
     // Only reload if values actually changed
-    if (prevSearchQuery.current !== searchQuery || prevSelectedSeller.current !== selectedSeller) {
+    if (prevSearchQuery.current !== searchQuery || prevSelectedSeller.current !== selectedSeller || prevFilterType.current !== filterType) {
       prevSearchQuery.current = searchQuery;
       prevSelectedSeller.current = selectedSeller;
+      prevFilterType.current = filterType;
 
       const delayDebounceFn = setTimeout(() => {
         setPage(1);
@@ -195,7 +199,7 @@ export default function BuyerChatPage() {
 
       return () => clearTimeout(delayDebounceFn);
     }
-  }, [searchQuery, selectedSeller]);
+  }, [searchQuery, selectedSeller, filterType]);
 
   // 2. Scroll Effect
   useEffect(() => {
@@ -291,7 +295,8 @@ export default function BuyerChatPage() {
       const params = {
         page: currentPage,
         limit: 50,
-        search: searchQuery
+        search: searchQuery,
+        filterType: filterType
       };
 
       if (selectedSeller) params.sellerId = selectedSeller;
@@ -484,6 +489,20 @@ export default function BuyerChatPage() {
                   {s.user?.username || s.user?.email}
                 </MenuItem>
               ))}
+            </Select>
+          </FormControl>
+
+          {/* MESSAGE TYPE FILTER */}
+          <FormControl fullWidth size="small" sx={{ mb: 2, bgcolor: 'white' }}>
+            <InputLabel>Filter by Type</InputLabel>
+            <Select
+              value={filterType}
+              label="Filter by Type"
+              onChange={(e) => setFilterType(e.target.value)}
+            >
+              <MenuItem value="ALL">All Messages</MenuItem>
+              <MenuItem value="ORDER">Order Related</MenuItem>
+              <MenuItem value="INQUIRY">Inquiries Only</MenuItem>
             </Select>
           </FormControl>
 
