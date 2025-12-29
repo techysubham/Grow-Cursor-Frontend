@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  Box, Paper, Typography, List, ListItem, ListItemText, ListItemAvatar,
   Avatar, TextField, Button, Divider, Badge, Stack, CircularProgress,
   IconButton, Chip, Alert, FormControl, Select, MenuItem, InputLabel, Link,
-  Snackbar
+  Snackbar, ListItemButton, Box, Paper, Typography, List, ListItem, ListItemText, ListItemAvatar
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import PersonIcon from '@mui/icons-material/Person';
@@ -49,6 +48,7 @@ export default function BuyerChatPage() {
   const [sellers, setSellers] = useState([]);
   const [selectedSeller, setSelectedSeller] = useState(() => getInitialState('selectedSeller', ''));
   const [filterType, setFilterType] = useState(() => getInitialState('filterType', 'ALL'));
+  const [filterMarketplace, setFilterMarketplace] = useState(() => getInitialState('filterMarketplace', ''));
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingThreads, setLoadingThreads] = useState(false);
@@ -77,7 +77,9 @@ export default function BuyerChatPage() {
       selectedThread,
       searchQuery,
       selectedSeller,
-      filterType
+      selectedSeller,
+      filterType,
+      filterMarketplace
     };
     try {
       sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(stateToSave));
@@ -177,6 +179,7 @@ export default function BuyerChatPage() {
   const prevSearchQuery = useRef(searchQuery);
   const prevSelectedSeller = useRef(selectedSeller);
   const prevFilterType = useRef(filterType);
+  const prevFilterMarketplace = useRef(filterMarketplace);
   const isFirstRender = useRef(true);
 
   useEffect(() => {
@@ -187,10 +190,11 @@ export default function BuyerChatPage() {
     }
 
     // Only reload if values actually changed
-    if (prevSearchQuery.current !== searchQuery || prevSelectedSeller.current !== selectedSeller || prevFilterType.current !== filterType) {
+    if (prevSearchQuery.current !== searchQuery || prevSelectedSeller.current !== selectedSeller || prevFilterType.current !== filterType || prevFilterMarketplace.current !== filterMarketplace) {
       prevSearchQuery.current = searchQuery;
       prevSelectedSeller.current = selectedSeller;
       prevFilterType.current = filterType;
+      prevFilterMarketplace.current = filterMarketplace;
 
       const delayDebounceFn = setTimeout(() => {
         setPage(1);
@@ -199,7 +203,7 @@ export default function BuyerChatPage() {
 
       return () => clearTimeout(delayDebounceFn);
     }
-  }, [searchQuery, selectedSeller, filterType]);
+  }, [searchQuery, selectedSeller, filterType, filterMarketplace]);
 
   // 2. Scroll Effect
   useEffect(() => {
@@ -296,7 +300,9 @@ export default function BuyerChatPage() {
         page: currentPage,
         limit: 50,
         search: searchQuery,
-        filterType: filterType
+        search: searchQuery,
+        filterType: filterType,
+        filterMarketplace: filterMarketplace
       };
 
       if (selectedSeller) params.sellerId = selectedSeller;
@@ -506,6 +512,24 @@ export default function BuyerChatPage() {
             </Select>
           </FormControl>
 
+          {/* MARKETPLACE FILTER */}
+          <FormControl fullWidth size="small" sx={{ mb: 2, bgcolor: 'white' }}>
+            <InputLabel>Filter by Marketplace</InputLabel>
+            <Select
+              value={filterMarketplace}
+              label="Filter by Marketplace"
+              onChange={(e) => setFilterMarketplace(e.target.value)}
+            >
+              <MenuItem value="">All Marketplaces</MenuItem>
+              <MenuItem value="EBAY_US">United States (US)</MenuItem>
+              <MenuItem value="EBAY_CA">Canada (CA)</MenuItem>
+              <MenuItem value="EBAY_AU">Australia (AU)</MenuItem>
+              <MenuItem value="EBAY_GB">United Kingdom (UK)</MenuItem>
+              <MenuItem value="EBAY_DE">Germany (DE)</MenuItem>
+              {/* Add more as needed */}
+            </Select>
+          </FormControl>
+
           <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
             <Typography variant="h6">Inbox</Typography>
             <Button
@@ -544,57 +568,83 @@ export default function BuyerChatPage() {
 
             return (
               <React.Fragment key={uniqueKey}>
-                <ListItem
-                  button
-                  selected={isSelected}
-                  onClick={() => handleThreadSelect(thread)}
-                  alignItems="flex-start"
-                >
-                  <ListItemAvatar>
-                    <Badge color="error" badgeContent={thread.unreadCount}>
-                      <Avatar sx={{
-                        bgcolor: thread.messageType === 'ORDER'
-                          ? 'primary.main'
-                          : thread.messageType === 'DIRECT'
-                            ? 'warning.main'
-                            : 'secondary.main'
-                      }}>
-                        {thread.messageType === 'ORDER'
-                          ? <ShoppingBagIcon fontSize="small" />
-                          : thread.messageType === 'DIRECT'
-                            ? <EmailIcon fontSize="small" />
-                            : <QuestionAnswerIcon fontSize="small" />
-                        }
-                      </Avatar>
-                    </Badge>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="subtitle2" noWrap sx={{ maxWidth: 140, fontWeight: 'bold' }}>
-                          {thread.buyerName || thread.buyerUsername || 'Unknown Buyer'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(thread.lastDate).toLocaleDateString()}
-                        </Typography>
-                      </Stack>
-                    }
-                    secondary={
-                      <>
-                        <Typography variant="caption" display="block" color="text.secondary" noWrap>
-                          {thread.orderId
-                            ? `#${thread.orderId}`
+                <ListItem disablePadding>
+                  <ListItemButton
+                    selected={isSelected}
+                    onClick={() => handleThreadSelect(thread)}
+                    alignItems="flex-start"
+                  >
+                    <ListItemAvatar>
+                      <Badge color="error" badgeContent={thread.unreadCount}>
+                        <Avatar sx={{
+                          bgcolor: thread.messageType === 'ORDER'
+                            ? 'primary.main'
                             : thread.messageType === 'DIRECT'
-                              ? 'Direct Message'
-                              : 'Inquiry'
-                          } • {thread.itemId === 'DIRECT_MESSAGE' ? 'No Item' : (thread.itemTitle || thread.itemId)}
-                        </Typography>
-                        <Typography variant="body2" noWrap sx={{ fontWeight: thread.unreadCount > 0 ? 'bold' : 'normal', color: 'text.primary' }}>
-                          {thread.sender === 'SELLER' ? 'You: ' : ''}{thread.lastMessage}
-                        </Typography>
-                      </>
-                    }
-                  />
+                              ? 'warning.main'
+                              : 'secondary.main'
+                        }}>
+                          {thread.messageType === 'ORDER'
+                            ? <ShoppingBagIcon fontSize="small" />
+                            : thread.messageType === 'DIRECT'
+                              ? <EmailIcon fontSize="small" />
+                              : <QuestionAnswerIcon fontSize="small" />
+                          }
+                        </Avatar>
+                      </Badge>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <Stack direction="row" justifyContent="space-between">
+                          <Typography variant="subtitle2" noWrap sx={{ maxWidth: 140, fontWeight: 'bold' }}>
+                            {thread.buyerName || thread.buyerUsername || 'Unknown Buyer'}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(thread.lastDate).toLocaleDateString()}
+                          </Typography>
+                        </Stack>
+                      }
+                      secondary={
+                        <Box>
+                          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+                            {/* MARKETPLACE BADGE */}
+                            {thread.marketplaceId && (
+                              <Chip
+                                label={thread.marketplaceId.replace('EBAY_', '')}
+                                size="small"
+                                sx={{
+                                  height: 16,
+                                  fontSize: '0.65rem',
+                                  minWidth: 24,
+                                  px: 0,
+                                  '& .MuiChip-label': { px: 0.5 },
+                                  bgcolor: thread.marketplaceId === 'EBAY_US' ? '#e3f2fd' : '#fff3e0',
+                                  color: thread.marketplaceId === 'EBAY_US' ? '#1565c0' : '#e65100',
+                                  fontWeight: 'bold'
+                                }}
+                              />
+                            )}
+                            <Typography variant="caption" display="block" color="text.secondary" noWrap>
+                              {thread.orderId
+                                ? `#${thread.orderId}`
+                                : thread.messageType === 'DIRECT'
+                                  ? 'Direct Message'
+                                  : 'Inquiry'
+                              }
+                            </Typography>
+                          </Stack>
+                          <Stack direction="row" alignItems="center">
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1, mr: 1 }}>
+                              {thread.itemId === 'DIRECT_MESSAGE' ? 'No Item' : (thread.itemTitle || thread.itemId)}
+                            </Typography>
+                          </Stack>
+
+                          <Typography variant="body2" noWrap sx={{ fontWeight: thread.unreadCount > 0 ? 'bold' : 'normal', color: 'text.primary', mt: 0.5 }}>
+                            {thread.sender === 'SELLER' ? 'You: ' : ''}{thread.lastMessage}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItemButton>
                 </ListItem>
                 <Divider component="li" />
               </React.Fragment>
@@ -621,330 +671,349 @@ export default function BuyerChatPage() {
             </Typography>
           )}
         </List>
-      </Paper>
+      </Paper >
 
       {/* RIGHT: CHAT AREA (Keep exactly the same) */}
-      <Paper sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      < Paper sx={{ flex: 1, display: 'flex', flexDirection: 'column' }
+      }>
         {/* ... existing chat area code ... */}
-        {selectedThread ? (
-          <>
-            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', position: 'relative' }}>
+        {
+          selectedThread ? (
+            <>
+              <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', position: 'relative' }}>
 
-              {/* --- NEW: TOP RIGHT CORNER (Seller + Close) --- */}
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                sx={{ position: 'absolute', top: 12, right: 12 }}
-              >
-
-                {/* 1. DROPDOWN: Conversation About */}
-                <FormControl size="small" sx={{ minWidth: 140 }}>
-                  <InputLabel sx={{ fontSize: '0.8rem' }}>About</InputLabel>
-                  <Select
-                    value={metaCategory}
-                    label="About"
-                    onChange={(e) => setMetaCategory(e.target.value)}
-                    sx={{ height: 32, fontSize: '0.8rem' }}
-                  >
-                    <MenuItem value="INR">INR</MenuItem>
-                    <MenuItem value="Cancellation">Cancellation</MenuItem>
-                    <MenuItem value="Return">Return</MenuItem>
-                    <MenuItem value="Out of Stock">Out of Stock</MenuItem>
-                    <MenuItem value="Issue with Product">Issue with Product</MenuItem>
-                    <MenuItem value="Inquiry">Inquiry</MenuItem>
-                  </Select>
-                </FormControl>
-
-                {/* 2. DROPDOWN: Case Status */}
-                <FormControl size="small" sx={{ minWidth: 140 }}>
-                  <InputLabel sx={{ fontSize: '0.8rem' }}>Case</InputLabel>
-                  <Select
-                    value={metaCaseStatus}
-                    label="Case"
-                    onChange={(e) => setMetaCaseStatus(e.target.value)}
-                    sx={{ height: 32, fontSize: '0.8rem' }}
-                  >
-                    <MenuItem value="Case Opened">Case Opened</MenuItem>
-                    <MenuItem value="Case Not Opened">Case Not Opened</MenuItem>
-                  </Select>
-                </FormControl>
-
-                {/* 3. SAVE BUTTON */}
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={handleSaveMeta}
-                  disabled={savingMeta}
-                  sx={{ minWidth: 40, height: 32, px: 1 }}
+                {/* --- NEW: TOP RIGHT CORNER (Seller + Close) --- */}
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ position: 'absolute', top: 12, right: 12 }}
                 >
-                  {savingMeta ? <CircularProgress size={16} color="inherit" /> : <SaveIcon fontSize="small" />}
-                </Button>
+
+                  {/* 1. DROPDOWN: Conversation About */}
+                  <FormControl size="small" sx={{ minWidth: 140 }}>
+                    <InputLabel sx={{ fontSize: '0.8rem' }}>About</InputLabel>
+                    <Select
+                      value={metaCategory}
+                      label="About"
+                      onChange={(e) => setMetaCategory(e.target.value)}
+                      sx={{ height: 32, fontSize: '0.8rem' }}
+                    >
+                      <MenuItem value="INR">INR</MenuItem>
+                      <MenuItem value="Cancellation">Cancellation</MenuItem>
+                      <MenuItem value="Return">Return</MenuItem>
+                      <MenuItem value="Out of Stock">Out of Stock</MenuItem>
+                      <MenuItem value="Issue with Product">Issue with Product</MenuItem>
+                      <MenuItem value="Inquiry">Inquiry</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  {/* 2. DROPDOWN: Case Status */}
+                  <FormControl size="small" sx={{ minWidth: 140 }}>
+                    <InputLabel sx={{ fontSize: '0.8rem' }}>Case</InputLabel>
+                    <Select
+                      value={metaCaseStatus}
+                      label="Case"
+                      onChange={(e) => setMetaCaseStatus(e.target.value)}
+                      sx={{ height: 32, fontSize: '0.8rem' }}
+                    >
+                      <MenuItem value="Case Opened">Case Opened</MenuItem>
+                      <MenuItem value="Case Not Opened">Case Not Opened</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  {/* 3. SAVE BUTTON */}
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={handleSaveMeta}
+                    disabled={savingMeta}
+                    sx={{ minWidth: 40, height: 32, px: 1 }}
+                  >
+                    {savingMeta ? <CircularProgress size={16} color="inherit" /> : <SaveIcon fontSize="small" />}
+                  </Button>
 
 
-                {/* Seller Name */}
-                <Chip
-                  label={getSellerName(selectedThread.sellerId)}
-                  size="small"
-                  icon={<PersonIcon style={{ fontSize: 20 }} />}
-                  sx={{
-                    bgcolor: '#e3f2fd',
-                    color: '#1565c0',
-                    fontWeight: 'bold',
-                    height: 30,
-                    fontSize: '1rem'
-                  }}
-                />
-                {selectedThread.isNew && <Chip label="New" size="small" color="success" sx={{ height: 24 }} />}
+                  {/* Seller Name */}
+                  <Chip
+                    label={getSellerName(selectedThread.sellerId)}
+                    size="small"
+                    icon={<PersonIcon style={{ fontSize: 20 }} />}
+                    sx={{
+                      bgcolor: '#e3f2fd',
+                      color: '#1565c0',
+                      fontWeight: 'bold',
+                      height: 30,
+                      fontSize: '1rem'
+                    }}
+                  />
+                  {selectedThread.isNew && <Chip label="New" size="small" color="success" sx={{ height: 24 }} />}
 
-                {/* Close Button */}
-                <IconButton
-                  onClick={() => setSelectedThread(null)}
-                  size="small"
-                  sx={{ color: 'text.disabled', ml: 1 }}
-                >
-                  <CloseIcon />
-                </IconButton>
-              </Stack>
-
-              {/* --- MAIN CONTENT (Left Side) --- */}
-              <Stack spacing={1.5} sx={{ pr: 12 }}> {/* Added Padding Right to avoid overlapping the chip */}
-
-                {/* 1. BUYER IDENTITY */}
-                <Stack direction="row" alignItems="center" spacing={3} sx={{ mt: 0.5 }}>
-                  <Box>
-                    <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                      Buyer Name
-                    </Typography>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1 }}>
-                      {selectedThread.buyerName || '-'}
-                    </Typography>
-                  </Box>
-
-                  <Divider orientation="vertical" flexItem sx={{ height: 20, alignSelf: 'center', opacity: 0.5 }} />
-
-                  <Box>
-                    <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                      Username
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', px: 0.5, borderRadius: 0.5 }}>
-                      {selectedThread.buyerUsername}
-                    </Typography>
-                  </Box>
+                  {/* Close Button */}
+                  <IconButton
+                    onClick={() => setSelectedThread(null)}
+                    size="small"
+                    sx={{ color: 'text.disabled', ml: 1 }}
+                  >
+                    <CloseIcon />
+                  </IconButton>
                 </Stack>
 
+                {/* --- MAIN CONTENT (Left Side) --- */}
+                <Stack spacing={1.5} sx={{ pr: 12 }}> {/* Added Padding Right to avoid overlapping the chip */}
 
-                {/* 2. PRODUCT & ORDER */}
-                <Box>
-                  {/* DIRECT MESSAGE - No item link */}
-                  {selectedThread.itemId === 'DIRECT_MESSAGE' ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <EmailIcon sx={{ fontSize: 20, color: 'warning.main' }} />
-                      <Typography
-                        variant="subtitle2"
-                        sx={{
-                          color: 'warning.main',
-                          fontWeight: 600,
-                          lineHeight: 1.3
-                        }}
-                      >
-                        Direct Message (No Item Context)
+                  {/* 1. BUYER IDENTITY */}
+                  <Stack direction="row" alignItems="center" spacing={3} sx={{ mt: 0.5 }}>
+                    <Box>
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                        Buyer Name
                       </Typography>
-                      <Chip
-                        label="Cannot Reply via API"
-                        size="small"
-                        color="warning"
-                        sx={{ height: 24, fontSize: '0.7rem' }}
-                      />
-                    </Box>
-                  ) : (
-                    /* REGULAR ITEM LINK */
-                    <Link
-                      href={`https://www.ebay.com/itm/${selectedThread.itemId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      underline="hover"
-                      sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5 }}
-                    >
-                      <Typography
-                        variant="subtitle2"
-                        sx={{
-                          color: 'primary.main',
-                          fontWeight: 600,
-                          lineHeight: 1.3
-                        }}
-                      >
-                        {selectedThread.itemTitle || `Item ID: ${selectedThread.itemId}`}
-                      </Typography>
-                      <OpenInNewIcon sx={{ fontSize: 16, color: 'primary.main', mt: 0.3 }} />
-                    </Link>
-                  )}
-
-                  {selectedThread.orderId && (
-                    <Chip
-                      label={`Order #: ${selectedThread.orderId}`}
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        borderRadius: 1,
-                        height: 30,
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold',
-                        color: 'text.secondary',
-                        borderColor: 'divider',
-                        bgcolor: '#fafafa'
-                      }}
-                    />
-                  )}
-                </Box>
-
-              </Stack>
-            </Box>
-
-            <Box sx={{ flex: 1, p: 2, overflowY: 'auto', bgcolor: '#f0f2f5' }}>
-              {loadingMessages ? (
-                <Box display="flex" justifyContent="center" mt={4}><CircularProgress /></Box>
-              ) : (
-                <Stack spacing={2}>
-                  {messages.length === 0 && selectedThread.isNew && (
-                    <Alert severity="info">Start the conversation by typing a welcome message below!</Alert>
-                  )}
-
-                  {messages.map((msg) => (
-                    <Box
-                      key={msg._id}
-                      sx={{
-                        alignSelf: msg.sender === 'SELLER' ? 'flex-end' : 'flex-start',
-                        maxWidth: '70%'
-                      }}
-                    >
-                      <Paper
-                        elevation={1}
-                        sx={{
-                          p: 1.5,
-                          bgcolor: msg.sender === 'SELLER' ? '#1976d2' : '#ffffff',
-                          color: msg.sender === 'SELLER' ? '#fff' : 'text.primary',
-                          borderRadius: 2,
-                          position: 'relative'
-                        }}
-                      >
-                        {/* TEXT */}
-                        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{msg.body}</Typography>
-
-                        {/* IMAGES */}
-                        {msg.mediaUrls && msg.mediaUrls.length > 0 && (
-                          <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            {msg.mediaUrls.map((url, idx) => {
-                              const fileName = url.split('/').pop() || 'Attachment';
-                              return (
-                                <Chip
-                                  key={idx}
-                                  icon={<AttachFileIcon />}
-                                  label={fileName}
-                                  onClick={() => window.open(url, '_blank')}
-                                  sx={{
-                                    cursor: 'pointer',
-                                    bgcolor: msg.sender === 'SELLER' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
-                                    color: 'inherit',
-                                    maxWidth: 200
-                                  }}
-                                />
-                              );
-                            })}
-                          </Box>
-                        )}
-                      </Paper>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, textAlign: msg.sender === 'SELLER' ? 'right' : 'left' }}>
-                        {new Date(msg.messageDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        {msg.sender === 'SELLER' && (msg.read ? ' • Read' : ' • Sent')}
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1 }}>
+                        {selectedThread.buyerName || '-'}
                       </Typography>
                     </Box>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </Stack>
-              )}
-            </Box>
 
-            <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: '#fff', display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {selectedThread.itemId === 'DIRECT_MESSAGE' ? (
-                <Alert severity="warning" sx={{ width: '100%' }}>
-                  <strong>Direct messages cannot be replied to via API.</strong> These are account-level messages without item context. Please respond through eBay's messaging center directly.
-                </Alert>
-              ) : (
-                <>
-                  {/* ATTACHMENT PREVIEWS */}
-                  {attachments.length > 0 && (
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
-                      {attachments.map((att, idx) => (
+                    <Divider orientation="vertical" flexItem sx={{ height: 20, alignSelf: 'center', opacity: 0.5 }} />
+
+                    <Box>
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                        Username
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', px: 0.5, borderRadius: 0.5 }}>
+                        {selectedThread.buyerUsername}
+                      </Typography>
+                    </Box>
+                  </Stack>
+
+
+                  {/* 2. PRODUCT & ORDER */}
+                  <Box>
+                    {/* DIRECT MESSAGE - No item link */}
+                    {selectedThread.itemId === 'DIRECT_MESSAGE' ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <EmailIcon sx={{ fontSize: 20, color: 'warning.main' }} />
+                        <Typography
+                          variant="subtitle2"
+                          sx={{
+                            color: 'warning.main',
+                            fontWeight: 600,
+                            lineHeight: 1.3
+                          }}
+                        >
+                          Direct Message (No Item Context)
+                        </Typography>
                         <Chip
-                          key={idx}
-                          label={att.name}
-                          onDelete={() => handleRemoveAttachment(idx)}
-                          variant="outlined"
+                          label="Cannot Reply via API"
                           size="small"
-                          sx={{ maxWidth: 200 }}
+                          color="warning"
+                          sx={{ height: 24, fontSize: '0.7rem' }}
                         />
-                      ))}
-                    </Box>
-                  )}
+                      </Box>
+                    ) : (
+                      /* REGULAR ITEM LINK */
+                      <Link
+                        href={`https://www.ebay.com/itm/${selectedThread.itemId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        underline="hover"
+                        sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5 }}
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          sx={{
+                            color: 'primary.main',
+                            fontWeight: 600,
+                            lineHeight: 1.3
+                          }}
+                        >
+                          {selectedThread.itemTitle || `Item ID: ${selectedThread.itemId}`}
+                        </Typography>
+                        <OpenInNewIcon sx={{ fontSize: 16, color: 'primary.main', mt: 0.3 }} />
+                      </Link>
+                    )}
 
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                    />
-                    <IconButton
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading || sending}
-                      sx={{ alignSelf: 'flex-end', mb: 0.5 }}
-                    >
-                      {uploading ? <CircularProgress size={24} /> : <AttachFileIcon />}
-                    </IconButton>
-
-                    <TextField
-                      fullWidth
-                      multiline
-                      placeholder="Type a message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      disabled={sending}
-                    />
-                    <Button
-                      variant="contained"
-                      sx={{ px: 3, alignSelf: 'flex-end', mb: 0.5 }}
-                      endIcon={sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
-                      onClick={handleSendMessage}
-                      disabled={sending || (!newMessage.trim() && attachments.length === 0)}
-                    >
-                      Send
-                    </Button>
+                    {selectedThread.orderId && (
+                      <Chip
+                        label={`Order #: ${selectedThread.orderId}`}
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          borderRadius: 1,
+                          height: 30,
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                          color: 'text.secondary',
+                          borderColor: 'divider',
+                          bgcolor: '#fafafa'
+                        }}
+                      />
+                    )}
+                    {/* MARKETPLACE BADGE (In Header) */}
+                    {selectedThread.marketplaceId && (
+                      <Chip
+                        label={selectedThread.marketplaceId.replace('EBAY_', '')}
+                        size="small"
+                        sx={{
+                          ml: 1,
+                          borderRadius: 1,
+                          height: 30,
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                          bgcolor: selectedThread.marketplaceId === 'EBAY_US' ? '#e3f2fd' : '#fff3e0',
+                          color: selectedThread.marketplaceId === 'EBAY_US' ? '#1565c0' : '#e65100',
+                        }}
+                      />
+                    )}
                   </Box>
-                </>
-              )}
+
+                </Stack>
+              </Box>
+
+              <Box sx={{ flex: 1, p: 2, overflowY: 'auto', bgcolor: '#f0f2f5' }}>
+                {loadingMessages ? (
+                  <Box display="flex" justifyContent="center" mt={4}><CircularProgress /></Box>
+                ) : (
+                  <Stack spacing={2}>
+                    {messages.length === 0 && selectedThread.isNew && (
+                      <Alert severity="info">Start the conversation by typing a welcome message below!</Alert>
+                    )}
+
+                    {messages.map((msg) => (
+                      <Box
+                        key={msg._id}
+                        sx={{
+                          alignSelf: msg.sender === 'SELLER' ? 'flex-end' : 'flex-start',
+                          maxWidth: '70%'
+                        }}
+                      >
+                        <Paper
+                          elevation={1}
+                          sx={{
+                            p: 1.5,
+                            bgcolor: msg.sender === 'SELLER' ? '#1976d2' : '#ffffff',
+                            color: msg.sender === 'SELLER' ? '#fff' : 'text.primary',
+                            borderRadius: 2,
+                            position: 'relative'
+                          }}
+                        >
+                          {/* TEXT */}
+                          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{msg.body}</Typography>
+
+                          {/* IMAGES */}
+                          {msg.mediaUrls && msg.mediaUrls.length > 0 && (
+                            <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                              {msg.mediaUrls.map((url, idx) => {
+                                const fileName = url.split('/').pop() || 'Attachment';
+                                return (
+                                  <Chip
+                                    key={idx}
+                                    icon={<AttachFileIcon />}
+                                    label={fileName}
+                                    onClick={() => window.open(url, '_blank')}
+                                    sx={{
+                                      cursor: 'pointer',
+                                      bgcolor: msg.sender === 'SELLER' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                                      color: 'inherit',
+                                      maxWidth: 200
+                                    }}
+                                  />
+                                );
+                              })}
+                            </Box>
+                          )}
+                        </Paper>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, textAlign: msg.sender === 'SELLER' ? 'right' : 'left' }}>
+                          {new Date(msg.messageDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {msg.sender === 'SELLER' && (msg.read ? ' • Read' : ' • Sent')}
+                        </Typography>
+                      </Box>
+                    ))}
+                    <div ref={messagesEndRef} />
+                  </Stack>
+                )}
+              </Box>
+
+              <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: '#fff', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {selectedThread.itemId === 'DIRECT_MESSAGE' ? (
+                  <Alert severity="warning" sx={{ width: '100%' }}>
+                    <strong>Direct messages cannot be replied to via API.</strong> These are account-level messages without item context. Please respond through eBay's messaging center directly.
+                  </Alert>
+                ) : (
+                  <>
+                    {/* ATTACHMENT PREVIEWS */}
+                    {attachments.length > 0 && (
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                        {attachments.map((att, idx) => (
+                          <Chip
+                            key={idx}
+                            label={att.name}
+                            onDelete={() => handleRemoveAttachment(idx)}
+                            variant="outlined"
+                            size="small"
+                            sx={{ maxWidth: 200 }}
+                          />
+                        ))}
+                      </Box>
+                    )}
+
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                      />
+                      <IconButton
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading || sending}
+                        sx={{ alignSelf: 'flex-end', mb: 0.5 }}
+                      >
+                        {uploading ? <CircularProgress size={24} /> : <AttachFileIcon />}
+                      </IconButton>
+
+                      <TextField
+                        fullWidth
+                        multiline
+                        placeholder="Type a message..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
+                        disabled={sending}
+                      />
+                      <Button
+                        variant="contained"
+                        sx={{ px: 3, alignSelf: 'flex-end', mb: 0.5 }}
+                        endIcon={sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
+                        onClick={handleSendMessage}
+                        disabled={sending || (!newMessage.trim() && attachments.length === 0)}
+                      >
+                        Send
+                      </Button>
+                    </Box>
+                  </>
+                )}
+              </Box>
+            </>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', bgcolor: '#fafafa' }}>
+              <Stack alignItems="center" spacing={1}>
+                <QuestionAnswerIcon sx={{ fontSize: 60, color: 'text.secondary', opacity: 0.2 }} />
+                <Typography color="text.secondary">Select a conversation or search an Order ID</Typography>
+              </Stack>
             </Box>
-          </>
-        ) : (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', bgcolor: '#fafafa' }}>
-            <Stack alignItems="center" spacing={1}>
-              <QuestionAnswerIcon sx={{ fontSize: 60, color: 'text.secondary', opacity: 0.2 }} />
-              <Typography color="text.secondary">Select a conversation or search an Order ID</Typography>
-            </Stack>
-          </Box>
-        )}
-      </Paper>
+          )
+        }
+      </Paper >
 
       {/* Snackbar for sync results */}
-      <Snackbar
+      < Snackbar
         open={snackbarOpen}
         autoHideDuration={8000}
         onClose={() => setSnackbarOpen(false)}
@@ -963,7 +1032,7 @@ export default function BuyerChatPage() {
         >
           {snackbarMsg}
         </Alert>
-      </Snackbar>
-    </Box>
+      </Snackbar >
+    </Box >
   );
 }
