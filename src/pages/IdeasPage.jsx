@@ -124,7 +124,9 @@ export default function IdeasPage() {
 
   const handlePickedUpByChange = async (ideaId, newPickedUpBy) => {
     try {
-      await api.patch(`/ideas/${ideaId}`, { pickedUpBy: newPickedUpBy });
+      console.log('Updating pickedUpBy:', { ideaId, newPickedUpBy });
+      const response = await api.patch(`/ideas/${ideaId}`, { pickedUpBy: newPickedUpBy });
+      console.log('Update response:', response.data);
       fetchIdeas();
     } catch (err) {
       console.error('Error updating picked up by:', err);
