@@ -122,6 +122,16 @@ export default function IdeasPage() {
     }
   };
 
+  const handlePickedUpByChange = async (ideaId, newPickedUpBy) => {
+    try {
+      await api.patch(`/ideas/${ideaId}`, { pickedUpBy: newPickedUpBy });
+      fetchIdeas();
+    } catch (err) {
+      console.error('Error updating picked up by:', err);
+      alert('Failed to update picked up by');
+    }
+  };
+
   const handleDelete = async (ideaId) => {
     if (!window.confirm('Are you sure you want to delete this idea?')) {
       return;
@@ -278,6 +288,7 @@ export default function IdeasPage() {
                   <TableCell><strong>Type</strong></TableCell>
                   <TableCell><strong>Priority</strong></TableCell>
                   <TableCell><strong>Status</strong></TableCell>
+                  <TableCell><strong>Picked Up By</strong></TableCell>
                   <TableCell><strong>Complete By</strong></TableCell>
                   <TableCell><strong>Created By</strong></TableCell>
                   <TableCell><strong>Actions</strong></TableCell>
@@ -373,6 +384,23 @@ export default function IdeasPage() {
                         <MenuItem value="open">Open</MenuItem>
                         <MenuItem value="in-progress">In Progress</MenuItem>
                         <MenuItem value="completed">Completed</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </TableCell>
+                  <TableCell>
+                    <FormControl size="small" fullWidth sx={{ minWidth: 120 }}>
+                      <Select
+                        value={idea.pickedUpBy || ''}
+                        onChange={(e) => handlePickedUpByChange(idea._id, e.target.value)}
+                        displayEmpty
+                        sx={{
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        <MenuItem value="">-</MenuItem>
+                        <MenuItem value="aaryan">aaryan</MenuItem>
+                        <MenuItem value="rajarshi">rajarshi</MenuItem>
+                        <MenuItem value="prassanna">prassanna</MenuItem>
                       </Select>
                     </FormControl>
                   </TableCell>
