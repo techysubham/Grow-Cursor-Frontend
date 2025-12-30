@@ -16,6 +16,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SaveIcon from '@mui/icons-material/Save';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import MarkAsUnreadIcon from '@mui/icons-material/MarkAsUnread';
 import api from '../../lib/api';
 
 // Session storage key for persisting state
@@ -70,6 +71,7 @@ export default function BuyerChatPage() {
 
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [markingUnread, setMarkingUnread] = useState(false);
 
   // Persist state to sessionStorage
   useEffect(() => {
@@ -472,6 +474,53 @@ export default function BuyerChatPage() {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   }
 
+  async function handleMarkAsUnread() {
+    if (!selectedThread) return;
+
+    setMarkingUnread(true);
+    try {
+      const payload = {
+        orderId: selectedThread.orderId,
+        buyerUsername: selectedThread.buyerUsername,
+        itemId: selectedThread.itemId
+      };
+
+      await api.post('/ebay/chat/mark-unread', payload);
+
+      // Update local thread state to show unread badge
+      setThreads(prevThreads =>
+        prevThreads.map(t => {
+          const isMatch = t.orderId
+            ? t.orderId === selectedThread.orderId
+            : (t.buyerUsername === selectedThread.buyerUsername && t.itemId === selectedThread.itemId);
+
+          if (isMatch) {
+            // Count buyer messages to set unread count
+            const buyerMessageCount = messages.filter(m => m.sender === 'BUYER').length;
+            return { ...t, unreadCount: buyerMessageCount };
+          }
+          return t;
+        })
+      );
+
+      // Show success notification
+      setSnackbarMsg('Conversation marked as unread');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+
+      // Close conversation
+      setSelectedThread(null);
+      setMessages([]);
+
+    } catch (err) {
+      setSnackbarMsg('Failed to mark as unread: ' + (err.response?.data?.error || err.message));
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setMarkingUnread(false);
+    }
+  }
+
   return (
     <Box sx={{ display: 'flex', height: '85vh', gap: 2 }}>
 
@@ -746,6 +795,20 @@ export default function BuyerChatPage() {
                     }}
                   />
                   {selectedThread.isNew && <Chip label="New" size="small" color="success" sx={{ height: 24 }} />}
+
+                  {/* Mark as Unread Button */}
+                  {!selectedThread.isNew && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleMarkAsUnread}
+                      disabled={markingUnread}
+                      startIcon={markingUnread ? <CircularProgress size={16} color="inherit" /> : <MarkAsUnreadIcon fontSize="small" />}
+                      sx={{ height: 30, fontSize: '0.75rem' }}
+                    >
+                      {markingUnread ? 'Marking...' : 'Mark Unread'}
+                    </Button>
+                  )}
 
                   {/* Close Button */}
                   <IconButton
