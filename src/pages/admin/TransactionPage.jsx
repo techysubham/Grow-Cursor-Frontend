@@ -24,7 +24,8 @@ import {
     CardContent,
     Stack,
     ToggleButton,
-    ToggleButtonGroup
+    ToggleButtonGroup,
+    Divider
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -205,22 +206,48 @@ const TransactionPage = () => {
             {/* Credit Card Summary Cards */}
             {creditCardSummary.length > 0 && (
                 <>
-                    <Typography variant="h6" gutterBottom>Credit Cards (Total Transferred)</Typography>
+                    <Typography variant="h6" gutterBottom>Credit Card Balance Summary</Typography>
                     <Grid container spacing={2} sx={{ mb: 3 }}>
                         {creditCardSummary.map((item) => (
-                            <Grid item xs={12} sm={6} md={3} key={item._id}>
+                            <Grid item xs={12} sm={6} md={4} key={item._id}>
                                 <Card>
                                     <CardContent>
-                                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                            <Box>
-                                                <Typography color="text.secondary" variant="body2">
-                                                    {item.cardName}
+                                        <Typography color="text.secondary" variant="body2" gutterBottom>
+                                            {item.cardName}
+                                        </Typography>
+                                        
+                                        {/* Remaining Balance - Primary Display */}
+                                        <Typography 
+                                            variant="h4" 
+                                            sx={{ 
+                                                mt: 1, 
+                                                mb: 2,
+                                                color: item.balance < 0 ? 'error.main' : 'success.main',
+                                                fontWeight: 'bold'
+                                            }}
+                                        >
+                                            ₹{item.balance.toFixed(2)}
+                                        </Typography>
+                                        
+                                        {/* Breakdown */}
+                                        <Divider sx={{ mb: 1 }} />
+                                        <Stack spacing={0.5}>
+                                            <Stack direction="row" justifyContent="space-between">
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Transferred:
                                                 </Typography>
-                                                <Typography variant="h5" sx={{ mt: 1, color: 'primary.main' }}>
-                                                    ₹{item.balance.toFixed(2)}
+                                                <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 'medium' }}>
+                                                    +₹{item.totalTransferred.toFixed(2)}
                                                 </Typography>
-                                            </Box>
-                                            <AccountBalanceIcon sx={{ fontSize: 40, color: 'secondary.main', opacity: 0.3 }} />
+                                            </Stack>
+                                            <Stack direction="row" justifyContent="space-between">
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Spent (Orders):
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 'medium' }}>
+                                                    -₹{item.totalSpent.toFixed(2)}
+                                                </Typography>
+                                            </Stack>
                                         </Stack>
                                     </CardContent>
                                 </Card>
