@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Select,
-  Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Paper, Alert
+  Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Paper, Alert,
+  Checkbox, ListItemText, OutlinedInput, Chip, InputAdornment
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import api from '../../lib/api.js';
 
 export default function ProductResearchPage() {
@@ -15,10 +17,29 @@ export default function ProductResearchPage() {
   const [subcategories, setSubcategories] = useState([]);
   const [form, setForm] = useState({ productTitle: '', supplierLink: '', sourcePlatformId: '', categoryId: '', subcategoryId: '', marketplace: '' });
   const [errors, setErrors] = useState({});
+
+  // Filter states
+  const [searchTitle, setSearchTitle] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const currentUser = useMemo(() => {
     const raw = localStorage.getItem('user');
     return raw ? JSON.parse(raw) : null;
   }, []);
+
+  // Filtered rows based on search and category filters
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      // Filter by product title (case-insensitive)
+      const matchesTitle = !searchTitle || 
+        row.productTitle?.toLowerCase().includes(searchTitle.toLowerCase());
+      
+      // Filter by selected categories (if any selected)
+      const matchesCategory = selectedCategories.length === 0 || 
+        selectedCategories.includes(row.category?._id);
+      
+      return matchesTitle && matchesCategory;
+    });
+  }, [rows, searchTitle, selectedCategories]);
 
   const marketplaces = [
     { value: 'EBAY_US', label: 'eBay US' },
@@ -103,6 +124,68 @@ export default function ProductResearchPage() {
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
         <Button variant="contained" onClick={() => setOpen(true)}>Create</Button>
       </Box>
+
+      {/* Filter Section */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+          {/* Product Title Search */}
+          <TextField
+            label="Search Product Title"
+            size="small"
+            value={searchTitle}
+            onChange={(e) => setSearchTitle(e.target.value)}
+            sx={{ minWidth: 250 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {/* Category Multi-Select */}
+          <FormControl size="small" sx={{ minWidth: 300 }}>
+            <InputLabel>Filter by Category</InputLabel>
+            <Select
+              multiple
+              value={selectedCategories}
+              onChange={(e) => setSelectedCategories(e.target.value)}
+              input={<OutlinedInput label="Filter by Category" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((id) => {
+                    const cat = categories.find(c => c._id === id);
+                    return <Chip key={id} label={cat?.name || id} size="small" />;
+                  })}
+                </Box>
+              )}
+            >
+              {categories.map((cat) => (
+                <MenuItem key={cat._id} value={cat._id}>
+                  <Checkbox checked={selectedCategories.includes(cat._id)} />
+                  <ListItemText primary={cat.name} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Clear Filters Button */}
+          {(searchTitle || selectedCategories.length > 0) && (
+            <Button 
+              variant="outlined" 
+              size="small"
+              onClick={() => {
+                setSearchTitle('');
+                setSelectedCategories([]);
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
+        </Stack>
+      </Paper>
+
       <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>
@@ -121,7 +204,7 @@ export default function ProductResearchPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {rows.map((r, idx) => (
+            {filteredRows.map((r, idx) => (
               <TableRow key={r._id}>
                 <TableCell>{idx + 1}</TableCell>
                 <TableCell>{new Date(r.date).toLocaleDateString()}</TableCell>
