@@ -333,10 +333,17 @@ const TransactionPage = () => {
                                 fullWidth
                                 value={formData.creditCardName || ''}
                                 onChange={(e) => setFormData({ ...formData, creditCardName: e.target.value })}
+                                InputLabelProps={{ shrink: true }}
+                                SelectProps={{
+                                    displayEmpty: true,
+                                    renderValue: (value) => {
+                                        if (!value) return 'Skip';
+                                        const selectedCard = creditCards.find(card => card._id === value);
+                                        return selectedCard?.name || '';
+                                    }
+                                }}
                             >
-                                <MenuItem value="">
-                                    <em>None</em>
-                                </MenuItem>
+                                <MenuItem value="">Skip</MenuItem>
                                 {creditCards.map((card) => (
                                     <MenuItem key={card._id} value={card._id}>
                                         {card.name}
