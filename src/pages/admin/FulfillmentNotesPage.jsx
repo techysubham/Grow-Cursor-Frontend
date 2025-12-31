@@ -641,7 +641,7 @@ export default function FulfillmentNotesPage() {
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
 
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
-
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, minWidth: 200 }}>Item Details</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, minWidth: 300 }}>Fulfillment Notes</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, align: 'center' }}>Chat</TableCell>
                 </TableRow>
@@ -682,6 +682,33 @@ export default function FulfillmentNotesPage() {
                             {order.buyer?.buyerRegistrationAddress?.fullName || '-'}
                           </Typography>
                         </Tooltip>
+                      </TableCell>
+
+                      <TableCell>
+                        <Stack spacing={0.5}>
+                          <Tooltip title={firstItem.title || 'No product info'} arrow>
+                            <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180, fontWeight: 500 }}>
+                              {firstItem.title || '-'}
+                            </Typography>
+                          </Tooltip>
+                          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                            <Chip 
+                              label={`Qty: ${itemCount}`}
+                              size="small"
+                              variant="outlined"
+                            />
+                            {hasMultipleItems && (
+                              <Tooltip title={`${itemCount} items in this order`} arrow>
+                                <Chip 
+                                  label="Multiple"
+                                  size="small"
+                                  color="warning"
+                                  variant="filled"
+                                />
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        </Stack>
                       </TableCell>
 
                       <TableCell>
