@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import {
   Box,
   Paper,
@@ -33,7 +33,104 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SaveIcon from '@mui/icons-material/Save';
 import api from '../lib/api';
+
+// Memoized NotesCell component to prevent unnecessary re-renders
+const NotesCell = memo(({ ideaId, initialNotes, onSave }) => {
+  const [localNotes, setLocalNotes] = useState(initialNotes || '');
+  const [isEditing, setIsEditing] = useState(false);
+
+  const hasChanges = localNotes !== (initialNotes || '');
+
+  const handleSave = useCallback(() => {
+    if (hasChanges) {
+      onSave(ideaId, localNotes);
+      setIsEditing(false);
+    }
+  }, [ideaId, localNotes, hasChanges, onSave]);
+
+  const handleFocus = useCallback(() => {
+    setIsEditing(true);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setIsEditing(false);
+  }, []);
+
+  return (
+    <TableCell sx={{ minWidth: 250, maxWidth: 300 }}>
+      {!isEditing && localNotes ? (
+        <Tooltip 
+          title={localNotes}
+          arrow 
+          placement="top"
+          componentsProps={{
+            tooltip: {
+              sx: {
+                bgcolor: 'rgba(0, 0, 0, 0.9)',
+                fontSize: '0.875rem',
+                maxWidth: 500,
+                p: 1.5,
+                whiteSpace: 'pre-wrap'
+              }
+            }
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <TextField
+              size="small"
+              fullWidth
+              multiline
+              maxRows={5}
+              placeholder="Add progress notes..."
+              value={localNotes}
+              onChange={(e) => setLocalNotes(e.target.value)}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              sx={{ fontSize: '0.875rem' }}
+            />
+            {hasChanges && (
+              <IconButton
+                size="small"
+                color="primary"
+                onClick={handleSave}
+                title="Save notes"
+              >
+                <SaveIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
+        </Tooltip>
+      ) : (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <TextField
+            size="small"
+            fullWidth
+            multiline
+            maxRows={5}
+            placeholder="Add progress notes..."
+            value={localNotes}
+            onChange={(e) => setLocalNotes(e.target.value)}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            sx={{ fontSize: '0.875rem' }}
+          />
+          {hasChanges && (
+            <IconButton
+              size="small"
+              color="primary"
+              onClick={handleSave}
+              title="Save notes"
+            >
+              <SaveIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Box>
+      )}
+    </TableCell>
+  );
+});
 
 export default function IdeasPage() {
   const [ideas, setIdeas] = useState([]);
@@ -133,6 +230,16 @@ export default function IdeasPage() {
       alert('Failed to update picked up by');
     }
   };
+
+  const handleNotesChange = useCallback(async (ideaId, notes) => {
+    try {
+      await api.patch(`/ideas/${ideaId}`, { notes });
+      fetchIdeas();
+    } catch (err) {
+      console.error('Error updating notes:', err);
+      alert('Failed to update notes');
+    }
+  }, []);
 
   const handleDelete = async (ideaId) => {
     if (!window.confirm('Are you sure you want to delete this idea?')) {
@@ -291,6 +398,7 @@ export default function IdeasPage() {
                   <TableCell><strong>Priority</strong></TableCell>
                   <TableCell><strong>Status</strong></TableCell>
                   <TableCell><strong>Picked Up By</strong></TableCell>
+                  <TableCell><strong>Notes</strong></TableCell>
                   <TableCell><strong>Complete By</strong></TableCell>
                   <TableCell><strong>Created By</strong></TableCell>
                   <TableCell><strong>Actions</strong></TableCell>
@@ -406,6 +514,11 @@ export default function IdeasPage() {
                       </Select>
                     </FormControl>
                   </TableCell>
+                  <NotesCell 
+                    ideaId={idea._id}
+                    initialNotes={idea.notes}
+                    onSave={handleNotesChange}
+                  />
                   <TableCell sx={{ minWidth: 120 }}>
                     {idea.completeByDate ? (
                       <Typography variant="body2" color="text.secondary">

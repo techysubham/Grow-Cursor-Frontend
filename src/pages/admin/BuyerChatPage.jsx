@@ -13,6 +13,7 @@ import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import EmailIcon from '@mui/icons-material/Email';
 import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import SaveIcon from '@mui/icons-material/Save';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import AttachFileIcon from '@mui/icons-material/AttachFile';
@@ -69,9 +70,20 @@ export default function BuyerChatPage() {
   const hasFetchedInitialData = useRef(false);
   const fileInputRef = useRef(null);
 
+  const handleCopy = (text) => {
+    const val = text || '-';
+    if (val === '-') return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(val);
+      setCopiedText(val);
+      setTimeout(() => setCopiedText(''), 1200);
+    }
+  };
+
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [markingUnread, setMarkingUnread] = useState(false);
+  const [copiedText, setCopiedText] = useState('');
 
   // Persist state to sessionStorage
   useEffect(() => {
@@ -872,25 +884,35 @@ export default function BuyerChatPage() {
                       </Box>
                     ) : (
                       /* REGULAR ITEM LINK */
-                      <Link
-                        href={`https://www.ebay.com/itm/${selectedThread.itemId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        underline="hover"
-                        sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5 }}
-                      >
-                        <Typography
-                          variant="subtitle2"
-                          sx={{
-                            color: 'primary.main',
-                            fontWeight: 600,
-                            lineHeight: 1.3
-                          }}
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5 }}>
+                        <Link
+                          href={`https://www.ebay.com/itm/${selectedThread.itemId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          underline="hover"
+                          sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}
                         >
-                          {selectedThread.itemTitle || `Item ID: ${selectedThread.itemId}`}
-                        </Typography>
-                        <OpenInNewIcon sx={{ fontSize: 16, color: 'primary.main', mt: 0.3 }} />
-                      </Link>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              color: 'primary.main',
+                              fontWeight: 600,
+                              lineHeight: 1.3
+                            }}
+                          >
+                            {selectedThread.itemTitle || `Item ID: ${selectedThread.itemId}`}
+                          </Typography>
+                          <OpenInNewIcon sx={{ fontSize: 16, color: 'primary.main', mt: 0.3 }} />
+                        </Link>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleCopy(selectedThread.itemTitle || `Item ID: ${selectedThread.itemId}`)}
+                          aria-label="copy product title"
+                          sx={{ p: 0.5, mt: -0.2 }}
+                        >
+                          <ContentCopyIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Box>
                     )}
 
                     {selectedThread.orderId && (
@@ -1094,6 +1116,14 @@ export default function BuyerChatPage() {
           {snackbarMsg}
         </Alert>
       </Snackbar >
+
+      {/* Copy Feedback Snackbar */}
+      <Snackbar
+        open={!!copiedText}
+        autoHideDuration={1200}
+        message="Copied to clipboard!"
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box >
   );
 }
