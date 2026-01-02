@@ -980,7 +980,7 @@ export default function BuyerChatPage() {
                           }}
                         >
                           {/* TEXT */}
-                          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{msg.body}</Typography>
+                          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.body}</Typography>
 
                           {/* IMAGES */}
                           {msg.mediaUrls && msg.mediaUrls.length > 0 && (
