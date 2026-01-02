@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, memo } from 'react';
 import Snackbar from '@mui/material/Snackbar';
 import MuiAlert from '@mui/material/Alert';
 import {
@@ -46,9 +46,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
-import ImageIcon from '@mui/icons-material/Image';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
@@ -521,7 +519,7 @@ function EditableCell({ value, type = 'text', onSave }) {
   );
 }
 
-export default function FulfillmentDashboard() {
+function FulfillmentDashboard() {
   const [sellers, setSellers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -3078,3 +3076,5 @@ function AutoSaveSelect({ value, options, onSave }) {
     </Select>
   );
 }
+
+export default memo(FulfillmentDashboard);

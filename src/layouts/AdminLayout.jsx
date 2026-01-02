@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, startTransition } from 'react';
 import { Link, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -120,11 +120,13 @@ export default function AdminLayout({ user, onLogout }) {
   // Close all dropdowns when sidebar collapses
   useEffect(() => {
     if (!sidebarOpen) {
-      setListingMenuOpen(false);
-      setMonitoringMenuOpen(false);
-      setCompatMenuOpen(false);
-      setOrdersMenuOpen(false);
-      setManageMenuOpen(false);
+      startTransition(() => {
+        setListingMenuOpen(false);
+        setMonitoringMenuOpen(false);
+        setCompatMenuOpen(false);
+        setOrdersMenuOpen(false);
+        setManageMenuOpen(false);
+      });
     }
   }, [sidebarOpen]);
 
