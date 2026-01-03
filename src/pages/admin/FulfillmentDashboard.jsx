@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, memo } from 'react';
 import Snackbar from '@mui/material/Snackbar';
 import MuiAlert from '@mui/material/Alert';
 import {
@@ -30,7 +30,10 @@ import {
   FormControlLabel,
   Popover,
   List,
-  ListItem
+  ListItem,
+  useMediaQuery,
+  useTheme,
+  Collapse
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
@@ -46,9 +49,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
-import ImageIcon from '@mui/icons-material/Image';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
@@ -60,6 +61,8 @@ import api from '../../lib/api';
 
 // --- IMAGE VIEWER DIALOG ---
 function ImageDialog({ open, onClose, images }) {
+  const theme = useTheme();
+  const isMobileDialog = useMediaQuery(theme.breakpoints.down('sm'));
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
@@ -77,31 +80,38 @@ function ImageDialog({ open, onClose, images }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="md" 
+      fullWidth
+      fullScreen={isMobileDialog}
+    >
+      <DialogTitle sx={{ p: { xs: 1.5, sm: 2 } }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">
-            Item Images ({currentIndex + 1} of {images.length})
+          <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+            Images ({currentIndex + 1}/{images.length})
           </Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
         </Stack>
       </DialogTitle>
-      <DialogContent>
+      <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>
         {images.length > 0 ? (
           <Box>
             {/* Main Image */}
             <Box
               sx={{
                 width: '100%',
-                height: 500,
+                height: { xs: 'calc(100vh - 200px)', sm: 500 },
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 bgcolor: 'grey.100',
                 borderRadius: 1,
-                mb: 2
+                mb: 2,
+                position: 'relative'
               }}
             >
               <img
@@ -113,10 +123,42 @@ function ImageDialog({ open, onClose, images }) {
                   objectFit: 'contain'
                 }}
               />
+              
+              {/* Mobile swipe hint overlay (optional arrows) */}
+              {images.length > 1 && isMobileDialog && (
+                <>
+                  <IconButton 
+                    onClick={handlePrev}
+                    sx={{ 
+                      position: 'absolute', 
+                      left: 4, 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      bgcolor: 'rgba(255,255,255,0.8)',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
+                    }}
+                  >
+                    <NavigateBeforeIcon />
+                  </IconButton>
+                  <IconButton 
+                    onClick={handleNext}
+                    sx={{ 
+                      position: 'absolute', 
+                      right: 4, 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      bgcolor: 'rgba(255,255,255,0.8)',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
+                    }}
+                  >
+                    <NavigateNextIcon />
+                  </IconButton>
+                </>
+              )}
             </Box>
 
-            {/* Navigation Buttons */}
-            {images.length > 1 && (
+            {/* Navigation Buttons - Desktop only */}
+            {images.length > 1 && !isMobileDialog && (
               <Stack direction="row" justifyContent="space-between" sx={{ mb: 2 }}>
                 <Button
                   onClick={handlePrev}
@@ -139,12 +181,12 @@ function ImageDialog({ open, onClose, images }) {
             {images.length > 1 && (
               <Stack
                 direction="row"
-                spacing={1}
+                spacing={0.5}
                 sx={{
                   overflowX: 'auto',
                   pb: 1,
-                  justifyContent: 'center',
-                  flexWrap: 'wrap'
+                  justifyContent: { xs: 'flex-start', sm: 'center' },
+                  flexWrap: { xs: 'nowrap', sm: 'wrap' }
                 }}
               >
                 {images.map((img, idx) => (
@@ -152,8 +194,8 @@ function ImageDialog({ open, onClose, images }) {
                     key={idx}
                     onClick={() => setCurrentIndex(idx)}
                     sx={{
-                      width: 80,
-                      height: 80,
+                      width: { xs: 60, sm: 80 },
+                      height: { xs: 60, sm: 80 },
                       cursor: 'pointer',
                       border: idx === currentIndex ? '3px solid' : '1px solid',
                       borderColor: idx === currentIndex ? 'primary.main' : 'grey.300',
@@ -190,6 +232,9 @@ function ImageDialog({ open, onClose, images }) {
 
 // --- NEW COMPONENT: Chat Dialog (Visual Match with BuyerChatPage) ---
 function ChatDialog({ open, onClose, order }) {
+  const theme = useTheme();
+  const isMobileChat = useMediaQuery(theme.breakpoints.down('sm'));
+  
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -288,56 +333,71 @@ function ChatDialog({ open, onClose, order }) {
 
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      fullWidth 
+      maxWidth="md"
+      fullScreen={isMobileChat}
+    >
 
       {/* --- HEADER (MATCHING BUYER CHAT PAGE) --- */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', position: 'relative' }}>
+      <Box sx={{ p: { xs: 1.5, sm: 2 }, borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', position: 'relative' }}>
 
         {/* Top Right: Seller Chip & Close */}
         <Stack
           direction="row"
-          spacing={1}
+          spacing={0.5}
           alignItems="center"
-          sx={{ position: 'absolute', top: 12, right: 12 }}
+          sx={{ position: 'absolute', top: { xs: 8, sm: 12 }, right: { xs: 8, sm: 12 } }}
         >
-          <Chip
-            label={sellerName}
-            size="small"
-            icon={<PersonIcon style={{ fontSize: 16 }} />}
-            sx={{
-              bgcolor: '#e3f2fd',
-              color: '#1565c0',
-              fontWeight: 'bold',
-              height: 24,
-              fontSize: '0.75rem'
-            }}
-          />
-          <IconButton onClick={onClose} size="small" sx={{ color: 'text.disabled', ml: 1 }}>
+          {!isMobileChat && (
+            <Chip
+              label={sellerName}
+              size="small"
+              icon={<PersonIcon style={{ fontSize: 16 }} />}
+              sx={{
+                bgcolor: '#e3f2fd',
+                color: '#1565c0',
+                fontWeight: 'bold',
+                height: 24,
+                fontSize: '0.75rem'
+              }}
+            />
+          )}
+          <IconButton onClick={onClose} size="small" sx={{ color: 'text.disabled' }}>
             <CloseIcon />
           </IconButton>
         </Stack>
 
         {/* Main Content: Buyer & Item */}
-        <Stack spacing={1.5} sx={{ pr: 12 }}>
+        <Stack spacing={1} sx={{ pr: { xs: 6, sm: 12 } }}>
 
           {/* 1. Buyer Info */}
-          <Stack direction="row" alignItems="center" spacing={3} sx={{ mt: 0.5 }}>
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            alignItems={{ xs: 'flex-start', sm: 'center' }} 
+            spacing={{ xs: 0.5, sm: 3 }} 
+            sx={{ mt: 0.5 }}
+          >
             <Box>
-              <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                Buyer Name
+              <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                Buyer
               </Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                 {buyerName}
               </Typography>
             </Box>
 
-            <Divider orientation="vertical" flexItem sx={{ height: 20, alignSelf: 'center', opacity: 0.5 }} />
+            {!isMobileChat && (
+              <Divider orientation="vertical" flexItem sx={{ height: 20, alignSelf: 'center', opacity: 0.5 }} />
+            )}
 
             <Box>
-              <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+              <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
                 Username
               </Typography>
-              <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', px: 0.5, borderRadius: 0.5 }}>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', px: 0.5, borderRadius: 0.5, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                 {buyerUsername}
               </Typography>
             </Box>
@@ -357,22 +417,27 @@ function ChatDialog({ open, onClose, order }) {
                 sx={{
                   color: 'primary.main',
                   fontWeight: 600,
-                  lineHeight: 1.3
+                  lineHeight: 1.3,
+                  fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                  display: '-webkit-box',
+                  WebkitLineClamp: isMobileChat ? 1 : 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
                 }}
               >
                 {itemTitle || `Item ID: ${itemId}`}
               </Typography>
-              <OpenInNewIcon sx={{ fontSize: 16, color: 'primary.main', mt: 0.3 }} />
+              <OpenInNewIcon sx={{ fontSize: 14, color: 'primary.main', mt: 0.3, flexShrink: 0 }} />
             </Link>
 
             <Chip
-              label={`Order #: ${order?.orderId}`}
+              label={`Order: ${order?.orderId?.slice(-12) || order?.orderId}`}
               size="small"
               variant="outlined"
               sx={{
                 borderRadius: 1,
-                height: 22,
-                fontSize: '0.7rem',
+                height: 20,
+                fontSize: '0.65rem',
                 color: 'text.secondary',
                 borderColor: 'divider',
                 bgcolor: '#fafafa'
@@ -383,7 +448,7 @@ function ChatDialog({ open, onClose, order }) {
       </Box>
 
       {/* --- CHAT AREA (MATCHING BUYER CHAT PAGE) --- */}
-      <DialogContent sx={{ p: 0, bgcolor: '#f0f2f5', height: '500px', display: 'flex', flexDirection: 'column' }}>
+      <DialogContent sx={{ p: 0, bgcolor: '#f0f2f5', height: { xs: 'calc(100vh - 180px)', sm: '500px' }, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ flex: 1, p: 2, overflowY: 'auto' }}>
           {loading ? (
             <Box display="flex" justifyContent="center" mt={4}><CircularProgress /></Box>
@@ -450,7 +515,7 @@ function ChatDialog({ open, onClose, order }) {
         </Box>
 
         {/* --- INPUT AREA --- */}
-        <Box sx={{ p: 2, bgcolor: '#fff', borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1 }}>
+        <Box sx={{ p: { xs: 1, sm: 2 }, bgcolor: '#fff', borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1 }}>
           <TextField
             fullWidth
             multiline
@@ -466,15 +531,20 @@ function ChatDialog({ open, onClose, order }) {
             }}
             disabled={sending}
             size="small"
+            sx={{ 
+              '& .MuiInputBase-input': { 
+                fontSize: { xs: '0.875rem', sm: '1rem' } 
+              } 
+            }}
           />
           <Button
             variant="contained"
-            sx={{ px: 3 }}
-            endIcon={sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
+            sx={{ px: { xs: 2, sm: 3 }, minWidth: { xs: 'auto', sm: 80 } }}
+            endIcon={!isMobileChat && (sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />)}
             onClick={handleSendMessage}
             disabled={sending || !newMessage.trim()}
           >
-            Send
+            {isMobileChat ? <SendIcon /> : 'Send'}
           </Button>
         </Box>
       </DialogContent>
@@ -482,8 +552,252 @@ function ChatDialog({ open, onClose, order }) {
   );
 }
 
+// --- MOBILE ORDER CARD COMPONENT ---
+function MobileOrderCard({ order, index, onCopy, onMessage, onViewImages, formatCurrency, thumbnailImages }) {
+  const [expanded, setExpanded] = useState(false);
+  
+  const productTitle = order.lineItems?.[0]?.title || order.productName || 'Unknown Product';
+  const itemId = order.lineItems?.[0]?.legacyItemId || order.itemNumber;
+  const buyerName = order.buyer?.buyerRegistrationAddress?.fullName || '-';
+  const dateSold = order.dateSold ? new Date(order.dateSold).toLocaleDateString() : '-';
+  
+  return (
+    <Paper 
+      elevation={2} 
+      sx={{ 
+        p: 2, 
+        borderRadius: 2,
+        borderLeft: 4,
+        borderLeftColor: order.cancelState === 'CANCELED' ? 'error.main' : 
+                         order.orderPaymentStatus === 'FULLY_REFUNDED' ? 'warning.main' : 'primary.main'
+      }}
+    >
+      <Stack spacing={1.5}>
+        {/* Header: Order ID + Seller */}
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Typography variant="caption" color="text.secondary">#{index}</Typography>
+            <Typography 
+              variant="subtitle2" 
+              fontWeight="bold" 
+              color="primary.main"
+              sx={{ cursor: 'pointer' }}
+              onClick={() => onCopy(order.orderId)}
+            >
+              {order.orderId?.slice(-12) || '-'}
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Chip 
+              label={order.seller?.user?.username || 'N/A'} 
+              size="small"
+              sx={{ fontSize: '0.7rem', height: 22 }}
+            />
+            {order.cancelState && order.cancelState !== 'NONE_REQUESTED' && (
+              <Chip 
+                label={order.cancelState === 'CANCELED' ? 'Canceled' : 'Cancel Req'}
+                size="small"
+                color={order.cancelState === 'CANCELED' ? 'error' : 'warning'}
+                sx={{ fontSize: '0.65rem', height: 20 }}
+              />
+            )}
+          </Stack>
+        </Stack>
 
+        {/* Product with thumbnail */}
+        <Stack direction="row" spacing={1.5} alignItems="flex-start">
+          {thumbnailImages[order._id] && (
+            <Box
+              onClick={() => onViewImages(order)}
+              sx={{
+                width: 60,
+                height: 60,
+                borderRadius: 1,
+                overflow: 'hidden',
+                border: '1px solid',
+                borderColor: 'grey.300',
+                flexShrink: 0,
+                cursor: 'pointer'
+              }}
+            >
+              <img 
+                src={thumbnailImages[order._id]} 
+                alt="Product"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </Box>
+          )}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                lineHeight: 1.3,
+                fontSize: '0.85rem'
+              }}
+            >
+              {productTitle}
+            </Typography>
+            {itemId && (
+              <Link
+                href={`https://www.ebay.com/itm/${itemId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ fontSize: '0.7rem' }}
+              >
+                ID: {itemId}
+              </Link>
+            )}
+          </Box>
+        </Stack>
 
+        {/* Key Info Grid */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+              Date Sold
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{dateSold}</Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+              Earnings
+            </Typography>
+            <Typography 
+              variant="body2" 
+              fontWeight="bold" 
+              sx={{ 
+                fontSize: '0.9rem',
+                color: order.orderEarnings >= 0 ? 'success.main' : 'error.main' 
+              }}
+            >
+              {formatCurrency(order.orderEarnings)}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+              Buyer
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }} noWrap>{buyerName}</Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+              Marketplace
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+              {order.purchaseMarketplaceId?.replace('EBAY_', '') || '-'}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Expandable Details */}
+        <Collapse in={expanded}>
+          <Divider sx={{ my: 1 }} />
+          <Stack spacing={1}>
+            {/* Financial Details */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Subtotal</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.subtotalUSD)}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Shipping</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.shippingUSD)}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Transaction Fees</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'error.main' }}>
+                  {formatCurrency(order.transactionFeesUSD)}
+                </Typography>
+              </Box>
+              {order.adFeeGeneral > 0 && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Ad Fees</Typography>
+                  <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'error.main' }}>
+                    {formatCurrency(order.adFeeGeneral)}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            {/* Shipping Address */}
+            {order.shippingFullName && (
+              <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ fontSize: '0.7rem' }}>
+                  SHIPPING ADDRESS
+                </Typography>
+                <Stack spacing={0.25} sx={{ mt: 0.5 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="body2" fontWeight="medium" sx={{ fontSize: '0.8rem' }}>
+                      {order.shippingFullName}
+                    </Typography>
+                    <IconButton size="small" onClick={() => onCopy(order.shippingFullName)}>
+                      <ContentCopyIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Stack>
+                  <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>{order.shippingAddressLine1}</Typography>
+                  {order.shippingAddressLine2 && (
+                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>{order.shippingAddressLine2}</Typography>
+                  )}
+                  <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
+                    {order.shippingCity}, {order.shippingState} {order.shippingPostalCode}
+                  </Typography>
+                  <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>{order.shippingCountry}</Typography>
+                </Stack>
+              </Box>
+            )}
+
+            {/* Tracking */}
+            {order.trackingNumber && (
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="caption" color="text.secondary">Tracking:</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                  {order.trackingNumber}
+                </Typography>
+                <IconButton size="small" onClick={() => onCopy(order.trackingNumber)}>
+                  <ContentCopyIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Stack>
+            )}
+
+            {/* Notes */}
+            {order.fulfillmentNotes && (
+              <Box sx={{ p: 1, bgcolor: 'warning.light', borderRadius: 1, opacity: 0.8 }}>
+                <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
+                  📝 {order.fulfillmentNotes}
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        </Collapse>
+
+        {/* Action Row */}
+        <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
+          <Button 
+            size="small" 
+            variant="text"
+            onClick={() => setExpanded(!expanded)}
+            endIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ fontSize: '0.75rem', color: 'text.secondary' }}
+          >
+            {expanded ? 'Less' : 'More Details'}
+          </Button>
+          <Stack direction="row" spacing={0.5}>
+            <IconButton size="small" onClick={() => onCopy(order.orderId)} title="Copy Order ID">
+              <ContentCopyIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+            <IconButton size="small" color="primary" onClick={() => onMessage(order)} title="Message Buyer">
+              <ChatIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Stack>
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
 
 function EditableCell({ value, type = 'text', onSave }) {
   const [editing, setEditing] = useState(false);
@@ -521,7 +835,12 @@ function EditableCell({ value, type = 'text', onSave }) {
   );
 }
 
-export default function FulfillmentDashboard() {
+function FulfillmentDashboard() {
+  // Mobile responsiveness
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [sellers, setSellers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -568,6 +887,13 @@ export default function FulfillmentDashboard() {
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [searchPaymentStatus, setSearchPaymentStatus] = useState(() => getInitialState('searchPaymentStatus', ''));
   const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
+  
+  // Close filters by default on mobile
+  useEffect(() => {
+    if (isSmallMobile && filtersExpanded) {
+      setFiltersExpanded(false);
+    }
+  }, []); // Only run on mount
 
   // Pagination state - restored from sessionStorage
   const [currentPage, setCurrentPage] = useState(() => getInitialState('currentPage', 1));
@@ -1690,10 +2016,11 @@ export default function FulfillmentDashboard() {
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
-      height: 'calc(100vh - 100px)', // Full viewport minus top toolbar
+      height: { xs: 'calc(100dvh - 56px)', sm: 'calc(100dvh - 64px)', md: 'calc(100vh - 100px)' },
       overflow: 'hidden',
       width: '100%',
-      maxWidth: '100%'
+      maxWidth: '100%',
+      px: { xs: 0.5, sm: 1, md: 0 }
     }}>
       {/* LOADING OVERLAY */}
       {loading && (
@@ -1731,23 +2058,36 @@ export default function FulfillmentDashboard() {
       )}
 
       {/* HEADER SECTION - FIXED */}
-      <Paper sx={{ p: 2, mb: 2, flexShrink: 0 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+      <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 1, sm: 2 }, flexShrink: 0 }}>
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          alignItems={{ xs: 'flex-start', sm: 'center' }} 
+          justifyContent="space-between" 
+          spacing={{ xs: 1, sm: 2 }} 
+          sx={{ mb: 2 }}
+        >
           <Stack direction="row" alignItems="center" spacing={1}>
-            <LocalShippingIcon color="primary" />
-            <Typography variant="h5" fontWeight="bold">Fulfillment Dashboard</Typography>
+            <LocalShippingIcon color="primary" sx={{ fontSize: { xs: 20, sm: 24 } }} />
+            <Typography 
+              variant="h5" 
+              fontWeight="bold"
+              sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem', md: '1.5rem' } }}
+            >
+              Fulfillment Dashboard
+            </Typography>
           </Stack>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
             {totalOrders > 0 && (
               <Chip
-                label={`${totalOrders} total orders`}
+                label={`${totalOrders} orders`}
                 color="primary"
                 variant="filled"
+                size={isSmallMobile ? 'small' : 'medium'}
               />
             )}
             {orders.length > 0 && totalPages > 1 && (
-              <Typography variant="body2" color="text.secondary">
-                (Page {currentPage} of {totalPages})
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                (Page {currentPage}/{totalPages})
               </Typography>
             )}
           </Stack>
@@ -1756,107 +2096,233 @@ export default function FulfillmentDashboard() {
         <Divider sx={{ my: 2 }} />
 
         {/* CONTROLS */}
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
-          <FormControl size="small" sx={{ minWidth: 250 }}>
-            <InputLabel id="seller-select-label">Select Seller</InputLabel>
-            <Select
-              labelId="seller-select-label"
-              value={selectedSeller}
-              label="Select Seller"
-              onChange={(e) => setSelectedSeller(e.target.value)}
-            >
-              <MenuItem value="">
-                <em>-- Select Seller --</em>
-              </MenuItem>
-              {sellers.map((s) => (
-                <MenuItem key={s._id} value={s._id}>
-                  {s.user?.username || s.user?.email || s._id}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
-            onClick={pollNewOrders}
-            disabled={loading}
-            sx={{ minWidth: 180 }}
-          >
-            {loading ? 'Polling...' : 'Poll New Orders'}
-          </Button>
-
-          <Button
-            variant="contained"
-            color="secondary"
-            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-            onClick={pollOrderUpdates}
-            disabled={loading}
-            sx={{ minWidth: 180 }}
-          >
-            {loading ? 'Updating...' : 'Poll Order Updates'}
-          </Button>
-
-          <Tooltip title={selectedSeller ? "Fetch ad fees from eBay for all orders" : "Select a seller first"}>
-            <span>
-              <Button
-                variant="outlined"
-                color="warning"
-                startIcon={backfillLoading ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
-                onClick={backfillAdFees}
-                disabled={backfillLoading || !selectedSeller}
-                sx={{ minWidth: 180 }}
+        {isMobile ? (
+          /* MOBILE LAYOUT - Compact Vertical Stack */
+          <Stack spacing={1}>
+            {/* Row 1: Seller Select */}
+            <FormControl size="small" fullWidth>
+              <InputLabel id="seller-select-label">Select Seller</InputLabel>
+              <Select
+                labelId="seller-select-label"
+                value={selectedSeller}
+                label="Select Seller"
+                onChange={(e) => setSelectedSeller(e.target.value)}
               >
-                {backfillLoading ? 'Fetching Ad Fees...' : 'Backfill Ad Fees'}
+                <MenuItem value="">
+                  <em>-- Select Seller --</em>
+                </MenuItem>
+                {sellers.map((s) => (
+                  <MenuItem key={s._id} value={s._id}>
+                    {s.user?.username || s.user?.email || s._id}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Row 2: Poll Buttons (side by side) */}
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />)}
+                onClick={pollNewOrders}
+                disabled={loading}
+                size="small"
+                fullWidth
+                sx={{ 
+                  fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                  px: { xs: 0.5, sm: 1 }
+                }}
+              >
+                {loading ? 'Polling...' : isSmallMobile ? 'Poll New' : 'Poll New Orders'}
               </Button>
-            </span>
-          </Tooltip>
 
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id="marketplace-filter-label">Marketplace</InputLabel>
-            <Select
-              labelId="marketplace-filter-label"
-              value={searchMarketplace}
-              label="Marketplace"
-              onChange={(e) => setSearchMarketplace(e.target.value)}
-            >
-              <MenuItem value="">
-                <em>All</em>
-              </MenuItem>
-              <MenuItem value="EBAY_US">EBAY_US</MenuItem>
-              <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
-              <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
-            </Select>
-          </FormControl>
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />)}
+                onClick={pollOrderUpdates}
+                disabled={loading}
+                size="small"
+                fullWidth
+                sx={{ 
+                  fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                  px: { xs: 0.5, sm: 1 }
+                }}
+              >
+                {loading ? 'Updating...' : isSmallMobile ? 'Poll Updates' : 'Poll Order Updates'}
+              </Button>
+            </Stack>
 
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel id="payment-status-filter-label">Payment Status</InputLabel>
-            <Select
-              labelId="payment-status-filter-label"
-              value={searchPaymentStatus}
-              label="Payment Status"
-              onChange={(e) => setSearchPaymentStatus(e.target.value)}
-            >
-              <MenuItem value="">
-                <em>All</em>
-              </MenuItem>
-              <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
-              <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
-            </Select>
-          </FormControl>
+            {/* Row 3: Filters side by side */}
+            <Stack direction="row" spacing={1}>
+              <FormControl size="small" fullWidth>
+                <InputLabel id="marketplace-filter-label">Marketplace</InputLabel>
+                <Select
+                  labelId="marketplace-filter-label"
+                  value={searchMarketplace}
+                  label="Marketplace"
+                  onChange={(e) => setSearchMarketplace(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>All</em>
+                  </MenuItem>
+                  <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+                  <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+                  <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+                </Select>
+              </FormControl>
 
-          {/* Column Selector Button */}
-          <Tooltip title="Select Columns">
-            <IconButton
+              <FormControl size="small" fullWidth>
+                <InputLabel id="payment-status-filter-label">Payment Status</InputLabel>
+                <Select
+                  labelId="payment-status-filter-label"
+                  value={searchPaymentStatus}
+                  label="Payment Status"
+                  onChange={(e) => setSearchPaymentStatus(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>All</em>
+                  </MenuItem>
+                  <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
+                  <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
+
+            {/* Row 4: Backfill & Column Selector */}
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Tooltip title={selectedSeller ? "Backfill Ad Fees" : "Select a seller first"}>
+                <span style={{ flex: 1 }}>
+                  <Button
+                    variant="outlined"
+                    color="warning"
+                    size="small"
+                    fullWidth
+                    startIcon={backfillLoading ? <CircularProgress size={14} color="inherit" /> : <LocalShippingIcon />}
+                    onClick={backfillAdFees}
+                    disabled={backfillLoading || !selectedSeller}
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    {backfillLoading ? 'Fetching...' : 'Backfill Ad Fees'}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title="Select Columns">
+                <IconButton
+                  color="primary"
+                  onClick={(e) => setColumnSelectorOpen(e.currentTarget)}
+                  size="small"
+                >
+                  <ViewColumnIcon />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          </Stack>
+        ) : (
+          /* DESKTOP LAYOUT - Original Horizontal Layout */
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+            <FormControl size="small" sx={{ minWidth: 250 }}>
+              <InputLabel id="seller-select-label">Select Seller</InputLabel>
+              <Select
+                labelId="seller-select-label"
+                value={selectedSeller}
+                label="Select Seller"
+                onChange={(e) => setSelectedSeller(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>-- Select Seller --</em>
+                </MenuItem>
+                {sellers.map((s) => (
+                  <MenuItem key={s._id} value={s._id}>
+                    {s.user?.username || s.user?.email || s._id}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Button
+              variant="contained"
               color="primary"
-              onClick={(e) => setColumnSelectorOpen(e.currentTarget)}
-              size="small"
+              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
+              onClick={pollNewOrders}
+              disabled={loading}
+              sx={{ minWidth: 180 }}
             >
-              <ViewColumnIcon />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+              {loading ? 'Polling...' : 'Poll New Orders'}
+            </Button>
+
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+              onClick={pollOrderUpdates}
+              disabled={loading}
+              sx={{ minWidth: 180 }}
+            >
+              {loading ? 'Updating...' : 'Poll Order Updates'}
+            </Button>
+
+            <Tooltip title={selectedSeller ? "Fetch ad fees from eBay for all orders" : "Select a seller first"}>
+              <span>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={backfillLoading ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
+                  onClick={backfillAdFees}
+                  disabled={backfillLoading || !selectedSeller}
+                  sx={{ minWidth: 180 }}
+                >
+                  {backfillLoading ? 'Fetching Ad Fees...' : 'Backfill Ad Fees'}
+                </Button>
+              </span>
+            </Tooltip>
+
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel id="marketplace-filter-label">Marketplace</InputLabel>
+              <Select
+                labelId="marketplace-filter-label"
+                value={searchMarketplace}
+                label="Marketplace"
+                onChange={(e) => setSearchMarketplace(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+                <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+                <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel id="payment-status-filter-label">Payment Status</InputLabel>
+              <Select
+                labelId="payment-status-filter-label"
+                value={searchPaymentStatus}
+                label="Payment Status"
+                onChange={(e) => setSearchPaymentStatus(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
+                <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* Column Selector Button */}
+            <Tooltip title="Select Columns">
+              <IconButton
+                color="primary"
+                onClick={(e) => setColumnSelectorOpen(e.currentTarget)}
+                size="small"
+              >
+                <ViewColumnIcon />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        )}
 
         {/* Column Selector Popover */}
         <Popover
@@ -1939,106 +2405,113 @@ export default function FulfillmentDashboard() {
         {/* SEARCH FILTERS */}
 
         {/* SEARCH FILTERS - REMOVED THE CONDITIONAL CHECK */}
-        <Box sx={{ mt: 2, p: 2, backgroundColor: 'action.hover', borderRadius: 1 }}>
+        <Box sx={{ mt: { xs: 1.5, sm: 2 }, p: { xs: 1.5, sm: 2 }, backgroundColor: 'action.hover', borderRadius: 1 }}>
           <Box
             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
             onClick={() => setFiltersExpanded(!filtersExpanded)}
           >
-            <Typography variant="subtitle2" fontWeight="bold">
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
               Search Filters
             </Typography>
             <IconButton size="small">
               {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             </IconButton>
           </Box>
-          {filtersExpanded && (
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 1.5 }}>
-              <TextField
-                size="small"
-                label="Order ID"
-                value={searchOrderId}
-                onChange={(e) => setSearchOrderId(e.target.value)}
-                placeholder="Search by order ID..."
-                sx={{ flex: 1 }}
-              />
-              <TextField
-                size="small"
-                label="Buyer Name"
-                value={searchBuyerName}
-                onChange={(e) => setSearchBuyerName(e.target.value)}
-                placeholder="Search by buyer name..."
-                sx={{ flex: 1 }}
-              />
-
-              {/* 1. DATE MODE SELECTOR */}
-              <FormControl size="small" sx={{ minWidth: 130 }}>
-                <InputLabel id="date-mode-label">Date Mode</InputLabel>
-                <Select
-                  labelId="date-mode-label"
-                  value={dateFilter.mode}
-                  label="Date Mode"
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, mode: e.target.value }))}
-                >
-                  <MenuItem value="none">None</MenuItem>
-                  <MenuItem value="single">Single Day</MenuItem>
-                  <MenuItem value="range">Date Range</MenuItem>
-                </Select>
-              </FormControl>
-
-              {/* 2. SINGLE DATE INPUT */}
-              {dateFilter.mode === 'single' && (
+          <Collapse in={filtersExpanded}>
+            <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ mt: 1.5 }}>
+              {/* Row 1: Text searches */}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 2 }}>
                 <TextField
                   size="small"
-                  label="Date"
-                  type="date"
-                  value={dateFilter.single}
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, single: e.target.value }))}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ width: 150 }}
+                  label="Order ID"
+                  value={searchOrderId}
+                  onChange={(e) => setSearchOrderId(e.target.value)}
+                  placeholder="Search by order ID..."
+                  sx={{ flex: 1 }}
+                  fullWidth
                 />
-              )}
+                <TextField
+                  size="small"
+                  label="Buyer Name"
+                  value={searchBuyerName}
+                  onChange={(e) => setSearchBuyerName(e.target.value)}
+                  placeholder="Search by buyer name..."
+                  sx={{ flex: 1 }}
+                  fullWidth
+                />
+              </Stack>
 
-              {/* 3. RANGE INPUTS */}
-              {dateFilter.mode === 'range' && (
-                <>
+              {/* Row 2: Date filters */}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 2 }} alignItems={{ xs: 'stretch', sm: 'center' }}>
+                {/* DATE MODE SELECTOR */}
+                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 } }}>
+                  <InputLabel id="date-mode-label">Date Mode</InputLabel>
+                  <Select
+                    labelId="date-mode-label"
+                    value={dateFilter.mode}
+                    label="Date Mode"
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, mode: e.target.value }))}
+                  >
+                    <MenuItem value="none">None</MenuItem>
+                    <MenuItem value="single">Single Day</MenuItem>
+                    <MenuItem value="range">Date Range</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* SINGLE DATE INPUT */}
+                {dateFilter.mode === 'single' && (
                   <TextField
                     size="small"
-                    label="From"
+                    label="Date"
                     type="date"
-                    value={dateFilter.from}
-                    onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                    value={dateFilter.single}
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, single: e.target.value }))}
                     InputLabelProps={{ shrink: true }}
-                    sx={{ width: 150 }}
+                    sx={{ width: { xs: '100%', sm: 150 } }}
                   />
-                  <TextField
-                    size="small"
-                    label="To"
-                    type="date"
-                    value={dateFilter.to}
-                    onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ width: 150 }}
-                  />
-                </>
-              )}
+                )}
 
-              {/* CLEAR BUTTON (Updated) */}
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => {
-                  setSearchOrderId('');
-                  setSearchBuyerName('');
-                  setSearchPaymentStatus('');
-                  // Reset Date Filter
-                  setDateFilter({ mode: 'none', single: '', from: '', to: '' });
-                }}
-                sx={{ minWidth: 80 }}
-              >
-                Clear
-              </Button>
+                {/* RANGE INPUTS */}
+                {dateFilter.mode === 'range' && (
+                  <Stack direction="row" spacing={1} sx={{ flex: { xs: 1, sm: 'none' } }}>
+                    <TextField
+                      size="small"
+                      label="From"
+                      type="date"
+                      value={dateFilter.from}
+                      onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                      InputLabelProps={{ shrink: true }}
+                      sx={{ width: { xs: '50%', sm: 150 } }}
+                    />
+                    <TextField
+                      size="small"
+                      label="To"
+                      type="date"
+                      value={dateFilter.to}
+                      onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
+                      InputLabelProps={{ shrink: true }}
+                      sx={{ width: { xs: '50%', sm: 150 } }}
+                    />
+                  </Stack>
+                )}
+
+                {/* CLEAR BUTTON */}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => {
+                    setSearchOrderId('');
+                    setSearchBuyerName('');
+                    setSearchPaymentStatus('');
+                    setDateFilter({ mode: 'none', single: '', from: '', to: '' });
+                  }}
+                  sx={{ minWidth: { xs: '100%', sm: 80 } }}
+                >
+                  Clear
+                </Button>
+              </Stack>
             </Stack>
-          )}
+          </Collapse>
         </Box>
 
 
@@ -2047,21 +2520,50 @@ export default function FulfillmentDashboard() {
 
       {/* TABLE SECTION */}
       {orders.length === 0 && !loading ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <ShoppingCartIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="body1" color="text.secondary">
+        <Paper sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center' }}>
+          <ShoppingCartIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
             No orders found. Click "Poll New Orders" to fetch orders from all sellers.
           </Typography>
         </Paper>
       ) : (
+        <>
+        {/* MOBILE CARD VIEW */}
+        <Box 
+          sx={{ 
+            display: { xs: 'block', md: 'none' }, 
+            flexGrow: 1,
+            overflow: 'auto',
+            p: 1,
+            '&::-webkit-scrollbar': { width: '4px' },
+            '&::-webkit-scrollbar-thumb': { backgroundColor: '#888', borderRadius: '4px' }
+          }}
+        >
+          <Stack spacing={1.5}>
+            {orders.map((order, idx) => (
+              <MobileOrderCard 
+                key={order._id || idx}
+                order={order}
+                index={(currentPage - 1) * ordersPerPage + idx + 1}
+                onCopy={handleCopy}
+                onMessage={handleOpenMessageDialog}
+                onViewImages={handleViewImages}
+                formatCurrency={formatCurrency}
+                thumbnailImages={thumbnailImages}
+              />
+            ))}
+          </Stack>
+        </Box>
+
+        {/* DESKTOP TABLE VIEW */}
         <TableContainer
           component={Paper}
           sx={{
+            display: { xs: 'none', md: 'block' },
             flexGrow: 1,
             overflow: 'auto',
-            maxHeight: 'calc(100% - 50px)', // Reduced from 80px to 50px for smaller footer
+            maxHeight: 'calc(100% - 50px)',
             width: '100%',
-            // Custom scrollbar styling
             '&::-webkit-scrollbar': {
               width: '8px',
               height: '8px',
@@ -2849,33 +3351,44 @@ export default function FulfillmentDashboard() {
             </TableBody>
           </Table>
         </TableContainer>
+        </>
       )}
 
       {/* Pagination Controls - FIXED AT BOTTOM */}
       {!loading && orders.length > 0 && totalPages > 1 && (
         <Box sx={{
-          py: 1,
-          px: 2,
+          py: { xs: 0.75, sm: 1 },
+          px: { xs: 1, sm: 2 },
           display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
           justifyContent: 'center',
           alignItems: 'center',
-          gap: 2,
+          gap: { xs: 0.5, sm: 2 },
           flexShrink: 0,
           borderTop: '1px solid',
           borderColor: 'divider',
           bgcolor: 'background.paper'
         }}>
-          <Typography variant="body2" color="text.secondary" fontSize="0.875rem">
-            Showing {orders.length > 0 ? (currentPage - 1) * ordersPerPage + 1 : 0} - {Math.min(currentPage * ordersPerPage, totalOrders)} of {totalOrders} orders
+          <Typography 
+            variant="body2" 
+            color="text.secondary" 
+            sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}
+          >
+            {isSmallMobile 
+              ? `${(currentPage - 1) * ordersPerPage + 1}-${Math.min(currentPage * ordersPerPage, totalOrders)} of ${totalOrders}`
+              : `Showing ${(currentPage - 1) * ordersPerPage + 1} - ${Math.min(currentPage * ordersPerPage, totalOrders)} of ${totalOrders} orders`
+            }
           </Typography>
           <Pagination
             count={totalPages}
             page={currentPage}
             onChange={(e, page) => setCurrentPage(page)}
             color="primary"
-            showFirstButton
-            showLastButton
-            size="small"
+            showFirstButton={!isMobile}
+            showLastButton={!isMobile}
+            size={isSmallMobile ? 'small' : 'medium'}
+            siblingCount={isSmallMobile ? 0 : 1}
+            boundaryCount={isSmallMobile ? 1 : 1}
           />
         </Box>
       )}
@@ -3078,3 +3591,5 @@ function AutoSaveSelect({ value, options, onSave }) {
     </Select>
   );
 }
+
+export default memo(FulfillmentDashboard);
