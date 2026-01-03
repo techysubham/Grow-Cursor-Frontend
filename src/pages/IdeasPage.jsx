@@ -27,6 +27,8 @@ import {
   CircularProgress,
   Pagination,
   Tooltip,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -40,6 +42,11 @@ import api from '../lib/api';
 const NotesCell = memo(({ ideaId, initialNotes, onSave }) => {
   const [localNotes, setLocalNotes] = useState(initialNotes || '');
   const [isEditing, setIsEditing] = useState(false);
+
+  // Sync with parent when initialNotes changes (after optimistic update)
+  useEffect(() => {
+    setLocalNotes(initialNotes || '');
+  }, [initialNotes]);
 
   const hasChanges = localNotes !== (initialNotes || '');
 
@@ -133,6 +140,10 @@ const NotesCell = memo(({ ideaId, initialNotes, onSave }) => {
 });
 
 export default function IdeasPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [ideas, setIdeas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -145,6 +156,7 @@ export default function IdeasPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [sortBy, setSortBy] = useState('updatedAt'); // Default to recently updated
   
   // Form state
   const [formData, setFormData] = useState({
@@ -158,7 +170,7 @@ export default function IdeasPage() {
 
   useEffect(() => {
     fetchIdeas();
-  }, [filterStatus, filterPriority, filterType, page]);
+  }, [filterStatus, filterPriority, filterType, sortBy, page]);
 
   const fetchIdeas = async () => {
     setLoading(true);
@@ -169,6 +181,7 @@ export default function IdeasPage() {
       if (filterStatus) params.append('status', filterStatus);
       if (filterPriority) params.append('priority', filterPriority);
       if (filterType) params.append('type', filterType);
+      if (sortBy) params.append('sortBy', sortBy);
       
       const response = await api.get(`/ideas?${params.toString()}`);
       setIdeas(response.data.ideas);
@@ -210,33 +223,58 @@ export default function IdeasPage() {
   };
 
   const handleStatusChange = async (ideaId, newStatus) => {
+    // Optimistic update: Update UI immediately
+    setIdeas(prevIdeas => 
+      prevIdeas.map(idea => 
+        idea._id === ideaId ? { ...idea, status: newStatus } : idea
+      )
+    );
+
     try {
       await api.patch(`/ideas/${ideaId}`, { status: newStatus });
-      fetchIdeas();
+      // No need to refresh - already updated locally
     } catch (err) {
       console.error('Error updating status:', err);
+      // Rollback: Refresh on error to restore correct state
+      fetchIdeas();
       alert('Failed to update status');
     }
   };
 
   const handlePickedUpByChange = async (ideaId, newPickedUpBy) => {
+    // Optimistic update: Update UI immediately
+    setIdeas(prevIdeas => 
+      prevIdeas.map(idea => 
+        idea._id === ideaId ? { ...idea, pickedUpBy: newPickedUpBy } : idea
+      )
+    );
+
     try {
-      console.log('Updating pickedUpBy:', { ideaId, newPickedUpBy });
-      const response = await api.patch(`/ideas/${ideaId}`, { pickedUpBy: newPickedUpBy });
-      console.log('Update response:', response.data);
-      fetchIdeas();
+      await api.patch(`/ideas/${ideaId}`, { pickedUpBy: newPickedUpBy });
+      // No need to refresh - already updated locally
     } catch (err) {
       console.error('Error updating picked up by:', err);
+      // Rollback: Refresh on error to restore correct state
+      fetchIdeas();
       alert('Failed to update picked up by');
     }
   };
 
   const handleNotesChange = useCallback(async (ideaId, notes) => {
+    // Optimistic update: Update UI immediately
+    setIdeas(prevIdeas => 
+      prevIdeas.map(idea => 
+        idea._id === ideaId ? { ...idea, notes } : idea
+      )
+    );
+
     try {
       await api.patch(`/ideas/${ideaId}`, { notes });
-      fetchIdeas();
+      // No need to refresh - already updated locally
     } catch (err) {
       console.error('Error updating notes:', err);
+      // Rollback: Refresh on error to restore correct state
+      fetchIdeas();
       alert('Failed to update notes');
     }
   }, []);
@@ -246,11 +284,17 @@ export default function IdeasPage() {
       return;
     }
     
+    // Optimistic removal: Remove from UI immediately
+    setIdeas(prevIdeas => prevIdeas.filter(idea => idea._id !== ideaId));
+    setTotal(prevTotal => prevTotal - 1);
+
     try {
       await api.delete(`/ideas/${ideaId}`);
-      fetchIdeas();
+      // No need to refresh - already removed locally
     } catch (err) {
       console.error('Error deleting idea:', err);
+      // Rollback: Refresh on error to restore correct state
+      fetchIdeas();
       alert('Failed to delete idea');
     }
   };
@@ -286,44 +330,48 @@ export default function IdeasPage() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
       {/* Header */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" fontWeight="bold">
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={{ xs: 1.5, sm: 0 }} mb={{ xs: 2, sm: 3 }}>
+        <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' } }}>
           Ideas & Issues Board
         </Typography>
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ width: { xs: '100%', sm: 'auto' } }}>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            startIcon={!isSmallMobile && <RefreshIcon />}
             onClick={fetchIdeas}
+            size={isSmallMobile ? 'small' : 'medium'}
+            fullWidth={isMobile}
           >
             Refresh
           </Button>
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
+            startIcon={!isSmallMobile && <AddIcon />}
             onClick={() => setShowForm(true)}
+            size={isSmallMobile ? 'small' : 'medium'}
+            fullWidth={isMobile}
           >
-            New Idea/Issue
+            {isSmallMobile ? 'New' : 'New Idea/Issue'}
           </Button>
         </Stack>
       </Stack>
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
         <Box display="flex" alignItems="center" justifyContent="space-between">
-          <Typography variant="subtitle1" fontWeight="bold">
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ fontSize: { xs: '0.95rem', sm: '1rem' } }}>
             Search Filters
           </Typography>
-          <IconButton onClick={() => setFiltersExpanded(!filtersExpanded)}>
+          <IconButton onClick={() => setFiltersExpanded(!filtersExpanded)} size={isSmallMobile ? 'small' : 'medium'}>
             {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
           </IconButton>
         </Box>
         
         <Collapse in={filtersExpanded}>
-          <Stack direction="row" spacing={2} mt={2}>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.5, sm: 2 }} mt={{ xs: 1.5, sm: 2 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
               <InputLabel>Status</InputLabel>
               <Select
                 value={filterStatus}
@@ -337,7 +385,7 @@ export default function IdeasPage() {
               </Select>
             </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
               <InputLabel>Priority</InputLabel>
               <Select
                 value={filterPriority}
@@ -351,7 +399,7 @@ export default function IdeasPage() {
               </Select>
             </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
               <InputLabel>Type</InputLabel>
               <Select
                 value={filterType}
@@ -363,6 +411,18 @@ export default function IdeasPage() {
                 <MenuItem value="issue">Issue</MenuItem>
                 <MenuItem value="feature">Feature Request</MenuItem>
                 <MenuItem value="bug">Bug</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
+              <InputLabel>Sort By</InputLabel>
+              <Select
+                value={sortBy}
+                label="Sort By"
+                onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+              >
+                <MenuItem value="updatedAt">Recently Updated</MenuItem>
+                <MenuItem value="createdAt">Recently Created</MenuItem>
               </Select>
             </FormControl>
           </Stack>
@@ -384,87 +444,96 @@ export default function IdeasPage() {
         ) : (
           <>
             {/* Total Count Header inside Table */}
-            <Box px={2} pt={2} pb={1}>
-              <Typography variant="body2" color="text.secondary" fontWeight="bold">
+            <Box px={{ xs: 1.5, sm: 2 }} pt={{ xs: 1.5, sm: 2 }} pb={1}>
+              <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
                 Total: {total} idea(s)
               </Typography>
             </Box>
-            <Table>
+            <Table size={isSmallMobile ? 'small' : 'medium'}>
               <TableHead>
                 <TableRow sx={{ bgcolor: 'grey.100' }}>
-                  <TableCell><strong>Date Created</strong></TableCell>
-                  <TableCell><strong>Title & Description</strong></TableCell>
-                  <TableCell><strong>Type</strong></TableCell>
+                  {!isSmallMobile && <TableCell><strong>Date Created</strong></TableCell>}
+                  <TableCell><strong>Title</strong></TableCell>
+                  {!isMobile && <TableCell><strong>Type</strong></TableCell>}
                   <TableCell><strong>Priority</strong></TableCell>
                   <TableCell><strong>Status</strong></TableCell>
-                  <TableCell><strong>Picked Up By</strong></TableCell>
-                  <TableCell><strong>Notes</strong></TableCell>
-                  <TableCell><strong>Complete By</strong></TableCell>
-                  <TableCell><strong>Created By</strong></TableCell>
+                  {!isMobile && <TableCell><strong>Picked Up By</strong></TableCell>}
+                  {!isMobile && <TableCell><strong>Notes</strong></TableCell>}
+                  {!isSmallMobile && <TableCell><strong>Complete By</strong></TableCell>}
+                  {!isSmallMobile && <TableCell><strong>Created By</strong></TableCell>}
                   <TableCell><strong>Actions</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
               {ideas.map((idea) => (
                 <TableRow key={idea._id} hover>
-                  <TableCell sx={{ minWidth: 140 }}>
-                    <Typography variant="body2">
-                      {formatDate(idea.createdAt)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 400 }}>
-                    <Typography variant="subtitle2" fontWeight="bold">
+                  {!isSmallMobile && (
+                    <TableCell sx={{ minWidth: 140 }}>
+                      <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                        {formatDate(idea.createdAt)}
+                      </Typography>
+                    </TableCell>
+                  )}
+                  <TableCell sx={{ maxWidth: { xs: 200, sm: 300, md: 400 } }}>
+                    <Typography variant="subtitle2" fontWeight="bold" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
                       {idea.title}
                     </Typography>
-                    <Tooltip 
-                      title={idea.description} 
-                      arrow 
-                      placement="top"
-                      componentsProps={{
-                        tooltip: {
-                          sx: {
-                            bgcolor: 'rgba(0, 0, 0, 0.9)',
-                            fontSize: '0.875rem',
-                            maxWidth: 500,
-                            p: 1.5
+                    {!isSmallMobile && (
+                      <Tooltip 
+                        title={idea.description} 
+                        arrow 
+                        placement="top"
+                        componentsProps={{
+                          tooltip: {
+                            sx: {
+                              bgcolor: 'rgba(0, 0, 0, 0.9)',
+                              fontSize: '0.875rem',
+                              maxWidth: 500,
+                              p: 1.5
+                            }
                           }
-                        }
-                      }}
-                    >
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary" 
-                        sx={{ 
-                          mt: 0.5,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: 'vertical',
-                          wordBreak: 'break-word',
-                          cursor: 'help'
                         }}
                       >
-                        {idea.description}
-                      </Typography>
-                    </Tooltip>
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary" 
+                          sx={{ 
+                            mt: 0.5,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            wordBreak: 'break-word',
+                            cursor: 'help',
+                            fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                          }}
+                        >
+                          {idea.description}
+                        </Typography>
+                      </Tooltip>
+                    )}
                   </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={idea.type.charAt(0).toUpperCase() + idea.type.slice(1)}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </TableCell>
+                  {!isMobile && (
+                    <TableCell>
+                      <Chip
+                        label={idea.type.charAt(0).toUpperCase() + idea.type.slice(1)}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Chip
                       label={idea.priority.charAt(0).toUpperCase() + idea.priority.slice(1)}
                       size="small"
                       color={getPriorityColor(idea.priority)}
+                      sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                     />
                   </TableCell>
                   <TableCell>
-                    <FormControl size="small" fullWidth sx={{ minWidth: 120 }}>
+                    <FormControl size="small" fullWidth sx={{ minWidth: { xs: 100, sm: 120 } }}>
                       <Select
                         value={idea.status}
                         onChange={(e) => handleStatusChange(idea._id, e.target.value)}
@@ -480,6 +549,7 @@ export default function IdeasPage() {
                             ? '#084298'
                             : '#0a3622',
                           fontWeight: 'bold',
+                          fontSize: { xs: '0.75rem', sm: '0.875rem' },
                           '& .MuiOutlinedInput-notchedOutline': { 
                             border: 'none' 
                           },
@@ -497,48 +567,56 @@ export default function IdeasPage() {
                       </Select>
                     </FormControl>
                   </TableCell>
-                  <TableCell>
-                    <FormControl size="small" fullWidth sx={{ minWidth: 120 }}>
-                      <Select
-                        value={idea.pickedUpBy || ''}
-                        onChange={(e) => handlePickedUpByChange(idea._id, e.target.value)}
-                        displayEmpty
-                        sx={{
-                          fontSize: '0.875rem',
-                        }}
-                      >
-                        <MenuItem value="">-</MenuItem>
-                        <MenuItem value="aaryan">aaryan</MenuItem>
-                        <MenuItem value="rajarshi">rajarshi</MenuItem>
-                        <MenuItem value="prassanna">prassanna</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </TableCell>
-                  <NotesCell 
-                    ideaId={idea._id}
-                    initialNotes={idea.notes}
-                    onSave={handleNotesChange}
-                  />
-                  <TableCell sx={{ minWidth: 120 }}>
-                    {idea.completeByDate ? (
-                      <Typography variant="body2" color="text.secondary">
-                        {new Date(idea.completeByDate).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
+                  {!isMobile && (
+                    <TableCell>
+                      <FormControl size="small" fullWidth sx={{ minWidth: 120 }}>
+                        <Select
+                          value={idea.pickedUpBy || ''}
+                          onChange={(e) => handlePickedUpByChange(idea._id, e.target.value)}
+                          displayEmpty
+                          sx={{
+                            fontSize: '0.875rem',
+                          }}
+                        >
+                          <MenuItem value="">-</MenuItem>
+                          <MenuItem value="aaryan">aaryan</MenuItem>
+                          <MenuItem value="rajarshi">rajarshi</MenuItem>
+                          <MenuItem value="prassanna">prassanna</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </TableCell>
+                  )}
+                  {!isMobile && (
+                    <NotesCell 
+                      ideaId={idea._id}
+                      initialNotes={idea.notes}
+                      onSave={handleNotesChange}
+                    />
+                  )}
+                  {!isSmallMobile && (
+                    <TableCell sx={{ minWidth: 120 }}>
+                      {idea.completeByDate ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                          {new Date(idea.completeByDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </Typography>
+                      ) : (
+                        <Typography variant="body2" color="text.disabled" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                          -
+                        </Typography>
+                      )}
+                    </TableCell>
+                  )}
+                  {!isSmallMobile && (
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                        {idea.createdBy}
                       </Typography>
-                    ) : (
-                      <Typography variant="body2" color="text.disabled">
-                        -
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {idea.createdBy}
-                    </Typography>
-                  </TableCell>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <IconButton
                       color="error"
@@ -558,26 +636,29 @@ export default function IdeasPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Box display="flex" justifyContent="center" mt={3}>
+        <Box display="flex" justifyContent="center" mt={{ xs: 2, sm: 3 }}>
           <Pagination
             count={totalPages}
             page={page}
             onChange={(e, value) => setPage(value)}
             color="primary"
+            size={isSmallMobile ? 'small' : 'medium'}
+            siblingCount={isMobile ? 0 : 1}
+            boundaryCount={isMobile ? 1 : 2}
           />
         </Box>
       )}
 
       {/* New Idea Dialog */}
-      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Typography variant="h6" fontWeight="bold">
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth fullScreen={isSmallMobile}>
+        <DialogTitle sx={{ p: { xs: 2, sm: 3 } }}>
+          <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
             Submit New Idea or Issue
           </Typography>
         </DialogTitle>
         <form onSubmit={handleSubmit}>
-          <DialogContent>
-            <Stack spacing={2}>
+          <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <Stack spacing={{ xs: 1.5, sm: 2 }}>
               <TextField
                 label="Your Name"
                 value={formData.createdBy}
@@ -643,9 +724,9 @@ export default function IdeasPage() {
               />
             </Stack>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button type="submit" variant="contained">Submit</Button>
+          <DialogActions sx={{ p: { xs: 2, sm: 3 }, gap: { xs: 1, sm: 0 } }}>
+            <Button onClick={() => setShowForm(false)} fullWidth={isSmallMobile} size={isSmallMobile ? 'small' : 'medium'}>Cancel</Button>
+            <Button type="submit" variant="contained" fullWidth={isSmallMobile} size={isSmallMobile ? 'small' : 'medium'}>Submit</Button>
           </DialogActions>
         </form>
       </Dialog>
