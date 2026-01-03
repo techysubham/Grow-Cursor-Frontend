@@ -147,6 +147,7 @@ export default function IdeasPage() {
   const [ideas, setIdeas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [selectedIdea, setSelectedIdea] = useState(null);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -430,7 +431,7 @@ export default function IdeasPage() {
       </Paper>
 
       {/* Ideas Table */}
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} sx={{ overflowX: 'hidden' }}>
         {loading ? (
           <Box display="flex" justifyContent="center" p={4}>
             <CircularProgress />
@@ -449,33 +450,45 @@ export default function IdeasPage() {
                 Total: {total} idea(s)
               </Typography>
             </Box>
-            <Table size={isSmallMobile ? 'small' : 'medium'}>
+            <Table size={isSmallMobile ? 'small' : 'medium'} sx={{ tableLayout: 'auto', width: '100%' }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: 'grey.100' }}>
-                  {!isSmallMobile && <TableCell><strong>Date Created</strong></TableCell>}
-                  <TableCell><strong>Title</strong></TableCell>
-                  {!isMobile && <TableCell><strong>Type</strong></TableCell>}
-                  <TableCell><strong>Priority</strong></TableCell>
-                  <TableCell><strong>Status</strong></TableCell>
-                  {!isMobile && <TableCell><strong>Picked Up By</strong></TableCell>}
-                  {!isMobile && <TableCell><strong>Notes</strong></TableCell>}
-                  {!isSmallMobile && <TableCell><strong>Complete By</strong></TableCell>}
-                  {!isSmallMobile && <TableCell><strong>Created By</strong></TableCell>}
-                  <TableCell><strong>Actions</strong></TableCell>
+                  {!isSmallMobile && <TableCell sx={{ width: { xs: '80px', sm: '120px' } }}><strong>Date</strong></TableCell>}
+                  <TableCell sx={{ width: 'auto', minWidth: { xs: '120px', sm: '200px' } }}><strong>Title</strong></TableCell>
+                  {!isMobile && <TableCell sx={{ width: '80px' }}><strong>Type</strong></TableCell>}
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' } }}><strong>Priority</strong></TableCell>
+                  <TableCell sx={{ width: { xs: '85px', sm: '110px' } }}><strong>Status</strong></TableCell>
+                  {!isMobile && <TableCell sx={{ width: '100px' }}><strong>Picked Up</strong></TableCell>}
+                  {!isMobile && <TableCell sx={{ width: '120px' }}><strong>Notes</strong></TableCell>}
+                  {!isSmallMobile && <TableCell sx={{ width: '100px' }}><strong>Complete By</strong></TableCell>}
+                  {!isSmallMobile && <TableCell sx={{ width: '90px' }}><strong>Created By</strong></TableCell>}
+                  <TableCell sx={{ width: { xs: '50px', sm: '60px' } }}><strong>Actions</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
               {ideas.map((idea) => (
                 <TableRow key={idea._id} hover>
                   {!isSmallMobile && (
-                    <TableCell sx={{ minWidth: 140 }}>
-                      <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    <TableCell sx={{ minWidth: 80 }}>
+                      <Typography variant="body2" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
                         {formatDate(idea.createdAt)}
                       </Typography>
                     </TableCell>
                   )}
-                  <TableCell sx={{ maxWidth: { xs: 200, sm: 300, md: 400 } }}>
-                    <Typography variant="subtitle2" fontWeight="bold" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                  <TableCell sx={{ maxWidth: { xs: 150, sm: 250 }, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <Typography 
+                      variant="subtitle2" 
+                      fontWeight="bold" 
+                      sx={{ 
+                        fontSize: { xs: '0.75rem', sm: '0.875rem' }, 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis', 
+                        whiteSpace: 'nowrap',
+                        cursor: isSmallMobile ? 'pointer' : 'default',
+                        '&:hover': isSmallMobile ? { textDecoration: 'underline', color: 'primary.main' } : {}
+                      }}
+                      onClick={() => isSmallMobile && setSelectedIdea(idea)}
+                    >
                       {idea.title}
                     </Typography>
                     {!isSmallMobile && (
@@ -533,7 +546,7 @@ export default function IdeasPage() {
                     />
                   </TableCell>
                   <TableCell>
-                    <FormControl size="small" fullWidth sx={{ minWidth: { xs: 100, sm: 120 } }}>
+                    <FormControl size="small" fullWidth sx={{ minWidth: { xs: 75, sm: 100 } }}>
                       <Select
                         value={idea.status}
                         onChange={(e) => handleStatusChange(idea._id, e.target.value)}
@@ -549,7 +562,13 @@ export default function IdeasPage() {
                             ? '#084298'
                             : '#0a3622',
                           fontWeight: 'bold',
-                          fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                          fontSize: { xs: '0.6rem', sm: '0.75rem' },
+                          padding: { xs: '2px 4px', sm: '4px 8px' },
+                          '& .MuiSelect-select': {
+                            paddingRight: { xs: '20px !important', sm: '32px !important' },
+                            paddingTop: { xs: '4px', sm: '8px' },
+                            paddingBottom: { xs: '4px', sm: '8px' },
+                          },
                           '& .MuiOutlinedInput-notchedOutline': { 
                             border: 'none' 
                           },
@@ -561,9 +580,9 @@ export default function IdeasPage() {
                           }
                         }}
                       >
-                        <MenuItem value="open">Open</MenuItem>
-                        <MenuItem value="in-progress">In Progress</MenuItem>
-                        <MenuItem value="completed">Completed</MenuItem>
+                        <MenuItem value="open">{isSmallMobile ? 'Open' : 'Open'}</MenuItem>
+                        <MenuItem value="in-progress">{isSmallMobile ? 'In Prog.' : 'In Progress'}</MenuItem>
+                        <MenuItem value="completed">{isSmallMobile ? 'Done' : 'Completed'}</MenuItem>
                       </Select>
                     </FormControl>
                   </TableCell>
@@ -648,6 +667,57 @@ export default function IdeasPage() {
           />
         </Box>
       )}
+
+      {/* Idea Detail Dialog for Mobile */}
+      <Dialog 
+        open={!!selectedIdea} 
+        onClose={() => setSelectedIdea(null)} 
+        maxWidth="sm" 
+        fullWidth
+        fullScreen={isSmallMobile}
+      >
+        <DialogTitle sx={{ p: { xs: 2.5, sm: 3 }, pb: { xs: 2, sm: 2.5 } }}>
+          <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, wordBreak: 'break-word' }}>
+            {selectedIdea?.title}
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+          <Stack spacing={3}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5, fontSize: { xs: '0.9rem', sm: '1rem' } }}>Description</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}>
+                {selectedIdea?.description}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5, fontSize: { xs: '0.9rem', sm: '1rem' } }}>Details</Typography>
+              <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', gap: 1.5 }}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Type</Typography>
+                  <Chip 
+                    label={selectedIdea?.type?.charAt(0).toUpperCase() + selectedIdea?.type?.slice(1)}
+                    size="small"
+                    variant="outlined"
+                    sx={{ mt: 0.75, fontSize: { xs: '0.65rem', sm: '0.75rem' } }}
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Priority</Typography>
+                  <Chip 
+                    label={selectedIdea?.priority?.charAt(0).toUpperCase() + selectedIdea?.priority?.slice(1)}
+                    size="small"
+                    color={getPriorityColor(selectedIdea?.priority)}
+                    sx={{ mt: 0.75, fontSize: { xs: '0.65rem', sm: '0.75rem' } }}
+                  />
+                </Box>
+              </Stack>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: { xs: 2.5, sm: 3 }, pt: { xs: 1.5, sm: 2 } }}>
+          <Button onClick={() => setSelectedIdea(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* New Idea Dialog */}
       <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth fullScreen={isSmallMobile}>
