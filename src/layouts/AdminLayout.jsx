@@ -80,6 +80,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
 import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboard.jsx';
 
 import ConversationManagementPage from '../pages/admin/ConversationManagementPage.jsx';
@@ -251,7 +252,7 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/credit-card-names'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><ReceiptLongIcon /></ListItemIcon>
+                <ListItemIcon><CreditCardIcon /></ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Credit Card Names" />}
               </ListItemButton>
             </ListItem>
