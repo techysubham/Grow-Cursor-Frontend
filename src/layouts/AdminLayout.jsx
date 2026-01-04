@@ -96,6 +96,12 @@ import SellerAnalyticsPage from '../pages/admin/SellerAnalyticsPage.jsx';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ChatIcon from '@mui/icons-material/Chat';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import AmazonLookupPage from '../pages/admin/AmazonLookupPage.jsx';
+import SearchIcon from '@mui/icons-material/Search';
+import ManageProductUmbrellasPage from '../pages/admin/ManageProductUmbrellasPage.jsx';
+import UmbrellaIcon from '@mui/icons-material/Umbrella';
+import ASINStoragePage from '../pages/admin/ASINStoragePage.jsx';
+import StorageIcon from '@mui/icons-material/Storage';
 
 const drawerWidth = 230;
 
@@ -273,18 +279,62 @@ export default function AdminLayout({ user, onLogout }) {
 
         {/* Product Research - visible to ProductAdmin or Superadmin */}
         {isProductAdmin || isSuper ? (
-          <ListItem disablePadding>
-            <ListItemButton 
-              component={Link} 
-              to="/admin/research" 
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/research'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon><Inventory2Icon /></ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Product Research" />}
-            </ListItemButton>
-          </ListItem>
+          <>
+            <ListItem disablePadding>
+              <ListItemButton 
+                component={Link} 
+                to="/admin/research" 
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/research'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon><Inventory2Icon /></ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Product Research" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* Amazon Lookup */}
+            <ListItem disablePadding>
+              <ListItemButton 
+                component={Link} 
+                to="/admin/amazon-lookup" 
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/amazon-lookup'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon><SearchIcon /></ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Amazon Lookup" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* Product Umbrellas */}
+            <ListItem disablePadding>
+              <ListItemButton 
+                component={Link} 
+                to="/admin/product-umbrellas" 
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/product-umbrellas'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon><UmbrellaIcon /></ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Product Umbrellas" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* ASIN Storage */}
+            <ListItem disablePadding>
+              <ListItemButton 
+                component={Link} 
+                to="/admin/asin-storage" 
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/asin-storage'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon><StorageIcon /></ListItemIcon>
+                {sidebarOpen && <ListItemText primary="ASIN Storage" />}
+              </ListItemButton>
+            </ListItem>
+          </>
         ) : null}
 
         {/* Range Analyzer - Direct access for superadmin and listingadmin */}
@@ -1047,6 +1097,9 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/research" element={<ProductResearchPage />} />
               <Route path="/ranges" element={<ManageRangesPage />} />
               <Route path="/categories" element={<ManageCategoriesPage />} />
+              <Route path="/amazon-lookup" element={<AmazonLookupPage />} />
+              <Route path="/product-umbrellas" element={<ManageProductUmbrellasPage />} />
+              <Route path="/asin-storage" element={<ASINStoragePage />} />
             </>
           ) : null}
           {isListingAdmin || isSuper ? (
