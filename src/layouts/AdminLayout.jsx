@@ -102,6 +102,8 @@ import ManageProductUmbrellasPage from '../pages/admin/ManageProductUmbrellasPag
 import UmbrellaIcon from '@mui/icons-material/Umbrella';
 import ASINStoragePage from '../pages/admin/ASINStoragePage.jsx';
 import StorageIcon from '@mui/icons-material/Storage';
+import ColumnCreatorPage from '../pages/admin/ColumnCreatorPage.jsx';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 
 const drawerWidth = 230;
 
@@ -332,6 +334,20 @@ export default function AdminLayout({ user, onLogout }) {
               >
                 <ListItemIcon><StorageIcon /></ListItemIcon>
                 {sidebarOpen && <ListItemText primary="ASIN Storage" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* Column Creator */}
+            <ListItem disablePadding>
+              <ListItemButton 
+                component={Link} 
+                to="/admin/column-creator" 
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/column-creator'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon><ViewColumnIcon /></ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Column Creator" />}
               </ListItemButton>
             </ListItem>
           </>
@@ -1100,6 +1116,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/amazon-lookup" element={<AmazonLookupPage />} />
               <Route path="/product-umbrellas" element={<ManageProductUmbrellasPage />} />
               <Route path="/asin-storage" element={<ASINStoragePage />} />
+              <Route path="/column-creator" element={<ColumnCreatorPage />} />
             </>
           ) : null}
           {isListingAdmin || isSuper ? (

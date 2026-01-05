@@ -1,24 +1,38 @@
 import { useState, useEffect } from 'react';
 import { Box, Button, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import api from '../../lib/api';
 
 export default function AmazonLookupPage() {
   const [asins, setAsins] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [exportingCSV, setExportingCSV] = useState(false);
   
   const [sellers, setSellers] = useState([]);
   const [selectedSeller, setSelectedSeller] = useState('');
   const [umbrellas, setUmbrellas] = useState([]);
   const [selectedUmbrella, setSelectedUmbrella] = useState('');
   const [savedProducts, setSavedProducts] = useState([]);
+  const [customColumnNames, setCustomColumnNames] = useState([]);
 
   useEffect(() => {
     fetchSellers();
     fetchUmbrellas();
     fetchSavedProducts();
   }, []);
+
+  useEffect(() => {
+    // Extract unique custom column names from all products
+    const columnNamesSet = new Set();
+    savedProducts.forEach(product => {
+      if (product.customFields) {
+        Object.keys(product.customFields).forEach(key => columnNamesSet.add(key));
+      }
+    });
+    setCustomColumnNames(Array.from(columnNamesSet));
+  }, [savedProducts]);
 
   const fetchSellers = async () => {
     try {
@@ -87,6 +101,77 @@ export default function AmazonLookupPage() {
       fetchSavedProducts();
     } catch (err) {
       alert('Failed to delete product');
+    }
+  };
+
+  const exportToCSV = () => {
+    if (savedProducts.length === 0) {
+      alert('No products to export');
+      return;
+    }
+
+    setExportingCSV(true);
+
+    try {
+      // Define CSV headers
+      const headers = [
+        'ASIN',
+        'Title',
+        'Price',
+        'Brand',
+        'Seller',
+        'Umbrella',
+        ...customColumnNames, // Dynamic custom columns
+        'Description',
+        'Images',
+        'Added Date'
+      ];
+
+      // Generate CSV rows
+      const rows = savedProducts.map(product => {
+        const customFieldValues = customColumnNames.map(columnName => 
+          product.customFields?.[columnName] || ''
+        );
+
+        return [
+          product.asin || '',
+          (product.title || '').replace(/"/g, '""'), // Escape quotes
+          product.price || '',
+          product.brand || '',
+          getSellerName(product.sellerId),
+          product.productUmbrellaId?.name || '',
+          ...customFieldValues,
+          (product.description || '').replace(/"/g, '""').substring(0, 500), // Limit description
+          (product.images || []).join(' | '),
+          product.createdAt ? new Date(product.createdAt).toLocaleDateString() : ''
+        ];
+      });
+
+      // Combine headers and rows
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      const fileName = `amazon_products_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Failed to export CSV');
+    } finally {
+      setExportingCSV(false);
     }
   };
 
@@ -163,21 +248,39 @@ export default function AmazonLookupPage() {
       </Paper>
 
       {/* Saved Products Table */}
-      <Typography variant="h6" sx={{ mb: 2 }}>Saved Products ({savedProducts.length})</Typography>
-      <TableContainer component={Paper}>
-        <Table size="small" sx={{ '& .MuiTableCell-root': { py: 1.5 } }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Typography variant="h6">Saved Products ({savedProducts.length})</Typography>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={exportToCSV}
+          disabled={exportingCSV || savedProducts.length === 0}
+        >
+          {exportingCSV ? 'Exporting...' : 'Download CSV'}
+        </Button>
+      </Stack>
+      <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+        <Table size="small" sx={{ '& .MuiTableCell-root': { py: 1.5 } }} stickyHeader>
           <TableHead>
             <TableRow sx={{ bgcolor: 'grey.100' }}>
-              <TableCell sx={{ fontWeight: 'bold', width: 100 }}>ASIN</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', minWidth: 250 }}>Title</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', width: 80 }}>Price</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', width: 120 }}>Brand</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', width: 120 }}>Seller</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', width: 120 }}>Umbrella</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Description</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', width: 100 }}>Images</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', width: 100 }}>Added</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold', width: 80 }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: 100, bgcolor: 'grey.100' }}>ASIN</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', minWidth: 250, bgcolor: 'grey.100' }}>Title</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: 80, bgcolor: 'grey.100' }}>Price</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: 120, bgcolor: 'grey.100' }}>Brand</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: 120, bgcolor: 'grey.100' }}>Seller</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: 120, bgcolor: 'grey.100' }}>Umbrella</TableCell>
+              
+              {/* Dynamic custom columns */}
+              {customColumnNames.map((columnName) => (
+                <TableCell key={columnName} sx={{ fontWeight: 'bold', minWidth: 200, bgcolor: 'grey.100' }}>
+                  {columnName}
+                </TableCell>
+              ))}
+              
+              <TableCell sx={{ fontWeight: 'bold', minWidth: 200, bgcolor: 'grey.100' }}>Description</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: 100, bgcolor: 'grey.100' }}>Images</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: 100, bgcolor: 'grey.100' }}>Added</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold', width: 80, bgcolor: 'grey.100' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -216,6 +319,31 @@ export default function AmazonLookupPage() {
                 <TableCell>
                   <Typography variant="body2">{product.productUmbrellaId?.name || 'N/A'}</Typography>
                 </TableCell>
+                
+                {/* Dynamic custom field columns */}
+                {customColumnNames.map((columnName) => (
+                  <TableCell key={columnName}>
+                    <Typography 
+                      variant="body2" 
+                      title={product.customFields?.[columnName] || '-'}
+                      sx={{ 
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        fontSize: '0.85rem',
+                        color: product.customFields?.[columnName] ? 'primary.main' : 'text.secondary',
+                        cursor: 'help',
+                        lineHeight: 1.3,
+                        fontWeight: product.customFields?.[columnName] ? 'medium' : 'normal'
+                      }}
+                    >
+                      {product.customFields?.[columnName] || '-'}
+                    </Typography>
+                  </TableCell>
+                ))}
+                
                 <TableCell>
                   <Typography 
                     variant="body2" 
@@ -275,7 +403,7 @@ export default function AmazonLookupPage() {
             ))}
             {savedProducts.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                <TableCell colSpan={10 + customColumnNames.length} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                   No saved products yet. Add your first product above!
                 </TableCell>
               </TableRow>
