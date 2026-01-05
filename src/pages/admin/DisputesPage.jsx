@@ -307,8 +307,11 @@ export default function DisputesPage() {
   const getCaseStatusColor = (status) => {
     if (!status) return 'default';
     const s = status.toUpperCase();
-    if (s === 'OPEN' || s === 'WAITING_FOR_SELLER') return 'warning';
-    if (s === 'ON_HOLD' || s === 'UNDER_REVIEW') return 'info';
+    // Open/Waiting statuses - warning (yellow/orange)
+    if (s === 'OPEN' || s === 'WAITING_FOR_SELLER' || s === 'WAITING_SELLER_RESPONSE') return 'warning';
+    // Waiting for buyer - info (blue) - we're good, waiting on them
+    if (s === 'WAITING_BUYER_RESPONSE' || s === 'ON_HOLD' || s === 'UNDER_REVIEW') return 'info';
+    // Closed - success (green)
     if (s === 'CLOSED') return 'success';
     return 'default';
   };
@@ -482,12 +485,30 @@ export default function DisputesPage() {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer component={Paper}>
-            <Table size="small">
+          <TableContainer 
+            component={Paper}
+            sx={{ 
+              maxWidth: '100%',
+              overflowX: 'auto',
+              '&::-webkit-scrollbar': {
+                height: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: '#f1f1f1',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: '#888',
+                borderRadius: '4px',
+                '&:hover': {
+                  backgroundColor: '#555',
+                },
+              },
+            }}
+          >
+            <Table size="small" sx={{ minWidth: 1200 }}>
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                   <TableCell><strong>Case ID</strong></TableCell>
-                  <TableCell><strong>Order ID</strong></TableCell>
                   <TableCell><strong>Type</strong></TableCell>
                   <TableCell><strong>Seller</strong></TableCell>
                   <TableCell><strong>Buyer</strong></TableCell>
@@ -501,7 +522,7 @@ export default function DisputesPage() {
               <TableBody>
                 {cases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} align="center">
+                    <TableCell colSpan={9} align="center">
                       <Typography variant="body2" color="text.secondary" py={2}>
                         No INR cases found. Click "Fetch INR Cases from eBay" to load data.
                       </Typography>
@@ -516,16 +537,6 @@ export default function DisputesPage() {
                             {c.caseId || '-'}
                           </Typography>
                           <IconButton size="small" onClick={() => handleCopy(c.caseId)}>
-                            <ContentCopyIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Stack>
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                          <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                            {c.orderId || '-'}
-                          </Typography>
-                          <IconButton size="small" onClick={() => handleCopy(c.orderId)}>
                             <ContentCopyIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         </Stack>
@@ -584,23 +595,16 @@ export default function DisputesPage() {
                           <Typography 
                             variant="body2" 
                             fontSize="0.75rem"
-                            color={isResponseOverdue(c.sellerResponseDueDate) ? 'error' : 'inherit'}
-                            fontWeight={isResponseOverdue(c.sellerResponseDueDate) || isResponseUrgent(c.sellerResponseDueDate) ? 'bold' : 'normal'}
+                            color={c.status !== 'CLOSED' && isResponseUrgent(c.sellerResponseDueDate) ? 'error' : 'inherit'}
+                            fontWeight={c.status !== 'CLOSED' && isResponseUrgent(c.sellerResponseDueDate) ? 'bold' : 'normal'}
                           >
                             {formatDate(c.sellerResponseDueDate)}
                           </Typography>
-                          {isResponseOverdue(c.sellerResponseDueDate) && (
-                            <Chip 
-                              label="OVERDUE" 
-                              color="error" 
-                              size="small" 
-                              sx={{ fontSize: '0.6rem', height: 18 }} 
-                            />
-                          )}
-                          {!isResponseOverdue(c.sellerResponseDueDate) && isResponseUrgent(c.sellerResponseDueDate) && (
+                          {/* Only show urgent badge if case is NOT closed */}
+                          {c.status !== 'CLOSED' && !isResponseOverdue(c.sellerResponseDueDate) && isResponseUrgent(c.sellerResponseDueDate) && (
                             <Chip 
                               label="URGENT" 
-                              color="warning" 
+                              color="error" 
                               size="small" 
                               sx={{ fontSize: '0.6rem', height: 18 }} 
                             />
@@ -716,8 +720,27 @@ export default function DisputesPage() {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer component={Paper}>
-            <Table size="small">
+          <TableContainer 
+            component={Paper}
+            sx={{ 
+              maxWidth: '100%',
+              overflowX: 'auto',
+              '&::-webkit-scrollbar': {
+                height: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: '#f1f1f1',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: '#888',
+                borderRadius: '4px',
+                '&:hover': {
+                  backgroundColor: '#555',
+                },
+              },
+            }}
+          >
+            <Table size="small" sx={{ minWidth: 1200 }}>
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                   <TableCell><strong>Dispute ID</strong></TableCell>
