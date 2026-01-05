@@ -17,7 +17,8 @@ import {
   Typography,
   Button,
   Menu,
-  MenuItem
+  MenuItem,
+  Tooltip
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
@@ -107,6 +108,25 @@ import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 
 const drawerWidth = 230;
 
+// Helper component for sidebar icons with tooltips when collapsed
+const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
+  sidebarOpen ? (
+    <Icon />
+  ) : (
+    <Tooltip
+      title={label}
+      placement="right"
+      arrow
+      enterDelay={200}
+      leaveDelay={200}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon />
+      </span>
+    </Tooltip>
+  )
+);
+
 export default function AdminLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -178,7 +198,9 @@ export default function AdminLayout({ user, onLogout }) {
             selected={location.pathname === '/admin/ideas'}
             sx={selectedMenuItemStyle}
           >
-            <ListItemIcon><LightbulbIcon /></ListItemIcon>
+            <ListItemIcon>
+              <NavIcon icon={LightbulbIcon} label="Ideas & Issues Board" sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
             {sidebarOpen && <ListItemText primary="Ideas & Issues" />}
           </ListItemButton>
         </ListItem>
@@ -193,7 +215,9 @@ export default function AdminLayout({ user, onLogout }) {
               selected={location.pathname === '/admin/about-me'}
               sx={selectedMenuItemStyle}
             >
-              <ListItemIcon><SupervisorAccountIcon /></ListItemIcon>
+              <ListItemIcon>
+                <NavIcon icon={SupervisorAccountIcon} label="View Your Profile" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
               {sidebarOpen && <ListItemText primary="About Me" />}
             </ListItemButton>
           </ListItem>
@@ -208,7 +232,9 @@ export default function AdminLayout({ user, onLogout }) {
             selected={location.pathname === '/admin/internal-messages'}
             sx={selectedMenuItemStyle}
           >
-            <ListItemIcon><ChatIcon /></ListItemIcon>
+            <ListItemIcon>
+              <NavIcon icon={ChatIcon} label="Team Chat & Messaging" sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
             {sidebarOpen && <ListItemText primary="Team Chat" />}
           </ListItemButton>
         </ListItem>
@@ -224,7 +250,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/payoneer'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><AttachMoneyIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={AttachMoneyIcon} label="Payment Information" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Payoneer Sheet" />}
               </ListItemButton>
             </ListItem>
@@ -236,7 +264,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/bank-accounts'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><AccountBalanceIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={AccountBalanceIcon} label="Bank Account Details" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Bank Accounts" />}
               </ListItemButton>
             </ListItem>
@@ -248,7 +278,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/transactions'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><ReceiptLongIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={ReceiptLongIcon} label="Transaction History" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Transactions" />}
               </ListItemButton>
             </ListItem>
@@ -260,7 +292,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/credit-card-names'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><CreditCardIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={CreditCardIcon} label="Credit Card Management" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Credit Card Names" />}
               </ListItemButton>
             </ListItem>
@@ -272,7 +306,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/internal-messages-admin'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><AdminPanelSettingsIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={AdminPanelSettingsIcon} label="Admin Message View" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="View All Messages" />}
               </ListItemButton>
             </ListItem>
@@ -290,7 +326,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/research'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><Inventory2Icon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={Inventory2Icon} label="Product Research & Analysis" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Product Research" />}
               </ListItemButton>
             </ListItem>
@@ -304,7 +342,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/amazon-lookup'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><SearchIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={SearchIcon} label="Search Amazon Products" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Amazon Lookup" />}
               </ListItemButton>
             </ListItem>
@@ -318,7 +358,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/product-umbrellas'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><UmbrellaIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={UmbrellaIcon} label="Product Categories" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Product Umbrellas" />}
               </ListItemButton>
             </ListItem>
@@ -332,7 +374,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/asin-storage'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><StorageIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={StorageIcon} label="ASIN Database" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="ASIN Storage" />}
               </ListItemButton>
             </ListItem>
@@ -346,7 +390,9 @@ export default function AdminLayout({ user, onLogout }) {
                 selected={location.pathname === '/admin/column-creator'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon><ViewColumnIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={ViewColumnIcon} label="Create Custom Columns" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Column Creator" />}
               </ListItemButton>
             </ListItem>
@@ -363,7 +409,9 @@ export default function AdminLayout({ user, onLogout }) {
               selected={location.pathname === '/admin/range-analyzer'}
               sx={selectedMenuItemStyle}
             >
-              <ListItemIcon><AutoAwesomeIcon /></ListItemIcon>
+              <ListItemIcon>
+                <NavIcon icon={AutoAwesomeIcon} label="Analyze Price Ranges" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
               {sidebarOpen && <ListItemText primary="Range Analyzer" />}
             </ListItemButton>
           </ListItem>
@@ -379,7 +427,9 @@ export default function AdminLayout({ user, onLogout }) {
                 onMouseLeave={() => !sidebarOpen && setListingAnchorEl(null)}
                 sx={{ justifyContent: 'space-between' }}
               >
-                <ListItemIcon><ListAltIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={ListAltIcon} label="Listing Management" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Listing" />}
                 {sidebarOpen && (listingMenuOpen ? <ExpandLess /> : <ExpandMore />)}
               </ListItemButton>
@@ -569,7 +619,9 @@ export default function AdminLayout({ user, onLogout }) {
                 onMouseLeave={() => !sidebarOpen && setCompatAnchorEl(null)}
                 sx={{ justifyContent: 'space-between' }}
               >
-                <ListItemIcon><TaskIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={TaskIcon} label="Compatibility Management" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Compatibility" />}
                 {sidebarOpen && (compatMenuOpen ? <ExpandLess /> : <ExpandMore />)}
               </ListItemButton>
@@ -633,7 +685,9 @@ export default function AdminLayout({ user, onLogout }) {
               selected={location.pathname === '/admin/compatibility-dashboard'}
               sx={selectedMenuItemStyle}
             >
-              <ListItemIcon><DashboardIcon /></ListItemIcon>
+              <ListItemIcon>
+                <NavIcon icon={DashboardIcon} label="Compatibility Dashboard" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
               {sidebarOpen && <ListItemText primary="Compat. Dashboard" />}
             </ListItemButton>
           </ListItem>
@@ -649,7 +703,9 @@ export default function AdminLayout({ user, onLogout }) {
                 onMouseLeave={() => !sidebarOpen && setOrdersAnchorEl(null)}
                 sx={{ justifyContent: 'space-between' }}
               >
-                <ListItemIcon><LocalShippingIcon /></ListItemIcon>
+                <ListItemIcon>
+                  <NavIcon icon={LocalShippingIcon} label="Orders & Fulfillment" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Orders Dept" />}
                 {sidebarOpen && (ordersMenuOpen ? <ExpandLess /> : <ExpandMore />)}
               </ListItemButton>
