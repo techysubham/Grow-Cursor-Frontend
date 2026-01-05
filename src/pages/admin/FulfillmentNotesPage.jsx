@@ -409,6 +409,49 @@ function NotesCell({ order, onSave, onNotify }) {
   );
 }
 
+// Format Delivery Date helper
+function formatDeliveryDate(order) {
+  let minDateStr = order.lineItems?.[0]?.lineItemFulfillmentInstructions?.minEstimatedDeliveryDate;
+  let maxDateStr = order.lineItems?.[0]?.lineItemFulfillmentInstructions?.maxEstimatedDeliveryDate || order.estimatedDelivery;
+
+  if (!maxDateStr) return '-';
+
+  const marketplaceId = order.purchaseMarketplaceId;
+
+  const getFormattedDatePart = (dStr) => {
+    if (!dStr) return null;
+    try {
+      const date = new Date(dStr);
+      let timeZone = 'UTC';
+      if (marketplaceId === 'EBAY_US') timeZone = 'America/Los_Angeles';
+      else if (['EBAY_CA', 'EBAY_ENCA'].includes(marketplaceId)) timeZone = 'America/New_York';
+      else if (marketplaceId === 'EBAY_AU') timeZone = 'Australia/Sydney';
+
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric', timeZone
+      });
+    } catch { return null; }
+  };
+
+  const minPart = getFormattedDatePart(minDateStr);
+  const maxPart = getFormattedDatePart(maxDateStr);
+
+  if (minPart && maxPart && minPart !== maxPart) {
+    return (
+      <Stack spacing={0}>
+        <Typography variant="body2" fontWeight="medium">{minPart} -</Typography>
+        <Typography variant="body2" fontWeight="medium">{maxPart}</Typography>
+      </Stack>
+    );
+  }
+
+  return (
+    <Typography variant="body2">
+      {maxPart || '-'}
+    </Typography>
+  );
+}
+
 export default function FulfillmentNotesPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -641,17 +684,13 @@ export default function FulfillmentNotesPage() {
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
 
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, minWidth: 200 }}>Item Details</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, minWidth: 150 }}>Delivery Date</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, minWidth: 300 }}>Fulfillment Notes</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, align: 'center' }}>Chat</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {orders.map((order, idx) => {
-                  const itemCount = order.lineItems?.length || 0;
-                  const firstItem = order.lineItems?.[0] || {};
-                  const hasMultipleItems = itemCount > 1;
-
                   return (
                     <TableRow key={order._id || idx} hover>
                       <TableCell>
@@ -685,30 +724,7 @@ export default function FulfillmentNotesPage() {
                       </TableCell>
 
                       <TableCell>
-                        <Stack spacing={0.5}>
-                          <Tooltip title={firstItem.title || 'No product info'} arrow>
-                            <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180, fontWeight: 500 }}>
-                              {firstItem.title || '-'}
-                            </Typography>
-                          </Tooltip>
-                          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                            <Chip 
-                              label={`Qty: ${itemCount}`}
-                              size="small"
-                              variant="outlined"
-                            />
-                            {hasMultipleItems && (
-                              <Tooltip title={`${itemCount} items in this order`} arrow>
-                                <Chip 
-                                  label="Multiple"
-                                  size="small"
-                                  color="warning"
-                                  variant="filled"
-                                />
-                              </Tooltip>
-                            )}
-                          </Stack>
-                        </Stack>
+                        {formatDeliveryDate(order)}
                       </TableCell>
 
                       <TableCell>
