@@ -885,6 +885,7 @@ function FulfillmentDashboard() {
   const [selectedSeller, setSelectedSeller] = useState(() => getInitialState('selectedSeller', ''));
   const [searchOrderId, setSearchOrderId] = useState(() => getInitialState('searchOrderId', ''));
   const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
+  const [searchItemId, setSearchItemId] = useState(() => getInitialState('searchItemId', ''));
   //const [searchSoldDate, setSearchSoldDate] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [searchPaymentStatus, setSearchPaymentStatus] = useState(() => getInitialState('searchPaymentStatus', ''));
@@ -1006,6 +1007,7 @@ function FulfillmentDashboard() {
       selectedSeller,
       searchOrderId,
       searchBuyerName,
+      searchItemId,
       searchMarketplace,
       searchPaymentStatus,
       filtersExpanded,
@@ -1103,6 +1105,7 @@ function FulfillmentDashboard() {
     selectedSeller,
     searchOrderId,
     searchBuyerName,
+    searchItemId,
     searchMarketplace,
     searchPaymentStatus,
     dateFilter
@@ -1144,6 +1147,7 @@ function FulfillmentDashboard() {
       prevFilters.current.selectedSeller !== selectedSeller ||
       prevFilters.current.searchOrderId !== searchOrderId ||
       prevFilters.current.searchBuyerName !== searchBuyerName ||
+      prevFilters.current.searchItemId !== searchItemId ||
       prevFilters.current.searchMarketplace !== searchMarketplace ||
       prevFilters.current.searchPaymentStatus !== searchPaymentStatus ||
       JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter);
@@ -1153,6 +1157,7 @@ function FulfillmentDashboard() {
       selectedSeller,
       searchOrderId,
       searchBuyerName,
+      searchItemId,
       searchMarketplace,
       searchPaymentStatus,
       dateFilter
@@ -1172,7 +1177,7 @@ function FulfillmentDashboard() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, searchPaymentStatus, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemId, searchMarketplace, searchPaymentStatus, dateFilter]);
 
   // Handle order earnings change (update local state)
   const handleOrderEarningsChange = (orderId, orderIdStr, value) => {
@@ -1256,6 +1261,7 @@ function FulfillmentDashboard() {
       if (selectedSeller) params.sellerId = selectedSeller;
       if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
+      if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
 
@@ -2553,6 +2559,15 @@ function FulfillmentDashboard() {
                   sx={{ flex: 1 }}
                   fullWidth
                 />
+                <TextField
+                  size="small"
+                  label="Item ID"
+                  value={searchItemId}
+                  onChange={(e) => setSearchItemId(e.target.value)}
+                  placeholder="Search by item ID..."
+                  sx={{ flex: 1 }}
+                  fullWidth
+                />
               </Stack>
 
               {/* Row 2: Date filters */}
@@ -2616,6 +2631,7 @@ function FulfillmentDashboard() {
                   onClick={() => {
                     setSearchOrderId('');
                     setSearchBuyerName('');
+                    setSearchItemId('');
                     setSearchPaymentStatus('');
                     setDateFilter({ mode: 'none', single: '', from: '', to: '' });
                   }}
