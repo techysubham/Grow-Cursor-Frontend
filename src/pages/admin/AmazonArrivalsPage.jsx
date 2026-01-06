@@ -28,6 +28,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import api from '../../lib/api';
 
 export default function AmazonArrivalsPage() {
@@ -155,6 +156,34 @@ export default function AmazonArrivalsPage() {
 
   const toggleSort = () => {
     setArrivalSort(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
+
+  const handleDismissOrder = async (orderId, orderName) => {
+    const confirmed = window.confirm(
+      `Remove "${orderName}" from Amazon Arrivals?\n\n` +
+      'The order will be hidden from this page but remains in All Orders. ' +
+      'You can bring it back by setting a new arriving date.'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const { data } = await api.patch(`/ebay/orders/${orderId}/dismiss-arrival`);
+      
+      if (data?.success) {
+        // Remove order from local state immediately (optimistic update)
+        setOrders(prev => prev.filter(o => o._id !== orderId));
+        setTotalOrders(prev => prev - 1);
+        
+        showSnack('success', '✅ Order dismissed from Amazon Arrivals');
+        
+        // Optionally refresh to get accurate pagination
+        setTimeout(() => fetchOrders(), 500);
+      }
+    } catch (err) {
+      const errorMsg = err?.response?.data?.error || 'Failed to dismiss order';
+      showSnack('error', errorMsg);
+    }
   };
 
   const formatArrivingDate = (dateStr) => {
@@ -342,6 +371,7 @@ export default function AmazonArrivalsPage() {
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Order ID</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -427,6 +457,18 @@ export default function AmazonArrivalsPage() {
                         }}>
                           {order.notes || '-'}
                         </Typography>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      <Tooltip title="Remove from Arrivals">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDismissOrder(order._id, order.orderId || order.productName?.substring(0, 30))}
+                          color="error"
+                          sx={{ p: 0.5 }}
+                        >
+                          <DeleteOutlineIcon sx={{ fontSize: '1.1rem' }} />
+                        </IconButton>
                       </Tooltip>
                     </TableCell>
                   </TableRow>
