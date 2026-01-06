@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   Avatar, TextField, Button, Divider, Badge, Stack, CircularProgress,
   IconButton, Chip, Alert, FormControl, Select, MenuItem, InputLabel, Link,
-  Snackbar, ListItemButton, Box, Paper, Typography, List, ListItem, ListItemText, ListItemAvatar
+  Snackbar, ListItemButton, Box, Paper, Typography, List, ListItem, ListItemText, ListItemAvatar,
+  useTheme, useMediaQuery
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import PersonIcon from '@mui/icons-material/Person';
@@ -18,6 +19,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import MarkAsUnreadIcon from '@mui/icons-material/MarkAsUnread';
+import MenuIcon from '@mui/icons-material/Menu';
 import api from '../../lib/api';
 
 // Session storage key for persisting state
@@ -86,6 +88,30 @@ export default function BuyerChatPage() {
   const [markingUnread, setMarkingUnread] = useState(false);
   const [copiedText, setCopiedText] = useState('');
 
+  // Responsive hooks
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // < 600px
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md')); // 600px - 960px
+  const isDesktop = !isMobile && !isTablet;
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const prevIsDesktopRef = useRef(null);
+
+  // Sync sidebar state with breakpoints - closed on mobile/tablet, open on desktop
+  useEffect(() => {
+    // On initial mount or when switching breakpoint categories
+    if (prevIsDesktopRef.current === null || prevIsDesktopRef.current !== isDesktop) {
+      setSidebarOpen(isDesktop);
+      prevIsDesktopRef.current = isDesktop;
+    }
+  }, [isDesktop]);
+
+  // On tablet, keep sidebar closed when viewing a chat
+  useEffect(() => {
+    if (isTablet && selectedThread) {
+      setSidebarOpen(false);
+    }
+  }, [isTablet, selectedThread]);
+
   // Persist state to sessionStorage
   useEffect(() => {
     const stateToSave = {
@@ -135,7 +161,13 @@ export default function BuyerChatPage() {
         setMetaCaseStatus('');
       }
     } catch (e) {
-      console.error("Failed to fetch meta tags", e);
+      // Don't log 401 errors - they're handled by the interceptor
+      if (e.response?.status !== 401) {
+        console.error("Failed to fetch meta tags", e);
+      }
+      // Reset to empty on error
+      setMetaCategory('');
+      setMetaCaseStatus('');
     }
   }
 
@@ -171,7 +203,12 @@ export default function BuyerChatPage() {
       const { data } = await api.get('/sellers/all');
       setSellers(data || []);
     } catch (e) {
-      console.error('Failed to load sellers');
+      // Don't log 401 errors - they're handled by the interceptor
+      if (e.response?.status !== 401) {
+        console.error('Failed to load sellers', e);
+      }
+      // Set empty array on error to prevent crashes
+      setSellers([]);
     }
   }
 
@@ -274,10 +311,13 @@ export default function BuyerChatPage() {
         setSnackbarOpen(true);
       }
     } catch (e) {
-      console.error("Inbox Sync failed", e);
-      setSnackbarMsg('Sync failed: ' + (e.response?.data?.error || e.message));
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+      // Don't log 401 errors - they're handled by the interceptor
+      if (e.response?.status !== 401) {
+        console.error("Inbox Sync failed", e);
+        setSnackbarMsg('Sync failed: ' + (e.response?.data?.error || e.message));
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+      }
     } finally {
       setSyncingInbox(false);
     }
@@ -300,8 +340,9 @@ export default function BuyerChatPage() {
         loadMessages(selectedThread, false);
       }
     } catch (e) {
-      // Use silent error logging to avoid spamming console if it's just a timeout
-      if (e.response && e.response.status !== 400) {
+      // Don't log 401 errors - they're handled by the interceptor
+      // Use silent error logging to avoid spamming console if it's just a timeout or 400
+      if (e.response && e.response.status !== 400 && e.response.status !== 401) {
         console.error("Thread Poll failed", e);
       }
     }
@@ -337,7 +378,14 @@ export default function BuyerChatPage() {
       setPage(currentPage + 1);
 
     } catch (e) {
-      console.error(e);
+      // Don't log 401 errors - they're handled by the interceptor
+      if (e.response?.status !== 401) {
+        console.error('Failed to load threads', e);
+      }
+      // Set empty array on error to prevent crashes
+      if (reset) {
+        setThreads([]);
+      }
     } finally {
       setLoadingThreads(false);
     }
@@ -346,6 +394,11 @@ export default function BuyerChatPage() {
   async function handleThreadSelect(thread) {
     setSelectedThread(thread);
     setSearchError('');
+    
+    // Close sidebar on mobile and tablet when thread is selected
+    if (isMobile || isTablet) {
+      setSidebarOpen(false);
+    }
 
     // 1. OPTIMISTIC UPDATE: Remove Red Dot Immediately
     if (thread.unreadCount > 0) {
@@ -385,7 +438,12 @@ export default function BuyerChatPage() {
       const res = await api.get('/ebay/chat/messages', { params });
       setMessages(res.data);
     } catch (e) {
-      console.error(e);
+      // Don't log 401 errors - they're handled by the interceptor
+      if (e.response?.status !== 401) {
+        console.error('Failed to load messages', e);
+      }
+      // Set empty array on error to prevent crashes
+      setMessages([]);
     } finally {
       if (showLoading) setLoadingMessages(false);
     }
@@ -537,82 +595,185 @@ export default function BuyerChatPage() {
   }
 
   return (
-    <Box sx={{ display: 'flex', height: '85vh', gap: 2 }}>
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: { xs: 'column', md: 'row' },
+      height: { xs: '100vh', md: '85vh' },
+      gap: { xs: 0, md: 2 },
+      position: 'relative'
+    }}>
+      {/* Mobile & Tablet: Backdrop overlay when sidebar is open */}
+      {(isMobile || isTablet) && sidebarOpen && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            bgcolor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 1500,
+            display: { xs: 'block', sm: 'block', md: 'none' }
+          }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* LEFT: SIDEBAR */}
-      <Paper sx={{ width: 340, display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderBottom: 1, borderColor: 'divider' }}>
+      <Paper sx={{ 
+        width: { xs: '100%', sm: sidebarOpen ? '100%' : 0, md: 340 },
+        display: { xs: sidebarOpen ? 'flex' : 'none', sm: sidebarOpen ? 'flex' : 'none', md: 'flex' },
+        flexDirection: 'column',
+        height: { xs: '100%', sm: '100%', md: '100%' },
+        position: { xs: 'fixed', sm: 'fixed', md: 'relative' },
+        top: { xs: 0, sm: 0, md: 'auto' },
+        left: { xs: 0, sm: 0, md: 'auto' },
+        zIndex: { xs: 1600, sm: 1600, md: 1 },
+        overflow: 'hidden',
+        boxShadow: { xs: 3, sm: 3, md: 1 }
+      }}>
+        <Box sx={{ 
+          p: { xs: 1.5, md: 2 }, 
+          bgcolor: '#f5f5f5', 
+          borderBottom: 1, 
+          borderColor: 'divider' 
+        }}>
+          {/* Mobile & Tablet: Close button */}
+          {(isMobile || isTablet) && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="h6" sx={{ fontSize: '1rem' }}>Conversations</Typography>
+              <IconButton 
+                onClick={() => setSidebarOpen(false)}
+                size="small"
+              >
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          )}
 
-          {/* SELLER FILTER */}
-          <FormControl fullWidth size="small" sx={{ mb: 2, bgcolor: 'white' }}>
-            <InputLabel>Filter by Seller</InputLabel>
-            <Select
-              value={selectedSeller}
-              label="Filter by Seller"
-              onChange={(e) => setSelectedSeller(e.target.value)}
+          {/* Filters - Stack on mobile, side-by-side on tablet */}
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            spacing={{ xs: 1.5, sm: 1 }}
+            sx={{ mb: 2 }}
+            flexWrap="wrap"
+          >
+            <FormControl 
+              fullWidth={isMobile}
+              size="small" 
+              sx={{ 
+                mb: { xs: 0, sm: 0 },
+                bgcolor: 'white',
+                minWidth: { sm: 140, md: 'auto' },
+                flex: { sm: 1, md: 'none' }
+              }}
             >
-              <MenuItem value="">
-                <em>All Sellers</em>
-              </MenuItem>
-              {sellers.map((s) => (
-                <MenuItem key={s._id} value={s._id}>
-                  {s.user?.username || s.user?.email}
+              <InputLabel>Filter by Seller</InputLabel>
+              <Select
+                value={selectedSeller}
+                label="Filter by Seller"
+                onChange={(e) => setSelectedSeller(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>All Sellers</em>
                 </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+                {sellers.map((s) => (
+                  <MenuItem key={s._id} value={s._id}>
+                    {s.user?.username || s.user?.email}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-          {/* MESSAGE TYPE FILTER */}
-          <FormControl fullWidth size="small" sx={{ mb: 2, bgcolor: 'white' }}>
-            <InputLabel>Filter by Type</InputLabel>
-            <Select
-              value={filterType}
-              label="Filter by Type"
-              onChange={(e) => setFilterType(e.target.value)}
+            <FormControl 
+              fullWidth={isMobile}
+              size="small" 
+              sx={{ 
+                mb: { xs: 0, sm: 0 },
+                bgcolor: 'white',
+                minWidth: { sm: 120, md: 'auto' },
+                flex: { sm: 1, md: 'none' }
+              }}
             >
-              <MenuItem value="ALL">All Messages</MenuItem>
-              <MenuItem value="ORDER">Order Related</MenuItem>
-              <MenuItem value="INQUIRY">Inquiries Only</MenuItem>
-            </Select>
-          </FormControl>
+              <InputLabel>Filter by Type</InputLabel>
+              <Select
+                value={filterType}
+                label="Filter by Type"
+                onChange={(e) => setFilterType(e.target.value)}
+              >
+                <MenuItem value="ALL">All Messages</MenuItem>
+                <MenuItem value="ORDER">Order Related</MenuItem>
+                <MenuItem value="INQUIRY">Inquiries Only</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
 
-          {/* MARKETPLACE FILTER */}
-          <FormControl fullWidth size="small" sx={{ mb: 2, bgcolor: 'white' }}>
-            <InputLabel>Filter by Marketplace</InputLabel>
-            <Select
-              value={filterMarketplace}
-              label="Filter by Marketplace"
-              onChange={(e) => setFilterMarketplace(e.target.value)}
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            spacing={{ xs: 1.5, sm: 1 }}
+            sx={{ mb: 2 }}
+          >
+            <FormControl 
+              fullWidth={isMobile}
+              size="small" 
+              sx={{ 
+                mb: { xs: 0, sm: 0 },
+                bgcolor: 'white',
+                minWidth: { sm: 140, md: 'auto' },
+                flex: { sm: 1, md: 'none' }
+              }}
             >
-              <MenuItem value="">All Marketplaces</MenuItem>
-              <MenuItem value="EBAY_US">United States (US)</MenuItem>
-              <MenuItem value="EBAY_CA">Canada (CA)</MenuItem>
-              <MenuItem value="EBAY_AU">Australia (AU)</MenuItem>
-              {/* Add more as needed */}
-            </Select>
-          </FormControl>
+              <InputLabel>Filter by Marketplace</InputLabel>
+              <Select
+                value={filterMarketplace}
+                label="Filter by Marketplace"
+                onChange={(e) => setFilterMarketplace(e.target.value)}
+              >
+                <MenuItem value="">All Marketplaces</MenuItem>
+                <MenuItem value="EBAY_US">United States (US)</MenuItem>
+                <MenuItem value="EBAY_CA">Canada (CA)</MenuItem>
+                <MenuItem value="EBAY_AU">Australia (AU)</MenuItem>
+              </Select>
+            </FormControl>
 
-          {/* UNREAD MESSAGES FILTER */}
-          <FormControl fullWidth size="small" sx={{ mb: 2, bgcolor: 'white' }}>
-            <InputLabel>Show Only</InputLabel>
-            <Select
-              value={showUnreadOnly}
-              label="Show Only"
-              onChange={(e) => setShowUnreadOnly(e.target.value)}
+            <FormControl 
+              fullWidth={isMobile}
+              size="small" 
+              sx={{ 
+                mb: { xs: 0, sm: 0 },
+                bgcolor: 'white',
+                minWidth: { sm: 140, md: 'auto' },
+                flex: { sm: 1, md: 'none' }
+              }}
             >
-              <MenuItem value={false}>All Conversations</MenuItem>
-              <MenuItem value={true}>Unread Messages Only</MenuItem>
-            </Select>
-          </FormControl>
+              <InputLabel>Show Only</InputLabel>
+              <Select
+                value={showUnreadOnly}
+                label="Show Only"
+                onChange={(e) => setShowUnreadOnly(e.target.value)}
+              >
+                <MenuItem value={false}>All Conversations</MenuItem>
+                <MenuItem value={true}>Unread Messages Only</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
 
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6">Inbox</Typography>
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            justifyContent="space-between" 
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            spacing={1}
+            mb={2}
+          >
+            {!isMobile && <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Inbox</Typography>}
             <Button
               size="small"
               startIcon={syncingInbox ? <CircularProgress size={16} /> : <RefreshIcon />}
               onClick={handleManualSync}
               disabled={syncingInbox}
               variant="outlined"
+              fullWidth={isMobile}
+              sx={{ minWidth: { sm: 'auto', md: 'auto' } }}
             >
               {syncingInbox ? 'Syncing...' : 'Check New'}
             </Button>
@@ -625,7 +786,6 @@ export default function BuyerChatPage() {
             placeholder="Search User, Order, or Item..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-          // We removed the search button because useEffect handles it now
           />
         </Box>
 
@@ -746,129 +906,236 @@ export default function BuyerChatPage() {
             </Typography>
           )}
         </List>
-      </Paper >
+      </Paper>
 
-      {/* RIGHT: CHAT AREA (Keep exactly the same) */}
-      < Paper sx={{ flex: 1, display: 'flex', flexDirection: 'column' }
-      }>
+      {/* Button to open sidebar when closed */}
+      {!sidebarOpen && !selectedThread && (
+        <Box sx={{ p: 2, width: '100%' }}>
+          <Button
+            fullWidth
+            variant="contained"
+            startIcon={<QuestionAnswerIcon />}
+            onClick={() => setSidebarOpen(true)}
+          >
+            View Conversations
+          </Button>
+        </Box>
+      )}
+
+      {/* RIGHT: CHAT AREA */}
+      <Paper sx={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column',
+        width: { xs: '100%', md: 'auto' },
+        height: { xs: '100vh', md: '100%' },
+        minWidth: 0
+      }}>
         {/* ... existing chat area code ... */}
         {
           selectedThread ? (
             <>
-              <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', position: 'relative' }}>
-
-                {/* --- NEW: TOP RIGHT CORNER (Seller + Close) --- */}
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ position: 'absolute', top: 12, right: 12 }}
-                >
-
-                  {/* 1. DROPDOWN: Conversation About */}
-                  <FormControl size="small" sx={{ minWidth: 140 }}>
-                    <InputLabel sx={{ fontSize: '0.8rem' }}>About</InputLabel>
-                    <Select
-                      value={metaCategory}
-                      label="About"
-                      onChange={(e) => setMetaCategory(e.target.value)}
-                      sx={{ height: 32, fontSize: '0.8rem' }}
-                    >
-                      <MenuItem value="INR">INR</MenuItem>
-                      <MenuItem value="Cancellation">Cancellation</MenuItem>
-                      <MenuItem value="Return">Return</MenuItem>
-                      <MenuItem value="Out of Stock">Out of Stock</MenuItem>
-                      <MenuItem value="Issue with Product">Issue with Product</MenuItem>
-                      <MenuItem value="Inquiry">Inquiry</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  {/* 2. DROPDOWN: Case Status */}
-                  <FormControl size="small" sx={{ minWidth: 140 }}>
-                    <InputLabel sx={{ fontSize: '0.8rem' }}>Case</InputLabel>
-                    <Select
-                      value={metaCaseStatus}
-                      label="Case"
-                      onChange={(e) => setMetaCaseStatus(e.target.value)}
-                      sx={{ height: 32, fontSize: '0.8rem' }}
-                    >
-                      <MenuItem value="Case Opened">Case Opened</MenuItem>
-                      <MenuItem value="Case Not Opened">Case Not Opened</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  {/* 3. SAVE BUTTON */}
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={handleSaveMeta}
-                    disabled={savingMeta}
-                    sx={{ minWidth: 40, height: 32, px: 1 }}
-                  >
-                    {savingMeta ? <CircularProgress size={16} color="inherit" /> : <SaveIcon fontSize="small" />}
-                  </Button>
-
-
-                  {/* Seller Name */}
-                  <Chip
-                    label={getSellerName(selectedThread.sellerId)}
-                    size="small"
-                    icon={<PersonIcon style={{ fontSize: 20 }} />}
-                    sx={{
-                      bgcolor: '#e3f2fd',
-                      color: '#1565c0',
-                      fontWeight: 'bold',
-                      height: 30,
-                      fontSize: '1rem'
-                    }}
-                  />
-                  {selectedThread.isNew && <Chip label="New" size="small" color="success" sx={{ height: 24 }} />}
-
-                  {/* Mark as Unread Button */}
-                  {!selectedThread.isNew && (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={handleMarkAsUnread}
-                      disabled={markingUnread}
-                      startIcon={markingUnread ? <CircularProgress size={16} color="inherit" /> : <MarkAsUnreadIcon fontSize="small" />}
-                      sx={{ height: 30, fontSize: '0.75rem' }}
-                    >
-                      {markingUnread ? 'Marking...' : 'Mark Unread'}
-                    </Button>
-                  )}
-
-                  {/* Close Button */}
+              <Box sx={{ 
+                p: { xs: 1.5, md: 2 }, 
+                borderBottom: 1, 
+                borderColor: 'divider', 
+                bgcolor: '#fff', 
+                position: 'relative' 
+              }}>
+                {/* Mobile & Tablet: Back button */}
+                {(isMobile || isTablet) && (
                   <IconButton
-                    onClick={() => setSelectedThread(null)}
-                    size="small"
-                    sx={{ color: 'text.disabled', ml: 1 }}
+                    onClick={() => {
+                      setSelectedThread(null);
+                      setSidebarOpen(true);
+                    }}
+                    sx={{ mb: 1 }}
                   >
                     <CloseIcon />
                   </IconButton>
+                )}
+
+                {/* TOP LEFT CORNER - Responsive Stack */}
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1}
+                  alignItems={{ xs: 'stretch', sm: 'center' }}
+                  flexWrap="wrap"
+                  sx={{ 
+                    position: { xs: 'static', md: 'absolute' },
+                    top: { md: 12 },
+                    left: { md: 12 },
+                    mb: { xs: 2, md: 0 },
+                    maxWidth: { md: 'calc(100% - 24px)' },
+                    justifyContent: { sm: 'flex-start', md: 'flex-start' },
+                    gap: 1,
+                    zIndex: 10
+                  }}
+                >
+
+                  {/* Meta dropdowns - Stack on mobile */}
+                  <Stack 
+                    direction={{ xs: 'column', sm: 'row' }} 
+                    spacing={1}
+                    flexWrap="wrap"
+                    sx={{ 
+                      width: { xs: '100%', sm: 'auto' },
+                      maxWidth: { md: '100%' },
+                      gap: 1
+                    }}
+                  >
+                    <FormControl 
+                      size="small" 
+                      fullWidth={isMobile}
+                      sx={{ 
+                        minWidth: { xs: '100%', sm: 120, md: 140 },
+                        maxWidth: { md: 180 },
+                        '& .MuiInputBase-root': { height: { xs: 40, sm: 32 } }
+                      }}
+                    >
+                      <InputLabel sx={{ fontSize: '0.8rem' }}>About</InputLabel>
+                      <Select
+                        value={metaCategory}
+                        label="About"
+                        onChange={(e) => setMetaCategory(e.target.value)}
+                        sx={{ fontSize: '0.8rem' }}
+                      >
+                        <MenuItem value="INR">INR</MenuItem>
+                        <MenuItem value="Cancellation">Cancellation</MenuItem>
+                        <MenuItem value="Return">Return</MenuItem>
+                        <MenuItem value="Out of Stock">Out of Stock</MenuItem>
+                        <MenuItem value="Issue with Product">Issue with Product</MenuItem>
+                        <MenuItem value="Inquiry">Inquiry</MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    <FormControl 
+                      size="small" 
+                      fullWidth={isMobile}
+                      sx={{ 
+                        minWidth: { xs: '100%', sm: 120, md: 140 },
+                        maxWidth: { md: 180 },
+                        '& .MuiInputBase-root': { height: { xs: 40, sm: 32 } }
+                      }}
+                    >
+                      <InputLabel sx={{ fontSize: '0.8rem' }}>Case</InputLabel>
+                      <Select
+                        value={metaCaseStatus}
+                        label="Case"
+                        onChange={(e) => setMetaCaseStatus(e.target.value)}
+                        sx={{ fontSize: '0.8rem' }}
+                      >
+                        <MenuItem value="Case Opened">Case Opened</MenuItem>
+                        <MenuItem value="Case Not Opened">Case Not Opened</MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={handleSaveMeta}
+                      disabled={savingMeta}
+                      fullWidth={isMobile}
+                      sx={{ 
+                        minWidth: { xs: '100%', sm: 40 }, 
+                        height: { xs: 40, sm: 32 }, 
+                        px: { xs: 2, sm: 1 } 
+                      }}
+                    >
+                      {savingMeta ? <CircularProgress size={16} color="inherit" /> : <SaveIcon fontSize="small" />}
+                    </Button>
+                  </Stack>
+
+                  {/* Seller chip and actions */}
+                  <Stack 
+                    direction={{ xs: 'column', sm: 'row' }} 
+                    spacing={1}
+                    alignItems={{ xs: 'stretch', sm: 'center' }}
+                    sx={{ width: { xs: '100%', sm: 'auto' } }}
+                  >
+                    <Chip
+                      label={getSellerName(selectedThread.sellerId)}
+                      size="small"
+                      icon={<PersonIcon style={{ fontSize: 20 }} />}
+                      sx={{
+                        bgcolor: '#e3f2fd',
+                        color: '#1565c0',
+                        fontWeight: 'bold',
+                        height: { xs: 36, sm: 30 },
+                        fontSize: { xs: '0.9rem', sm: '1rem' },
+                        justifyContent: { xs: 'flex-start', sm: 'center' }
+                      }}
+                    />
+                    {selectedThread.isNew && (
+                      <Chip 
+                        label="New" 
+                        size="small" 
+                        color="success" 
+                        sx={{ height: { xs: 36, sm: 24 } }} 
+                      />
+                    )}
+
+                    {!selectedThread.isNew && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={handleMarkAsUnread}
+                        disabled={markingUnread}
+                        startIcon={markingUnread ? <CircularProgress size={16} color="inherit" /> : <MarkAsUnreadIcon fontSize="small" />}
+                        fullWidth={isMobile}
+                        sx={{ 
+                          height: { xs: 40, sm: 30 }, 
+                          fontSize: '0.75rem' 
+                        }}
+                      >
+                        {markingUnread ? 'Marking...' : 'Mark Unread'}
+                      </Button>
+                    )}
+
+                    {!isMobile && (
+                      <IconButton
+                        onClick={() => setSelectedThread(null)}
+                        size="small"
+                        sx={{ color: 'text.disabled', ml: 1 }}
+                      >
+                        <CloseIcon />
+                      </IconButton>
+                    )}
+                  </Stack>
                 </Stack>
 
-                {/* --- MAIN CONTENT (Left Side) --- */}
-                <Stack spacing={1.5} sx={{ pr: 12 }}> {/* Added Padding Right to avoid overlapping the chip */}
+                {/* MAIN CONTENT - Responsive padding */}
+                <Stack spacing={1.5} sx={{ 
+                  pl: { xs: 0, md: 0 }, 
+                  pr: { xs: 0, md: 0 },
+                  mt: { xs: 1, md: 6 }, // Add top margin to prevent overlap with absolutely positioned buttons
+                  mb: { md: 0 }
+                }}>
 
-                  {/* 1. BUYER IDENTITY */}
-                  <Stack direction="row" alignItems="center" spacing={3} sx={{ mt: 0.5 }}>
+                  {/* 1. BUYER IDENTITY - Stack on mobile */}
+                  <Stack 
+                    direction={{ xs: 'column', sm: 'row' }} 
+                    alignItems={{ xs: 'flex-start', sm: 'center' }} 
+                    spacing={{ xs: 1, sm: 3 }}
+                  >
                     <Box>
                       <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
                         Buyer Name
                       </Typography>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1, fontSize: { xs: '0.9rem', md: '1rem' } }}>
                         {selectedThread.buyerName || '-'}
                       </Typography>
                     </Box>
 
-                    <Divider orientation="vertical" flexItem sx={{ height: 20, alignSelf: 'center', opacity: 0.5 }} />
+                    {!isMobile && (
+                      <Divider orientation="vertical" flexItem sx={{ height: 20, alignSelf: 'center', opacity: 0.5 }} />
+                    )}
 
                     <Box>
                       <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
                         Username
                       </Typography>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', px: 0.5, borderRadius: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', px: 0.5, borderRadius: 0.5, fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
                         {selectedThread.buyerUsername}
                       </Typography>
                     </Box>
@@ -968,7 +1235,12 @@ export default function BuyerChatPage() {
                 </Stack>
               </Box>
 
-              <Box sx={{ flex: 1, p: 2, overflowY: 'auto', bgcolor: '#f0f2f5' }}>
+              <Box sx={{ 
+                flex: 1, 
+                p: { xs: 1.5, md: 2 }, 
+                overflowY: 'auto', 
+                bgcolor: '#f0f2f5' 
+              }}>
                 {loadingMessages ? (
                   <Box display="flex" justifyContent="center" mt={4}><CircularProgress /></Box>
                 ) : (
@@ -982,21 +1254,29 @@ export default function BuyerChatPage() {
                         key={msg._id}
                         sx={{
                           alignSelf: msg.sender === 'SELLER' ? 'flex-end' : 'flex-start',
-                          maxWidth: '70%'
+                          maxWidth: { xs: '85%', sm: '75%', md: '70%' }
                         }}
                       >
                         <Paper
                           elevation={1}
                           sx={{
-                            p: 1.5,
+                            p: { xs: 1, md: 1.5 },
                             bgcolor: msg.sender === 'SELLER' ? '#1976d2' : '#ffffff',
                             color: msg.sender === 'SELLER' ? '#fff' : 'text.primary',
                             borderRadius: 2,
                             position: 'relative'
                           }}
                         >
-                          {/* TEXT */}
-                          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.body}</Typography>
+                          <Typography 
+                            variant="body1" 
+                            sx={{ 
+                              whiteSpace: 'pre-wrap', 
+                              wordBreak: 'break-word',
+                              fontSize: { xs: '0.875rem', md: '1rem' }
+                            }}
+                          >
+                            {msg.body}
+                          </Typography>
 
                           {/* IMAGES */}
                           {msg.mediaUrls && msg.mediaUrls.length > 0 && (
@@ -1013,7 +1293,8 @@ export default function BuyerChatPage() {
                                       cursor: 'pointer',
                                       bgcolor: msg.sender === 'SELLER' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
                                       color: 'inherit',
-                                      maxWidth: 200
+                                      maxWidth: { xs: 150, md: 200 },
+                                      fontSize: { xs: '0.7rem', md: '0.75rem' }
                                     }}
                                   />
                                 );
@@ -1021,7 +1302,16 @@ export default function BuyerChatPage() {
                             </Box>
                           )}
                         </Paper>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, textAlign: msg.sender === 'SELLER' ? 'right' : 'left' }}>
+                        <Typography 
+                          variant="caption" 
+                          color="text.secondary" 
+                          sx={{ 
+                            display: 'block', 
+                            mt: 0.5, 
+                            textAlign: msg.sender === 'SELLER' ? 'right' : 'left',
+                            fontSize: { xs: '0.7rem', md: '0.75rem' }
+                          }}
+                        >
                           {new Date(msg.messageDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           {msg.sender === 'SELLER' && (msg.read ? ' • Read' : ' • Sent')}
                         </Typography>
@@ -1032,7 +1322,15 @@ export default function BuyerChatPage() {
                 )}
               </Box>
 
-              <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: '#fff', display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ 
+                p: { xs: 1.5, md: 2 }, 
+                borderTop: 1, 
+                borderColor: 'divider', 
+                bgcolor: '#fff', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: 1 
+              }}>
                 {selectedThread.itemId === 'DIRECT_MESSAGE' ? (
                   <Alert severity="warning" sx={{ width: '100%' }}>
                     <strong>Direct messages cannot be replied to via API.</strong> These are account-level messages without item context. Please respond through eBay's messaging center directly.
@@ -1049,13 +1347,13 @@ export default function BuyerChatPage() {
                             onDelete={() => handleRemoveAttachment(idx)}
                             variant="outlined"
                             size="small"
-                            sx={{ maxWidth: 200 }}
+                            sx={{ maxWidth: { xs: 150, md: 200 } }}
                           />
                         ))}
                       </Box>
                     )}
 
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
                       <input
                         type="file"
                         multiple
@@ -1075,6 +1373,7 @@ export default function BuyerChatPage() {
                       <TextField
                         fullWidth
                         multiline
+                        maxRows={isMobile ? 3 : 5}
                         placeholder="Type a message..."
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
@@ -1085,15 +1384,21 @@ export default function BuyerChatPage() {
                           }
                         }}
                         disabled={sending}
+                        size={isMobile ? 'small' : 'medium'}
                       />
                       <Button
                         variant="contained"
-                        sx={{ px: 3, alignSelf: 'flex-end', mb: 0.5 }}
+                        sx={{ 
+                          px: { xs: 2, md: 3 }, 
+                          alignSelf: 'flex-end', 
+                          mb: 0.5,
+                          minWidth: { xs: 'auto', md: 'auto' }
+                        }}
                         endIcon={sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
                         onClick={handleSendMessage}
                         disabled={sending || (!newMessage.trim() && attachments.length === 0)}
                       >
-                        Send
+                        {isMobile ? '' : 'Send'}
                       </Button>
                     </Box>
                   </>
@@ -1103,13 +1408,25 @@ export default function BuyerChatPage() {
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', bgcolor: '#fafafa' }}>
               <Stack alignItems="center" spacing={1}>
-                <QuestionAnswerIcon sx={{ fontSize: 60, color: 'text.secondary', opacity: 0.2 }} />
-                <Typography color="text.secondary">Select a conversation or search an Order ID</Typography>
+                <QuestionAnswerIcon sx={{ fontSize: { xs: 40, md: 60 }, color: 'text.secondary', opacity: 0.2 }} />
+                <Typography color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
+                  {isMobile ? 'Select a conversation' : 'Select a conversation or search an Order ID'}
+                </Typography>
+                {!sidebarOpen && (
+                  <Button
+                    variant="contained"
+                    onClick={() => setSidebarOpen(true)}
+                    sx={{ mt: 1 }}
+                    startIcon={<MenuIcon />}
+                  >
+                    View Conversations
+                  </Button>
+                )}
               </Stack>
             </Box>
           )
         }
-      </Paper >
+      </Paper>
 
       {/* Snackbar for sync results */}
       < Snackbar

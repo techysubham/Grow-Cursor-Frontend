@@ -18,6 +18,25 @@ export function setAuthToken(token) {
   }
 }
 
+// Add response interceptor to handle 401 errors globally
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear auth token and session storage
+      currentToken = null;
+      delete api.defaults.headers.common.Authorization;
+      sessionStorage.removeItem('auth_token');
+      
+      // Redirect to login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
 
 // Employee Profiles APIs
