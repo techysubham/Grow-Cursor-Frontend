@@ -59,6 +59,7 @@ import ProgressTrackingPage from '../pages/compatibility/ProgressTrackingPage.js
 import FulfillmentDashboard from '../pages/admin/FulfillmentDashboard.jsx';
 import AllOrdersSheetPage from '../pages/admin/AllOrdersSheetPage.jsx';
 import AwaitingShipmentPage from '../pages/admin/AwaitingShipmentPage.jsx';
+import AmazonArrivalsPage from '../pages/admin/AmazonArrivalsPage.jsx';
 import FulfillmentNotesPage from '../pages/admin/FulfillmentNotesPage.jsx';
 import ConversationTrackingPage from '../pages/admin/ConversationTrackingPage.jsx';
 import CancelledStatusPage from '../pages/admin/CancelledStatusPage.jsx';
@@ -762,6 +763,15 @@ export default function AdminLayout({ user, onLogout }) {
                   </ListItemButton>
                   <ListItemButton 
                     component={Link} 
+                    to="/admin/amazon-arrivals" 
+                    onClick={() => setMobileOpen(false)}
+                    selected={location.pathname === '/admin/amazon-arrivals'}
+                    sx={selectedMenuItemStyle}
+                  >
+                    <ListItemText primary="Amazon Arrivals" />
+                  </ListItemButton>
+                  <ListItemButton 
+                    component={Link} 
                     to="/admin/fulfillment-notes" 
                     onClick={() => setMobileOpen(false)}
                     selected={location.pathname === '/admin/fulfillment-notes'}
@@ -1242,6 +1252,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/fulfillment" element={<FulfillmentDashboard />} />
               <Route path="/all-orders-sheet" element={<AllOrdersSheetPage />} />
               <Route path="/awaiting-shipment" element={<AwaitingShipmentPage />} />
+              <Route path="/amazon-arrivals" element={<AmazonArrivalsPage />} />
               <Route path="/fulfillment-notes" element={<FulfillmentNotesPage />} />
               <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
               <Route path="/cancelled-status" element={<CancelledStatusPage />} />

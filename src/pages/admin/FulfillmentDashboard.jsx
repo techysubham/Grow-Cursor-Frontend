@@ -36,6 +36,10 @@ import {
   Collapse
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { format, parseISO, isValid } from 'date-fns';
 
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
@@ -3315,7 +3319,7 @@ function FulfillmentDashboard() {
                     {visibleColumns.includes('arriving') && (
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <AutoSaveTextField
+                          <AutoSaveDatePicker
                             value={order.arrivingDate}
                             onSave={(val) => updateManualField(order._id, 'arrivingDate', val)}
                           />
@@ -3678,6 +3682,101 @@ function AutoSaveTextField({ value, type = 'text', onSave, sx = {} }) {
         ...sx // Merge custom sx prop
       }}
     />
+  );
+}
+
+function AutoSaveDatePicker({ value, onSave, sx = {} }) {
+  // Helper to check if value is a valid ISO format date
+  const parseValue = (val) => {
+    if (!val) return null;
+    
+    // Only accept ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss...
+    // This prevents "Jan 8" from being parsed as 2001-01-08
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}/;
+    
+    if (!isoDateRegex.test(val)) {
+      // Not ISO format → treat as legacy text
+      return null;
+    }
+    
+    try {
+      const date = new Date(val);
+      return isValid(date) ? date : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const [localValue, setLocalValue] = useState(parseValue(value));
+  const [isLegacyText, setIsLegacyText] = useState(false);
+
+  useEffect(() => {
+    const parsed = parseValue(value);
+    setLocalValue(parsed);
+    // Check if it's legacy text (not a valid date)
+    setIsLegacyText(value && !parsed);
+  }, [value]);
+
+  const handleChange = (newDate) => {
+    setLocalValue(newDate);
+    if (newDate && isValid(newDate)) {
+      // Save as ISO date string (YYYY-MM-DD)
+      onSave(format(newDate, 'yyyy-MM-dd'));
+    } else {
+      onSave(null);
+    }
+  };
+
+  // If legacy text detected, show text field with option to convert
+  if (isLegacyText) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <TextField
+          size="small"
+          value={value}
+          disabled
+          sx={{
+            backgroundColor: '#f5f5f5',
+            borderRadius: 1,
+            minWidth: 100,
+            '& input': { padding: '6px 8px', fontSize: '0.85rem' },
+            ...sx
+          }}
+        />
+        <Tooltip title="Convert to date picker">
+          <IconButton
+            size="small"
+            onClick={() => setIsLegacyText(false)}
+            sx={{ p: 0.5 }}
+          >
+            <RefreshIcon sx={{ fontSize: '1rem' }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    );
+  }
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <DatePicker
+        value={localValue}
+        onChange={handleChange}
+        slotProps={{
+          textField: {
+            size: 'small',
+            placeholder: '-',
+            sx: {
+              backgroundColor: '#fff',
+              borderRadius: 1,
+              minWidth: 150,
+              '& .MuiOutlinedInput-root': { paddingRight: 0 },
+              '& input': { padding: '6px 8px', fontSize: '0.85rem' },
+              ...sx
+            }
+          }
+        }}
+      />
+    </LocalizationProvider>
   );
 }
 
