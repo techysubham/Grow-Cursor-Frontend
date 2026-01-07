@@ -664,7 +664,7 @@ export default function BuyerChatPage() {
               sx={{ 
                 mb: { xs: 0, sm: 0 },
                 bgcolor: 'white',
-                minWidth: { sm: 140, md: 'auto' },
+                minWidth: { sm: 140, md: 135 },
                 flex: { sm: 1, md: 'none' }
               }}
             >
@@ -691,7 +691,7 @@ export default function BuyerChatPage() {
               sx={{ 
                 mb: { xs: 0, sm: 0 },
                 bgcolor: 'white',
-                minWidth: { sm: 120, md: 'auto' },
+                minWidth: { sm: 120, md: 125 },
                 flex: { sm: 1, md: 'none' }
               }}
             >
@@ -719,7 +719,7 @@ export default function BuyerChatPage() {
               sx={{ 
                 mb: { xs: 0, sm: 0 },
                 bgcolor: 'white',
-                minWidth: { sm: 140, md: 'auto' },
+                minWidth: { sm: 140, md: 135 },
                 flex: { sm: 1, md: 'none' }
               }}
             >
@@ -742,7 +742,7 @@ export default function BuyerChatPage() {
               sx={{ 
                 mb: { xs: 0, sm: 0 },
                 bgcolor: 'white',
-                minWidth: { sm: 140, md: 'auto' },
+                minWidth: { sm: 140, md: 135 },
                 flex: { sm: 1, md: 'none' }
               }}
             >
