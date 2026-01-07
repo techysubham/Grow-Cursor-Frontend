@@ -651,21 +651,17 @@ export default function BuyerChatPage() {
             </Box>
           )}
 
-          {/* Filters - Stack on mobile, side-by-side on tablet */}
+          {/* Filters - Vertically stacked, full width */}
           <Stack 
-            direction={{ xs: 'column', sm: 'row' }} 
-            spacing={{ xs: 1.5, sm: 1 }}
+            direction="column" 
+            spacing={1.5}
             sx={{ mb: 2 }}
-            flexWrap="wrap"
           >
             <FormControl 
-              fullWidth={isMobile}
+              fullWidth
               size="small" 
               sx={{ 
-                mb: { xs: 0, sm: 0 },
-                bgcolor: 'white',
-                minWidth: { sm: 140, md: 135 },
-                flex: { sm: 1, md: 'none' }
+                bgcolor: 'white'
               }}
             >
               <InputLabel>Filter by Seller</InputLabel>
@@ -686,13 +682,10 @@ export default function BuyerChatPage() {
             </FormControl>
 
             <FormControl 
-              fullWidth={isMobile}
+              fullWidth
               size="small" 
               sx={{ 
-                mb: { xs: 0, sm: 0 },
-                bgcolor: 'white',
-                minWidth: { sm: 120, md: 125 },
-                flex: { sm: 1, md: 'none' }
+                bgcolor: 'white'
               }}
             >
               <InputLabel>Filter by Type</InputLabel>
@@ -706,21 +699,12 @@ export default function BuyerChatPage() {
                 <MenuItem value="INQUIRY">Inquiries Only</MenuItem>
               </Select>
             </FormControl>
-          </Stack>
 
-          <Stack 
-            direction={{ xs: 'column', sm: 'row' }} 
-            spacing={{ xs: 1.5, sm: 1 }}
-            sx={{ mb: 2 }}
-          >
             <FormControl 
-              fullWidth={isMobile}
+              fullWidth
               size="small" 
               sx={{ 
-                mb: { xs: 0, sm: 0 },
-                bgcolor: 'white',
-                minWidth: { sm: 140, md: 135 },
-                flex: { sm: 1, md: 'none' }
+                bgcolor: 'white'
               }}
             >
               <InputLabel>Filter by Marketplace</InputLabel>
@@ -737,13 +721,10 @@ export default function BuyerChatPage() {
             </FormControl>
 
             <FormControl 
-              fullWidth={isMobile}
+              fullWidth
               size="small" 
               sx={{ 
-                mb: { xs: 0, sm: 0 },
-                bgcolor: 'white',
-                minWidth: { sm: 140, md: 135 },
-                flex: { sm: 1, md: 'none' }
+                bgcolor: 'white'
               }}
             >
               <InputLabel>Show Only</InputLabel>
