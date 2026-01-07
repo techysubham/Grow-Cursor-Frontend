@@ -4,7 +4,7 @@ import {
   Button, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, IconButton, TextField, Grid, Chip, Divider, FormControl, 
   InputLabel, Select, MenuItem, Snackbar, Alert, Pagination, OutlinedInput, Checkbox, ListItemText,
-  Autocomplete, InputAdornment
+  Autocomplete, InputAdornment, Tooltip
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
@@ -74,6 +74,9 @@ export default function CompatibilityDashboard() {
   // SEARCH STATE
   const [searchTerm, setSearchTerm] = useState('');
 
+  // API USAGE STATE
+  const [apiUsage, setApiUsage] = useState(null);
+
   const [openModal, setOpenModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [editCompatList, setEditCompatList] = useState([]);
@@ -113,6 +116,22 @@ export default function CompatibilityDashboard() {
   useEffect(() => {
     if (currentSellerId) loadListings();
   }, [currentSellerId, page]);
+
+  useEffect(() => {
+    if (currentSellerId) fetchApiUsage();
+  }, [currentSellerId]);
+
+  const fetchApiUsage = async () => {
+    try {
+      const { data } = await api.get('/ebay/api-usage-stats', {
+        params: { sellerId: currentSellerId }
+      });
+      setApiUsage(data);
+    } catch (e) {
+      // Silent fail - not critical
+      console.error('Failed to fetch API usage:', e);
+    }
+  };
 
   const loadListings = async (customSearch = null) => {
     setLoading(true);
@@ -272,9 +291,27 @@ export default function CompatibilityDashboard() {
         )
       );
 
+      // Refresh API usage after successful save
+      fetchApiUsage();
+
     } catch (e) {
       const errorMsg = e.response?.data?.error || e.message;
-      showSnackbar(`Update failed: ${errorMsg}`, 'error');
+      const rateLimitInfo = e.response?.data?.rateLimitInfo;
+      
+      if (rateLimitInfo) {
+        // Show rate limit specific message with stats
+        const detailedMsg = `eBay API Limit Reached
+Used: ${rateLimitInfo.used.toLocaleString()} / ${rateLimitInfo.limit.toLocaleString()} calls today
+Remaining: ${rateLimitInfo.remaining.toLocaleString()} calls
+Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset !== 1 ? 's' : ''}`;
+        
+        showSnackbar(detailedMsg, 'error');
+        // Refresh usage stats to show updated count
+        fetchApiUsage();
+      } else {
+        // Standard error handling
+        showSnackbar(`Update failed: ${errorMsg}`, 'error');
+      }
     }
   };
 
@@ -293,9 +330,31 @@ export default function CompatibilityDashboard() {
     <Box sx={{ p: 3 }}>
       {/* HEADER WITH SEARCH */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-        <Box>
-            <Typography variant="h5">Compatibility Dashboard</Typography>
-            <Typography variant="caption" color="textSecondary">Showing {listings.length} of {totalItems} Active Listings</Typography>
+        <Box display="flex" alignItems="center" gap={2}>
+            <Box>
+              <Typography variant="h5">Compatibility Dashboard</Typography>
+              <Typography variant="caption" color="textSecondary">Showing {listings.length} of {totalItems} Active Listings</Typography>
+            </Box>
+            
+            {/* API USAGE BADGE */}
+            {apiUsage && apiUsage.success && (
+              <Tooltip 
+                title={`${apiUsage.used.toLocaleString()} / ${apiUsage.limit.toLocaleString()} calls used today. Resets in ${apiUsage.hoursUntilReset}h`}
+                arrow
+              >
+                <Chip 
+                  size="small"
+                  label={`API: ${Math.round((apiUsage.used / apiUsage.limit) * 100)}%`}
+                  color={
+                    apiUsage.used / apiUsage.limit > 0.9 ? 'error' :
+                    apiUsage.used / apiUsage.limit > 0.7 ? 'warning' : 
+                    'success'
+                  }
+                  variant="outlined"
+                  sx={{ fontSize: '0.75rem' }}
+                />
+              </Tooltip>
+            )}
         </Box>
         
         <Box display="flex" gap={2} alignItems="center">
@@ -547,8 +606,22 @@ export default function CompatibilityDashboard() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={snackbar.severity === 'error' ? 10000 : 6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity} 
+          sx={{ 
+            width: '100%',
+            whiteSpace: 'pre-line' // Allow multi-line text
+          }}
+        >
+          {snackbar.message}
+        </Alert>
       </Snackbar>
     </Box>
   );
