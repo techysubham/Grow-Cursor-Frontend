@@ -15,7 +15,9 @@ import {
     DialogContent,
     DialogActions,
     TextField,
-    IconButton
+    IconButton,
+    useMediaQuery,
+    useTheme
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -23,6 +25,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../../lib/api';
 
 const BankAccountsPage = () => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    
     const [accounts, setAccounts] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -82,19 +87,27 @@ const BankAccountsPage = () => {
     };
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box sx={{ p: { xs: 2, sm: 3 } }}>
+            <Box 
+                display="flex" 
+                flexDirection={{ xs: 'column', sm: 'row' }}
+                justifyContent="space-between" 
+                alignItems={{ xs: 'stretch', sm: 'center' }}
+                gap={{ xs: 1, sm: 0 }}
+                mb={3}
+            >
                 <Typography variant="h5">Bank Accounts</Typography>
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={() => setOpenDialog(true)}
+                    fullWidth={isMobile}
                 >
                     Add Bank Account
                 </Button>
             </Box>
 
-            <TableContainer component={Paper}>
+            <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
                 <Table>
                     <TableHead>
                         <TableRow sx={{ bgcolor: '#f5f5f5' }}>
@@ -108,11 +121,11 @@ const BankAccountsPage = () => {
                         {accounts.map((acc) => (
                             <TableRow key={acc._id}>
                                 <TableCell>{acc.name}</TableCell>
-                                <TableCell>{acc.accountNumber}</TableCell>
-                                <TableCell>{acc.ifscCode}</TableCell>
+                                <TableCell sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>{acc.accountNumber}</TableCell>
+                                <TableCell sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>{acc.ifscCode}</TableCell>
                                 <TableCell align="right">
-                                    <IconButton onClick={() => handleEdit(acc)} color="primary"><EditIcon /></IconButton>
-                                    <IconButton onClick={() => handleDelete(acc._id)} color="error"><DeleteIcon /></IconButton>
+                                    <IconButton onClick={() => handleEdit(acc)} color="primary" size="small"><EditIcon /></IconButton>
+                                    <IconButton onClick={() => handleDelete(acc._id)} color="error" size="small"><DeleteIcon /></IconButton>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -125,10 +138,10 @@ const BankAccountsPage = () => {
                 </Table>
             </TableContainer>
 
-            <Dialog open={openDialog} onClose={handleClose}>
+            <Dialog open={openDialog} onClose={handleClose} fullWidth maxWidth="sm">
                 <DialogTitle>{editingId ? 'Edit Bank Account' : 'New Bank Account'}</DialogTitle>
-                <DialogContent sx={{ minWidth: 300 }}>
-                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
+                <DialogContent sx={{ pt: 2 }}>
+                    <Box display="flex" flexDirection="column" gap={2}>
                         <TextField
                             label="Bank Name"
                             fullWidth
