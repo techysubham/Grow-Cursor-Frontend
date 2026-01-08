@@ -4,6 +4,14 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import api from '../../lib/api';
 
+// Helper function to construct static file URLs
+const getStaticUrl = (path) => {
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  // Remove /api suffix if present, since static files aren't served under /api
+  const cleanBaseUrl = baseUrl.endsWith('/api') ? baseUrl.slice(0, -4) : baseUrl;
+  return `${cleanBaseUrl}${path}`;
+};
+
 export default function AmazonLookupPage() {
   const [asins, setAsins] = useState('');
   const [loading, setLoading] = useState(false);
@@ -124,6 +132,7 @@ export default function AmazonLookupPage() {
         ...customColumnNames, // Dynamic custom columns
         'Description',
         'Images',
+        'eBay Image',
         'Added Date'
       ];
 
@@ -143,6 +152,7 @@ export default function AmazonLookupPage() {
           ...customFieldValues,
           (product.description || '').replace(/"/g, '""').substring(0, 500), // Limit description
           (product.images || []).join(' | '),
+          product.ebayImage || '',
           product.createdAt ? new Date(product.createdAt).toLocaleDateString() : ''
         ];
       });
@@ -279,6 +289,7 @@ export default function AmazonLookupPage() {
               
               <TableCell sx={{ fontWeight: 'bold', minWidth: 200, bgcolor: 'grey.100' }}>Description</TableCell>
               <TableCell sx={{ fontWeight: 'bold', width: 100, bgcolor: 'grey.100' }}>Images</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: 100, bgcolor: 'grey.100' }}>eBay Image</TableCell>
               <TableCell sx={{ fontWeight: 'bold', width: 100, bgcolor: 'grey.100' }}>Added</TableCell>
               <TableCell align="right" sx={{ fontWeight: 'bold', width: 80, bgcolor: 'grey.100' }}>Actions</TableCell>
             </TableRow>
@@ -386,6 +397,27 @@ export default function AmazonLookupPage() {
                   </Stack>
                 </TableCell>
                 <TableCell>
+                  {product.ebayImage ? (
+                    <Box
+                      component="img"
+                      src={product.ebayImage}
+                      alt="eBay Product with Overlay"
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        objectFit: 'cover',
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'success.main',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => window.open(product.ebayImage, '_blank')}
+                    />
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">-</Typography>
+                  )}
+                </TableCell>
+                <TableCell>
                   <Typography variant="body2" fontSize="0.75rem">
                     {new Date(product.createdAt).toLocaleDateString()}
                   </Typography>
@@ -403,7 +435,7 @@ export default function AmazonLookupPage() {
             ))}
             {savedProducts.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10 + customColumnNames.length} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                <TableCell colSpan={11 + customColumnNames.length} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                   No saved products yet. Add your first product above!
                 </TableCell>
               </TableRow>
