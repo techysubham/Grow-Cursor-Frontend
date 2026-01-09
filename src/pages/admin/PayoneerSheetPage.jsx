@@ -17,7 +17,11 @@ import {
     TextField,
     MenuItem,
     IconButton,
-    Tooltip
+    Tooltip,
+    Stack,
+    Divider,
+    useTheme,
+    useMediaQuery
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -26,7 +30,120 @@ import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
 import api from '../../lib/api';
 
+// --- MOBILE PAYONEER CARD COMPONENT ---
+function MobilePayoneerCard({ record, isEditing, renderCell, onEdit, onDelete, onSave, onCancel }) {
+    return (
+        <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
+            <Stack spacing={1.5}>
+                {/* Header Row: Store + Actions */}
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold' }}>
+                            STORE
+                        </Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+                            {isEditing ? 'Editing...' : (record.store?.user?.username || 'Unknown')}
+                        </Typography>
+                    </Box>
+
+                    <Stack direction="row" spacing={0.5}>
+                        {isEditing ? (
+                            <>
+                                <Tooltip title="Save">
+                                    <IconButton color="primary" onClick={onSave} size="small">
+                                        <SaveIcon />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Cancel">
+                                    <IconButton color="error" onClick={onCancel} size="small">
+                                        <CancelIcon />
+                                    </IconButton>
+                                </Tooltip>
+                            </>
+                        ) : (
+                            <>
+                                <Tooltip title="Edit">
+                                    <IconButton color="primary" onClick={onEdit} size="small">
+                                        <EditIcon />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete">
+                                    <IconButton color="error" onClick={onDelete} size="small">
+                                        <DeleteIcon />
+                                    </IconButton>
+                                </Tooltip>
+                            </>
+                        )}
+                    </Stack>
+                </Stack>
+
+                <Divider />
+
+                {/* Details Grid */}
+                <Stack spacing={1.25}>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold' }}>
+                            BANK ACCOUNT
+                        </Typography>
+                        <Box sx={{ mt: 0.5 }}>{renderCell(record, 'bankAccount')}</Box>
+                    </Box>
+
+                    <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold' }}>
+                            PAYMENT DATE
+                        </Typography>
+                        <Box sx={{ mt: 0.5 }}>{renderCell(record, 'paymentDate', 'date')}</Box>
+                    </Box>
+
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold' }}>
+                                AMOUNT ($)
+                            </Typography>
+                            <Box sx={{ mt: 0.5 }}>{renderCell(record, 'amount', 'number')}</Box>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold' }}>
+                                EXCHANGE RATE (₹)
+                            </Typography>
+                            <Box sx={{ mt: 0.5 }}>{renderCell(record, 'exchangeRate', 'number')}</Box>
+                        </Box>
+                    </Stack>
+
+                    {!isEditing && (
+                        <Paper variant="outlined" sx={{ p: 1.25, bgcolor: 'action.hover', borderRadius: 1 }}>
+                            <Stack direction="row" justifyContent="space-between" spacing={1}>
+                                <Box>
+                                    <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                                        Actual (+2%)
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                        {record.actualExchangeRate?.toFixed(4) ?? '-'}
+                                    </Typography>
+                                </Box>
+                                <Box sx={{ textAlign: 'right' }}>
+                                    <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                                        Deposit (₹)
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                                        {record.bankDeposit?.toFixed(2) ?? '-'}
+                                    </Typography>
+                                </Box>
+                            </Stack>
+                        </Paper>
+                    )}
+                </Stack>
+            </Stack>
+        </Paper>
+    );
+}
+
 const PayoneerSheetPage = () => {
+    // Responsive breakpoints
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
     const [records, setRecords] = useState([]);
     const [sellers, setSellers] = useState([]);
     const [bankAccounts, setBankAccounts] = useState([]); // Changed from paymentAccounts
@@ -225,96 +342,146 @@ const PayoneerSheetPage = () => {
     };
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h5">Payoneer Sheet</Typography>
+        <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: { xs: 1, sm: 2 },
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'stretch', sm: 'center' },
+                    mb: { xs: 2, sm: 3 }
+                }}
+            >
+                <Typography variant={isSmallMobile ? 'h6' : 'h5'} sx={{ fontWeight: 'bold' }}>
+                    Payoneer Sheet
+                </Typography>
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={() => setOpenDialog(true)}
+                    fullWidth={isSmallMobile}
                 >
                     Add Record
                 </Button>
             </Box>
 
-            <TableContainer component={Paper}>
-                <Table>
-                    <TableHead>
-                        <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                            <TableCell>Bank Account</TableCell>
-                            <TableCell>Payment Date</TableCell>
-                            <TableCell>Store Name</TableCell>
-                            <TableCell>Amount ($)</TableCell>
-                            <TableCell>Exchange Rate (₹)</TableCell>
-                            <TableCell>Actual Rate (+2%)</TableCell>
-                            <TableCell>Bank Deposit (₹)</TableCell>
-                            <TableCell align="right">Actions</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
+            {isMobile ? (
+                // MOBILE CARD VIEW
+                <Box sx={{ mt: { xs: 1.5, sm: 2 } }}>
+                    <Stack spacing={1.5}>
                         {records.map((record) => {
                             const isEditing = editingId === record._id;
                             return (
-                                <TableRow key={record._id}>
-                                    <TableCell>{renderCell(record, 'bankAccount')}</TableCell>
-                                    <TableCell>{renderCell(record, 'paymentDate', 'date')}</TableCell>
-                                    <TableCell>{renderCell(record, 'store')}</TableCell>
-                                    <TableCell>{renderCell(record, 'amount', 'number')}</TableCell>
-                                    <TableCell>{renderCell(record, 'exchangeRate', 'number')}</TableCell>
-
-                                    {/* Calculated fields are READ-ONLY even in edit mode (server calculates them) */}
-                                    <TableCell sx={{ bgcolor: isEditing ? '#f8f9fa' : 'inherit', color: 'text.secondary' }}>
-                                        {isEditing ? 'Auto-calc' : record.actualExchangeRate?.toFixed(4)}
-                                    </TableCell>
-                                    <TableCell sx={{ bgcolor: isEditing ? '#f8f9fa' : 'inherit', color: 'text.secondary', fontWeight: 'bold' }}>
-                                        {isEditing ? 'Auto-calc' : record.bankDeposit?.toFixed(2)}
-                                    </TableCell>
-
-                                    <TableCell align="right">
-                                        {isEditing ? (
-                                            <>
-                                                <Tooltip title="Save">
-                                                    <IconButton color="primary" onClick={saveEdit}>
-                                                        <SaveIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title="Cancel">
-                                                    <IconButton color="error" onClick={cancelEditing}>
-                                                        <CancelIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Tooltip title="Edit">
-                                                    <IconButton color="primary" size="small" onClick={() => startEditing(record)}>
-                                                        <EditIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title="Delete">
-                                                    <IconButton color="error" size="small" onClick={() => handleDelete(record._id)}>
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
+                                <MobilePayoneerCard
+                                    key={record._id}
+                                    record={record}
+                                    isEditing={isEditing}
+                                    renderCell={renderCell}
+                                    onEdit={() => startEditing(record)}
+                                    onDelete={() => handleDelete(record._id)}
+                                    onSave={saveEdit}
+                                    onCancel={cancelEditing}
+                                />
                             );
                         })}
+
                         {records.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={8} align="center">
-                                    No records found. Click "Add Record" to create one.
-                                </TableCell>
-                            </TableRow>
+                            <Paper sx={{ p: 2, textAlign: 'center' }}>
+                                <Typography color="text.secondary">
+                                    No records found. Tap "Add Record" to create one.
+                                </Typography>
+                            </Paper>
                         )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                    </Stack>
+                </Box>
+            ) : (
+                // DESKTOP TABLE VIEW
+                <TableContainer component={Paper} sx={{ mt: 2 }}>
+                    <Table>
+                        <TableHead>
+                            <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                                <TableCell>Bank Account</TableCell>
+                                <TableCell>Payment Date</TableCell>
+                                <TableCell>Store Name</TableCell>
+                                <TableCell>Amount ($)</TableCell>
+                                <TableCell>Exchange Rate (₹)</TableCell>
+                                <TableCell>Actual Rate (+2%)</TableCell>
+                                <TableCell>Bank Deposit (₹)</TableCell>
+                                <TableCell align="right">Actions</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {records.map((record) => {
+                                const isEditing = editingId === record._id;
+                                return (
+                                    <TableRow key={record._id}>
+                                        <TableCell>{renderCell(record, 'bankAccount')}</TableCell>
+                                        <TableCell>{renderCell(record, 'paymentDate', 'date')}</TableCell>
+                                        <TableCell>{renderCell(record, 'store')}</TableCell>
+                                        <TableCell>{renderCell(record, 'amount', 'number')}</TableCell>
+                                        <TableCell>{renderCell(record, 'exchangeRate', 'number')}</TableCell>
+
+                                        {/* Calculated fields are READ-ONLY even in edit mode (server calculates them) */}
+                                        <TableCell sx={{ bgcolor: isEditing ? '#f8f9fa' : 'inherit', color: 'text.secondary' }}>
+                                            {isEditing ? 'Auto-calc' : record.actualExchangeRate?.toFixed(4)}
+                                        </TableCell>
+                                        <TableCell sx={{ bgcolor: isEditing ? '#f8f9fa' : 'inherit', color: 'text.secondary', fontWeight: 'bold' }}>
+                                            {isEditing ? 'Auto-calc' : record.bankDeposit?.toFixed(2)}
+                                        </TableCell>
+
+                                        <TableCell align="right">
+                                            {isEditing ? (
+                                                <>
+                                                    <Tooltip title="Save">
+                                                        <IconButton color="primary" onClick={saveEdit}>
+                                                            <SaveIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Cancel">
+                                                        <IconButton color="error" onClick={cancelEditing}>
+                                                            <CancelIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Tooltip title="Edit">
+                                                        <IconButton color="primary" size="small" onClick={() => startEditing(record)}>
+                                                            <EditIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Delete">
+                                                        <IconButton color="error" size="small" onClick={() => handleDelete(record._id)}>
+                                                            <DeleteIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                            {records.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={8} align="center">
+                                        No records found. Click "Add Record" to create one.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
 
             {/* CREATE DIALOG */}
-            <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+            <Dialog
+                open={openDialog}
+                onClose={() => setOpenDialog(false)}
+                maxWidth="sm"
+                fullWidth
+                fullScreen={isSmallMobile}
+            >
                 <DialogTitle>Add Payoneer Record</DialogTitle>
                 <DialogContent>
                     <Box display="flex" flexDirection="column" gap={2} mt={1}>
@@ -356,7 +523,7 @@ const PayoneerSheetPage = () => {
                             onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
                         />
 
-                        <Box display="flex" gap={2}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
                             <TextField
                                 label="Amount ($)"
                                 type="number"
@@ -371,7 +538,7 @@ const PayoneerSheetPage = () => {
                                 value={formData.exchangeRate}
                                 onChange={(e) => setFormData({ ...formData, exchangeRate: e.target.value })}
                             />
-                        </Box>
+                        </Stack>
 
                         {/* PREVIEW OF CALCULATIONS */}
                         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f5f5f5' }}>
@@ -383,9 +550,16 @@ const PayoneerSheetPage = () => {
                         </Paper>
                     </Box>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-                    <Button onClick={handleCreate} variant="contained" disabled={loading}>
+                <DialogActions sx={{ p: { xs: 1, sm: 2 }, gap: 1, flexDirection: { xs: 'column-reverse', sm: 'row' } }}>
+                    <Button onClick={() => setOpenDialog(false)} fullWidth={isSmallMobile}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleCreate}
+                        variant="contained"
+                        disabled={loading}
+                        fullWidth={isSmallMobile}
+                    >
                         {loading ? 'Saving...' : 'Save Record'}
                     </Button>
                 </DialogActions>
