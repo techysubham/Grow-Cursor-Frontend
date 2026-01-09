@@ -65,6 +65,19 @@ import SaveIcon from '@mui/icons-material/Save';
 
 import api from '../../lib/api';
 
+// Remark dropdown options
+const REMARK_OPTIONS = [
+  { _id: '1', name: 'Delivered' },
+  { _id: '2', name: 'In-transit' },
+  { _id: '3', name: 'Not yet shipped' },
+  { _id: '4', name: 'Shipped' },
+  { _id: '5', name: 'Out for delivery' },
+  { _id: '6', name: 'Delayed' },
+  { _id: '7', name: 'Re-ordered' },
+  { _id: '8', name: 'Refund' },
+  { _id: '9', name: 'Return started' }
+];
+
 // --- IMAGE VIEWER DIALOG ---
 function ImageDialog({ open, onClose, images }) {
   const theme = useTheme();
@@ -950,7 +963,7 @@ function FulfillmentDashboard() {
     'shipping', 'salesTax', 'discount', 'transactionFees',
     'adFeeGeneral', 'cancelStatus', 'refunds', 'orderEarnings', 'trackingNumber',
     'amazonAccount', 'arriving', 'beforeTax', 'estimatedTax',
-    'azOrderId', 'amazonRefund', 'cardName', 'notes', 'messagingStatus'
+    'azOrderId', 'amazonRefund', 'cardName', 'notes', 'messagingStatus', 'remark'
   ];
 
   const ALL_COLUMNS = [
@@ -985,7 +998,8 @@ function FulfillmentDashboard() {
     { id: 'amazonRefund', label: 'Amazon Refund' },
     { id: 'cardName', label: 'Card Name' },
     { id: 'notes', label: 'Notes' },
-    { id: 'messagingStatus', label: 'Messaging' }
+    { id: 'messagingStatus', label: 'Messaging' },
+    { id: 'remark', label: 'Remark' }
   ];
 
   const [visibleColumns, setVisibleColumns] = useState(() =>
@@ -2753,6 +2767,7 @@ function FulfillmentDashboard() {
                 {visibleColumns.includes('cardName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Card Name</TableCell>}
                 {visibleColumns.includes('notes') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>}
                 {visibleColumns.includes('messagingStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Messaging</TableCell>}
+                {visibleColumns.includes('remark') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>}
                 <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}></TableCell>
               </TableRow>
             </TableHead>
@@ -3475,6 +3490,15 @@ function FulfillmentDashboard() {
                             </IconButton>
                           </Tooltip>
                         </Stack>
+                      </TableCell>
+                    )}
+                    {visibleColumns.includes('remark') && (
+                      <TableCell>
+                        <AutoSaveSelect
+                          value={order.remark || ''}
+                          options={REMARK_OPTIONS}
+                          onSave={(val) => updateManualField(order._id, 'remark', val)}
+                        />
                       </TableCell>
                     )}
 
