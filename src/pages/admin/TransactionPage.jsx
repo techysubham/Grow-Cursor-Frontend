@@ -25,7 +25,9 @@ import {
     Stack,
     ToggleButton,
     ToggleButtonGroup,
-    Divider
+    Divider,
+    useMediaQuery,
+    useTheme
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -33,7 +35,97 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import api from '../../lib/api';
 
+// Mobile Transaction Card Component
+const MobileTransactionCard = ({ txn, onEdit, onDelete }) => {
+    const dateStr = txn.date ? new Date(txn.date).toLocaleDateString() : '-';
+
+    return (
+        <Paper elevation={2} sx={{ p: 1.5, borderRadius: 2 }}>
+            <Stack spacing={1}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                            Date
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {dateStr}
+                        </Typography>
+                    </Box>
+
+                    <Typography
+                        variant="body2"
+                        noWrap
+                        sx={{
+                            fontWeight: 800,
+                            color: txn.transactionType === 'Credit' ? 'success.main' : 'error.main',
+                            textAlign: 'right',
+                            lineHeight: 1.15,
+                            // Stay single-line, but scale down when the container is narrow
+                            fontSize: 'clamp(0.95rem, 2.2vw, 1.1rem)',
+                            maxWidth: '60%'
+                        }}
+                    >
+                        {txn.transactionType === 'Credit' ? '+' : '-'} ₹{Number.isFinite(txn.amount) ? txn.amount.toFixed(2) : (txn.amount ?? '-')}
+                    </Typography>
+                </Stack>
+
+                <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+                    <Chip
+                        label={txn.transactionType}
+                        color={txn.transactionType === 'Credit' ? 'success' : 'error'}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontWeight: 700 }}
+                    />
+                    <Chip
+                        label={txn.source}
+                        size="small"
+                        color={txn.source === 'PAYONEER' ? 'primary' : 'default'}
+                        variant={txn.source === 'PAYONEER' ? 'filled' : 'outlined'}
+                    />
+                </Stack>
+
+                <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                        Bank Account
+                    </Typography>
+                    <Typography variant="body2">{txn.bankAccount?.name || '-'}</Typography>
+                </Box>
+
+                <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                        Remark
+                    </Typography>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>
+                        {txn.remark || '-'}
+                    </Typography>
+                    {txn.creditCardName && (
+                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                            To: {txn.creditCardName.name}
+                        </Typography>
+                    )}
+                </Box>
+
+                {txn.source === 'MANUAL' && (
+                    <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                        <IconButton size="small" onClick={onEdit} color="primary">
+                            <EditIcon />
+                        </IconButton>
+                        <IconButton size="small" onClick={onDelete} color="error">
+                            <DeleteIcon />
+                        </IconButton>
+                    </Stack>
+                )}
+            </Stack>
+        </Paper>
+    );
+};
+
 const TransactionPage = () => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
     const [transactions, setTransactions] = useState([]);
     const [bankAccounts, setBankAccounts] = useState([]);
     const [creditCards, setCreditCards] = useState([]);
@@ -167,17 +259,24 @@ const TransactionPage = () => {
     };
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+            <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={1.5}
+                justifyContent="space-between"
+                alignItems={{ xs: 'stretch', sm: 'center' }}
+                mb={3}
+            >
                 <Typography variant="h5">Transactions</Typography>
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={() => setOpenDialog(true)}
+                    fullWidth={isMobile}
                 >
                     Add Transaction
                 </Button>
-            </Box>
+            </Stack>
 
             {/* Balance Summary Cards */}
             <Typography variant="h6" gutterBottom>Bank Accounts</Typography>
@@ -185,17 +284,41 @@ const TransactionPage = () => {
                 {balanceSummary.map((item) => (
                     <Grid item xs={12} sm={6} md={3} key={item._id}>
                         <Card>
-                            <CardContent>
+                            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                    <Box>
-                                        <Typography color="text.secondary" variant="body2">
+                                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                                        <Typography
+                                            color="text.secondary"
+                                            variant="body2"
+                                            noWrap
+                                            sx={{ textOverflow: 'ellipsis', overflow: 'hidden' }}
+                                        >
                                             {item.bankName}
                                         </Typography>
-                                        <Typography variant="h5" sx={{ mt: 1, color: item.balance >= 0 ? 'success.main' : 'error.main' }}>
+                                        <Typography
+                                            variant="h5"
+                                            noWrap
+                                            sx={{
+                                                mt: 1,
+                                                color: item.balance >= 0 ? 'success.main' : 'error.main',
+                                                fontWeight: 'bold',
+                                                // Single line; scale down smoothly as the card narrows
+                                                fontSize: 'clamp(1.05rem, 2.2vw, 1.75rem)',
+                                                lineHeight: 1.1,
+                                                maxWidth: '100%'
+                                            }}
+                                        >
                                             ₹{item.balance.toFixed(2)}
                                         </Typography>
                                     </Box>
-                                    <AccountBalanceIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.3 }} />
+                                    <AccountBalanceIcon
+                                        sx={{
+                                            fontSize: { xs: 34, sm: 38, md: 40 },
+                                            color: 'primary.main',
+                                            opacity: 0.3,
+                                            flexShrink: 0
+                                        }}
+                                    />
                                 </Stack>
                             </CardContent>
                         </Card>
@@ -211,19 +334,30 @@ const TransactionPage = () => {
                         {creditCardSummary.map((item) => (
                             <Grid item xs={12} sm={6} md={4} key={item._id}>
                                 <Card>
-                                    <CardContent>
-                                        <Typography color="text.secondary" variant="body2" gutterBottom>
+                                    <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                                        <Typography
+                                            color="text.secondary"
+                                            variant="body2"
+                                            gutterBottom
+                                            noWrap
+                                            sx={{ textOverflow: 'ellipsis', overflow: 'hidden' }}
+                                        >
                                             {item.cardName}
                                         </Typography>
                                         
                                         {/* Remaining Balance - Primary Display */}
                                         <Typography 
                                             variant="h4" 
+                                            noWrap
                                             sx={{ 
                                                 mt: 1, 
                                                 mb: 2,
                                                 color: item.balance < 0 ? 'error.main' : 'success.main',
-                                                fontWeight: 'bold'
+                                                fontWeight: 'bold',
+                                                // Single line; scale down smoothly as the card narrows
+                                                fontSize: 'clamp(1.35rem, 2.4vw, 2.125rem)',
+                                                lineHeight: 1.1,
+                                                maxWidth: '100%'
                                             }}
                                         >
                                             ₹{item.balance.toFixed(2)}
@@ -257,7 +391,30 @@ const TransactionPage = () => {
                 </>
             )}
 
-            <TableContainer component={Paper}>
+            {/* MOBILE CARD VIEW */}
+            <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 3 }}>
+                {transactions.length === 0 ? (
+                    <Paper sx={{ p: 2, textAlign: 'center' }}>
+                        <Typography variant="body2" color="text.secondary">
+                            No transactions found.
+                        </Typography>
+                    </Paper>
+                ) : (
+                    <Stack spacing={1.5}>
+                        {transactions.map((txn) => (
+                            <MobileTransactionCard
+                                key={txn._id}
+                                txn={txn}
+                                onEdit={() => startEdit(txn)}
+                                onDelete={() => handleDelete(txn._id)}
+                            />
+                        ))}
+                    </Stack>
+                )}
+            </Box>
+
+            {/* DESKTOP TABLE VIEW */}
+            <TableContainer component={Paper} sx={{ display: { xs: 'none', md: 'block' }, overflowX: 'auto' }}>
                 <Table>
                     <TableHead>
                         <TableRow sx={{ bgcolor: '#f5f5f5' }}>
@@ -299,8 +456,8 @@ const TransactionPage = () => {
                                         variant={txn.source === 'PAYONEER' ? 'filled' : 'outlined'}
                                     />
                                 </TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>
-                                    {txn.amount?.toFixed(2)}
+                                <TableCell align="right" sx={{ fontWeight: 'bold', color: txn.transactionType === 'Credit' ? 'success.main' : 'error.main' }}>
+                                    {txn.transactionType === 'Credit' ? '+' : '-'} ₹{txn.amount?.toFixed(2)}
                                 </TableCell>
                                 <TableCell align="right">
                                     {txn.source === 'MANUAL' && (
@@ -325,9 +482,15 @@ const TransactionPage = () => {
                 </Table>
             </TableContainer>
 
-            <Dialog open={openDialog} onClose={handleClose}>
+            <Dialog
+                open={openDialog}
+                onClose={handleClose}
+                fullScreen={isSmallMobile}
+                fullWidth
+                maxWidth="sm"
+            >
                 <DialogTitle>{editingId ? 'Edit Transaction' : 'Add Manual Transaction'}</DialogTitle>
-                <DialogContent sx={{ minWidth: 300 }}>
+                <DialogContent sx={{ minWidth: { xs: 'auto', sm: 300 } }}>
                     <Box display="flex" flexDirection="column" gap={2} mt={1}>
                         <TextField
                             label="Date"
