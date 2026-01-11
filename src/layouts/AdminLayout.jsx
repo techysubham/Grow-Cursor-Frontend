@@ -106,6 +106,9 @@ import ASINStoragePage from '../pages/admin/ASINStoragePage.jsx';
 import StorageIcon from '@mui/icons-material/Storage';
 import ColumnCreatorPage from '../pages/admin/ColumnCreatorPage.jsx';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
+import ManageTemplatesPage from '../pages/admin/ManageTemplatesPage.jsx';
+import TemplateListingsPage from '../pages/admin/TemplateListingsPage.jsx';
+import DescriptionIcon from '@mui/icons-material/Description';
 
 const drawerWidth = 230;
 
@@ -347,6 +350,22 @@ export default function AdminLayout({ user, onLogout }) {
                   <NavIcon icon={SearchIcon} label="Search Amazon Products" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Amazon Lookup" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* Listing Templates */}
+            <ListItem disablePadding>
+              <ListItemButton 
+                component={Link} 
+                to="/admin/manage-templates" 
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/manage-templates'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={DescriptionIcon} label="eBay Listing Templates" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Listing Templates" />}
               </ListItemButton>
             </ListItem>
 
@@ -1216,6 +1235,8 @@ export default function AdminLayout({ user, onLogout }) {
                 <Route path="/payoneer" element={<PayoneerSheetPage />} />
                 <Route path="/bank-accounts" element={<BankAccountsPage />} />
                 <Route path="/transactions" element={<TransactionPage />} />
+                <Route path="/manage-templates" element={<ManageTemplatesPage />} />
+                <Route path="/template-listings" element={<TemplateListingsPage />} />
               </>
             </>
           )}
