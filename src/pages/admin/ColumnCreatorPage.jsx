@@ -19,12 +19,18 @@ import {
   MenuItem,
   Alert,
   Stack,
-  Chip
+  Chip,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import api from '../../lib/api';
 
 export default function ColumnCreatorPage() {
+  // Mobile responsiveness (same approach as FulfillmentDashboard)
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   const [columns, setColumns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -197,7 +203,55 @@ export default function ColumnCreatorPage() {
         <Typography variant="h6" sx={{ p: 2, bgcolor: 'grey.100', borderBottom: 1, borderColor: 'divider' }}>
           Existing Columns ({columns.length})
         </Typography>
-        <TableContainer>
+
+        {/* MOBILE: Card view */}
+        <Box sx={{ display: { xs: 'block', md: 'none' }, p: 2 }}>
+          <Stack spacing={1.5}>
+            {columns.length === 0 ? (
+              <Paper sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
+                No columns created yet. Add one above!
+              </Paper>
+            ) : (
+              columns.map((column) => (
+                <Paper key={column._id} elevation={2} sx={{ p: 2, borderRadius: 2 }}>
+                  <Stack spacing={1}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, wordBreak: 'break-word' }}>
+                          {column.name}
+                        </Typography>
+                        <Chip label={column.dataType} size="small" variant="outlined" sx={{ mt: 0.5 }} />
+                      </Box>
+
+                      <Stack direction="row" spacing={0.5} flexShrink={0}>
+                        <IconButton size="small" onClick={() => handleEdit(column)}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" color="error" onClick={() => handleDelete(column._id)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    </Stack>
+
+                    <Typography variant="body2" color="text.secondary">
+                      {column.description || '-'}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.4 }}
+                    >
+                      {column.prompt}
+                    </Typography>
+                  </Stack>
+                </Paper>
+              ))
+            )}
+          </Stack>
+        </Box>
+
+        {/* DESKTOP: Table view */}
+        <TableContainer sx={{ display: { xs: 'none', md: 'block' }, overflowX: 'auto' }}>
           <Table size="small">
             <TableHead sx={{ bgcolor: 'grey.50' }}>
               <TableRow>
@@ -256,7 +310,7 @@ export default function ColumnCreatorPage() {
       </Paper>
 
       {/* Edit Dialog */}
-      <Dialog open={editDialog} onClose={() => setEditDialog(false)} maxWidth="md" fullWidth>
+      <Dialog open={editDialog} onClose={() => setEditDialog(false)} maxWidth="md" fullWidth fullScreen={isMobile}>
         <DialogTitle>Edit Column</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
