@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Box, Button, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Tooltip } from '@mui/material';
+import { Box, Button, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Tooltip, useMediaQuery, useTheme, Chip } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import RestoreIcon from '@mui/icons-material/Restore';
@@ -15,6 +15,11 @@ const getStaticUrl = (path) => {
 };
 
 export default function AmazonLookupPage() {
+  // Mobile responsiveness (same approach as FulfillmentDashboard)
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [asins, setAsins] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -259,10 +264,10 @@ export default function AmazonLookupPage() {
     <Box>
       <Typography variant="h6" sx={{ mb: 2 }}>Amazon Product Lookup</Typography>
       
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: 3 }}>
         <Stack spacing={2} component="form" onSubmit={handleLookup}>
-          <Stack direction="row" spacing={2}>
-            <FormControl sx={{ flex: 1 }} required>
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} alignItems={{ xs: 'stretch', lg: 'flex-start' }}>
+            <FormControl sx={{ flex: 1, minWidth: 0 }} required>
               <InputLabel>Select Seller</InputLabel>
               <Select 
                 label="Select Seller" 
@@ -277,7 +282,7 @@ export default function AmazonLookupPage() {
               </Select>
             </FormControl>
             
-            <FormControl sx={{ flex: 1 }} required>
+            <FormControl sx={{ flex: 1, minWidth: 0 }} required>
               <InputLabel>Product Umbrella</InputLabel>
               <Select 
                 label="Product Umbrella" 
@@ -293,20 +298,22 @@ export default function AmazonLookupPage() {
             </FormControl>
           </Stack>
 
-          <Stack direction="row" spacing={2}>
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} alignItems={{ xs: 'stretch', lg: 'flex-end' }}>
             <TextField 
               label="ASIN(s) - Separate multiple with spaces" 
               value={asins} 
               onChange={(e) => setAsins(e.target.value)} 
               placeholder="e.g., B08N5WRWNW B0CGV192GK"
               required 
-              sx={{ flex: 1 }}
+              fullWidth
+              sx={{ flex: 1, minWidth: 0 }}
             />
             <Button 
               type="submit" 
               variant="contained" 
               disabled={loading || !selectedSeller || !selectedUmbrella}
-              sx={{ minWidth: 120 }}
+              fullWidth={isMobile}
+              sx={{ minWidth: { xs: '100%', lg: 160 } }}
             >
               {loading ? 'Processing...' : 'Add Products'}
             </Button>
@@ -327,15 +334,16 @@ export default function AmazonLookupPage() {
       </Paper>
 
       {/* Saved Products Table */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+      <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', lg: 'center' }} spacing={2} sx={{ mb: 2 }}>
         <Typography variant="h6">
           {showArchived ? 'Archived Products' : 'Active Products'} ({savedProducts.length})
         </Typography>
-        <Stack direction="row" spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ minWidth: 0 }}>
           <Button
             variant={showArchived ? 'contained' : 'outlined'}
             onClick={() => setShowArchived(!showArchived)}
             color={showArchived ? 'warning' : 'primary'}
+            fullWidth={isSmallMobile}
           >
             {showArchived ? 'Show Active' : 'Show Archived'}
           </Button>
@@ -344,6 +352,7 @@ export default function AmazonLookupPage() {
             startIcon={<DownloadIcon />}
             onClick={exportToCSV}
             disabled={exportingCSV || savedProducts.length === 0}
+            fullWidth={isSmallMobile}
           >
             {exportingCSV ? 'Exporting...' : 'Download CSV'}
           </Button>
@@ -351,10 +360,10 @@ export default function AmazonLookupPage() {
       </Stack>
 
       {/* Table Filters */}
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
+      <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} alignItems={{ xs: 'stretch', lg: 'center' }}>
           <Typography variant="subtitle2" sx={{ minWidth: 80 }}>Filters:</Typography>
-          <FormControl sx={{ minWidth: 200 }} size="small">
+          <FormControl sx={{ minWidth: { xs: '100%', lg: 200 } }} size="small">
             <InputLabel>Filter by Seller</InputLabel>
             <Select 
               label="Filter by Seller" 
@@ -370,7 +379,7 @@ export default function AmazonLookupPage() {
             </Select>
           </FormControl>
           
-          <FormControl sx={{ minWidth: 200 }} size="small">
+          <FormControl sx={{ minWidth: { xs: '100%', lg: 200 } }} size="small">
             <InputLabel>Filter by Umbrella</InputLabel>
             <Select 
               label="Filter by Umbrella" 
@@ -388,7 +397,8 @@ export default function AmazonLookupPage() {
 
           {(filterSeller || filterUmbrella) && (
             <Button 
-              size="small" 
+              size="small"
+              fullWidth={isMobile}
               onClick={() => {
                 setFilterSeller('');
                 setFilterUmbrella('');
@@ -400,7 +410,84 @@ export default function AmazonLookupPage() {
         </Stack>
       </Paper>
 
-      <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+      {/* MOBILE: Card view (md and down) */}
+      <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+        <Stack spacing={1.5}>
+          {savedProducts.map((product) => (
+            <Paper key={product._id} elevation={2} sx={{ p: 2, borderRadius: 2 }}>
+              <Stack spacing={1}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                      {product.asin}
+                    </Typography>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, wordBreak: 'break-word', lineHeight: 1.3 }}>
+                      {product.title || '-'}
+                    </Typography>
+                  </Box>
+
+                  {/* Actions */}
+                  {showArchived ? (
+                    <Stack direction="row" spacing={0.5} flexShrink={0}>
+                      <Tooltip title="Restore">
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={() => handleRestoreProduct(product._id, product.asin)}
+                        >
+                          <RestoreIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete Permanently">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handlePermanentDelete(product._id, product.asin)}
+                        >
+                          <DeleteForeverIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  ) : (
+                    <Tooltip title="Archive">
+                      <IconButton
+                        size="small"
+                        color="warning"
+                        onClick={() => handleDeleteProduct(product._id, product.asin)}
+                        sx={{ flexShrink: 0 }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Stack>
+
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Chip size="small" label={`Price: ${product.price || '-'}`} />
+                  <Chip size="small" label={`Brand: ${product.brand || '-'}`} />
+                  <Chip size="small" label={`Seller: ${getSellerName(product.sellerId?._id || product.sellerId)}`} />
+                  <Chip size="small" label={`Umbrella: ${product.productUmbrellaId?.name || '-'}`} />
+                </Stack>
+
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                  Added: {product.createdAt ? new Date(product.createdAt).toLocaleDateString() : '-'}
+                </Typography>
+              </Stack>
+            </Paper>
+          ))}
+
+          {savedProducts.length === 0 && (
+            <Paper sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
+              {showArchived
+                ? 'No archived products. Archived products will appear here.'
+                : 'No saved products yet. Add your first product above!'}
+            </Paper>
+          )}
+        </Stack>
+      </Box>
+
+      {/* DESKTOP: Table view (md+) */}
+      <TableContainer component={Paper} sx={{ display: { xs: 'none', md: 'block' }, maxHeight: 600, overflowX: 'auto' }}>
         <Table size="small" sx={{ '& .MuiTableCell-root': { py: 1.5 } }} stickyHeader>
           <TableHead>
             <TableRow sx={{ bgcolor: 'grey.100' }}>
