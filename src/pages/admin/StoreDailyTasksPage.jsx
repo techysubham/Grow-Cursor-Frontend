@@ -23,7 +23,10 @@ import {
     Alert,
     Autocomplete,
     LinearProgress,
-    Checkbox
+    Checkbox,
+    useMediaQuery,
+    useTheme,
+    Chip
 } from '@mui/material';
 import api from '../../lib/api.js';
 
@@ -40,11 +43,14 @@ const toISTYMD = (d) => {
 };
 
 export default function StoreDailyTasksPage() {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(false);
 
     // Selection State
-    const [selectedStore, setSelectedStore] = useState(null);
+    const [selectedStore, setSelectedStore] = useState('all'); // Changed to 'all' to show everything by default
     const [selectedDate, setSelectedDate] = useState(toISTYMD(new Date())); // Default to today
 
     // Filter Options
@@ -77,7 +83,7 @@ export default function StoreDailyTasksPage() {
 
     // Fetch Tasks when Store/Date changes
     useEffect(() => {
-        if (!selectedStore || !selectedDate) {
+        if (!selectedDate) {
             setTasks([]);
             return;
         }
@@ -85,14 +91,18 @@ export default function StoreDailyTasksPage() {
         const fetchTasks = async () => {
             setLoading(true);
             try {
-                const { data } = await api.get('/assignments', {
-                    params: {
-                        storeId: selectedStore._id,
-                        scheduledDateMode: 'single',
-                        scheduledDateSingle: selectedDate,
-                        limit: 1000 // Get all for the day
-                    }
-                });
+                const params = {
+                    scheduledDateMode: 'single',
+                    scheduledDateSingle: selectedDate,
+                    limit: 1000 // Get all for the day
+                };
+
+                // Only add storeId if a specific store is selected
+                if (selectedStore && selectedStore !== 'all') {
+                    params.storeId = selectedStore._id;
+                }
+
+                const { data } = await api.get('/assignments', { params });
                 setTasks(data.items || data); // Handle paginated or list response
                 setSelectedTaskIds([]); // Reset selection on fetch
             } catch (e) {
@@ -176,14 +186,15 @@ export default function StoreDailyTasksPage() {
             // We don't strictly need to refresh if the new task is for a different store/date,
             // but if it matches current filter, we should.
             // Let's refresh just in case.
-            const { data } = await api.get('/assignments', {
-                params: {
-                    storeId: selectedStore._id,
-                    scheduledDateMode: 'single',
-                    scheduledDateSingle: selectedDate,
-                    limit: 1000
-                }
-            });
+            const params = {
+                scheduledDateMode: 'single',
+                scheduledDateSingle: selectedDate,
+                limit: 1000
+            };
+            if (selectedStore && selectedStore !== 'all') {
+                params.storeId = selectedStore._id;
+            }
+            const { data } = await api.get('/assignments', { params });
             setTasks(data.items || data);
             setSelectedTaskIds([]);
 
@@ -283,14 +294,15 @@ export default function StoreDailyTasksPage() {
                 setBulkShareOpen(false);
                 setSelectedTaskIds([]);
                 // Refresh
-                const { data } = await api.get('/assignments', {
-                    params: {
-                        storeId: selectedStore._id,
-                        scheduledDateMode: 'single',
-                        scheduledDateSingle: selectedDate,
-                        limit: 1000
-                    }
-                });
+                const params = {
+                    scheduledDateMode: 'single',
+                    scheduledDateSingle: selectedDate,
+                    limit: 1000
+                };
+                if (selectedStore && selectedStore !== 'all') {
+                    params.storeId = selectedStore._id;
+                }
+                const { data } = await api.get('/assignments', { params });
                 setTasks(data.items || data);
             }
         } catch (e) {
@@ -306,15 +318,57 @@ export default function StoreDailyTasksPage() {
         return Math.round((c / q) * 100);
     };
 
+    const TaskCards = () => (
+        <Stack spacing={1.5}>
+            {tasks.map((row, idx) => {
+                const selected = isSelected(row._id);
+                const pct = progressPct(row);
+                return (
+                    <Paper key={row._id} elevation={2} sx={{ p: 2, borderRadius: 2 }}>
+                        <Stack spacing={1}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                                <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+                                    <Checkbox checked={selected} onChange={() => handleSelectRow(row._id)} />
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 700, wordBreak: 'break-word' }}>
+                                        {idx + 1}. {row.task?.productTitle || '-'}
+                                    </Typography>
+                                </Stack>
+
+                                <Button variant="outlined" size="small" onClick={() => openShare(row)} sx={{ flexShrink: 0 }}>
+                                    Share
+                                </Button>
+                            </Stack>
+
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                <Chip size="small" label={`Category: ${row.task?.category?.name || '-'}`} />
+                                <Chip size="small" label={`Lister: ${row.lister?.username || '-'}`} />
+                                <Chip size="small" label={`Qty: ${row.quantity ?? '-'}`} />
+                                <Chip size="small" label={`Source: ${row.task?.sourcePlatform?.name || '-'}`} />
+                            </Stack>
+
+                            <Box>
+                                <LinearProgress variant="determinate" value={pct} />
+                                <Typography variant="caption" color="text.secondary">
+                                    {pct}%
+                                </Typography>
+                            </Box>
+                        </Stack>
+                    </Paper>
+                );
+            })}
+        </Stack>
+    );
+
     return (
         <Box>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+            <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', lg: 'center' }} gap={1} mb={2}>
                 <Typography variant="h5">Store Daily Tasks</Typography>
                 {selectedTaskIds.length > 0 && (
                     <Button
                         variant="contained"
                         color="primary"
                         onClick={openBulkShare}
+                        fullWidth={isMobile}
                     >
                         Share {selectedTaskIds.length} Selected
                     </Button>
@@ -322,13 +376,14 @@ export default function StoreDailyTasksPage() {
             </Stack>
 
             <Paper sx={{ p: 2, mb: 2 }}>
-                <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} alignItems={{ xs: 'stretch', lg: 'center' }}>
                     <Autocomplete
-                        options={stores}
+                        options={[{ _id: 'all', name: 'All Stores' }, ...stores]}
                         getOptionLabel={(option) => option.name}
-                        value={selectedStore}
-                        onChange={(e, v) => setSelectedStore(v)}
-                        renderInput={(params) => <TextField {...params} label="Select Store" size="small" sx={{ width: 300 }} />}
+                        value={selectedStore === 'all' ? { _id: 'all', name: 'All Stores' } : selectedStore}
+                        onChange={(e, v) => setSelectedStore(v || 'all')}
+                        renderInput={(params) => <TextField {...params} label="Filter by Store" size="small" fullWidth />}
+                        sx={{ width: '100%' }}
                     />
 
                     <TextField
@@ -338,11 +393,37 @@ export default function StoreDailyTasksPage() {
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
                         InputLabelProps={{ shrink: true }}
+                        fullWidth={isMobile}
+                        sx={{ width: { xs: '100%', lg: 250 } }}
                     />
                 </Stack>
             </Paper>
 
-            <TableContainer component={Paper}>
+            {/* MOBILE: Card view */}
+            <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+                {loading ? (
+                    <Box sx={{ p: 2, textAlign: 'center' }}>Loading...</Box>
+                ) : tasks.length === 0 ? (
+                    <Alert severity="info">No tasks found for this store and date.</Alert>
+                ) : (
+                    <>
+                        <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
+                            <Checkbox
+                                indeterminate={selectedTaskIds.length > 0 && selectedTaskIds.length < tasks.length}
+                                checked={tasks.length > 0 && selectedTaskIds.length === tasks.length}
+                                onChange={handleSelectAll}
+                            />
+                            <Typography variant="caption">
+                                {selectedTaskIds.length > 0 ? `${selectedTaskIds.length} selected` : 'Select All'}
+                            </Typography>
+                        </Stack>
+                        <TaskCards />
+                    </>
+                )}
+            </Box>
+
+            {/* DESKTOP: Table view */}
+            <TableContainer component={Paper} sx={{ display: { xs: 'none', md: 'block' }, overflowX: 'auto' }}>
                 <Table size="small">
                     <TableHead>
                         <TableRow>
@@ -419,9 +500,9 @@ export default function StoreDailyTasksPage() {
             </TableContainer>
 
             {/* Share Modal (Single) */}
-            <Dialog open={shareOpen} onClose={() => setShareOpen(false)}>
+            <Dialog open={shareOpen} onClose={() => setShareOpen(false)} fullScreen={isMobile} fullWidth maxWidth="sm">
                 <DialogTitle>Share Task</DialogTitle>
-                <DialogContent sx={{ minWidth: 400, pt: 2 }}>
+                <DialogContent sx={{ pt: 2 }}>
                     {targetTask && (
                         <Alert severity="info" sx={{ mb: 2 }}>
                             Sharing: {targetTask.task?.productTitle}
@@ -488,7 +569,7 @@ export default function StoreDailyTasksPage() {
             </Dialog>
 
             {/* Bulk Share Modal */}
-            <Dialog open={bulkShareOpen} onClose={() => setBulkShareOpen(false)} maxWidth="md" fullWidth>
+            <Dialog open={bulkShareOpen} onClose={() => setBulkShareOpen(false)} maxWidth="md" fullWidth fullScreen={isMobile}>
                 <DialogTitle>Bulk Share Tasks</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2} sx={{ mt: 1 }}>
@@ -497,7 +578,7 @@ export default function StoreDailyTasksPage() {
                         </Alert>
 
                         {/* Common Fields */}
-                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Lister</InputLabel>
                                 <Select
@@ -522,7 +603,7 @@ export default function StoreDailyTasksPage() {
                             />
                         </Stack>
 
-                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Set All Stores</InputLabel>
                                 <Select
@@ -536,7 +617,7 @@ export default function StoreDailyTasksPage() {
                                 </Select>
                             </FormControl>
 
-                            <Box display="flex" gap={1} alignItems="center" sx={{ width: '100%' }}>
+                            <Stack direction={{ xs: 'column', lg: 'row' }} gap={1} alignItems={{ xs: 'stretch', lg: 'center' }} sx={{ width: '100%' }}>
                                 <Typography variant="caption" sx={{ whiteSpace: 'nowrap' }}>Set all Qty:</Typography>
                                 <TextField
                                     size="small"
@@ -545,7 +626,7 @@ export default function StoreDailyTasksPage() {
                                     onChange={(e) => applyToAll('quantity', e.target.value)}
                                     placeholder="0"
                                 />
-                            </Box>
+                            </Stack>
                         </Stack>
 
                         <TextField
@@ -558,7 +639,7 @@ export default function StoreDailyTasksPage() {
                         />
 
                         {/* Task List Table */}
-                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300, mt: 2 }}>
+                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300, mt: 2, overflowX: 'auto' }}>
                             <Table size="small" stickyHeader>
                                 <TableHead>
                                     <TableRow>
