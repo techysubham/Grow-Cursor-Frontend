@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { 
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Typography, IconButton, Dialog, DialogTitle, 
-  DialogContent, DialogActions, Alert, Pagination, TextField, Tabs, Tab, MenuItem
+  DialogContent, DialogActions, Alert, Pagination, TextField, Tabs, Tab, MenuItem,
+  Chip, CircularProgress
 } from '@mui/material';
 import { 
   Delete as DeleteIcon, 
@@ -29,6 +30,13 @@ export default function TemplateListingsPage() {
   const [addEditDialog, setAddEditDialog] = useState(false);
   const [editingListing, setEditingListing] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
+
+  // ASIN Auto-Fill state
+  const [asinInput, setAsinInput] = useState('');
+  const [loadingAsin, setLoadingAsin] = useState(false);
+  const [asinError, setAsinError] = useState('');
+  const [asinSuccess, setAsinSuccess] = useState('');
+  const [autoFilledFields, setAutoFilledFields] = useState(new Set());
 
   const [listingFormData, setListingFormData] = useState({
     action: 'Add',
@@ -147,6 +155,10 @@ export default function TemplateListingsPage() {
 
   const handleAddListing = () => {
     setEditingListing(null);
+    setAsinInput('');
+    setAsinError('');
+    setAsinSuccess('');
+    setAutoFilledFields(new Set());
     setListingFormData({
       action: 'Add',
       customLabel: '',
@@ -310,6 +322,41 @@ export default function TemplateListingsPage() {
     setAddEditDialog(true);
   };
 
+  const handleAsinAutofill = async () => {
+    if (!asinInput.trim()) {
+      setAsinError('Please enter an ASIN');
+      return;
+    }
+
+    setAsinError('');
+    setAsinSuccess('');
+    setLoadingAsin(true);
+
+    try {
+      const { data } = await api.post('/template-listings/autofill-from-asin', {
+        asin: asinInput.trim(),
+        templateId
+      });
+
+      // Populate form with auto-filled data
+      setListingFormData({
+        ...listingFormData,
+        ...data.autoFilledData,
+        _asinReference: asinInput.trim()
+      });
+
+      // Track which fields were auto-filled
+      setAutoFilledFields(new Set(Object.keys(data.autoFilledData)));
+
+      setAsinSuccess(`Successfully auto-filled ${Object.keys(data.autoFilledData).length} field(s) from Amazon data`);
+    } catch (err) {
+      setAsinError(err.response?.data?.error || 'Failed to auto-fill from ASIN');
+      console.error(err);
+    } finally {
+      setLoadingAsin(false);
+    }
+  };
+
   const handleExportCSV = async () => {
     try {
       setLoading(true);
@@ -342,6 +389,24 @@ export default function TemplateListingsPage() {
         [fieldName]: value
       }
     });
+  };
+
+  // Helper to get TextField props for auto-filled fields
+  const getAutoFilledProps = (fieldKey) => {
+    const isAutoFilled = autoFilledFields.has(fieldKey);
+    return {
+      sx: isAutoFilled ? { bgcolor: 'success.50' } : {},
+      InputProps: isAutoFilled ? {
+        endAdornment: (
+          <Chip 
+            label="Auto-filled" 
+            size="small" 
+            color="success" 
+            sx={{ height: 20, fontSize: '0.7rem' }}
+          />
+        )
+      } : {}
+    };
   };
 
   if (!templateId) {
@@ -470,6 +535,44 @@ export default function TemplateListingsPage() {
       <Dialog open={addEditDialog} onClose={() => setAddEditDialog(false)} maxWidth="lg" fullWidth>
         <DialogTitle>{editingListing ? 'Edit Listing' : 'Add New Listing'}</DialogTitle>
         <DialogContent>
+          {/* ASIN Auto-Fill Section (only show if template has automation enabled and not editing) */}
+          {!editingListing && template?.asinAutomation?.enabled && (
+            <Paper variant="outlined" sx={{ p: 2, mb: 3, mt: 1, bgcolor: 'primary.50' }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Auto-Fill from Amazon ASIN
+              </Typography>
+              <Stack direction="row" spacing={2} alignItems="flex-start">
+                <TextField
+                  label="Amazon ASIN"
+                  size="small"
+                  value={asinInput}
+                  onChange={(e) => setAsinInput(e.target.value)}
+                  placeholder="e.g., B08N5WRWNW"
+                  sx={{ flexGrow: 1 }}
+                  disabled={loadingAsin}
+                />
+                <Button
+                  variant="contained"
+                  onClick={handleAsinAutofill}
+                  disabled={loadingAsin || !asinInput.trim()}
+                  startIcon={loadingAsin && <CircularProgress size={16} />}
+                >
+                  {loadingAsin ? 'Loading...' : 'Auto-Fill'}
+                </Button>
+              </Stack>
+              {asinError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {asinError}
+                </Alert>
+              )}
+              {asinSuccess && (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  {asinSuccess}
+                </Alert>
+              )}
+            </Paper>
+          )}
+
           <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)} sx={{ mb: 2, mt: 1 }} variant="scrollable" scrollButtons="auto">
             <Tab label="Basic Info" />
             <Tab label="Pricing & Offers" />
@@ -515,17 +618,33 @@ export default function TemplateListingsPage() {
                   label="Category name"
                   fullWidth
                   value={listingFormData.categoryName}
-                  onChange={(e) => setListingFormData({ ...listingFormData, categoryName: e.target.value })}
+                  onChange={(e) => {
+                    setListingFormData({ ...listingFormData, categoryName: e.target.value });
+                    setAutoFilledFields(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete('categoryName');
+                      return newSet;
+                    });
+                  }}
                   placeholder="e.g., /Cell Phones & Accessories/Cell Phones & Smartphones"
+                  {...getAutoFilledProps('categoryName')}
                 />
                 <TextField
                   label="Title"
                   required
                   fullWidth
                   value={listingFormData.title}
-                  onChange={(e) => setListingFormData({ ...listingFormData, title: e.target.value })}
+                  onChange={(e) => {
+                    setListingFormData({ ...listingFormData, title: e.target.value });
+                    setAutoFilledFields(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete('title');
+                      return newSet;
+                    });
+                  }}
                   inputProps={{ maxLength: 80 }}
                   helperText={`${listingFormData.title.length}/80 characters`}
+                  {...getAutoFilledProps('title')}
                 />
                 <TextField
                   label="Quantity"
@@ -577,15 +696,31 @@ export default function TemplateListingsPage() {
                   type="number"
                   fullWidth
                   value={listingFormData.startPrice}
-                  onChange={(e) => setListingFormData({ ...listingFormData, startPrice: e.target.value })}
+                  onChange={(e) => {
+                    setListingFormData({ ...listingFormData, startPrice: e.target.value });
+                    setAutoFilledFields(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete('startPrice');
+                      return newSet;
+                    });
+                  }}
                   placeholder="e.g., 19.99"
+                  {...getAutoFilledProps('startPrice')}
                 />
                 <TextField
                   label="Buy It Now price"
                   type="number"
                   fullWidth
                   value={listingFormData.buyItNowPrice}
-                  onChange={(e) => setListingFormData({ ...listingFormData, buyItNowPrice: e.target.value })}
+                  onChange={(e) => {
+                    setListingFormData({ ...listingFormData, buyItNowPrice: e.target.value });
+                    setAutoFilledFields(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete('buyItNowPrice');
+                      return newSet;
+                    });
+                  }}
+                  {...getAutoFilledProps('buyItNowPrice')}
                 />
                 <TextField
                   label="Best Offer enabled"
@@ -744,9 +879,17 @@ export default function TemplateListingsPage() {
                   multiline
                   rows={3}
                   value={listingFormData.itemPhotoUrl}
-                  onChange={(e) => setListingFormData({ ...listingFormData, itemPhotoUrl: e.target.value })}
+                  onChange={(e) => {
+                    setListingFormData({ ...listingFormData, itemPhotoUrl: e.target.value });
+                    setAutoFilledFields(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete('itemPhotoUrl');
+                      return newSet;
+                    });
+                  }}
                   placeholder="https://image1.jpg| https://image2.jpg| https://image3.jpg"
                   helperText="Separate multiple URLs with pipe (|) character with spaces: ' | '"
+                  {...getAutoFilledProps('itemPhotoUrl')}
                 />
                 <TextField
                   label="Video ID"
@@ -760,8 +903,16 @@ export default function TemplateListingsPage() {
                   multiline
                   rows={12}
                   value={listingFormData.description}
-                  onChange={(e) => setListingFormData({ ...listingFormData, description: e.target.value })}
+                  onChange={(e) => {
+                    setListingFormData({ ...listingFormData, description: e.target.value });
+                    setAutoFilledFields(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete('description');
+                      return newSet;
+                    });
+                  }}
                   placeholder="<html>...</html>"
+                  {...getAutoFilledProps('description')}
                 />
               </Stack>
             )}

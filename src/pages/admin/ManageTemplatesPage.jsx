@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { 
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, 
-  DialogContent, DialogActions, Alert, Chip, FormControl, InputLabel, Select, MenuItem
+  DialogContent, DialogActions, Alert, Chip, FormControl, InputLabel, Select, MenuItem,
+  Tabs, Tab, Switch, FormControlLabel
 } from '@mui/material';
 import { 
   Delete as DeleteIcon, 
@@ -12,6 +13,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
+import FieldConfigList from '../../components/FieldConfigList.jsx';
 
 export default function ManageTemplatesPage() {
   const navigate = useNavigate();
@@ -22,8 +24,14 @@ export default function ManageTemplatesPage() {
 
   const [formData, setFormData] = useState({
     name: '',
-    customColumns: []
+    customColumns: [],
+    asinAutomation: {
+      enabled: false,
+      fieldConfigs: []
+    }
   });
+  
+  const [currentTab, setCurrentTab] = useState(0);
 
   const [editDialog, setEditDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -70,7 +78,11 @@ export default function ManageTemplatesPage() {
       setSuccess('Template created successfully!');
       setFormData({
         name: '',
-        customColumns: []
+        customColumns: [],
+        asinAutomation: {
+          enabled: false,
+          fieldConfigs: []
+        }
       });
       fetchTemplates();
     } catch (err) {
@@ -85,7 +97,11 @@ export default function ManageTemplatesPage() {
     setEditingTemplate(template);
     setFormData({
       name: template.name,
-      customColumns: template.customColumns || []
+      customColumns: template.customColumns || [],
+      asinAutomation: template.asinAutomation || {
+        enabled: false,
+        fieldConfigs: []
+      }
     });
     setEditDialog(true);
   };
@@ -102,7 +118,11 @@ export default function ManageTemplatesPage() {
       setEditingTemplate(null);
       setFormData({
         name: '',
-        customColumns: []
+        customColumns: [],
+        asinAutomation: {
+          enabled: false,
+          fieldConfigs: []
+        }
       });
       fetchTemplates();
     } catch (err) {
@@ -169,6 +189,26 @@ export default function ManageTemplatesPage() {
     setFormData({
       ...formData,
       customColumns: formData.customColumns.filter(col => col.name !== columnName)
+    });
+  };
+  
+  const handleAddFieldConfig = () => {
+    setFormData({
+      ...formData,
+      asinAutomation: {
+        ...formData.asinAutomation,
+        fieldConfigs: [
+          ...formData.asinAutomation.fieldConfigs,
+          {
+            ebayField: 'title',
+            source: 'ai',
+            promptTemplate: '',
+            amazonField: '',
+            transform: 'none',
+            enabled: true
+          }
+        ]
+      }
     });
   };
 
@@ -306,52 +346,117 @@ export default function ManageTemplatesPage() {
         <DialogTitle>Edit Template</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 1 }}>
-            <Stack spacing={2}>
-              <TextField
-                label="Template Name"
-                required
-                fullWidth
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-
-              <Box>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                  <Typography variant="subtitle2">Custom Columns</Typography>
-                  <Button size="small" startIcon={<AddIcon />} onClick={handleAddColumn}>
-                    Add Column
-                  </Button>
+            <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)} sx={{ mb: 3 }}>
+              <Tab label="Basic Info" />
+              <Tab label="Custom Columns" />
+              <Tab label="ASIN Auto-Fill" />
+            </Tabs>
+            
+            <Box sx={{ minHeight: 300 }}>
+              {/* Tab 0: Basic Info */}
+              {currentTab === 0 && (
+                <Stack spacing={2}>
+                  <TextField
+                    label="Template Name"
+                    required
+                    fullWidth
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
                 </Stack>
-
-                {formData.customColumns.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                    No custom columns
-                  </Typography>
-                ) : (
-                  <Stack spacing={1}>
-                    {formData.customColumns.map((col) => (
-                      <Paper key={col.name} variant="outlined" sx={{ p: 1.5 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Box>
-                            <Typography variant="body2" fontWeight="bold">{col.name}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {col.displayName} • {col.dataType}
-                            </Typography>
-                          </Box>
-                          <IconButton size="small" color="error" onClick={() => handleRemoveColumn(col.name)}>
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Stack>
-                      </Paper>
-                    ))}
+              )}
+              
+              {/* Tab 1: Custom Columns */}
+              {currentTab === 1 && (
+                <Box>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2">Custom Columns</Typography>
+                    <Button size="small" startIcon={<AddIcon />} onClick={handleAddColumn}>
+                      Add Column
+                    </Button>
                   </Stack>
-                )}
-              </Box>
-            </Stack>
+
+                  {formData.customColumns.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                      No custom columns
+                    </Typography>
+                  ) : (
+                    <Stack spacing={1}>
+                      {formData.customColumns.map((col) => (
+                        <Paper key={col.name} variant="outlined" sx={{ p: 1.5 }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Box>
+                              <Typography variant="body2" fontWeight="bold">{col.name}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {col.displayName} • {col.dataType}
+                              </Typography>
+                            </Box>
+                            <IconButton size="small" color="error" onClick={() => handleRemoveColumn(col.name)}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  )}
+                </Box>
+              )}
+              
+              {/* Tab 2: ASIN Auto-Fill */}
+              {currentTab === 2 && (
+                <Stack spacing={3}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formData.asinAutomation?.enabled || false}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          asinAutomation: {
+                            ...formData.asinAutomation,
+                            enabled: e.target.checked
+                          }
+                        })}
+                      />
+                    }
+                    label="Enable ASIN Auto-Fill for Listings"
+                  />
+                  
+                  {formData.asinAutomation?.enabled && (
+                    <>
+                      <Alert severity="info">
+                        Configure which eBay fields should auto-populate when users enter an ASIN while creating listings. The system will fetch Amazon data and use AI to generate field values.
+                      </Alert>
+                      
+                      <Typography variant="subtitle2">
+                        Auto-Fill Field Configurations
+                      </Typography>
+                      
+                      <FieldConfigList
+                        configs={formData.asinAutomation.fieldConfigs}
+                        onChange={(configs) => setFormData({
+                          ...formData,
+                          asinAutomation: {
+                            ...formData.asinAutomation,
+                            fieldConfigs: configs
+                          }
+                        })}
+                      />
+                      
+                      <Button
+                        startIcon={<AddIcon />}
+                        onClick={handleAddFieldConfig}
+                      >
+                        Add Field Configuration
+                      </Button>
+                    </>
+                  )}
+                </Stack>
+              )}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setEditDialog(false); setCurrentTab(0); }}>Cancel</Button>
           <Button onClick={handleUpdate} variant="contained" disabled={loading}>
             Update
           </Button>
