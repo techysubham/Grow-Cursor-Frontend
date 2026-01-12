@@ -419,24 +419,6 @@ export default function AdminLayout({ user, onLogout }) {
           </>
         ) : null}
 
-        {/* Range Analyzer - Direct access for superadmin and listingadmin */}
-        {(isSuper || isListingAdmin) && (
-          <ListItem disablePadding>
-            <ListItemButton 
-              component={Link} 
-              to="/admin/range-analyzer" 
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/range-analyzer'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon>
-                <NavIcon icon={AutoAwesomeIcon} label="Analyze Price Ranges" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Range Analyzer" />}
-            </ListItemButton>
-          </ListItem>
-        )}
-
         {/* Listing Dropdown with Monitoring Subdropdown */}
         {(isListingAdmin || isSuper) && (
           <>
