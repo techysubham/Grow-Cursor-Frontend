@@ -79,6 +79,7 @@ export default function CompatibilityDashboard() {
 
   const [openModal, setOpenModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [currentListingIndex, setCurrentListingIndex] = useState(-1);
   const [editCompatList, setEditCompatList] = useState([]);
 
   // Dropdown Data
@@ -227,13 +228,15 @@ export default function CompatibilityDashboard() {
 
   // --- HANDLERS ---
 
-  const handleEditClick = (item) => {
+  const handleEditClick = (item, index) => {
     setSelectedItem(item);
+    setCurrentListingIndex(index);
     setEditCompatList(JSON.parse(JSON.stringify(item.compatibility || [])));
     setOpenModal(true);
     setSelectedMake(null);
     setSelectedModel(null);
     setSelectedYears([]);
+    setNewNotes('');
     fetchMakes();
   };
 
@@ -266,7 +269,7 @@ export default function CompatibilityDashboard() {
     setEditCompatList(updated);
   };
 
-  const handleSaveCompatibility = async () => {
+  const handleSaveCompatibility = async (closeModal = true) => {
     if (!selectedItem || !currentSellerId) return;
     try {
       const { data } = await api.post('/ebay/update-compatibility', {
@@ -275,7 +278,9 @@ export default function CompatibilityDashboard() {
         compatibilityList: editCompatList
       });
 
-      setOpenModal(false);
+      if (closeModal) {
+        setOpenModal(false);
+      }
 
       if (data.warning) {
           showSnackbar(`Saved with eBay Warning: ${data.warning}`, 'warning');
@@ -312,6 +317,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
         // Standard error handling
         showSnackbar(`Update failed: ${errorMsg}`, 'error');
       }
+      throw e;
     }
   };
 
@@ -324,6 +330,33 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
     setSelectedYears((prev) => (
       prev.length === yearOptions.length ? [] : [...yearOptions]
     ));
+  };
+
+  const handleSaveAndNext = async () => {
+    try {
+      // Save current item first without closing modal
+      await handleSaveCompatibility(false);
+      
+      // Check if there's a next item
+      if (currentListingIndex < listings.length - 1) {
+        const nextItem = listings[currentListingIndex + 1];
+        setSelectedItem(nextItem);
+        setCurrentListingIndex(currentListingIndex + 1);
+        setEditCompatList(JSON.parse(JSON.stringify(nextItem.compatibility || [])));
+        setSelectedMake(null);
+        setSelectedModel(null);
+        setSelectedYears([]);
+        setNewNotes('');
+        // Makes are already loaded, no need to refetch
+      } else {
+        // No more items, close modal
+        showSnackbar('No more listings to edit', 'info');
+        setOpenModal(false);
+      }
+    } catch (e) {
+      // Error already shown by handleSaveCompatibility
+      console.error('Save and next failed:', e);
+    }
   };
 
   return (
@@ -428,7 +461,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 </TableRow>
             </TableHead>
             <TableBody>
-                {listings.map((item) => {
+                {listings.map((item, index) => {
                     const fitmentSummary = groupFitmentData(item.compatibility);
                     return (
                     <TableRow key={item.itemId}>
@@ -456,7 +489,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                         </TableCell>
 
                         <TableCell>
-                            <Button variant="outlined" size="small" startIcon={<EditIcon />} onClick={() => handleEditClick(item)}>Edit</Button>
+                            <Button variant="outlined" size="small" startIcon={<EditIcon />} onClick={() => handleEditClick(item, index)}>Edit</Button>
                         </TableCell>
                     </TableRow>
                     );
@@ -602,7 +635,15 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenModal(false)}>Cancel</Button>
-          <Button onClick={handleSaveCompatibility} variant="contained" color="primary">Save Changes to eBay</Button>
+          <Button onClick={() => handleSaveCompatibility(true)} variant="outlined" color="primary">Save</Button>
+          <Button 
+            onClick={handleSaveAndNext} 
+            variant="contained" 
+            color="primary"
+            disabled={currentListingIndex >= listings.length - 1}
+          >
+            Save and Go to Next
+          </Button>
         </DialogActions>
       </Dialog>
 
