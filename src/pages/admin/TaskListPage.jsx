@@ -35,6 +35,8 @@ import {
   Alert,
   Pagination,
   Autocomplete,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -68,6 +70,11 @@ const toISTYMD = (d) => {
 const unique = (arr) => Array.from(new Set(arr.filter(Boolean)));
 
 export default function TaskListPage() {
+  // Mobile responsiveness (same approach as FulfillmentDashboard)
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [items, setItems] = useState([]);
   const [openFilters, setOpenFilters] = useState(false); // start collapsed for a cleaner look
   const [expandedRows, setExpandedRows] = useState({}); // { [assignmentId]: true/false }
@@ -373,8 +380,17 @@ export default function TaskListPage() {
     <Box>
       {/* FILTER TOOLBAR (compact, starts collapsed) */}
       <Paper sx={{ p: 1, mb: 1 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
-          <Stack direction="row" alignItems="center" gap={1}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          alignItems={{ xs: 'stretch', sm: 'center' }}
+          justifyContent="space-between"
+          gap={1}
+        >
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'flex-start', sm: 'center' }}
+            gap={1}
+          >
             <Badge color={activeCount ? 'primary' : 'default'} badgeContent={activeCount} overlap="circular">
               <IconButton
                 onClick={() => setOpenFilters(v => !v)}
@@ -396,7 +412,7 @@ export default function TaskListPage() {
             </Typography>
           </Stack>
 
-          <Stack direction="row" gap={1}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
             <Tooltip title="Clear all filters">
               <span>
                 <Button
@@ -405,6 +421,7 @@ export default function TaskListPage() {
                   startIcon={<ClearAllIcon />}
                   onClick={clearAll}
                   disabled={activeCount === 0}
+                  fullWidth={isSmallMobile}
                 >
                   Clear
                 </Button>
@@ -723,8 +740,108 @@ export default function TaskListPage() {
         </Collapse>
       </Paper>
 
-      {/* TABLE (all columns retained; a little compact styling) */}
-      <TableContainer component={Paper}>
+      {/* MOBILE/TABLET: Card view */}
+      <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+        <Stack spacing={1.5}>
+          {filteredItems.map((it, idx) => {
+            const t = it.task || {};
+            const q = A.quantity(it);
+            const p = pendingQty(it);
+            const pct = progressPct(it);
+            const distributedQty = A.distributedQty(it);
+            const rangeQuantities = it.rangeQuantities || [];
+            const isExpanded = expandedRows[it._id] || false;
+
+            return (
+              <Paper key={it._id || idx} elevation={2} sx={{ p: 2, borderRadius: 2 }}>
+                <Stack spacing={1}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        #{(page - 1) * limit + idx + 1} • Scheduled: {toISTYMD(it.scheduledDate)} • Created: {toISTYMD(it.createdAt)}
+                      </Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, wordBreak: 'break-word' }}>
+                        {t.productTitle || '-'}
+                      </Typography>
+
+                      {t.supplierLink ? (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          component="a"
+                          href={t.supplierLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          sx={{ mt: 1 }}
+                        >
+                          Supplier Link
+                        </Button>
+                      ) : null}
+                    </Box>
+
+                    <Button size="small" color="error" onClick={() => openDelete(it)} sx={{ flexShrink: 0 }}>
+                      Delete
+                    </Button>
+                  </Stack>
+
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    <Chip size="small" label={`Source: ${t.sourcePlatform?.name || '-'}`} />
+                    <Chip size="small" label={`Category: ${t.category?.name || '-'}`} />
+                    <Chip size="small" label={`Subcategory: ${t.subcategory?.name || '-'}`} />
+                    <Chip size="small" label={`Created By: ${t.createdBy?.username || '-'}`} />
+                    <Chip size="small" label={`Platform: ${it.listingPlatform?.name || '-'}`} />
+                    <Chip size="small" label={`Store: ${it.store?.name || '-'}`} />
+                    <Chip size="small" label={`Marketplace: ${it.marketplace?.replace('EBAY_', 'eBay ')?.replace('_', ' ') || '-'}`} />
+                    <Chip size="small" label={`Lister: ${it.lister?.username || '-'}`} />
+                    <Chip size="small" label={`Assigned By: ${it.createdBy?.username || '-'}`} />
+                  </Stack>
+
+                  <Stack spacing={0.5}>
+                    <Typography variant="body2">
+                      Qty: {q ?? '-'} • Distributed: {distributedQty} • Pending: {p}
+                    </Typography>
+                    <LinearProgress variant="determinate" value={pct} sx={{ height: 6, borderRadius: 3 }} />
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {Math.min(A.completedQuantity(it), q || 0)} / {q || 0} ({pct}%)
+                    </Typography>
+                  </Stack>
+
+                  {rangeQuantities.length > 0 && (
+                    <Box>
+                      <Button
+                        size="small"
+                        onClick={() => setExpandedRows(prev => ({ ...prev, [it._id]: !isExpanded }))}
+                        endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      >
+                        Range Breakdown
+                      </Button>
+
+                      <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                        <Paper variant="outlined" sx={{ mt: 1, p: 1.5 }}>
+                          {rangeQuantities.map((rq, rIdx) => (
+                            <Stack key={rIdx} direction="row" justifyContent="space-between">
+                              <Typography variant="body2">{rq.range?.name || rq.range || '-'}</Typography>
+                              <Typography variant="body2">{rq.quantity || 0}</Typography>
+                            </Stack>
+                          ))}
+                          <Divider sx={{ my: 1 }} />
+                          <Stack direction="row" justifyContent="space-between">
+                            <Typography variant="body2" fontWeight="bold">Total</Typography>
+                            <Typography variant="body2" fontWeight="bold">{distributedQty}</Typography>
+                          </Stack>
+                        </Paper>
+                      </Collapse>
+                    </Box>
+                  )}
+                </Stack>
+              </Paper>
+            );
+          })}
+        </Stack>
+      </Box>
+
+      {/* DESKTOP: Table view */}
+      <TableContainer component={Paper} sx={{ display: { xs: 'none', md: 'block' }, overflowX: 'auto' }}>
         <Table size="small" sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}>
           <TableHead>
             <TableRow>
@@ -862,7 +979,7 @@ export default function TaskListPage() {
       )}
 
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} maxWidth="sm" fullWidth fullScreen={isMobile}>
         <DialogTitle>Delete Assignment</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mt: 1 }}>
