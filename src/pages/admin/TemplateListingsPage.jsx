@@ -338,17 +338,28 @@ export default function TemplateListingsPage() {
         templateId
       });
 
+      const { coreFields, customFields } = data.autoFilledData;
+
       // Populate form with auto-filled data
       setListingFormData({
         ...listingFormData,
-        ...data.autoFilledData,
+        ...coreFields,
+        customFields: {
+          ...listingFormData.customFields,
+          ...customFields
+        },
         _asinReference: asinInput.trim()
       });
 
-      // Track which fields were auto-filled
-      setAutoFilledFields(new Set(Object.keys(data.autoFilledData)));
+      // Track which fields were auto-filled (prefix custom fields with 'custom_')
+      const allFilledFields = new Set([
+        ...Object.keys(coreFields),
+        ...Object.keys(customFields).map(k => `custom_${k}`)
+      ]);
+      setAutoFilledFields(allFilledFields);
 
-      setAsinSuccess(`Successfully auto-filled ${Object.keys(data.autoFilledData).length} field(s) from Amazon data`);
+      const totalFields = Object.keys(coreFields).length + Object.keys(customFields).length;
+      setAsinSuccess(`Successfully auto-filled ${totalFields} field(s) from Amazon data (${Object.keys(coreFields).length} core, ${Object.keys(customFields).length} custom)`);
     } catch (err) {
       setAsinError(err.response?.data?.error || 'Failed to auto-fill from ASIN');
       console.error(err);
@@ -967,9 +978,18 @@ export default function TemplateListingsPage() {
                         label={col.displayName}
                         fullWidth
                         value={listingFormData.customFields[col.name] || col.defaultValue || ''}
-                        onChange={(e) => updateCustomField(col.name, e.target.value)}
+                        onChange={(e) => {
+                          updateCustomField(col.name, e.target.value);
+                          // Clear auto-filled indicator when user edits
+                          setAutoFilledFields(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(`custom_${col.name}`);
+                            return newSet;
+                          });
+                        }}
                         placeholder={col.placeholder}
                         required={col.isRequired}
+                        {...getAutoFilledProps(`custom_${col.name}`)}
                       />
                     ))
                 ) : (

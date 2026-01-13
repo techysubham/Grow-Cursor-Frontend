@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Stack, Paper, IconButton, TextField, MenuItem, Switch,
   FormControlLabel, Typography, Collapse, Box, Chip
@@ -32,8 +32,34 @@ const TRANSFORM_OPTIONS = [
   { value: 'htmlFormat', label: 'Convert to HTML' }
 ];
 
-export default function FieldConfigList({ configs, onChange }) {
+export default function FieldConfigList({ configs, customColumns, onChange }) {
   const [expandedIndex, setExpandedIndex] = useState(null);
+  
+  // Build dynamic field options: core fields + custom columns
+  // Use useMemo to avoid rebuilding on every render
+  const allFieldOptions = useMemo(() => {
+    const coreFields = AVAILABLE_EBAY_FIELDS.map(f => ({
+      ...f,
+      fieldType: 'core',
+      groupLabel: 'Core eBay Fields'
+    }));
+    
+    const customFieldsList = (customColumns || []).map(col => ({
+      value: col.name,
+      label: col.displayName,
+      fieldType: 'custom',
+      supportsAI: true,
+      groupLabel: 'Custom Columns'
+    }));
+    
+    console.log('Built allFieldOptions:', { 
+      coreCount: coreFields.length, 
+      customCount: customFieldsList.length, 
+      customFields: customFieldsList 
+    });
+    
+    return [...coreFields, ...customFieldsList];
+  }, [customColumns]);
   
   const handleUpdate = (index, field, value) => {
     const newConfigs = [...configs];
@@ -48,8 +74,9 @@ export default function FieldConfigList({ configs, onChange }) {
   return (
     <Stack spacing={2}>
       {configs.map((config, index) => {
-        const fieldInfo = AVAILABLE_EBAY_FIELDS.find(f => f.value === config.ebayField);
+        const fieldInfo = allFieldOptions.find(f => f.value === config.ebayField);
         const isExpanded = expandedIndex === index;
+        const isCustomField = config.fieldType === 'custom';
         
         return (
           <Paper key={index} sx={{ p: 2 }}>
@@ -70,6 +97,7 @@ export default function FieldConfigList({ configs, onChange }) {
                 
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle2">
+                    {isCustomField && <Chip label="Custom" size="small" sx={{ mr: 1 }} />}
                     {fieldInfo?.label || config.ebayField}
                   </Typography>
                   <Stack direction="row" spacing={1} mt={0.5}>
@@ -108,16 +136,61 @@ export default function FieldConfigList({ configs, onChange }) {
                 <Stack spacing={2} sx={{ pl: 5, pt: 1 }}>
                   <TextField
                     select
-                    label="eBay Field"
-                    value={config.ebayField}
-                    onChange={(e) => handleUpdate(index, 'ebayField', e.target.value)}
+                    label="Field to Auto-Fill"
+                    value={config.ebayField || ''}
+                    onChange={(e) => {
+                      const selectedValue = e.target.value;
+                      const selectedField = allFieldOptions.find(f => f.value === selectedValue);
+                      
+                      console.log('=== ONCHANGE FIRED ===');
+                      console.log('Selected value:', selectedValue);
+                      console.log('Selected field:', selectedField);
+                      console.log('Current config:', config);
+                      
+                      const newConfigs = [...configs];
+                      newConfigs[index] = {
+                        ...newConfigs[index],
+                        ebayField: selectedValue,
+                        fieldType: selectedField?.fieldType || 'core',
+                        // Force AI source for custom fields
+                        ...(selectedField?.fieldType === 'custom' ? { source: 'ai' } : {})
+                      };
+                      
+                      console.log('Updated config:', newConfigs[index]);
+                      console.log('All configs:', newConfigs);
+                      onChange(newConfigs);
+                    }}
                     fullWidth
+                    SelectProps={{
+                      MenuProps: {
+                        PaperProps: {
+                          style: {
+                            maxHeight: 400
+                          }
+                        }
+                      }
+                    }}
                   >
-                    {AVAILABLE_EBAY_FIELDS.map(field => (
-                      <MenuItem key={field.value} value={field.value}>
-                        {field.label}
-                      </MenuItem>
-                    ))}
+                    {allFieldOptions.map((field, idx) => {
+                      // Add visual separator before first custom column
+                      const isFirstCustom = field.fieldType === 'custom' && 
+                        (idx === 0 || allFieldOptions[idx - 1].fieldType !== 'custom');
+                      
+                      return (
+                        <MenuItem 
+                          key={field.value} 
+                          value={field.value}
+                          sx={isFirstCustom ? { 
+                            borderTop: '2px solid',
+                            borderColor: 'divider',
+                            mt: 1,
+                            pt: 1
+                          } : {}}
+                        >
+                          {field.label}
+                        </MenuItem>
+                      );
+                    })}
                   </TextField>
                   
                   <TextField
@@ -141,9 +214,13 @@ export default function FieldConfigList({ configs, onChange }) {
                       onChange(newConfigs);
                     }}
                     fullWidth
+                    disabled={isCustomField}
+                    helperText={isCustomField ? 'Custom columns only support AI generation' : ''}
                   >
                     <MenuItem value="ai">AI Generated (uses prompt)</MenuItem>
-                    <MenuItem value="direct">Direct Mapping (copy from Amazon)</MenuItem>
+                    <MenuItem value="direct" disabled={isCustomField}>
+                      Direct Mapping (copy from Amazon)
+                    </MenuItem>
                   </TextField>
                   
                   {config.source === 'ai' ? (

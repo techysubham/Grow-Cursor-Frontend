@@ -214,6 +214,7 @@ export default function ManageTemplatesPage() {
         fieldConfigs: [
           ...formData.asinAutomation.fieldConfigs,
           {
+            fieldType: 'core',
             ebayField: 'title',
             source: 'ai',
             promptTemplate: '',
@@ -447,6 +448,7 @@ export default function ManageTemplatesPage() {
                       
                       <FieldConfigList
                         configs={formData.asinAutomation.fieldConfigs}
+                        customColumns={formData.customColumns}
                         onChange={(configs) => setFormData({
                           ...formData,
                           asinAutomation: {
