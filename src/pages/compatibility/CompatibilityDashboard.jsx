@@ -12,6 +12,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
+import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import api from '../../lib/api';
 
 // --- YOUR PREFERRED HELPERS (Strict Matching) ---
@@ -81,6 +83,7 @@ export default function CompatibilityDashboard() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [currentListingIndex, setCurrentListingIndex] = useState(-1);
   const [editCompatList, setEditCompatList] = useState([]);
+  const [pendingNavigation, setPendingNavigation] = useState(null); // 'first' or 'last' after page change
 
   // Dropdown Data
   const [makeOptions, setMakeOptions] = useState([]);
@@ -121,6 +124,32 @@ export default function CompatibilityDashboard() {
   useEffect(() => {
     if (currentSellerId) fetchApiUsage();
   }, [currentSellerId]);
+
+  // Handle navigation after page load
+  useEffect(() => {
+    if (!loading && pendingNavigation && listings.length > 0) {
+      if (pendingNavigation === 'first') {
+        const firstItem = listings[0];
+        setSelectedItem(firstItem);
+        setCurrentListingIndex(0);
+        setEditCompatList(JSON.parse(JSON.stringify(firstItem.compatibility || [])));
+        setSelectedMake(null);
+        setSelectedModel(null);
+        setSelectedYears([]);
+        setNewNotes('');
+      } else if (pendingNavigation === 'last') {
+        const lastItem = listings[listings.length - 1];
+        setSelectedItem(lastItem);
+        setCurrentListingIndex(listings.length - 1);
+        setEditCompatList(JSON.parse(JSON.stringify(lastItem.compatibility || [])));
+        setSelectedMake(null);
+        setSelectedModel(null);
+        setSelectedYears([]);
+        setNewNotes('');
+      }
+      setPendingNavigation(null);
+    }
+  }, [loading, pendingNavigation, listings]);
 
   const fetchApiUsage = async () => {
     try {
@@ -337,7 +366,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       // Save current item first without closing modal
       await handleSaveCompatibility(false);
       
-      // Check if there's a next item
+      // Check if there's a next item on current page
       if (currentListingIndex < listings.length - 1) {
         const nextItem = listings[currentListingIndex + 1];
         setSelectedItem(nextItem);
@@ -347,15 +376,52 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
         setSelectedModel(null);
         setSelectedYears([]);
         setNewNotes('');
-        // Makes are already loaded, no need to refetch
+      } else if (page < totalPages) {
+        // Load next page and open first item
+        setPendingNavigation('first');
+        setPage(page + 1);
       } else {
-        // No more items, close modal
+        // No more items anywhere, close modal
         showSnackbar('No more listings to edit', 'info');
         setOpenModal(false);
       }
     } catch (e) {
       // Error already shown by handleSaveCompatibility
       console.error('Save and next failed:', e);
+    }
+  };
+
+  const handleNavigatePrevious = () => {
+    if (currentListingIndex > 0) {
+      const prevItem = listings[currentListingIndex - 1];
+      setSelectedItem(prevItem);
+      setCurrentListingIndex(currentListingIndex - 1);
+      setEditCompatList(JSON.parse(JSON.stringify(prevItem.compatibility || [])));
+      setSelectedMake(null);
+      setSelectedModel(null);
+      setSelectedYears([]);
+      setNewNotes('');
+    } else if (page > 1) {
+      // Load previous page and open last item
+      setPendingNavigation('last');
+      setPage(page - 1);
+    }
+  };
+
+  const handleNavigateNext = () => {
+    if (currentListingIndex < listings.length - 1) {
+      const nextItem = listings[currentListingIndex + 1];
+      setSelectedItem(nextItem);
+      setCurrentListingIndex(currentListingIndex + 1);
+      setEditCompatList(JSON.parse(JSON.stringify(nextItem.compatibility || [])));
+      setSelectedMake(null);
+      setSelectedModel(null);
+      setSelectedYears([]);
+      setNewNotes('');
+    } else if (page < totalPages) {
+      // Load next page and open first item
+      setPendingNavigation('first');
+      setPage(page + 1);
     }
   };
 
@@ -505,7 +571,37 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
 
       {/* EDIT MODAL */}
       <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="xl" fullWidth>
-        <DialogTitle sx={{ borderBottom: '1px solid #eee' }}>Edit Compatibility: {selectedItem?.itemId}</DialogTitle>
+        <DialogTitle sx={{ borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2 }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5, fontSize: '1.3rem' }}>
+              {selectedItem?.title}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              ID: {selectedItem?.itemId}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Typography variant="caption" sx={{ mr: 1 }}>
+              {(page - 1) * 50 + currentListingIndex + 1} / {totalItems}
+            </Typography>
+            <IconButton 
+              size="small" 
+              onClick={handleNavigatePrevious} 
+              disabled={currentListingIndex <= 0 && page <= 1}
+              title="Previous listing"
+            >
+              <NavigateBeforeIcon />
+            </IconButton>
+            <IconButton 
+              size="small" 
+              onClick={handleNavigateNext} 
+              disabled={currentListingIndex >= listings.length - 1 && page >= totalPages}
+              title="Next listing"
+            >
+              <NavigateNextIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
         <DialogContent sx={{ p: 0, display: 'flex', height: '75vh' }}>
           
           <Box sx={{ flex: 1, borderRight: '1px solid #eee', p: 2, overflowY: 'auto', bgcolor: '#fafafa' }}>
@@ -640,7 +736,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
             onClick={handleSaveAndNext} 
             variant="contained" 
             color="primary"
-            disabled={currentListingIndex >= listings.length - 1}
+            disabled={currentListingIndex >= listings.length - 1 && page >= totalPages}
           >
             Save and Go to Next
           </Button>
