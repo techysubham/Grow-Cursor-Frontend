@@ -286,7 +286,8 @@ export default function ManageTemplatesPage() {
             promptTemplate: '',
             amazonField: '',
             transform: 'none',
-            enabled: true
+            enabled: true,
+            defaultValue: ''
           }
         ]
       }

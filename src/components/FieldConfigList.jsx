@@ -109,6 +109,14 @@ export default function FieldConfigList({ configs, customColumns, onChange }) {
                     {!config.enabled && (
                       <Chip label="Disabled" size="small" color="error" variant="outlined" />
                     )}
+                    {config.defaultValue && (
+                      <Chip 
+                        label={`Default: ${config.defaultValue.substring(0, 20)}${config.defaultValue.length > 20 ? '...' : ''}`}
+                        size="small" 
+                        color="info" 
+                        variant="outlined"
+                      />
+                    )}
                   </Stack>
                 </Box>
                 
@@ -193,8 +201,38 @@ export default function FieldConfigList({ configs, customColumns, onChange }) {
                     })}
                   </TextField>
                   
-                  <TextField
-                    select
+                  <TextField                    label="Default Value (optional)"
+                    value={config.defaultValue || ''}
+                    onChange={(e) => handleUpdate(index, 'defaultValue', e.target.value)}
+                    fullWidth
+                    placeholder={
+                      config.ebayField === 'startPrice' || config.ebayField === 'buyItNowPrice'
+                        ? 'e.g., 29.99'
+                        : 'Enter default value for this field'
+                    }
+                    helperText={
+                      config.defaultValue 
+                        ? '✓ This field will be pre-filled with this value when auto-fill is disabled or fails'
+                        : 'Optional: Provide a fallback value. Used when auto-fill is disabled or encounters errors.'
+                    }
+                    type={
+                      config.ebayField === 'startPrice' || config.ebayField === 'buyItNowPrice'
+                        ? 'number'
+                        : 'text'
+                    }
+                    InputProps={{
+                      startAdornment: config.defaultValue ? (
+                        <Chip 
+                          label="Default Set" 
+                          size="small" 
+                          color="info" 
+                          sx={{ mr: 1, height: 20 }}
+                        />
+                      ) : null
+                    }}
+                  />
+                  
+                  <TextField                    select
                     label="Source Type"
                     value={config.source}
                     onChange={(e) => {

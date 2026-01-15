@@ -12,10 +12,12 @@ import {
   Add as AddIcon,
   Download as DownloadIcon,
   Upload as UploadIcon,
-  ContentCopy as CopyIcon
+  ContentCopy as CopyIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
 import BulkListingPreview from '../../components/BulkListingPreview.jsx';
+import CoreFieldDefaultsDialog from '../../components/CoreFieldDefaultsDialog.jsx';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 
 export default function TemplateListingsPage() {
@@ -45,6 +47,9 @@ export default function TemplateListingsPage() {
   const [bulkResults, setBulkResults] = useState([]);
   const [loadingBulk, setLoadingBulk] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+
+  // Core field defaults dialog state
+  const [defaultsDialog, setDefaultsDialog] = useState(false);
 
   const [listingFormData, setListingFormData] = useState({
     action: 'Add',
@@ -161,51 +166,75 @@ export default function TemplateListingsPage() {
     }
   };
 
+  const handleSaveDefaults = async (defaults) => {
+    console.log('🔄 handleSaveDefaults called with:', defaults);
+    console.log('📤 Sending to API - template:', template);
+    try {
+      const response = await api.put(`/listing-templates/${templateId}`, {
+        ...template,
+        coreFieldDefaults: defaults
+      });
+      console.log('✅ API response:', response.data);
+      setSuccess('Core field defaults saved successfully!');
+      // Refresh template to get updated defaults
+      await fetchTemplate();
+    } catch (err) {
+      console.error('❌ Save defaults error:', err);
+      throw new Error(err.response?.data?.error || 'Failed to save defaults');
+    }
+  };
+
   const handleAddListing = () => {
     setEditingListing(null);
     setAsinInput('');
     setAsinError('');
     setAsinSuccess('');
     setAutoFilledFields(new Set());
+    
+    // Apply template's core field defaults (if any)
+    const defaults = template?.coreFieldDefaults || {};
+    console.log('📋 Applying core field defaults:', defaults);
+    console.log('📄 Current template:', template);
+    
     setListingFormData({
       action: 'Add',
-      customLabel: '',
-      categoryId: template?.ebayCategory?.id || '',
-      categoryName: template?.ebayCategory?.name || '',
-      title: '',
-      relationship: '',
-      relationshipDetails: '',
-      scheduleTime: '',
-      upc: '',
-      epid: '',
-      startPrice: '',
-      quantity: 1,
-      itemPhotoUrl: '',
-      videoId: '',
-      conditionId: '1000',
-      description: '',
-      format: 'FixedPrice',
-      duration: 'GTC',
-      buyItNowPrice: '',
-      bestOfferEnabled: false,
-      bestOfferAutoAcceptPrice: '',
-      minimumBestOfferPrice: '',
-      immediatePayRequired: false,
-      location: '',
-      shippingService1Option: '',
-      shippingService1Cost: '',
-      shippingService1Priority: '',
-      shippingService2Option: '',
-      shippingService2Cost: '',
-      shippingService2Priority: '',
-      maxDispatchTime: '',
-      returnsAcceptedOption: '',
-      returnsWithinOption: '',
-      refundOption: '',
-      returnShippingCostPaidBy: '',
-      shippingProfileName: '',
-      returnProfileName: '',
-      paymentProfileName: '',
+      customLabel: defaults.customLabel || '',
+      categoryId: defaults.categoryId || template?.ebayCategory?.id || '',
+      categoryName: defaults.categoryName || template?.ebayCategory?.name || '',
+      title: defaults.title || '',
+      relationship: defaults.relationship || '',
+      relationshipDetails: defaults.relationshipDetails || '',
+      scheduleTime: defaults.scheduleTime || '',
+      upc: defaults.upc || '',
+      epid: defaults.epid || '',
+      startPrice: defaults.startPrice || '',
+      quantity: defaults.quantity || 1,
+      itemPhotoUrl: defaults.itemPhotoUrl || '',
+      videoId: defaults.videoId || '',
+      conditionId: defaults.conditionId || '1000',
+      description: defaults.description || '',
+      format: defaults.format || 'FixedPrice',
+      duration: defaults.duration || 'GTC',
+      buyItNowPrice: defaults.buyItNowPrice || '',
+      bestOfferEnabled: defaults.bestOfferEnabled || false,
+      bestOfferAutoAcceptPrice: defaults.bestOfferAutoAcceptPrice || '',
+      minimumBestOfferPrice: defaults.minimumBestOfferPrice || '',
+      immediatePayRequired: defaults.immediatePayRequired || false,
+      location: defaults.location || '',
+      shippingService1Option: defaults.shippingService1Option || '',
+      shippingService1Cost: defaults.shippingService1Cost || '',
+      shippingService1Priority: defaults.shippingService1Priority || '',
+      shippingService2Option: defaults.shippingService2Option || '',
+      shippingService2Cost: defaults.shippingService2Cost || '',
+      shippingService2Priority: defaults.shippingService2Priority || '',
+      maxDispatchTime: defaults.maxDispatchTime || '',
+      returnsAcceptedOption: defaults.returnsAcceptedOption || '',
+      returnsWithinOption: defaults.returnsWithinOption || '',
+      refundOption: defaults.refundOption || '',
+      returnShippingCostPaidBy: defaults.returnShippingCostPaidBy || '',
+      shippingProfileName: defaults.shippingProfileName || '',
+      returnProfileName: defaults.returnProfileName || '',
+      paymentProfileName: defaults.paymentProfileName || '',
       customFields: {}
     });
     setCurrentTab(0);
@@ -613,6 +642,22 @@ export default function TemplateListingsPage() {
         </Button>
         <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
           Download CSV
+        </Button>
+        <Button 
+          variant="outlined" 
+          startIcon={<SettingsIcon />} 
+          onClick={() => setDefaultsDialog(true)}
+          color="primary"
+        >
+          Set Defaults
+          {template?.coreFieldDefaults && Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length > 0 && (
+            <Chip 
+              label={Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length} 
+              size="small" 
+              color="primary"
+              sx={{ ml: 1, height: 20 }}
+            />
+          )}
         </Button>
       </Stack>
 
@@ -1297,6 +1342,15 @@ export default function TemplateListingsPage() {
           ) : null}
         </DialogActions>
       </Dialog>
+
+      {/* Core Field Defaults Dialog */}
+      <CoreFieldDefaultsDialog
+        open={defaultsDialog}
+        onClose={() => setDefaultsDialog(false)}
+        templateId={templateId}
+        currentDefaults={template?.coreFieldDefaults || {}}
+        onSave={handleSaveDefaults}
+      />
     </Box>
   );
 }
