@@ -20,6 +20,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  TextField,
   Snackbar,
   Tabs,
   Tab,
@@ -69,6 +70,14 @@ export default function DisputesPage() {
   const [pdSellerFilter, setPdSellerFilter] = useState('');
   const [pdReasonFilter, setPdReasonFilter] = useState('');
   
+  // Date Filter
+  const [dateFilter, setDateFilter] = useState({
+    mode: 'all',
+    single: '',
+    from: '',
+    to: ''
+  });
+  
   const hasFetchedCases = useRef(false);
   const hasFetchedDisputes = useRef(false);
 
@@ -93,7 +102,7 @@ export default function DisputesPage() {
       return;
     }
     loadStoredCases();
-  }, [inrStatusFilter, inrSellerFilter, inrTypeFilter]);
+  }, [inrStatusFilter, inrSellerFilter, inrTypeFilter, dateFilter]);
 
   // Load Payment Disputes when filters change
   useEffect(() => {
@@ -103,7 +112,7 @@ export default function DisputesPage() {
       return;
     }
     loadStoredDisputes();
-  }, [pdStatusFilter, pdSellerFilter, pdReasonFilter]);
+  }, [pdStatusFilter, pdSellerFilter, pdReasonFilter, dateFilter]);
 
   async function loadStoredCases() {
     setCasesLoading(true);
@@ -113,6 +122,14 @@ export default function DisputesPage() {
       if (inrStatusFilter) params.status = inrStatusFilter;
       if (inrSellerFilter) params.sellerId = inrSellerFilter;
       if (inrTypeFilter) params.caseType = inrTypeFilter;
+      if (dateFilter.mode === 'single' && dateFilter.single) {
+        params.startDate = dateFilter.single;
+        params.endDate = dateFilter.single;
+      } else if (dateFilter.mode === 'range') {
+        if (dateFilter.from) params.startDate = dateFilter.from;
+        if (dateFilter.to) params.endDate = dateFilter.to;
+      }
+      // mode 'all' = no date params, shows all cases
       
       const res = await api.get('/ebay/stored-inr-cases', { params });
       const caseData = res.data.cases || [];
@@ -134,6 +151,14 @@ export default function DisputesPage() {
       if (pdStatusFilter) params.status = pdStatusFilter;
       if (pdSellerFilter) params.sellerId = pdSellerFilter;
       if (pdReasonFilter) params.reason = pdReasonFilter;
+      if (dateFilter.mode === 'single' && dateFilter.single) {
+        params.startDate = dateFilter.single;
+        params.endDate = dateFilter.single;
+      } else if (dateFilter.mode === 'range') {
+        if (dateFilter.from) params.startDate = dateFilter.from;
+        if (dateFilter.to) params.endDate = dateFilter.to;
+      }
+      // mode 'all' = no date params, shows all disputes
       
       const res = await api.get('/ebay/stored-payment-disputes', { params });
       const disputeData = res.data.disputes || [];
@@ -378,6 +403,56 @@ export default function DisputesPage() {
           {snackbarMsg}
         </Alert>
       </Snackbar>
+
+      {/* DATE FILTER SECTION */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap" useFlexGap>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Date</InputLabel>
+            <Select
+              value={dateFilter.mode}
+              onChange={(e) => setDateFilter({...dateFilter, mode: e.target.value})}
+              label="Date"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="single">Single Date</MenuItem>
+              <MenuItem value="range">Date Range</MenuItem>
+            </Select>
+          </FormControl>
+
+          {dateFilter.mode === 'single' && (
+            <TextField
+              type="date"
+              size="small"
+              value={dateFilter.single}
+              onChange={(e) => setDateFilter({...dateFilter, single: e.target.value})}
+              InputLabelProps={{ shrink: true }}
+            />
+          )}
+
+          {dateFilter.mode === 'range' && (
+            <>
+              <TextField
+                type="date"
+                size="small"
+                value={dateFilter.from}
+                onChange={(e) => setDateFilter({...dateFilter, from: e.target.value})}
+                label="From"
+                InputLabelProps={{ shrink: true }}
+              />
+              <Typography variant="body2">to</Typography>
+              <TextField
+                type="date"
+                size="small"
+                value={dateFilter.to}
+                onChange={(e) => setDateFilter({...dateFilter, to: e.target.value})}
+                label="To"
+                InputLabelProps={{ shrink: true }}
+              />
+            </>
+          )}
+        </Stack>
+      </Paper>
 
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>

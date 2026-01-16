@@ -22,6 +22,7 @@ import {
   MenuItem,
   Snackbar,
   Pagination,
+  TextField,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -50,6 +51,12 @@ export default function ReturnRequestedPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [sellerFilter, setSellerFilter] = useState('');
   const [reasonFilter, setReasonFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState({
+    mode: 'all',
+    single: '',
+    from: '',
+    to: ''
+  });
   
   const hasFetchedInitialData = useRef(false);
 
@@ -74,14 +81,14 @@ export default function ReturnRequestedPage() {
       return;
     }
     loadStoredReturns();
-  }, [statusFilter, sellerFilter, reasonFilter, page]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     if (hasFetchedInitialData.current) {
       setPage(1);
     }
-  }, [statusFilter, sellerFilter, reasonFilter]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter]);
 
   async function loadStoredReturns() {
     setLoading(true);
@@ -94,6 +101,13 @@ export default function ReturnRequestedPage() {
       if (statusFilter) params.status = statusFilter;
       if (sellerFilter) params.sellerId = sellerFilter;
       if (reasonFilter) params.reason = reasonFilter;
+      if (dateFilter.mode === 'single' && dateFilter.single) {
+        params.startDate = dateFilter.single;
+        params.endDate = dateFilter.single;
+      } else if (dateFilter.mode === 'range') {
+        if (dateFilter.from) params.startDate = dateFilter.from;
+        if (dateFilter.to) params.endDate = dateFilter.to;
+      }
       
       const res = await api.get('/ebay/stored-returns', { params });
       const returnData = res.data.returns || [];
@@ -184,6 +198,22 @@ export default function ReturnRequestedPage() {
     setStatusFilter('');
     setSellerFilter('');
     setReasonFilter('');
+    setDateFilter({ mode: 'all', single: '', from: '', to: '' });
+  };
+
+  const handleWorksheetStatusChange = async (returnId, newStatus) => {
+    try {
+      await api.patch(`/ebay/returns/${returnId}/worksheet-status`, { worksheetStatus: newStatus });
+      // Update local state
+      setReturns(prevReturns => 
+        prevReturns.map(ret => 
+          ret.returnId === returnId ? { ...ret, worksheetStatus: newStatus } : ret
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update worksheet status:', err);
+      alert('Failed to update worksheet status: ' + (err.response?.data?.error || err.message));
+    }
   };
 
   const handleCopy = (text) => {
@@ -221,7 +251,14 @@ export default function ReturnRequestedPage() {
     return 'default';
   };
 
-  const hasActiveFilters = statusFilter || sellerFilter || reasonFilter;
+  const hasActiveFilters =
+    statusFilter ||
+    sellerFilter ||
+    reasonFilter ||
+    dateFilter.mode !== 'all' ||
+    dateFilter.single ||
+    dateFilter.from ||
+    dateFilter.to;
 
   // Check if response due date is within next 2 days (urgent)
   const isResponseUrgent = (responseDate) => {
@@ -353,6 +390,71 @@ export default function ReturnRequestedPage() {
             </Select>
           </FormControl>
 
+          {/* Date Filter */}
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel>Date</InputLabel>
+            <Select
+              value={dateFilter.mode}
+              label="Date"
+              onChange={(e) => {
+                const mode = e.target.value;
+                if (mode === 'all') {
+                  setDateFilter({ mode: 'all', single: '', from: '', to: '' });
+                } else if (mode === 'single') {
+                  setDateFilter((prev) => ({
+                    mode: 'single',
+                    single: prev.single || new Date().toISOString().split('T')[0],
+                    from: '',
+                    to: ''
+                  }));
+                } else {
+                  setDateFilter((prev) => ({
+                    mode: 'range',
+                    single: '',
+                    from: prev.from || '',
+                    to: prev.to || ''
+                  }));
+                }
+              }}
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="single">Single date</MenuItem>
+              <MenuItem value="range">Date range</MenuItem>
+            </Select>
+          </FormControl>
+
+          {dateFilter.mode === 'single' && (
+            <TextField
+              size="small"
+              type="date"
+              label="On"
+              value={dateFilter.single}
+              onChange={(e) => setDateFilter({ ...dateFilter, single: e.target.value })}
+              InputLabelProps={{ shrink: true }}
+            />
+          )}
+
+          {dateFilter.mode === 'range' && (
+            <>
+              <TextField
+                size="small"
+                type="date"
+                label="From"
+                value={dateFilter.from}
+                onChange={(e) => setDateFilter({ ...dateFilter, from: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="To"
+                value={dateFilter.to}
+                onChange={(e) => setDateFilter({ ...dateFilter, to: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </>
+          )}
+
           {/* Clear Filters Button */}
           {hasActiveFilters && (
             <Button
@@ -413,6 +515,7 @@ export default function ReturnRequestedPage() {
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Reason</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Status</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Worksheet Status</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -535,6 +638,19 @@ export default function ReturnRequestedPage() {
                           ? `${ret.refundAmount.currency} ${ret.refundAmount.value}` 
                           : '-'}
                       </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <FormControl size="small" fullWidth>
+                        <Select
+                          value={ret.worksheetStatus || 'open'}
+                          onChange={(e) => handleWorksheetStatusChange(ret.returnId, e.target.value)}
+                          sx={{ fontSize: '0.75rem' }}
+                        >
+                          <MenuItem value="open">Open</MenuItem>
+                          <MenuItem value="attended">Attended</MenuItem>
+                          <MenuItem value="resolved">Resolved</MenuItem>
+                        </Select>
+                      </FormControl>
                     </TableCell>
                   </TableRow>
                 ))

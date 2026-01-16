@@ -95,6 +95,7 @@ import IdeasPage from '../pages/IdeasPage.jsx';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
 import SellerAnalyticsPage from '../pages/admin/SellerAnalyticsPage.jsx';
+import WorksheetPage from '../pages/admin/WorksheetPage.jsx';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ChatIcon from '@mui/icons-material/Chat';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -728,6 +729,15 @@ export default function AdminLayout({ user, onLogout }) {
                   </ListItemButton>
                   <ListItemButton 
                     component={Link} 
+                    to="/admin/worksheet" 
+                    onClick={() => setMobileOpen(false)}
+                    selected={location.pathname === '/admin/worksheet'}
+                    sx={selectedMenuItemStyle}
+                  >
+                    <ListItemText primary="Worksheet" />
+                  </ListItemButton>
+                  <ListItemButton 
+                    component={Link} 
                     to="/admin/seller-analytics" 
                     onClick={() => setMobileOpen(false)}
                     selected={location.pathname === '/admin/seller-analytics'}
@@ -864,6 +874,9 @@ export default function AdminLayout({ user, onLogout }) {
             >
               <MenuItem component={Link} to="/admin/order-analytics" onClick={() => setOrdersAnchorEl(null)}>
                 Order Analytics
+              </MenuItem>
+              <MenuItem component={Link} to="/admin/worksheet" onClick={() => setOrdersAnchorEl(null)}>
+                Worksheet
               </MenuItem>
               <MenuItem component={Link} to="/admin/seller-analytics" onClick={() => setOrdersAnchorEl(null)}>
                 Seller Analytics
@@ -1251,6 +1264,7 @@ export default function AdminLayout({ user, onLogout }) {
           {(isFulfillmentAdmin || isSuper || isHOC || isComplianceManager) && (
             <>
               <Route path="/order-analytics" element={<OrderAnalyticsPage />} />
+              <Route path="/worksheet" element={<WorksheetPage />} />
               <Route path="/seller-analytics" element={<SellerAnalyticsPage />} />
               <Route path="/fulfillment" element={<FulfillmentDashboard />} />
               <Route path="/all-orders-sheet" element={<AllOrdersSheetPage />} />

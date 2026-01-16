@@ -13,6 +13,7 @@ import {
   Chip,
   Alert,
   FormControl,
+  InputLabel,
   Select,
   MenuItem,
   Stack,
@@ -31,16 +32,32 @@ export default function INRPage() {
   const [error, setError] = useState(null);
   const [editingNotes, setEditingNotes] = useState({});
   const [notesValues, setNotesValues] = useState({});
+  const [dateFilter, setDateFilter] = useState({
+    mode: 'all',
+    single: '',
+    from: '',
+    to: ''
+  });
 
   useEffect(() => {
     fetchINROrders();
-  }, []);
+  }, [dateFilter]);
 
   const fetchINROrders = async () => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get('/ebay/stored-orders');
+      const params = {};
+      if (dateFilter.mode === 'single' && dateFilter.single) {
+        params.startDate = dateFilter.single;
+        params.endDate = dateFilter.single;
+      } else if (dateFilter.mode === 'range') {
+        if (dateFilter.from) params.startDate = dateFilter.from;
+        if (dateFilter.to) params.endDate = dateFilter.to;
+      }
+      // mode 'all' = no date params, shows all orders
+      
+      const { data } = await api.get('/ebay/stored-orders', { params });
       const allOrders = data.orders || [];
       // Filter orders with itemStatus = 'INR'
       const inrOrders = allOrders.filter(order => order.itemStatus === 'INR');
@@ -204,6 +221,54 @@ export default function INRPage() {
               color="error"
               variant="outlined"
             />
+          )}
+        </Stack>
+
+        {/* Date Filter */}
+        <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Date</InputLabel>
+            <Select
+              value={dateFilter.mode}
+              onChange={(e) => setDateFilter({...dateFilter, mode: e.target.value})}
+              label="Date"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="single">Single Date</MenuItem>
+              <MenuItem value="range">Date Range</MenuItem>
+            </Select>
+          </FormControl>
+
+          {dateFilter.mode === 'single' && (
+            <TextField
+              type="date"
+              size="small"
+              value={dateFilter.single}
+              onChange={(e) => setDateFilter({...dateFilter, single: e.target.value})}
+              InputLabelProps={{ shrink: true }}
+            />
+          )}
+
+          {dateFilter.mode === 'range' && (
+            <>
+              <TextField
+                type="date"
+                size="small"
+                value={dateFilter.from}
+                onChange={(e) => setDateFilter({...dateFilter, from: e.target.value})}
+                label="From"
+                InputLabelProps={{ shrink: true }}
+              />
+              <Typography variant="body2">to</Typography>
+              <TextField
+                type="date"
+                size="small"
+                value={dateFilter.to}
+                onChange={(e) => setDateFilter({...dateFilter, to: e.target.value})}
+                label="To"
+                InputLabelProps={{ shrink: true }}
+              />
+            </>
           )}
         </Stack>
 

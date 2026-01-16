@@ -15,6 +15,11 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  TextField
 } from '@mui/material';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -24,17 +29,48 @@ export default function CancelledStatusPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [dateFilter, setDateFilter] = useState({
+    mode: 'all',
+    single: '',
+    from: '',
+    to: ''
+  });
 
   useEffect(() => {
     fetchCancelledOrders();
-  }, []);
+  }, [dateFilter]);
+
+  const handleWorksheetStatusChange = async (orderId, newStatus) => {
+    try {
+      await api.patch(`/ebay/orders/${orderId}/worksheet-status`, { worksheetStatus: newStatus });
+      // Update local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.orderId === orderId ? { ...order, worksheetStatus: newStatus } : order
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update worksheet status:', err);
+      alert('Failed to update worksheet status: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   async function fetchCancelledOrders() {
     setLoading(true);
     setError('');
     try {
+      const params = {};
+      if (dateFilter.mode === 'single' && dateFilter.single) {
+        params.startDate = dateFilter.single;
+        params.endDate = dateFilter.single;
+      } else if (dateFilter.mode === 'range') {
+        if (dateFilter.from) params.startDate = dateFilter.from;
+        if (dateFilter.to) params.endDate = dateFilter.to;
+      }
+      // mode 'all' = no date params, shows all orders
+      
       // NEW: Use the dedicated endpoint that filters server-side (30-day window)
-      const res = await api.get('/ebay/cancelled-orders');
+      const res = await api.get('/ebay/cancelled-orders', { params });
       const cancelledOrders = res.data.orders || [];
       
       console.log(`Loaded ${cancelledOrders.length} IN_PROGRESS orders (filtered server-side)`);
@@ -98,6 +134,54 @@ export default function CancelledStatusPage() {
           )}
         </Stack>
 
+        {/* Date Filter */}
+        <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Date</InputLabel>
+            <Select
+              value={dateFilter.mode}
+              onChange={(e) => setDateFilter({...dateFilter, mode: e.target.value})}
+              label="Date"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="single">Single Date</MenuItem>
+              <MenuItem value="range">Date Range</MenuItem>
+            </Select>
+          </FormControl>
+
+          {dateFilter.mode === 'single' && (
+            <TextField
+              type="date"
+              size="small"
+              value={dateFilter.single}
+              onChange={(e) => setDateFilter({...dateFilter, single: e.target.value})}
+              InputLabelProps={{ shrink: true }}
+            />
+          )}
+
+          {dateFilter.mode === 'range' && (
+            <>
+              <TextField
+                type="date"
+                size="small"
+                value={dateFilter.from}
+                onChange={(e) => setDateFilter({...dateFilter, from: e.target.value})}
+                label="From"
+                InputLabelProps={{ shrink: true }}
+              />
+              <Typography variant="body2">to</Typography>
+              <TextField
+                type="date"
+                size="small"
+                value={dateFilter.to}
+                onChange={(e) => setDateFilter({...dateFilter, to: e.target.value})}
+                label="To"
+                InputLabelProps={{ shrink: true }}
+              />
+            </>
+          )}
+        </Stack>
+
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
@@ -137,6 +221,7 @@ export default function CancelledStatusPage() {
                 </TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cancel Status</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Refunds</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Worksheet Status</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -298,6 +383,19 @@ export default function CancelledStatusPage() {
                         -
                       </Typography>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <FormControl size="small" fullWidth>
+                      <Select
+                        value={order.worksheetStatus || 'open'}
+                        onChange={(e) => handleWorksheetStatusChange(order.orderId, e.target.value)}
+                        sx={{ fontSize: '0.75rem' }}
+                      >
+                        <MenuItem value="open">Open</MenuItem>
+                        <MenuItem value="attended">Attended</MenuItem>
+                        <MenuItem value="resolved">Resolved</MenuItem>
+                      </Select>
+                    </FormControl>
                   </TableCell>
                 </TableRow>
               ))}
