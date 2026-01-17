@@ -23,6 +23,7 @@ import {
   Snackbar,
   Pagination,
   TextField,
+  OutlinedInput,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -54,7 +55,7 @@ export default function ReturnRequestedPage({
   // Filter states
   const [statusFilter, setStatusFilter] = useState('');
   const [sellerFilter, setSellerFilter] = useState('');
-  const [reasonFilter, setReasonFilter] = useState('');
+  const [reasonFilter, setReasonFilter] = useState([]);
   const [internalDateFilter, setInternalDateFilter] = useState({
     mode: 'all',
     single: '',
@@ -108,7 +109,7 @@ export default function ReturnRequestedPage({
       };
       if (statusFilter) params.status = statusFilter;
       if (sellerFilter) params.sellerId = sellerFilter;
-      if (reasonFilter) params.reason = reasonFilter;
+      if (reasonFilter.length > 0) params.reason = reasonFilter.join(',');
       if (dateFilter.mode === 'single' && dateFilter.single) {
         params.startDate = dateFilter.single;
         params.endDate = dateFilter.single;
@@ -205,7 +206,7 @@ export default function ReturnRequestedPage({
   const handleClearFilters = () => {
     setStatusFilter('');
     setSellerFilter('');
-    setReasonFilter('');
+    setReasonFilter([]);
     setInternalDateFilter({ mode: 'all', single: '', from: '', to: '' });
   };
 
@@ -262,7 +263,7 @@ export default function ReturnRequestedPage({
   const hasActiveFilters =
     statusFilter ||
     sellerFilter ||
-    reasonFilter ||
+    reasonFilter.length > 0 ||
     (!hideDateFilter &&
       (dateFilter.mode !== 'all' || dateFilter.single || dateFilter.from || dateFilter.to));
 
@@ -382,15 +383,35 @@ export default function ReturnRequestedPage({
             </Select>
           </FormControl>
 
-          {/* Reason Filter */}
+          {/* Reason Filter - Multi-select */}
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel>Reason</InputLabel>
             <Select
+              multiple
               value={reasonFilter}
               onChange={(e) => setReasonFilter(e.target.value)}
-              label="Reason"
+              input={<OutlinedInput label="Reason" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip 
+                      key={value} 
+                      label={{
+                        'WRONG_SIZE': 'Wrong Size',
+                        'NOT_AS_DESCRIBED': 'Not As Described',
+                        'DEFECTIVE_ITEM': 'Defective Item',
+                        'NO_LONGER_NEED_ITEM': 'No Longer Needed',
+                        'ORDERED_ACCIDENTALLY': 'Ordered Accidentally',
+                        'ARRIVED_DAMAGED': 'Arrived Damaged',
+                        'MISSING_PARTS': 'Missing Parts',
+                        'OTHER': 'Other'
+                      }[value] || value}
+                      size="small" 
+                    />
+                  ))}
+                </Box>
+              )}
             >
-              <MenuItem value="">All Reasons</MenuItem>
               <MenuItem value="WRONG_SIZE">Wrong Size</MenuItem>
               <MenuItem value="NOT_AS_DESCRIBED">Not As Described</MenuItem>
               <MenuItem value="DEFECTIVE_ITEM">Defective Item</MenuItem>
