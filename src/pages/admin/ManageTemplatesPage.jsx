@@ -14,7 +14,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
 import FieldConfigList from '../../components/FieldConfigList.jsx';
-import PricingConfigSection from '../../components/PricingConfigSection.jsx';
 
 export default function ManageTemplatesPage() {
   const navigate = useNavigate();
@@ -295,7 +294,8 @@ export default function ManageTemplatesPage() {
   };
 
   const handleViewListings = (templateId) => {
-    navigate(`/admin/template-listings?templateId=${templateId}`);
+    // Navigate to seller selection page with returnTo parameter for direct template access
+    navigate(`/admin/select-seller?returnTo=/admin/template-listings?templateId=${templateId}`);
   };
 
   return (
@@ -432,7 +432,6 @@ export default function ManageTemplatesPage() {
               <Tab label="Basic Info" />
               <Tab label="Custom Columns" />
               <Tab label="ASIN Auto-Fill" />
-              <Tab label="💰 Pricing Calculator" />
             </Tabs>
             
             <Box sx={{ minHeight: 300 }}>
@@ -535,17 +534,6 @@ export default function ManageTemplatesPage() {
                     </>
                   )}
                 </Stack>
-              )}
-              
-              {/* Tab 3: Pricing Calculator */}
-              {currentTab === 3 && (
-                <PricingConfigSection
-                  pricingConfig={formData.pricingConfig}
-                  onChange={(newConfig) => setFormData({
-                    ...formData,
-                    pricingConfig: newConfig
-                  })}
-                />
               )}
             </Box>
           </Box>
