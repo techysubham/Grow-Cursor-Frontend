@@ -3,7 +3,8 @@ import {
   Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, 
   TableRow, Typography, Chip, Stack, IconButton, Link as MuiLink, FormControl,
   InputLabel, Select, MenuItem, TextField, Collapse, Pagination, Alert,
-  useMediaQuery, useTheme
+  useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions,
+  Divider, Grid
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -11,6 +12,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import api from '../../lib/api';
 
 export default function TemplateDatabasePage() {
@@ -35,6 +37,10 @@ export default function TemplateDatabasePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expandedSellers, setExpandedSellers] = useState(new Set());
+  
+  // Details dialog state
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedListing, setSelectedListing] = useState(null);
 
   useEffect(() => {
     fetchSellers();
@@ -116,6 +122,16 @@ export default function TemplateDatabasePage() {
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
+  };
+
+  const handleViewDetails = (listing) => {
+    setSelectedListing(listing);
+    setDetailsDialogOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsDialogOpen(false);
+    setSelectedListing(null);
   };
 
   const toggleSeller = (sellerName) => {
@@ -480,6 +496,17 @@ export default function TemplateDatabasePage() {
                               Qty: <strong>{listing.quantity || 0}</strong>
                             </Typography>
                           </Stack>
+
+                          {/* Actions */}
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<VisibilityIcon />}
+                            onClick={() => handleViewDetails(listing)}
+                            fullWidth
+                          >
+                            View Details
+                          </Button>
                         </Stack>
                       </Paper>
                     ))}
@@ -623,6 +650,14 @@ export default function TemplateDatabasePage() {
                             </TableCell>
                             <TableCell align="right">
                               <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleViewDetails(listing)}
+                                  title="View Details"
+                                  color="primary"
+                                >
+                                  <VisibilityIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
                                 {listing._asinReference && (
                                   <IconButton
                                     size="small"
@@ -658,6 +693,348 @@ export default function TemplateDatabasePage() {
           />
         </Box>
       )}
+
+      {/* Details Dialog */}
+      <Dialog
+        open={detailsDialogOpen}
+        onClose={handleCloseDetails}
+        maxWidth="md"
+        fullWidth
+        fullScreen={isMobile}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Listing Details</Typography>
+            <Chip 
+              label={selectedListing?.status || 'draft'} 
+              size="small" 
+              color={selectedListing?.status === 'active' ? 'success' : 'default'}
+            />
+          </Stack>
+        </DialogTitle>
+        <Divider />
+        <DialogContent>
+          {selectedListing && (
+            <Stack spacing={3}>
+              {/* Basic Info */}
+              <Box>
+                <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                  Basic Information
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">ASIN</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                        {selectedListing._asinReference || 'N/A'}
+                      </Typography>
+                      {selectedListing._asinReference && (
+                        <IconButton size="small" onClick={() => handleCopy(selectedListing._asinReference)}>
+                          <ContentCopyIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      )}
+                    </Stack>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">SKU (Custom Label)</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                        {selectedListing.customLabel}
+                      </Typography>
+                      <IconButton size="small" onClick={() => handleCopy(selectedListing.customLabel)}>
+                        <ContentCopyIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Stack>
+                  </Grid>
+                  {selectedListing.amazonLink && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">Amazon Link</Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <MuiLink 
+                          href={selectedListing.amazonLink} 
+                          target="_blank" 
+                          rel="noopener" 
+                          variant="body2"
+                          sx={{ wordBreak: 'break-all' }}
+                        >
+                          {selectedListing.amazonLink}
+                        </MuiLink>
+                        <IconButton size="small" onClick={() => handleCopy(selectedListing.amazonLink)}>
+                          <ContentCopyIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Stack>
+                    </Grid>
+                  )}
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">Title</Typography>
+                    <Typography variant="body2">{selectedListing.title}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">Template</Typography>
+                    <Typography variant="body2">{selectedListing.templateId?.name || 'N/A'}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">Seller</Typography>
+                    <Typography variant="body2">
+                      {selectedListing.sellerId?.user?.username || selectedListing.sellerId?.user?.email || 'N/A'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+
+              <Divider />
+
+              {/* Product Details */}
+              <Box>
+                <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                  Product Details
+                </Typography>
+                <Grid container spacing={2}>
+                  {selectedListing.conditionId && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Condition</Typography>
+                      <Typography variant="body2">{selectedListing.conditionId}</Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.upc && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">UPC</Typography>
+                      <Typography variant="body2">{selectedListing.upc}</Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.epid && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">EPID</Typography>
+                      <Typography variant="body2">{selectedListing.epid}</Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.categoryName && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Category</Typography>
+                      <Typography variant="body2">{selectedListing.categoryName}</Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.description && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">Description</Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          maxHeight: 150, 
+                          overflowY: 'auto', 
+                          p: 1, 
+                          bgcolor: 'grey.50', 
+                          borderRadius: 1,
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        {selectedListing.description.replace(/<[^>]*>/g, '')}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.itemPhotoUrl && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">Product Image</Typography>
+                      <Box sx={{ mt: 1 }}>
+                        <img 
+                          src={selectedListing.itemPhotoUrl} 
+                          alt="Product" 
+                          style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 4 }}
+                        />
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+
+              <Divider />
+
+              {/* Pricing */}
+              <Box>
+                <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                  Pricing & Offers
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Start Price</Typography>
+                    <Typography variant="body2" fontWeight="bold" color="primary">
+                      ${selectedListing.startPrice?.toFixed(2) || '0.00'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Quantity</Typography>
+                    <Typography variant="body2" fontWeight="bold">
+                      {selectedListing.quantity || 0}
+                    </Typography>
+                  </Grid>
+                  {selectedListing.buyItNowPrice && (
+                    <Grid item xs={6} sm={3}>
+                      <Typography variant="caption" color="text.secondary">Buy It Now</Typography>
+                      <Typography variant="body2">${selectedListing.buyItNowPrice.toFixed(2)}</Typography>
+                    </Grid>
+                  )}
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Format</Typography>
+                    <Typography variant="body2">{selectedListing.format || 'FixedPrice'}</Typography>
+                  </Grid>
+                  {selectedListing.bestOfferEnabled && (
+                    <>
+                      <Grid item xs={12}>
+                        <Chip label="Best Offer Enabled" size="small" color="info" />
+                      </Grid>
+                      {selectedListing.bestOfferAutoAcceptPrice && (
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">Auto Accept Price</Typography>
+                          <Typography variant="body2">${selectedListing.bestOfferAutoAcceptPrice.toFixed(2)}</Typography>
+                        </Grid>
+                      )}
+                      {selectedListing.minimumBestOfferPrice && (
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">Minimum Offer</Typography>
+                          <Typography variant="body2">${selectedListing.minimumBestOfferPrice.toFixed(2)}</Typography>
+                        </Grid>
+                      )}
+                    </>
+                  )}
+                </Grid>
+              </Box>
+
+              <Divider />
+
+              {/* Shipping & Returns */}
+              <Box>
+                <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                  Shipping & Returns
+                </Typography>
+                <Grid container spacing={2}>
+                  {selectedListing.location && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Location</Typography>
+                      <Typography variant="body2">{selectedListing.location}</Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.maxDispatchTime && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Dispatch Time</Typography>
+                      <Typography variant="body2">{selectedListing.maxDispatchTime} days</Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.shippingProfileName && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Shipping Profile</Typography>
+                      <Typography variant="body2">{selectedListing.shippingProfileName}</Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.returnProfileName && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Return Profile</Typography>
+                      <Typography variant="body2">{selectedListing.returnProfileName}</Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.returnsAcceptedOption && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Returns Accepted</Typography>
+                      <Typography variant="body2">{selectedListing.returnsAcceptedOption}</Typography>
+                    </Grid>
+                  )}
+                  {selectedListing.returnsWithinOption && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Return Within</Typography>
+                      <Typography variant="body2">{selectedListing.returnsWithinOption}</Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+
+              {/* Custom Fields */}
+              {selectedListing.customFields && selectedListing.customFields.size > 0 && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                      Custom Fields
+                    </Typography>
+                    <Grid container spacing={2}>
+                      {Array.from(selectedListing.customFields.entries()).map(([key, value]) => (
+                        <Grid item xs={12} sm={6} key={key}>
+                          <Typography variant="caption" color="text.secondary">
+                            {key.replace('C:', '')}
+                          </Typography>
+                          <Typography variant="body2">{value}</Typography>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                </>
+              )}
+
+              {/* eBay Integration */}
+              {(selectedListing.ebayItemId || selectedListing.ebayListingUrl) && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                      eBay Integration
+                    </Typography>
+                    <Grid container spacing={2}>
+                      {selectedListing.ebayItemId && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">eBay Item ID</Typography>
+                          <Typography variant="body2">{selectedListing.ebayItemId}</Typography>
+                        </Grid>
+                      )}
+                      {selectedListing.ebayListingUrl && (
+                        <Grid item xs={12}>
+                          <Typography variant="caption" color="text.secondary">eBay Listing URL</Typography>
+                          <MuiLink href={selectedListing.ebayListingUrl} target="_blank" rel="noopener" variant="body2">
+                            {selectedListing.ebayListingUrl}
+                          </MuiLink>
+                        </Grid>
+                      )}
+                      {selectedListing.ebayPublishedAt && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">Published At</Typography>
+                          <Typography variant="body2">
+                            {new Date(selectedListing.ebayPublishedAt).toLocaleString()}
+                          </Typography>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </Box>
+                </>
+              )}
+
+              {/* Metadata */}
+              <Divider />
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                  Metadata
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">Created At</Typography>
+                    <Typography variant="body2" fontSize="0.85rem">
+                      {new Date(selectedListing.createdAt).toLocaleString()}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">Updated At</Typography>
+                    <Typography variant="body2" fontSize="0.85rem">
+                      {new Date(selectedListing.updatedAt).toLocaleString()}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+        <Divider />
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={handleCloseDetails} variant="outlined">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
