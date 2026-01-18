@@ -110,6 +110,7 @@ import ManageTemplatesPage from '../pages/admin/ManageTemplatesPage.jsx';
 import TemplateListingsPage from '../pages/admin/TemplateListingsPage.jsx';
 import SelectSellerPage from '../pages/admin/SelectSellerPage.jsx';
 import SellerTemplatesPage from '../pages/admin/SellerTemplatesPage.jsx';
+import TemplateDatabasePage from '../pages/admin/TemplateDatabasePage.jsx';
 import DescriptionIcon from '@mui/icons-material/Description';
 
 const drawerWidth = 230;
@@ -384,6 +385,22 @@ export default function AdminLayout({ user, onLogout }) {
                   <NavIcon icon={AddCircleIcon} label="Add Template Listings" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Add Template Listings" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* Template Listings Database */}
+            <ListItem disablePadding>
+              <ListItemButton 
+                component={Link} 
+                to="/admin/listings-database" 
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/listings-database'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={StorageIcon} label="Listings Database" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Listings Database" />}
               </ListItemButton>
             </ListItem>
 
@@ -1218,6 +1235,7 @@ export default function AdminLayout({ user, onLogout }) {
                 <Route path="/template-listings" element={<TemplateListingsPage />} />
                 <Route path="/select-seller" element={<SelectSellerPage />} />
                 <Route path="/seller-templates" element={<SellerTemplatesPage />} />
+                <Route path="/listings-database" element={<TemplateDatabasePage />} />
               </>
             </>
           )}
