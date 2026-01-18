@@ -108,6 +108,9 @@ import ColumnCreatorPage from '../pages/admin/ColumnCreatorPage.jsx';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import ManageTemplatesPage from '../pages/admin/ManageTemplatesPage.jsx';
 import TemplateListingsPage from '../pages/admin/TemplateListingsPage.jsx';
+import SelectSellerPage from '../pages/admin/SelectSellerPage.jsx';
+import SellerTemplatesPage from '../pages/admin/SellerTemplatesPage.jsx';
+import TemplateDatabasePage from '../pages/admin/TemplateDatabasePage.jsx';
 import DescriptionIcon from '@mui/icons-material/Description';
 
 const drawerWidth = 230;
@@ -353,7 +356,7 @@ export default function AdminLayout({ user, onLogout }) {
               </ListItemButton>
             </ListItem>
 
-            {/* Listing Templates */}
+            {/* Listing Templates - Create/Edit Templates */}
             <ListItem disablePadding>
               <ListItemButton 
                 component={Link} 
@@ -363,9 +366,41 @@ export default function AdminLayout({ user, onLogout }) {
                 sx={selectedMenuItemStyle}
               >
                 <ListItemIcon>
-                  <NavIcon icon={DescriptionIcon} label="eBay Listing Templates" sidebarOpen={sidebarOpen} />
+                  <NavIcon icon={DescriptionIcon} label="Manage Templates" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Listing Templates" />}
+                {sidebarOpen && <ListItemText primary="Manage Templates" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* Template Listings - Seller-based listing workflow */}
+            <ListItem disablePadding>
+              <ListItemButton 
+                component={Link} 
+                to="/admin/select-seller" 
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname.startsWith('/admin/select-seller') || location.pathname.startsWith('/admin/seller-templates') || location.pathname.startsWith('/admin/template-listings')}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={AddCircleIcon} label="Add Template Listings" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Add Template Listings" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* Template Listings Database */}
+            <ListItem disablePadding>
+              <ListItemButton 
+                component={Link} 
+                to="/admin/listings-database" 
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/listings-database'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={StorageIcon} label="Listings Database" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Listings Database" />}
               </ListItemButton>
             </ListItem>
 
@@ -1198,6 +1233,9 @@ export default function AdminLayout({ user, onLogout }) {
                 <Route path="/transactions" element={<TransactionPage />} />
                 <Route path="/manage-templates" element={<ManageTemplatesPage />} />
                 <Route path="/template-listings" element={<TemplateListingsPage />} />
+                <Route path="/select-seller" element={<SelectSellerPage />} />
+                <Route path="/seller-templates" element={<SellerTemplatesPage />} />
+                <Route path="/listings-database" element={<TemplateDatabasePage />} />
               </>
             </>
           )}

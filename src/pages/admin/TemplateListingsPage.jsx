@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Typography, IconButton, Dialog, DialogTitle, 
   DialogContent, DialogActions, Alert, Pagination, TextField, Tabs, Tab, MenuItem,
   Chip, CircularProgress, Switch, FormControlLabel, LinearProgress, FormControl,
-  InputLabel, Select
+  InputLabel, Select, Breadcrumbs, Link
 } from '@mui/material';
 import { 
   Delete as DeleteIcon, 
@@ -14,17 +14,21 @@ import {
   Download as DownloadIcon,
   Upload as UploadIcon,
   ContentCopy as CopyIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Calculate as CalculatorIcon
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
 import BulkListingPreview from '../../components/BulkListingPreview.jsx';
 import CoreFieldDefaultsDialog from '../../components/CoreFieldDefaultsDialog.jsx';
+import PricingConfigSection from '../../components/PricingConfigSection.jsx';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
 
 export default function TemplateListingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const templateId = searchParams.get('templateId');
+  const sellerId = searchParams.get('sellerId');
 
   const [template, setTemplate] = useState(null);
   const [listings, setListings] = useState([]);
@@ -33,10 +37,11 @@ export default function TemplateListingsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Seller state
-  const [sellers, setSellers] = useState([]);
-  const [selectedSeller, setSelectedSeller] = useState('');
-  const [loadingSellers, setLoadingSellers] = useState(false);
+  // Seller and pricing state
+  const [seller, setSeller] = useState(null);
+  const [pricingConfig, setPricingConfig] = useState(null);
+  const [isCustomPricing, setIsCustomPricing] = useState(false);
+  const [calculatorDialog, setCalculatorDialog] = useState(false);
 
   const [addEditDialog, setAddEditDialog] = useState(false);
   const [editingListing, setEditingListing] = useState(null);
@@ -142,26 +147,53 @@ export default function TemplateListingsPage() {
     { key: 'paymentProfileName', label: 'Payment profile name', width: 180 }
   ];
 
+  // Validate sellerId on mount
   useEffect(() => {
-    if (templateId) {
+    if (!sellerId) {
+      setError('Seller ID is required. Redirecting to seller selection...');
+      setTimeout(() => navigate('/admin/select-seller'), 2000);
+      return;
+    }
+    
+    // Fetch seller info for breadcrumb
+    const fetchSellerInfo = async () => {
+      try {
+        const { data } = await api.get('/sellers/all');
+        const sellerInfo = data.find(s => s._id === sellerId);
+        setSeller(sellerInfo || null);
+      } catch (err) {
+        console.error('Failed to fetch seller info:', err);
+      }
+    };
+    
+    fetchSellerInfo();
+  }, [sellerId, navigate]);
+
+  // Fetch pricing config for this seller + template
+  useEffect(() => {
+    if (!templateId || !sellerId) return;
+    
+    const fetchPricingConfig = async () => {
+      try {
+        const { data } = await api.get('/seller-pricing-config', {
+          params: { sellerId, templateId }
+        });
+        setPricingConfig(data.pricingConfig || null);
+        setIsCustomPricing(data.isCustom || false);
+      } catch (err) {
+        console.error('Failed to fetch pricing config:', err);
+      }
+    };
+    
+    fetchPricingConfig();
+  }, [sellerId, templateId]);
+
+  useEffect(() => {
+    if (templateId && sellerId) {
       fetchTemplate();
-      fetchSellers();
       fetchListings();
     }
-  }, [templateId, pagination.page, selectedSeller]);
-
-  const fetchSellers = async () => {
-    try {
-      setLoadingSellers(true);
-      const { data } = await api.get('/sellers/all');
-      setSellers(data || []);
-    } catch (err) {
-      console.error('Failed to fetch sellers:', err);
-      setError('Failed to fetch sellers');
-    } finally {
-      setLoadingSellers(false);
-    }
-  };
+  }, [templateId, pagination.page, sellerId]);
 
   const fetchTemplate = async () => {
     try {
@@ -177,8 +209,8 @@ export default function TemplateListingsPage() {
     try {
       setLoading(true);
       let url = `/template-listings?templateId=${templateId}&page=${pagination.page}&limit=${pagination.limit}`;
-      if (selectedSeller) {
-        url += `&sellerId=${selectedSeller}`;
+      if (sellerId) {
+        url += `&sellerId=${sellerId}`;
       }
       const { data } = await api.get(url);
       setListings(data.listings || []);
@@ -317,8 +349,8 @@ export default function TemplateListingsPage() {
     setError('');
     setSuccess('');
 
-    if (!selectedSeller) {
-      setError('Please select a seller first');
+    if (!sellerId) {
+      setError('Seller ID is required');
       return;
     }
 
@@ -342,7 +374,7 @@ export default function TemplateListingsPage() {
       const dataToSend = {
         ...listingFormData,
         templateId,
-        sellerId: selectedSeller
+        sellerId
       };
 
       if (editingListing) {
@@ -457,8 +489,8 @@ export default function TemplateListingsPage() {
       return;
     }
 
-    if (!selectedSeller) {
-      setAsinError('Please select a seller first');
+    if (!sellerId) {
+      setAsinError('Seller ID is required');
       return;
     }
 
@@ -494,7 +526,7 @@ export default function TemplateListingsPage() {
       const { data } = await api.post('/template-listings/bulk-autofill-from-asins', {
         asins,
         templateId,
-        sellerId: selectedSeller
+        sellerId
       });
 
       // Add auto-generated SKUs to results
@@ -558,8 +590,8 @@ export default function TemplateListingsPage() {
       return;
     }
 
-    if (!selectedSeller) {
-      setError('Please select a seller first');
+    if (!sellerId) {
+      setError('Seller ID is required');
       return;
     }
 
@@ -593,7 +625,7 @@ export default function TemplateListingsPage() {
 
       const { data } = await api.post('/template-listings/bulk-create', {
         templateId,
-        sellerId: selectedSeller,
+        sellerId,
         listings,
         options: {
           autoGenerateSKU: true,
@@ -632,17 +664,15 @@ export default function TemplateListingsPage() {
     try {
       setLoading(true);
       let url = `/template-listings/export-csv/${templateId}`;
-      if (selectedSeller) {
-        url += `?sellerId=${selectedSeller}`;
+      if (sellerId) {
+        url += `?sellerId=${sellerId}`;
       }
       
       const response = await api.get(url, {
         responseType: 'blob'
       });
       
-      const sellerName = selectedSeller 
-        ? sellers.find(s => s._id === selectedSeller)?.user?.username || sellers.find(s => s._id === selectedSeller)?.user?.email || 'seller'
-        : 'all-sellers';
+      const sellerName = seller?.user?.username || seller?.user?.email || 'seller';
       
       const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -669,6 +699,46 @@ export default function TemplateListingsPage() {
         [fieldName]: value
       }
     });
+  };
+
+  const handleSavePricingConfig = async () => {
+    try {
+      setLoading(true);
+      await api.post('/seller-pricing-config', {
+        sellerId,
+        templateId,
+        pricingConfig
+      });
+      setSuccess('Pricing configuration saved successfully!');
+      setIsCustomPricing(true);
+      setCalculatorDialog(false);
+    } catch (err) {
+      setError('Failed to save pricing configuration');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPricingConfig = async () => {
+    try {
+      setLoading(true);
+      await api.delete('/seller-pricing-config', {
+        params: { sellerId, templateId }
+      });
+      // Reload pricing config (will fallback to template default)
+      const { data } = await api.get('/seller-pricing-config', {
+        params: { sellerId, templateId }
+      });
+      setPricingConfig(data.pricingConfig || null);
+      setIsCustomPricing(false);
+      setSuccess('Pricing configuration reset to template default');
+    } catch (err) {
+      setError('Failed to reset pricing configuration');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Helper to get TextField props for auto-filled fields
@@ -699,6 +769,29 @@ export default function TemplateListingsPage() {
 
   return (
     <Box>
+      {/* Breadcrumb Navigation */}
+      <Breadcrumbs sx={{ mb: 2 }}>
+        <Link 
+          component="button"
+          variant="body2" 
+          onClick={() => navigate('/admin/select-seller')}
+          sx={{ cursor: 'pointer', textDecoration: 'none' }}
+        >
+          Select Seller
+        </Link>
+        <Link 
+          component="button"
+          variant="body2" 
+          onClick={() => navigate(`/admin/seller-templates?sellerId=${sellerId}`)}
+          sx={{ cursor: 'pointer', textDecoration: 'none' }}
+        >
+          {seller?.user?.username || seller?.user?.email || 'Seller'}
+        </Link>
+        <Typography color="text.primary" variant="body2">
+          {template?.name || 'Template Listings'}
+        </Typography>
+      </Breadcrumbs>
+
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h6">
           {template ? `${template.name} - Listings` : 'Template Listings'}
@@ -708,52 +801,25 @@ export default function TemplateListingsPage() {
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
-      {/* Seller Filter */}
-      <Box sx={{ mb: 2 }}>
-        <FormControl fullWidth>
-          <InputLabel>Filter by Seller</InputLabel>
-          <Select
-            value={selectedSeller}
-            onChange={(e) => setSelectedSeller(e.target.value)}
-            label="Filter by Seller"
-            disabled={loadingSellers}
-          >
-            <MenuItem value="">All Sellers</MenuItem>
-            {sellers.map((seller) => (
-              <MenuItem key={seller._id} value={seller._id}>
-                {seller.user?.username || seller.user?.email || 'Unknown Seller'}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        
-        {selectedSeller && (
-          <Chip 
-            label={`Viewing: ${sellers.find(s => s._id === selectedSeller)?.user?.username || sellers.find(s => s._id === selectedSeller)?.user?.email || 'Unknown'}`}
-            onDelete={() => setSelectedSeller('')}
-            color="primary"
-            sx={{ mt: 1 }}
-          />
-        )}
-        
-        {!selectedSeller && (
-          <Alert severity="info" sx={{ mt: 1 }}>
-            Please select a seller to add or manage listings
-          </Alert>
-        )}
-      </Box>
-
       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
         <Button 
           variant="contained" 
           startIcon={<AddIcon />} 
           onClick={handleAddListing}
-          disabled={!selectedSeller}
+          disabled={!sellerId}
         >
           Add Listing
         </Button>
         <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
           Download CSV
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<CalculatorIcon />}
+          onClick={() => setCalculatorDialog(true)}
+          disabled={!pricingConfig}
+        >
+          Pricing Calculator {isCustomPricing && '(Custom)'}
         </Button>
         <Button 
           variant="outlined" 
@@ -1463,6 +1529,52 @@ export default function TemplateListingsPage() {
         currentDefaults={template?.coreFieldDefaults || {}}
         onSave={handleSaveDefaults}
       />
+
+      {/* Pricing Calculator Dialog */}
+      <Dialog 
+        open={calculatorDialog} 
+        onClose={() => setCalculatorDialog(false)} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          Pricing Calculator
+          {isCustomPricing && (
+            <Chip 
+              label="Custom Config" 
+              size="small" 
+              color="primary" 
+              sx={{ ml: 2 }}
+            />
+          )}
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            This pricing configuration applies to all listings for this seller ({seller?.user?.username || seller?.user?.email}) 
+            in the "{template?.name}" template.
+          </Alert>
+          
+          {pricingConfig && (
+            <PricingConfigSection
+              pricingConfig={pricingConfig}
+              onChange={setPricingConfig}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          {isCustomPricing && (
+            <Button onClick={handleResetPricingConfig} color="warning">
+              Reset to Template Default
+            </Button>
+          )}
+          <Button onClick={() => setCalculatorDialog(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSavePricingConfig} variant="contained">
+            Save Configuration
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
