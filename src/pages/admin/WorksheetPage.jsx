@@ -120,11 +120,20 @@ export default function WorksheetPage({
   }, [tableData]);
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T00:00:00'); // Parse as local date
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       weekday: 'short'
+    }).format(date);
+  };
+
+  const formatPstDate = (dateString) => {
+    if (!dateString) return null;
+    const date = new Date(dateString + 'T00:00:00');
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric'
     }).format(date);
   };
 
@@ -190,7 +199,7 @@ export default function WorksheetPage({
             Worksheet
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Daily overview of cancellations, returns, INR & disputes, and inquiries (PST timezone).
+            Daily overview of cancellations, returns, INR & disputes, and inquiries. Dates shown in local time with PST reference.
           </Typography>
         </Box>
         <Chip
@@ -433,7 +442,16 @@ export default function WorksheetPage({
                             zIndex: 1
                           }}
                         >
-                          {formatDate(row.date)}
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                              {formatDate(row.date)}
+                            </Typography>
+                            {row.pstDate && row.pstDate !== row.date && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                                PST: {formatPstDate(row.pstDate)}
+                              </Typography>
+                            )}
+                          </Box>
                         </TableCell>
                         {CATEGORIES.map((category) => (
                           <React.Fragment key={`${row.date}-${category.key}`}>

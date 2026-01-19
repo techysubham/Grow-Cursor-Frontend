@@ -23,7 +23,9 @@ import {
 } from '@mui/material';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ChatIcon from '@mui/icons-material/Chat';
 import api from '../../lib/api';
+import ChatModal from '../../components/ChatModal';
 
 export default function CancelledStatusPage({
   dateFilter: dateFilterProp,
@@ -32,6 +34,7 @@ export default function CancelledStatusPage({
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [internalDateFilter, setInternalDateFilter] = useState({
     mode: 'all',
     single: '',
@@ -216,23 +219,45 @@ export default function CancelledStatusPage({
           </Typography>
         </Paper>
       ) : (
-        <TableContainer component={Paper}>
-          <Table size="small" sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}>
+        <TableContainer 
+          component={Paper}
+          sx={{ 
+            maxHeight: 'calc(100vh - 300px)',
+            overflow: 'auto',
+            '&::-webkit-scrollbar': {
+              width: '8px',
+              height: '8px',
+            },
+            '&::-webkit-scrollbar-track': {
+              backgroundColor: '#f1f1f1',
+              borderRadius: '10px',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: '#888',
+              borderRadius: '10px',
+              '&:hover': {
+                backgroundColor: '#555',
+              },
+            },
+          }}
+        >
+          <Table size="small" stickyHeader sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}>
             <TableHead>
-              <TableRow sx={{ backgroundColor: 'error.main' }}>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>SL No</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Seller</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Order ID</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Date Sold</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Product Name</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Buyer Name</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Marketplace</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">
+              <TableRow>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>SL No</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Seller</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Order ID</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Date Sold</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Product Name</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Buyer Name</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Marketplace</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }} align="right">
                   Total
                 </TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cancel Status</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Refunds</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Worksheet Status</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Cancel Status</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Refunds</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Worksheet Status</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }} align="center">Chat</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -407,12 +432,35 @@ export default function CancelledStatusPage({
                         <MenuItem value="resolved">Resolved</MenuItem>
                       </Select>
                     </FormControl>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Chat with buyer">
+                        <IconButton 
+                          size="small" 
+                          color="primary"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <ChatIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+
+      {/* Chat Modal */}
+      {selectedOrder && (
+        <ChatModal
+          open={Boolean(selectedOrder)}
+          onClose={() => setSelectedOrder(null)}
+          orderId={selectedOrder.orderId || selectedOrder.legacyOrderId}
+          buyerUsername={selectedOrder.buyer?.username || selectedOrder.buyer?.buyerRegistrationAddress?.fullName}
+          buyerName={selectedOrder.buyer?.buyerRegistrationAddress?.fullName || selectedOrder.buyer?.username}
+          title="Cancellation Chat"
+        />
       )}
     </Box>
   );

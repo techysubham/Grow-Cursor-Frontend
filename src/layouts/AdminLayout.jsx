@@ -63,9 +63,6 @@ import AmazonArrivalsPage from '../pages/admin/AmazonArrivalsPage.jsx';
 import FulfillmentNotesPage from '../pages/admin/FulfillmentNotesPage.jsx';
 import ConversationTrackingPage from '../pages/admin/ConversationTrackingPage.jsx';
 // CancelledStatusPage is now embedded in Issues and Resolutions (DisputesPage)
-import ReturnPage from '../pages/admin/ReturnPage.jsx';
-import ReplacePage from '../pages/admin/ReplacePage.jsx';
-import INRPage from '../pages/admin/INRPage.jsx';
 import DisputesPage from '../pages/admin/DisputesPage.jsx';
 import PayoneerSheetPage from '../pages/admin/PayoneerSheetPage.jsx';
 import BankAccountsPage from '../pages/admin/BankAccountsPage.jsx';

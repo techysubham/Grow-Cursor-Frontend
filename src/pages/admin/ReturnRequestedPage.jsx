@@ -29,7 +29,10 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import ClearIcon from '@mui/icons-material/Clear';
+import ChatIcon from '@mui/icons-material/Chat';
 import api from '../../lib/api';
+import ChatModal from '../../components/ChatModal';
+import OrderDetailsModal from '../../components/OrderDetailsModal';
 
 export default function ReturnRequestedPage({
   dateFilter: dateFilterProp,
@@ -41,6 +44,8 @@ export default function ReturnRequestedPage({
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
+  const [selectedReturn, setSelectedReturn] = useState(null);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
   
   // Pagination state
   const [page, setPage] = useState(1);
@@ -559,12 +564,13 @@ export default function ReturnRequestedPage({
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Status</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Worksheet Status</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }} align="center"><strong>Chat</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {returns.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} align="center">
+                  <TableCell colSpan={12} align="center">
                     <Typography variant="body2" color="text.secondary" py={2}>
                       No return requests found. Click "Fetch Returns from eBay" to load data.
                     </Typography>
@@ -628,12 +634,26 @@ export default function ReturnRequestedPage({
                     </TableCell>
                     <TableCell>
                       <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => setSelectedOrderId(ret.orderId)}
+                          sx={{ 
+                            fontFamily: 'monospace', 
+                            fontSize: '0.75rem',
+                            textTransform: 'none',
+                            p: 0,
+                            minWidth: 'auto',
+                            '&:hover': { textDecoration: 'underline' }
+                          }}
+                        >
                           {ret.orderId || '-'}
-                        </Typography>
-                        <IconButton size="small" onClick={() => handleCopy(ret.orderId)}>
-                          <ContentCopyIcon sx={{ fontSize: 14 }} />
-                        </IconButton>
+                        </Button>
+                        {ret.orderId && (
+                          <IconButton size="small" onClick={() => handleCopy(ret.orderId)}>
+                            <ContentCopyIcon sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        )}
                       </Stack>
                     </TableCell>
                     <TableCell>
@@ -695,6 +715,17 @@ export default function ReturnRequestedPage({
                         </Select>
                       </FormControl>
                     </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Chat with buyer">
+                        <IconButton 
+                          size="small" 
+                          color="primary"
+                          onClick={() => setSelectedReturn(ret)}
+                        >
+                          <ChatIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -718,6 +749,28 @@ export default function ReturnRequestedPage({
             showLastButton
           />
         </Box>
+      )}
+
+      {/* Chat Modal */}
+      {selectedReturn && (
+        <ChatModal
+          open={Boolean(selectedReturn)}
+          onClose={() => setSelectedReturn(null)}
+          orderId={selectedReturn.orderId}
+          buyerUsername={selectedReturn.buyerUsername}
+          buyerName={selectedReturn.buyerUsername}
+          itemId={selectedReturn.itemId}
+          title="Return Request Chat"
+        />
+      )}
+
+      {/* Order Details Modal */}
+      {selectedOrderId && (
+        <OrderDetailsModal
+          open={Boolean(selectedOrderId)}
+          onClose={() => setSelectedOrderId(null)}
+          orderId={selectedOrderId}
+        />
       )}
     </Box>
   );
