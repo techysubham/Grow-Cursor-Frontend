@@ -170,9 +170,6 @@ export default function WorksheetPage({
 
         <Box sx={{ display: 'flex', gap: 3, alignItems: 'stretch', pr: 2 }}>
           <Box sx={{ flex: 1, zIndex: 1 }}>
-            <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', lineHeight: 1 }}>
-              Open Cases
-            </Typography>
             <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1 }}>
               {openCount}
             </Typography>
