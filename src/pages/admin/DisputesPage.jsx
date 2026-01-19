@@ -34,10 +34,13 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ListAltIcon from '@mui/icons-material/ListAlt';
+import ChatIcon from '@mui/icons-material/Chat';
 import api from '../../lib/api';
 import ReturnRequestedPage from './ReturnRequestedPage.jsx';
 import CancelledStatusPage from './CancelledStatusPage.jsx';
 import WorksheetPage from './WorksheetPage.jsx';
+import ChatModal from '../../components/ChatModal';
+import OrderDetailsModal from '../../components/OrderDetailsModal';
 
 function TabPanel({ children, value, index }) {
   return (
@@ -78,6 +81,11 @@ export default function DisputesPage({ initialTab = 0 }) {
   const [pdStatusFilter, setPdStatusFilter] = useState('');
   const [pdSellerFilter, setPdSellerFilter] = useState('');
   const [pdReasonFilter, setPdReasonFilter] = useState('');
+  
+  // Selected items for chat and order details modal
+  const [selectedCase, setSelectedCase] = useState(null);
+  const [selectedDispute, setSelectedDispute] = useState(null);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
   
   // Date Filter
   const [dateFilter, setDateFilter] = useState({
@@ -616,12 +624,13 @@ export default function DisputesPage({ initialTab = 0 }) {
                   <TableCell><strong>Claim Amount</strong></TableCell>
                   <TableCell><strong>Created (PST)</strong></TableCell>
                   <TableCell><strong>Response Due (PST)</strong></TableCell>
+                  <TableCell align="center"><strong>Chat</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {cases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} align="center">
+                    <TableCell colSpan={10} align="center">
                       <Typography variant="body2" color="text.secondary" py={2}>
                         No INR cases found. Click "Fetch INR Cases from eBay" to load data.
                       </Typography>
@@ -709,6 +718,17 @@ export default function DisputesPage({ initialTab = 0 }) {
                             />
                           )}
                         </Stack>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="Chat with buyer">
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={() => setSelectedCase(c)}
+                          >
+                            <ChatIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))
@@ -984,6 +1004,44 @@ export default function DisputesPage({ initialTab = 0 }) {
       <TabPanel value={tabValue} index={4}>
         <WorksheetPage dateFilter={dateFilter} hideDateFilter embedded />
       </TabPanel>
+
+      {/* Chat Modal for INR Cases */}
+      {selectedCase && (
+        <ChatModal
+          open={Boolean(selectedCase)}
+          onClose={() => setSelectedCase(null)}
+          orderId={selectedCase.orderId}
+          buyerUsername={selectedCase.buyerUsername}
+          buyerName={selectedCase.buyerUsername}
+          itemId={selectedCase.itemId}
+          title="INR Case Chat"
+          category={selectedCase.caseType || 'INR'}
+          caseStatus={selectedCase.status || 'Open'}
+        />
+      )}
+
+      {/* Chat Modal for Payment Disputes */}
+      {selectedDispute && (
+        <ChatModal
+          open={Boolean(selectedDispute)}
+          onClose={() => setSelectedDispute(null)}
+          orderId={selectedDispute.orderId}
+          buyerUsername={selectedDispute.buyerUsername}
+          buyerName={selectedDispute.buyerUsername}
+          title="Payment Dispute Chat"
+          category="Payment Dispute"
+          caseStatus={selectedDispute.paymentDisputeStatus || 'Open'}
+        />
+      )}
+
+      {/* Order Details Modal */}
+      {selectedOrderId && (
+        <OrderDetailsModal
+          open={Boolean(selectedOrderId)}
+          onClose={() => setSelectedOrderId(null)}
+          orderId={selectedOrderId}
+        />
+      )}
     </Box>
   );
 }
