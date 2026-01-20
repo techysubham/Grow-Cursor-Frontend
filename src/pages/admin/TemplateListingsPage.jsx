@@ -36,6 +36,12 @@ export default function TemplateListingsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Download batch filtering state
+  const [batchFilter, setBatchFilter] = useState('active'); // 'active', 'all', or specific batchId
+  const [downloadHistory, setDownloadHistory] = useState([]);
+  const [historyDialog, setHistoryDialog] = useState(false);
+  const [confirmDownloadDialog, setConfirmDownloadDialog] = useState(false);
 
   // Seller and pricing state
   const [seller, setSeller] = useState(null);
@@ -192,8 +198,9 @@ export default function TemplateListingsPage() {
     if (templateId && sellerId) {
       fetchTemplate();
       fetchListings();
+      fetchDownloadHistory();
     }
-  }, [templateId, pagination.page, sellerId]);
+  }, [templateId, pagination.page, sellerId, batchFilter]);
 
   const fetchTemplate = async () => {
     try {
@@ -212,6 +219,18 @@ export default function TemplateListingsPage() {
       if (sellerId) {
         url += `&sellerId=${sellerId}`;
       }
+      
+      // Add batch filter parameter
+      if (batchFilter && batchFilter !== 'all') {
+        if (batchFilter === 'active') {
+          url += `&batchFilter=active`;
+        } else {
+          url += `&batchId=${batchFilter}`;
+        }
+      } else if (batchFilter === 'all') {
+        url += `&batchFilter=all`;
+      }
+      
       const { data } = await api.get(url);
       setListings(data.listings || []);
       setPagination(data.pagination);
@@ -220,6 +239,24 @@ export default function TemplateListingsPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const fetchDownloadHistory = async () => {
+    if (!templateId || !sellerId) {
+      console.log('⏭️ Skipping history fetch - missing templateId or sellerId');
+      return;
+    }
+    
+    try {
+      console.log('📜 Fetching download history for template:', templateId, 'seller:', sellerId);
+      const { data } = await api.get(`/template-listings/download-history/${templateId}`, {
+        params: { sellerId }
+      });
+      console.log('✅ Download history received:', data);
+      setDownloadHistory(data);
+    } catch (err) {
+      console.error('❌ Failed to fetch download history:', err);
     }
   };
 
@@ -661,9 +698,77 @@ export default function TemplateListingsPage() {
   };
 
   const handleExportCSV = async () => {
+    if (batchFilter !== 'active') {
+      // For historical batches, download directly without confirmation
+      await performCSVDownload();
+      return;
+    }
+    
+    // For active batch, show confirmation
+    setConfirmDownloadDialog(true);
+  };
+  
+  const performCSVDownload = async () => {
     try {
       setLoading(true);
+      setConfirmDownloadDialog(false);
+      
       let url = `/template-listings/export-csv/${templateId}`;
+      if (sellerId) {
+        url += `?sellerId=${sellerId}`;
+      }
+      
+      console.log('📥 Downloading CSV from:', url);
+      
+      const response = await api.get(url, {
+        responseType: 'blob'
+      });
+      
+      console.log('📦 Response headers:', response.headers);
+      
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `listings_${Date.now()}.csv`; // fallback
+      
+      console.log('📋 Content-Disposition:', contentDisposition);
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/"/g, '');
+        }
+      }
+      
+      console.log('📁 Final filename:', filename);
+      
+      const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      setSuccess('CSV downloaded successfully! Your view has been cleared for new listings.');
+      
+      // Refresh listings (will now be empty) and history
+      console.log('🔄 Refreshing listings and history...');
+      await fetchListings();
+      await fetchDownloadHistory();
+    } catch (err) {
+      console.error('❌ Download error:', err);
+      setError(err.response?.data?.error || 'Failed to export CSV');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleReDownloadBatch = async (batchId) => {
+    try {
+      setLoading(true);
+      
+      let url = `/template-listings/re-download-batch/${templateId}/${batchId}`;
       if (sellerId) {
         url += `?sellerId=${sellerId}`;
       }
@@ -672,19 +777,29 @@ export default function TemplateListingsPage() {
         responseType: 'blob'
       });
       
-      const sellerName = seller?.user?.username || seller?.user?.email || 'seller';
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `batch_redownload_${Date.now()}.csv`; // fallback
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/"/g, '');
+        }
+      }
       
       const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `${template?.name || 'listings'}_${sellerName}_${Date.now()}.csv`);
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
       
-      setSuccess('CSV exported successfully!');
+      setSuccess('Batch re-downloaded successfully!');
+      setHistoryDialog(false);
     } catch (err) {
-      setError('Failed to export CSV');
+      setError('Failed to re-download batch');
       console.error(err);
     } finally {
       setLoading(false);
@@ -806,12 +921,19 @@ export default function TemplateListingsPage() {
           variant="contained" 
           startIcon={<AddIcon />} 
           onClick={handleAddListing}
-          disabled={!sellerId}
+          disabled={!sellerId || batchFilter !== 'active'}
         >
           Add Listing
         </Button>
         <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
           Download CSV
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => setHistoryDialog(true)}
+          disabled={downloadHistory.length === 0}
+        >
+          Download History ({downloadHistory.length})
         </Button>
         <Button
           variant="outlined"
@@ -838,6 +960,36 @@ export default function TemplateListingsPage() {
           )}
         </Button>
       </Stack>
+      
+      {/* Batch Filter */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Typography variant="subtitle2">View:</Typography>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <Select
+              value={batchFilter}
+              onChange={(e) => setBatchFilter(e.target.value)}
+            >
+              <MenuItem value="active">
+                Active Batch ({pagination.total} items)
+              </MenuItem>
+              <MenuItem value="all">All Batches</MenuItem>
+              {downloadHistory.map((batch) => (
+                <MenuItem key={batch.batchId} value={batch.batchId}>
+                  Batch #{batch.batchNumber} - {new Date(batch.downloadedAt).toLocaleDateString()} ({batch.listingCount} items)
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {batchFilter !== 'active' && (
+            <Chip
+              label={batchFilter === 'all' ? 'Viewing All Batches' : 'Viewing Historical Batch'}
+              color="info"
+              size="small"
+            />
+          )}
+        </Stack>
+      </Paper>
 
       <TableContainer component={Paper} sx={{ maxHeight: 600, maxWidth: '100%', overflowX: 'auto' }}>
         <Table stickyHeader size="small">
@@ -1573,6 +1725,101 @@ export default function TemplateListingsPage() {
           <Button onClick={handleSavePricingConfig} variant="contained">
             Save Configuration
           </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Confirm Download Dialog */}
+      <Dialog
+        open={confirmDownloadDialog}
+        onClose={() => setConfirmDownloadDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Confirm CSV Download</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+              This will mark all current listings as downloaded and clear your view.
+            </Typography>
+            <Typography variant="body2">
+              • {listings.length} listing(s) will be archived<br />
+              • Your view will become empty after download<br />
+              • You can add new listings immediately after<br />
+              • Download history will be preserved
+            </Typography>
+          </Alert>
+          <Typography variant="body2">
+            Do you want to continue?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDownloadDialog(false)}>
+            Cancel
+          </Button>
+          <Button onClick={performCSVDownload} variant="contained" color="primary">
+            Download & Clear View
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Download History Dialog */}
+      <Dialog
+        open={historyDialog}
+        onClose={() => setHistoryDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Download History</DialogTitle>
+        <DialogContent>
+          {downloadHistory.length === 0 ? (
+            <Typography color="text.secondary">No download history yet.</Typography>
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>Batch #</strong></TableCell>
+                    <TableCell><strong>Downloaded</strong></TableCell>
+                    <TableCell><strong>Listings</strong></TableCell>
+                    <TableCell align="right"><strong>Actions</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {downloadHistory.map((batch) => (
+                    <TableRow key={batch.batchId}>
+                      <TableCell>Batch #{batch.batchNumber}</TableCell>
+                      <TableCell>
+                        {new Date(batch.downloadedAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell>{batch.listingCount}</TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setBatchFilter(batch.batchId)}
+                          >
+                            View
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<DownloadIcon />}
+                            onClick={() => handleReDownloadBatch(batch.batchId)}
+                          >
+                            Re-Download
+                          </Button>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHistoryDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
