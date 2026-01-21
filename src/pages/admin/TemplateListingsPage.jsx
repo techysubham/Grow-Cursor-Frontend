@@ -21,6 +21,7 @@ import api from '../../lib/api.js';
 import BulkListingPreview from '../../components/BulkListingPreview.jsx';
 import CoreFieldDefaultsDialog from '../../components/CoreFieldDefaultsDialog.jsx';
 import PricingConfigSection from '../../components/PricingConfigSection.jsx';
+import BulkImportASINsDialog from '../../components/BulkImportASINsDialog.jsx';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
 
@@ -42,6 +43,9 @@ export default function TemplateListingsPage() {
   const [downloadHistory, setDownloadHistory] = useState([]);
   const [historyDialog, setHistoryDialog] = useState(false);
   const [confirmDownloadDialog, setConfirmDownloadDialog] = useState(false);
+
+  // Bulk ASIN import state
+  const [bulkImportDialog, setBulkImportDialog] = useState(false);
 
   // Seller and pricing state
   const [seller, setSeller] = useState(null);
@@ -924,6 +928,14 @@ export default function TemplateListingsPage() {
           disabled={!sellerId || batchFilter !== 'active'}
         >
           Add Listing
+        </Button>
+        <Button 
+          variant="outlined" 
+          startIcon={<UploadIcon />} 
+          onClick={() => setBulkImportDialog(true)}
+          disabled={!sellerId || !templateId || batchFilter !== 'active'}
+        >
+          Bulk Import ASINs
         </Button>
         <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
           Download CSV
@@ -1822,6 +1834,18 @@ export default function TemplateListingsPage() {
           <Button onClick={() => setHistoryDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Bulk Import ASINs Dialog */}
+      <BulkImportASINsDialog
+        open={bulkImportDialog}
+        onClose={() => setBulkImportDialog(false)}
+        templateId={templateId}
+        sellerId={sellerId}
+        onImportComplete={() => {
+          fetchListings();
+          setSuccess('ASINs imported successfully');
+        }}
+      />
     </Box>
   );
 }
