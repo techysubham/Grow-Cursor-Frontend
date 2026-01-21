@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 import { AppBar, Toolbar, IconButton, Box, Paper, Typography, Grid, TextField, MenuItem, Button, Stack, Snackbar, Alert, Tabs, Tab } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonIcon from '@mui/icons-material/Person';
 import ChatIcon from '@mui/icons-material/Chat';
 import { useLocation, useNavigate } from 'react-router-dom';
 import InternalMessagesPage from './admin/InternalMessagesPage.jsx';
-import { getMyProfile, updateMyProfile } from '../lib/api.js';
+import { getMyProfile, updateMyProfile, uploadEmployeeFile, getMyFileUrl } from '../lib/api.js';
 
 export default function AboutMePage() {
   const location = useLocation();
@@ -28,11 +26,23 @@ export default function AboutMePage() {
     bankIFSC: '',
     bankName: '',
     aadharNumber: '',
-    panNumber: '',
-    profilePicUrl: '',
-    aadharImageUrl: '',
-    panImageUrl: ''
+    panNumber: ''
   });
+
+  // Track file existence with boolean flags
+  const [fileFlags, setFileFlags] = useState({
+    hasProfilePic: false,
+    hasAadhar: false,
+    hasPan: false
+  });
+
+  // Refresh keys to force image reload after upload
+  const [fileRefreshKeys, setFileRefreshKeys] = useState({
+    profilePic: Date.now(),
+    aadhar: Date.now(),
+    pan: Date.now()
+  });
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [uploading, setUploading] = useState({ profilePic: false, aadhar: false, pan: false });
 
@@ -52,10 +62,14 @@ export default function AboutMePage() {
           bankIFSC: p?.bankIFSC || '',
           bankName: p?.bankName || '',
           aadharNumber: p?.aadharNumber || '',
-          panNumber: p?.panNumber || '',
-          profilePicUrl: p?.profilePicUrl || '',
-          aadharImageUrl: p?.aadharImageUrl || '',
-          panImageUrl: p?.panImageUrl || ''
+          panNumber: p?.panNumber || ''
+        });
+
+        // Set file flags from profile data
+        setFileFlags({
+          hasProfilePic: p?.hasProfilePic || false,
+          hasAadhar: p?.hasAadhar || false,
+          hasPan: p?.hasPan || false
         });
       } finally {
         setLoading(false);
@@ -63,33 +77,44 @@ export default function AboutMePage() {
     })();
   }, []);
 
-  // Cloudinary upload helper - only for images now
-  const uploadToCloudinary = async (file) => {
-    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
-    const data = new FormData();
-    data.append('file', file);
-    data.append('upload_preset', UPLOAD_PRESET);
-    
-    const res = await fetch(url, { method: 'POST', body: data });
-    const json = await res.json();
-    
-    return json.secure_url;
-  };
-
-  const handleUpload = async (e, key) => {
+  // Upload file to MongoDB backend
+  const handleUpload = async (e, fileType) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setSnackbar({ open: true, message: 'File size must be less than 5MB', severity: 'error' });
+      return;
+    }
+
     let uploadKey;
-    if (key === 'profilePicUrl') uploadKey = 'profilePic';
-    else if (key === 'aadharImageUrl') uploadKey = 'aadhar';
-    else if (key === 'panImageUrl') uploadKey = 'pan';
+    if (fileType === 'profile-pic') uploadKey = 'profilePic';
+    else if (fileType === 'aadhar') uploadKey = 'aadhar';
+    else if (fileType === 'pan') uploadKey = 'pan';
+
     setUploading(u => ({ ...u, [uploadKey]: true }));
     try {
-      const url = await uploadToCloudinary(file);
-      setForm(f => ({ ...f, [key]: url }));
-      setSnackbar({ open: true, message: 'Upload successful!', severity: 'success' });
+      const response = await uploadEmployeeFile(fileType, file);
+
+      // Update file flags and refresh keys based on response
+      const now = Date.now();
+      if (fileType === 'profile-pic') {
+        setFileFlags(f => ({ ...f, hasProfilePic: true }));
+        setFileRefreshKeys(k => ({ ...k, profilePic: now }));
+      } else if (fileType === 'aadhar') {
+        setFileFlags(f => ({ ...f, hasAadhar: true }));
+        setFileRefreshKeys(k => ({ ...k, aadhar: now }));
+      } else if (fileType === 'pan') {
+        setFileFlags(f => ({ ...f, hasPan: true }));
+        setFileRefreshKeys(k => ({ ...k, pan: now }));
+      }
+
+      setSnackbar({ open: true, message: response.message || 'Upload successful!', severity: 'success' });
     } catch (err) {
-      setSnackbar({ open: true, message: 'Upload failed!', severity: 'error' });
+      console.error('Upload error:', err);
+      const errorMsg = err.response?.data?.error || 'Upload failed!';
+      setSnackbar({ open: true, message: errorMsg, severity: 'error' });
     } finally {
       setUploading(u => ({ ...u, [uploadKey]: false }));
     }
@@ -134,7 +159,7 @@ export default function AboutMePage() {
           </Toolbar>
         </AppBar>
       )}
-      
+
       {/* Tabs for Profile and Chat */}
       <Paper sx={{ mb: 2 }}>
         <Tabs value={currentTab} onChange={(e, newValue) => setCurrentTab(newValue)} variant="fullWidth">
@@ -152,100 +177,108 @@ export default function AboutMePage() {
               {(uploading.profilePic || uploading.aadhar || uploading.pan) ? 'Uploading...' : 'Save'}
             </Button>
           </Stack>
-        <Box component="form" onSubmit={onSubmit}>
-          <Grid container spacing={2}>
-            {/* Profile Photo Upload */}
-            <Grid item xs={12} sm={6}>
-              <label>Profile Photo:</label>
-              {form.profilePicUrl ? (
-                <img src={form.profilePicUrl} alt="Profile" style={{ width: 80, height: 80, borderRadius: '50%', display: 'block', marginTop: 8 }} />
-              ) : uploading.profilePic ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  <CircularProgress size={24} />
-                  <span style={{ marginLeft: 8 }}>Uploading...</span>
-                </Box>
-              ) : (
-                <input type="file" accept="image/*" onChange={e => handleUpload(e, 'profilePicUrl')} />
-              )}
+          <Box component="form" onSubmit={onSubmit}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <label>Profile Photo:</label>
+                {fileFlags.hasProfilePic ? (
+                  <img
+                    key={fileRefreshKeys.profilePic}
+                    src={`${import.meta.env.VITE_API_URL}/employee-profiles/me/file/profile-pic?token=${sessionStorage.getItem('auth_token')}&t=${fileRefreshKeys.profilePic}`}
+                    alt="Profile"
+                    style={{ width: 80, height: 80, borderRadius: '50%', display: 'block', marginTop: 8 }}
+                  />
+                ) : uploading.profilePic ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                    <CircularProgress size={24} />
+                    <span style={{ marginLeft: 8 }}>Uploading...</span>
+                  </Box>
+                ) : (
+                  <input type="file" accept="image/*,application/pdf" onChange={e => handleUpload(e, 'profile-pic')} />
+                )}
+              </Grid>
+              {/* Aadhar Document Upload */}
+              <Grid item xs={12} sm={6}>
+                <label>Aadhar Card Document:</label>
+                {fileFlags.hasAadhar ? (
+                  <Box sx={{ mt: 1 }}>
+                    <Button variant="outlined" size="small" onClick={() => window.open(getMyFileUrl('aadhar'), '_blank')}>
+                      View Aadhar Document
+                    </Button>
+                    <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.5 }}>Aadhar document uploaded</Typography>
+                  </Box>
+                ) : uploading.aadhar ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                    <CircularProgress size={24} />
+                    <span style={{ marginLeft: 8 }}>Uploading...</span>
+                  </Box>
+                ) : (
+                  <input type="file" accept="image/*,application/pdf" onChange={e => handleUpload(e, 'aadhar')} />
+                )}
+              </Grid>
+              {/* PAN Document Upload */}
+              <Grid item xs={12} sm={6}>
+                <label>PAN Card Document:</label>
+                {fileFlags.hasPan ? (
+                  <Box sx={{ mt: 1 }}>
+                    <Button variant="outlined" size="small" onClick={() => window.open(getMyFileUrl('pan'), '_blank')}>
+                      View PAN Document
+                    </Button>
+                    <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.5 }}>PAN document uploaded</Typography>
+                  </Box>
+                ) : uploading.pan ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                    <CircularProgress size={24} />
+                    <span style={{ marginLeft: 8 }}>Uploading...</span>
+                  </Box>
+                ) : (
+                  <input type="file" accept="image/*,application/pdf" onChange={e => handleUpload(e, 'pan')} />
+                )}
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="Name" name="name" value={form.name} onChange={onChange} fullWidth />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="Email" name="email" value={form.email} onChange={onChange} fullWidth />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="Phone Number" name="phoneNumber" value={form.phoneNumber} onChange={onChange} fullWidth />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="Date of Birth" name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={onChange} fullWidth InputLabelProps={{ shrink: true }} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="Date of Joining" name="dateOfJoining" type="date" value={form.dateOfJoining} onChange={onChange} fullWidth InputLabelProps={{ shrink: true }} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField select label="Gender" name="gender" value={form.gender} onChange={onChange} fullWidth>
+                  <MenuItem value="">Select</MenuItem>
+                  <MenuItem value="male">Male</MenuItem>
+                  <MenuItem value="female">Female</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                  <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField label="Address" name="address" value={form.address} onChange={onChange} fullWidth multiline minRows={2} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="Bank Account Number" name="bankAccountNumber" value={form.bankAccountNumber} onChange={onChange} fullWidth />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="Bank IFSC Code" name="bankIFSC" value={form.bankIFSC} onChange={onChange} fullWidth />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="Bank Name" name="bankName" value={form.bankName} onChange={onChange} fullWidth />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="Aadhar Number" name="aadharNumber" value={form.aadharNumber} onChange={onChange} fullWidth />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField label="PAN Number" name="panNumber" value={form.panNumber} onChange={onChange} fullWidth />
+              </Grid>
             </Grid>
-            {/* Aadhar Image Upload */}
-            <Grid item xs={12} sm={6}>
-              <label>Aadhar Card Image:</label>
-              {form.aadharImageUrl ? (
-                <Box sx={{ mt: 1 }}>
-                  <img src={form.aadharImageUrl} alt="Aadhar" style={{ width: 120, height: 80, objectFit: 'cover', display: 'block', border: '1px solid #ddd' }} />
-                  <Typography variant="caption" color="success.main">Aadhar image uploaded</Typography>
-                </Box>
-              ) : uploading.aadhar ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  <CircularProgress size={24} />
-                  <span style={{ marginLeft: 8 }}>Uploading...</span>
-                </Box>
-              ) : (
-                <input type="file" accept="image/*" onChange={e => handleUpload(e, 'aadharImageUrl')} />
-              )}
-            </Grid>
-            {/* PAN Image Upload */}
-            <Grid item xs={12} sm={6}>
-              <label>PAN Card Image:</label>
-              {form.panImageUrl ? (
-                <Box sx={{ mt: 1 }}>
-                  <img src={form.panImageUrl} alt="PAN" style={{ width: 120, height: 80, objectFit: 'cover', display: 'block', border: '1px solid #ddd' }} />
-                  <Typography variant="caption" color="success.main">PAN image uploaded</Typography>
-                </Box>
-              ) : uploading.pan ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  <CircularProgress size={24} />
-                  <span style={{ marginLeft: 8 }}>Uploading...</span>
-                </Box>
-              ) : (
-                <input type="file" accept="image/*" onChange={e => handleUpload(e, 'panImageUrl')} />
-              )}
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Name" name="name" value={form.name} onChange={onChange} fullWidth />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Email" name="email" value={form.email} onChange={onChange} fullWidth />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Phone Number" name="phoneNumber" value={form.phoneNumber} onChange={onChange} fullWidth />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Date of Birth" name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={onChange} fullWidth InputLabelProps={{ shrink: true }} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Date of Joining" name="dateOfJoining" type="date" value={form.dateOfJoining} onChange={onChange} fullWidth InputLabelProps={{ shrink: true }} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField select label="Gender" name="gender" value={form.gender} onChange={onChange} fullWidth>
-                <MenuItem value="">Select</MenuItem>
-                <MenuItem value="male">Male</MenuItem>
-                <MenuItem value="female">Female</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-                <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField label="Address" name="address" value={form.address} onChange={onChange} fullWidth multiline minRows={2} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Bank Account Number" name="bankAccountNumber" value={form.bankAccountNumber} onChange={onChange} fullWidth />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Bank IFSC Code" name="bankIFSC" value={form.bankIFSC} onChange={onChange} fullWidth />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Bank Name" name="bankName" value={form.bankName} onChange={onChange} fullWidth />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Aadhar Number" name="aadharNumber" value={form.aadharNumber} onChange={onChange} fullWidth />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="PAN Number" name="panNumber" value={form.panNumber} onChange={onChange} fullWidth />
-            </Grid>
-          </Grid>
-        </Box>
+          </Box>
         </Paper>
       )}
 

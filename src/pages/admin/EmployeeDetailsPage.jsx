@@ -28,7 +28,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import LaunchIcon from '@mui/icons-material/Launch';
-import { listEmployeeProfiles, updateEmployeeProfile } from '../../lib/api.js';
+import { listEmployeeProfiles, updateEmployeeProfile, getEmployeeFileUrl } from '../../lib/api.js';
 
 export default function EmployeeDetailsPage() {
   const [rows, setRows] = useState([]);
@@ -208,9 +208,9 @@ export default function EmployeeDetailsPage() {
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Stack spacing={1} direction="row" alignItems="center" justifyContent="space-between">
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1, overflow: 'hidden' }}>
-                        {r.profilePicUrl && (
+                        {r.hasProfilePic && (
                           <img
-                            src={r.profilePicUrl}
+                            src={`${import.meta.env.VITE_API_URL}/employee-profiles/${r._id}/file/profile-pic?token=${sessionStorage.getItem('auth_token')}&t=${r.updatedAt || Date.now()}`}
                             alt="Profile"
                             style={{
                               width: 50,
@@ -219,6 +219,10 @@ export default function EmployeeDetailsPage() {
                               objectFit: 'cover',
                               border: '2px solid #1976d2',
                               flexShrink: 0
+                            }}
+                            onError={(e) => {
+                              console.error('Failed to load profile image for:', r._id);
+                              e.target.style.display = 'none';
                             }}
                           />
                         )}
@@ -531,11 +535,11 @@ export default function EmployeeDetailsPage() {
                           disabled={!isEditing}
                           size="small"
                         />
-                        {editingProfile?.aadharImageUrl && (
+                        {editingProfile?.hasAadhar && (
                           <Tooltip title="View Aadhar Card">
                             <Button
                               variant="outlined"
-                              onClick={() => window.open(editingProfile.aadharImageUrl, '_blank')}
+                              onClick={() => window.open(getEmployeeFileUrl(editingProfile._id, 'aadhar'), '_blank')}
                               sx={{ height: 40, minWidth: 40, px: 2 }}
                             >
                               <LaunchIcon fontSize="small" />
@@ -554,11 +558,11 @@ export default function EmployeeDetailsPage() {
                           disabled={!isEditing}
                           size="small"
                         />
-                        {editingProfile?.panImageUrl && (
+                        {editingProfile?.hasPan && (
                           <Tooltip title="View PAN Card">
                             <Button
                               variant="outlined"
-                              onClick={() => window.open(editingProfile.panImageUrl, '_blank')}
+                              onClick={() => window.open(getEmployeeFileUrl(editingProfile._id, 'pan'), '_blank')}
                               sx={{ height: 40, minWidth: 40, px: 2 }}
                             >
                               <LaunchIcon fontSize="small" />
