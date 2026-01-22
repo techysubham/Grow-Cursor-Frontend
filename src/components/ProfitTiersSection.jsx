@@ -61,6 +61,22 @@ export default function ProfitTiersSection({ pricingConfig, onChange }) {
     
     if (field === 'minCost' || field === 'maxCost') {
       newTiers[index][field] = value === '' ? null : parseFloat(value);
+      
+      // Cascade update: When maxCost changes, update next tier's minCost
+      if (field === 'maxCost' && index < newTiers.length - 1) {
+        const nextTier = newTiers[index + 1];
+        if (nextTier && value !== '' && value !== null) {
+          nextTier.minCost = parseFloat(value);
+        }
+      }
+      
+      // Cascade update: When minCost changes, update previous tier's maxCost
+      if (field === 'minCost' && index > 0) {
+        const prevTier = newTiers[index - 1];
+        if (prevTier && value !== '' && value !== null) {
+          prevTier.maxCost = parseFloat(value);
+        }
+      }
     } else if (field === 'profit') {
       newTiers[index][field] = value === '' ? 0 : parseFloat(value);
     }
@@ -71,16 +87,18 @@ export default function ProfitTiersSection({ pricingConfig, onChange }) {
 
   const handleAddTier = () => {
     const lastTier = tiers[tiers.length - 1];
-    const newMinCost = lastTier.maxCost !== null ? lastTier.maxCost : 20;
+    
+    // Validate that last tier has a valid maxCost before adding new tier
+    if (lastTier.maxCost === null || lastTier.maxCost === undefined) {
+      setValidationError('Please set a Max Cost for the last tier before adding a new one');
+      return;
+    }
+    
+    const newMinCost = lastTier.maxCost;
     
     const newTiers = [...tiers];
-    // Update last tier to have maxCost
-    newTiers[newTiers.length - 1] = {
-      ...lastTier,
-      maxCost: newMinCost
-    };
     
-    // Add new tier
+    // Add new tier (no need to update last tier's maxCost, it's already set)
     newTiers.push({
       minCost: newMinCost,
       maxCost: null,
@@ -143,7 +161,7 @@ export default function ProfitTiersSection({ pricingConfig, onChange }) {
         }
         
         if (tier.maxCost !== nextTier.minCost) {
-          setValidationError(`Tier ${i + 1} and ${i + 2}: Ranges must be continuous (no gaps or overlaps)`);
+          setValidationError(`Tier ${i + 1} → ${i + 2}: Max cost ($${tier.maxCost}) must equal next tier's min cost ($${nextTier.minCost}). Tiers must be continuous.`);
           return false;
         }
       }
@@ -215,7 +233,7 @@ export default function ProfitTiersSection({ pricingConfig, onChange }) {
                       fullWidth
                       size="small"
                       inputProps={{ step: 0.01, min: 0 }}
-                      disabled={index !== 0} // Only first tier can change minCost of tier 1
+                      helperText={index > 0 ? "Auto-syncs with previous tier's max" : undefined}
                     />
                   </Grid>
                   <Grid item xs={12} sm={4}>
@@ -227,8 +245,12 @@ export default function ProfitTiersSection({ pricingConfig, onChange }) {
                       fullWidth
                       size="small"
                       inputProps={{ step: 0.01, min: tier.minCost }}
-                      disabled={index === tiers.length - 1} // Last tier always unlimited
-                      placeholder={index === tiers.length - 1 ? 'No Limit' : ''}
+                      placeholder={index === tiers.length - 1 ? 'Leave empty for unlimited' : ''}
+                      helperText={
+                        index === tiers.length - 1 
+                          ? "Set a value to add more tiers, or leave empty for unlimited" 
+                          : "Auto-syncs with next tier's min"
+                      }
                     />
                   </Grid>
                   <Grid item xs={12} sm={4}>
