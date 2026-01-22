@@ -46,6 +46,8 @@ export default function WorksheetPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [summary, setSummary] = useState(null);
+  const [sellers, setSellers] = useState([]);
+  const [sellerFilter, setSellerFilter] = useState('');
 
   const [internalDateFilter, setInternalDateFilter] = useState({
     mode: 'single',
@@ -58,9 +60,22 @@ export default function WorksheetPage({
     [dateFilterProp, internalDateFilter]
   );
 
+  // Fetch sellers on mount
+  useEffect(() => {
+    async function fetchSellers() {
+      try {
+        const res = await api.get('/sellers/all');
+        setSellers(res.data || []);
+      } catch (e) {
+        console.error('Failed to fetch sellers:', e);
+      }
+    }
+    fetchSellers();
+  }, []);
+
   useEffect(() => {
     fetchStatistics();
-  }, [dateFilter]);
+  }, [dateFilter, sellerFilter]);
 
   const fetchStatistics = async () => {
     try {
@@ -75,7 +90,12 @@ export default function WorksheetPage({
         if (dateFilter.from) params.startDate = dateFilter.from;
         if (dateFilter.to) params.endDate = dateFilter.to;
       }
-      // mode 'all' or 'none' => no params
+      // mode 'all' or 'none' => no date params
+
+      // Seller filter
+      if (sellerFilter) {
+        params.sellerId = sellerFilter;
+      }
 
       const [statsResponse, summaryResponse] = await Promise.all([
         api.get('/orders/worksheet-statistics', { params }),
@@ -208,7 +228,24 @@ export default function WorksheetPage({
       </Stack>
 
       {hideDateFilter && (
-        <Box sx={{ mb: 2 }}>
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+          {/* Seller Filter */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel id="seller-filter-label-embedded">Seller</InputLabel>
+            <Select
+              labelId="seller-filter-label-embedded"
+              value={sellerFilter}
+              label="Seller"
+              onChange={(e) => setSellerFilter(e.target.value)}
+            >
+              <MenuItem value="">All Sellers</MenuItem>
+              {sellers.map((s) => (
+                <MenuItem key={s._id} value={s._id}>
+                  {s.user?.username || s._id}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
@@ -218,7 +255,7 @@ export default function WorksheetPage({
           >
             Refresh
           </Button>
-        </Box>
+        </Stack>
       )}
 
       {!hideDateFilter && (
@@ -235,6 +272,24 @@ export default function WorksheetPage({
                 <MenuItem value="all">All</MenuItem>
                 <MenuItem value="single">Single Day</MenuItem>
                 <MenuItem value="range">Date Range</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* Seller Filter */}
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel id="seller-filter-label">Seller</InputLabel>
+              <Select
+                labelId="seller-filter-label"
+                value={sellerFilter}
+                label="Seller"
+                onChange={(e) => setSellerFilter(e.target.value)}
+              >
+                <MenuItem value="">All Sellers</MenuItem>
+                {sellers.map((s) => (
+                  <MenuItem key={s._id} value={s._id}>
+                    {s.user?.username || s._id}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 

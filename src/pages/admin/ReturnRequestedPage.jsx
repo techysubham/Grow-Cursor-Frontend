@@ -30,7 +30,9 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import ClearIcon from '@mui/icons-material/Clear';
 import ChatIcon from '@mui/icons-material/Chat';
+import DownloadIcon from '@mui/icons-material/Download';
 import api from '../../lib/api';
+import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ChatModal from '../../components/ChatModal';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
 
@@ -337,20 +339,44 @@ export default function ReturnRequestedPage({
       </Snackbar>
 
       {/* Controls Row 1: Fetch Button & Info */}
-      <Stack direction="row" spacing={2} mb={2} alignItems="center">
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={fetching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
-          onClick={fetchReturnsFromEbay}
-          disabled={fetching}
-        >
-          {fetching ? 'Fetching...' : 'Fetch Returns from eBay'}
-        </Button>
+      <Stack direction="row" spacing={2} mb={2} alignItems="center" justifyContent="space-between">
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={fetching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+            onClick={fetchReturnsFromEbay}
+            disabled={fetching}
+          >
+            {fetching ? 'Fetching...' : 'Fetch Returns from eBay'}
+          </Button>
+          
+          <Typography variant="caption" color="text.secondary">
+            📅 Polls returns from <strong>last 30 days</strong> from eBay
+          </Typography>
+        </Stack>
         
-        <Typography variant="caption" color="text.secondary">
-          📅 Polls returns from <strong>last 30 days</strong> from eBay
-        </Typography>
+        <Button
+          variant="outlined"
+          color="success"
+          startIcon={<DownloadIcon />}
+          onClick={() => {
+            const csvData = prepareCSVData(returns, {
+              'Return ID': 'returnId',
+              'Order ID': 'orderId',
+              'Seller': (r) => r.seller?.user?.username || '',
+              'Buyer': 'buyerUsername',
+              'Reason': (r) => r.returnReason?.value || r.returnReason || '',
+              'Status': (r) => r.currentStatus || r.returnRequest?.currentType || '',
+              'RMA Number': 'RMANumber',
+              'Created Date': (r) => r.creationDate ? new Date(r.creationDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+            });
+            downloadCSV(csvData, 'Return_Requests');
+          }}
+          disabled={returns.length === 0}
+        >
+          Download CSV ({returns.length})
+        </Button>
       </Stack>
 
       {/* Controls Row 2: Filters */}

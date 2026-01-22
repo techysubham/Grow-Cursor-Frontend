@@ -159,10 +159,11 @@ export default function OrderDetailsModal({ open, onClose, orderId }) {
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
               <DetailRow label="Buyer Name" value={order.buyer?.username || order.shippingFullName} />
               <DetailRow label="Email" value={order.buyer?.email} />
+              <DetailRow label="Phone" value={order.shippingPhone} />
               <Box sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}>
                 <DetailRow
                   label="Shipping Address"
-                  value={order.buyerAddress || `${order.shippingAddressLine1}, ${order.shippingCity}, ${order.shippingState} ${order.shippingPostalCode}, ${order.shippingCountry}`}
+                  value={order.buyerAddress || `${order.shippingAddressLine1}${order.shippingAddressLine2 ? ', ' + order.shippingAddressLine2 : ''}, ${order.shippingCity}, ${order.shippingState} ${order.shippingPostalCode}, ${order.shippingCountry}`}
                 />
               </Box>
             </Box>
@@ -177,9 +178,10 @@ export default function OrderDetailsModal({ open, onClose, orderId }) {
               <Box sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}>
                 <DetailRow label="Item Title" value={order.productName || order.lineItems?.[0]?.title} />
               </Box>
-              <DetailRow label="Item Number" value={order.itemNumber || order.lineItems?.[0]?.legacyItemId} />
+              <DetailRow label="Item Number" value={order.itemNumber || order.lineItems?.[0]?.legacyItemId} copyable />
               <DetailRow label="Quantity" value={order.quantity} />
               <DetailRow label="SKU" value={order.lineItems?.[0]?.sku} />
+              <DetailRow label="Line Item ID" value={order.lineItems?.[0]?.lineItemId} copyable />
             </Box>
 
             <Divider sx={{ my: 2 }} />
@@ -189,20 +191,62 @@ export default function OrderDetailsModal({ open, onClose, orderId }) {
               Pricing
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
-              <DetailRow label="Subtotal" value={formatCurrency(order.subtotal, order.pricingSummary?.priceSubtotal?.currency)} />
-              <DetailRow label="Shipping" value={formatCurrency(order.shipping, order.pricingSummary?.deliveryCost?.currency)} />
-              <DetailRow label="Sales Tax" value={formatCurrency(order.salesTax)} />
-              <DetailRow label="Discount" value={formatCurrency(order.discount)} />
+              <DetailRow label="Subtotal" value={formatCurrency(order.subtotalUSD || order.subtotal, order.purchaseMarketplaceId === 'EBAY_US' ? 'USD' : order.pricingSummary?.priceSubtotal?.currency)} />
+              <DetailRow label="Shipping" value={formatCurrency(order.shippingUSD || order.shipping, 'USD')} />
+              <DetailRow label="Sales Tax" value={formatCurrency(order.salesTaxUSD || order.salesTax, 'USD')} />
+              <DetailRow label="Discount" value={formatCurrency(order.discountUSD || order.discount, 'USD')} />
               <DetailRow 
                 label="Total" 
                 value={formatCurrency(
                   order.pricingSummary?.total?.value || 
-                  (parseFloat(order.subtotal || 0) + parseFloat(order.shipping || 0) + parseFloat(order.salesTax || 0) - parseFloat(order.discount || 0)),
-                  order.pricingSummary?.total?.currency
+                  (parseFloat(order.subtotalUSD || order.subtotal || 0) + parseFloat(order.shippingUSD || order.shipping || 0) + parseFloat(order.salesTaxUSD || order.salesTax || 0) + parseFloat(order.discountUSD || order.discount || 0)),
+                  'USD'
                 )} 
               />
-              <DetailRow label="Transaction Fees" value={formatCurrency(order.transactionFees)} />
+              <DetailRow label="Transaction Fees" value={formatCurrency(order.transactionFeesUSD || order.transactionFees, 'USD')} />
+              <DetailRow label="Ad Fee" value={formatCurrency(order.adFeeGeneralUSD || order.adFeeGeneral, 'USD')} />
+              {order.orderEarnings !== null && order.orderEarnings !== undefined && (
+                <DetailRow 
+                  label="Order Earnings" 
+                  value={
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      {formatCurrency(order.orderEarnings, 'USD')}
+                    </Typography>
+                  } 
+                />
+              )}
             </Box>
+
+            {/* Refund Information */}
+            {order.refunds && order.refunds.length > 0 && (
+              <>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="error">
+                  Refund Information
+                </Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                  <DetailRow 
+                    label="Total Refunded" 
+                    value={formatCurrency(order.refundTotalUSD || order.refunds.reduce((sum, r) => sum + parseFloat(r.amount?.value || 0), 0), 'USD')} 
+                  />
+                  <DetailRow label="Number of Refunds" value={order.refunds.length} />
+                  {order.refunds.map((refund, idx) => (
+                    <Box key={idx} sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}>
+                      <DetailRow 
+                        label={`Refund ${idx + 1}`}
+                        value={`${formatCurrency(refund.amount?.value, refund.amount?.currency)} - ${refund.refundStatus || 'Unknown'} - ${formatDate(refund.refundDate)}`}
+                      />
+                    </Box>
+                  ))}
+                </Box>
+              </>
+            )}
 
             <Divider sx={{ my: 2 }} />
 
@@ -239,11 +283,49 @@ export default function OrderDetailsModal({ open, onClose, orderId }) {
                 </Typography>
                 <Chip
                   label={order.cancelState || order.cancelStatus?.cancelState || 'NONE_REQUESTED'}
-                  color={order.cancelState?.includes('CANCEL') ? 'error' : 'success'}
+                  color={order.cancelState?.includes('CANCEL') || order.cancelState?.includes('PROGRESS') ? 'error' : 'success'}
                   size="small"
                   sx={{ mt: 0.5 }}
                 />
               </Box>
+              {order.itemStatus && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Item Status
+                  </Typography>
+                  <Chip
+                    label={order.itemStatus}
+                    color={getStatusColor(order.itemStatus)}
+                    size="small"
+                    sx={{ mt: 0.5 }}
+                  />
+                </Box>
+              )}
+              {order.messagingStatus && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Messaging Status
+                  </Typography>
+                  <Chip
+                    label={order.messagingStatus}
+                    color={getStatusColor(order.messagingStatus)}
+                    size="small"
+                    sx={{ mt: 0.5 }}
+                  />
+                </Box>
+              )}
+              {order.worksheetStatus && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Worksheet Status
+                  </Typography>
+                  <Chip
+                    label={order.worksheetStatus}
+                    size="small"
+                    sx={{ mt: 0.5 }}
+                  />
+                </Box>
+              )}
               {order.trackingNumber && (
                 <DetailRow label="Tracking Number" value={order.trackingNumber} copyable />
               )}
@@ -255,6 +337,40 @@ export default function OrderDetailsModal({ open, onClose, orderId }) {
               )}
             </Box>
 
+            {/* Amazon/Fulfillment Info */}
+            {(order.amazonAccount || order.amazonOrderId || order.fulfillmentNotes) && (
+              <>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  Fulfillment Information
+                </Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                  {order.amazonAccount && (
+                    <DetailRow label="Amazon Account" value={order.amazonAccount} />
+                  )}
+                  {order.amazonOrderId && (
+                    <DetailRow label="Amazon Order ID" value={order.amazonOrderId} copyable />
+                  )}
+                  {order.beforeTaxUSD !== null && order.beforeTaxUSD !== undefined && (
+                    <DetailRow label="Amazon Before Tax" value={formatCurrency(order.beforeTaxUSD, 'USD')} />
+                  )}
+                  {order.estimatedTaxUSD !== null && order.estimatedTaxUSD !== undefined && (
+                    <DetailRow label="Amazon Estimated Tax" value={formatCurrency(order.estimatedTaxUSD, 'USD')} />
+                  )}
+                  {order.fulfillmentNotes && (
+                    <Box sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Fulfillment Notes
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 1, p: 2, bgcolor: 'warning.50', borderRadius: 1, border: '1px solid', borderColor: 'warning.200' }}>
+                        {order.fulfillmentNotes}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </>
+            )}
+
             {/* Buyer Notes */}
             {order.buyerCheckoutNotes && (
               <>
@@ -264,6 +380,19 @@ export default function OrderDetailsModal({ open, onClose, orderId }) {
                 </Typography>
                 <Typography variant="body2" sx={{ mb: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
                   {order.buyerCheckoutNotes}
+                </Typography>
+              </>
+            )}
+
+            {/* Internal Notes */}
+            {order.notes && (
+              <>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  Internal Notes
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, border: '1px solid', borderColor: 'info.200' }}>
+                  {order.notes}
                 </Typography>
               </>
             )}

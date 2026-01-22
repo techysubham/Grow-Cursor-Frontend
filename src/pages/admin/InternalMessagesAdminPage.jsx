@@ -222,7 +222,7 @@ export default function InternalMessagesAdminPage() {
                               {conv.messageCount} messages
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {new Date(conv.lastMessageDate).toLocaleDateString()}
+                              {new Date(conv.lastMessageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} PT
                             </Typography>
                           </Stack>
                         </Stack>
@@ -385,7 +385,7 @@ export default function InternalMessagesAdminPage() {
                               color="text.secondary"
                               sx={{ textAlign: isUser1 ? 'left' : 'right' }}
                             >
-                              {new Date(msg.messageDate).toLocaleString()}
+                              {new Date(msg.messageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} PT
                             </Typography>
                           </Stack>
                         </Box>
@@ -402,10 +402,10 @@ export default function InternalMessagesAdminPage() {
                     <strong>Total Messages:</strong> {messages.length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    <strong>First Message:</strong> {messages[0] ? new Date(messages[0].messageDate).toLocaleString() : 'N/A'}
+                    <strong>First Message:</strong> {messages[0] ? new Date(messages[0].messageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' PT' : 'N/A'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Last Message:</strong> {messages[messages.length - 1] ? new Date(messages[messages.length - 1].messageDate).toLocaleString() : 'N/A'}
+                    <strong>Last Message:</strong> {messages[messages.length - 1] ? new Date(messages[messages.length - 1].messageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' PT' : 'N/A'}
                   </Typography>
                 </Stack>
               </Box>

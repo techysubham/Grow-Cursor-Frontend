@@ -107,7 +107,7 @@ function ResolutionDialog({ open, onClose, metaItem, onSave }) {
                      <Typography variant="body2">{msg.body}</Typography>
                    </Paper>
                    <Typography variant="caption" sx={{ display:'block', mt:0.5, textAlign: msg.sender==='SELLER'?'right':'left' }}>
-                     {new Date(msg.messageDate).toLocaleString()}
+                     {new Date(msg.messageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} PT
                    </Typography>
                  </Box>
                ))}

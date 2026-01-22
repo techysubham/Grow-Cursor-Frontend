@@ -1293,7 +1293,7 @@ export default function BuyerChatPage() {
                             fontSize: { xs: '0.7rem', md: '0.75rem' }
                           }}
                         >
-                          {new Date(msg.messageDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(msg.messageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} PT
                           {msg.sender === 'SELLER' && (msg.read ? ' • Read' : ' • Sent')}
                         </Typography>
                       </Box>

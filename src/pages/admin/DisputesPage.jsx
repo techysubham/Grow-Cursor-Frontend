@@ -35,7 +35,9 @@ import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import ChatIcon from '@mui/icons-material/Chat';
+import DownloadIcon from '@mui/icons-material/Download';
 import api from '../../lib/api';
+import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ReturnRequestedPage from './ReturnRequestedPage.jsx';
 import CancelledStatusPage from './CancelledStatusPage.jsx';
 import WorksheetPage from './WorksheetPage.jsx';
@@ -393,6 +395,104 @@ export default function DisputesPage({ initialTab = 0 }) {
   const hasActiveInrFilters = inrStatusFilter || inrSellerFilter || inrTypeFilter;
   const hasActivePdFilters = pdStatusFilter || pdSellerFilter || pdReasonFilter;
 
+  // Compute filtered INR cases
+  const filteredCases = cases.filter(c => {
+    if (inrSellerFilter && c.seller?._id !== inrSellerFilter) return false;
+    if (inrStatusFilter && c.status !== inrStatusFilter) return false;
+    if (inrTypeFilter && c.caseType !== inrTypeFilter) return false;
+    
+    // Date filter
+    if (dateFilter.mode !== 'all') {
+      const caseDate = c.creationDate ? new Date(c.creationDate) : null;
+      if (!caseDate) return false;
+      
+      if (dateFilter.mode === 'single' && dateFilter.single) {
+        const filterDate = new Date(dateFilter.single);
+        // Compare only the date portion
+        if (caseDate.toDateString() !== filterDate.toDateString()) return false;
+      }
+      
+      if (dateFilter.mode === 'range') {
+        if (dateFilter.from) {
+          const fromDate = new Date(dateFilter.from);
+          fromDate.setHours(0, 0, 0, 0);
+          if (caseDate < fromDate) return false;
+        }
+        if (dateFilter.to) {
+          const toDate = new Date(dateFilter.to);
+          toDate.setHours(23, 59, 59, 999);
+          if (caseDate > toDate) return false;
+        }
+      }
+    }
+    
+    return true;
+  });
+
+  // Compute filtered payment disputes
+  const filteredDisputes = disputes.filter(d => {
+    if (pdSellerFilter && d.seller?._id !== pdSellerFilter) return false;
+    if (pdStatusFilter && d.paymentDisputeStatus !== pdStatusFilter) return false;
+    if (pdReasonFilter && d.buyerProvidedReason !== pdReasonFilter) return false;
+    
+    // Date filter
+    if (dateFilter.mode !== 'all') {
+      const disputeDate = d.openDate ? new Date(d.openDate) : null;
+      if (!disputeDate) return false;
+      
+      if (dateFilter.mode === 'single' && dateFilter.single) {
+        const filterDate = new Date(dateFilter.single);
+        if (disputeDate.toDateString() !== filterDate.toDateString()) return false;
+      }
+      
+      if (dateFilter.mode === 'range') {
+        if (dateFilter.from) {
+          const fromDate = new Date(dateFilter.from);
+          fromDate.setHours(0, 0, 0, 0);
+          if (disputeDate < fromDate) return false;
+        }
+        if (dateFilter.to) {
+          const toDate = new Date(dateFilter.to);
+          toDate.setHours(23, 59, 59, 999);
+          if (disputeDate > toDate) return false;
+        }
+      }
+    }
+    
+    return true;
+  });
+
+  // CSV Export Handlers
+  const handleExportINRCases = () => {
+    const csvData = prepareCSVData(filteredCases, {
+      'Case ID': 'caseId',
+      'Order ID': 'orderId',
+      'Type': 'caseType',
+      'Seller': (c) => c.seller?.user?.username || '',
+      'Buyer': 'buyerUsername',
+      'Item': 'itemTitle',
+      'Status': 'status',
+      'Claim Amount': (c) => c.claimAmount?.value ? `${c.claimAmount.currency || 'USD'} ${c.claimAmount.value}` : '',
+      'Created Date': (c) => formatDate(c.creationDate),
+      'Response Due': (c) => formatDate(c.sellerResponseDueDate),
+    });
+    downloadCSV(csvData, 'INR_Cases');
+  };
+
+  const handleExportPaymentDisputes = () => {
+    const csvData = prepareCSVData(filteredDisputes, {
+      'Dispute ID': 'paymentDisputeId',
+      'Order ID': 'orderId',
+      'Seller': (d) => d.seller?.user?.username || '',
+      'Buyer': 'buyerUsername',
+      'Reason': 'buyerProvidedReason',
+      'Status': 'paymentDisputeStatus',
+      'Opened Date': (d) => formatDate(d.openDate),
+      'Response Due': (d) => formatDate(d.respondByDate),
+    });
+    downloadCSV(csvData, 'Payment_Disputes');
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Stack direction="row" alignItems="center" spacing={2} mb={3}>
@@ -509,20 +609,32 @@ export default function DisputesPage({ initialTab = 0 }) {
       {/* INR Cases Tab */}
       <TabPanel value={tabValue} index={0}>
         {/* Controls Row 1: Fetch Button & Info */}
-        <Stack direction="row" spacing={2} mb={2} alignItems="center">
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={casesFetching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
-            onClick={fetchCasesFromEbay}
-            disabled={casesFetching}
-          >
-            {casesFetching ? 'Fetching...' : 'Fetch INR Cases from eBay'}
-          </Button>
+        <Stack direction="row" spacing={2} mb={2} alignItems="center" justifyContent="space-between">
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={casesFetching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+              onClick={fetchCasesFromEbay}
+              disabled={casesFetching}
+            >
+              {casesFetching ? 'Fetching...' : 'Fetch INR Cases from eBay'}
+            </Button>
+            
+            <Typography variant="caption" color="text.secondary">
+              📅 Polls INR/SNAD cases from <strong>last 30 days</strong> via Post-Order API
+            </Typography>
+          </Stack>
           
-          <Typography variant="caption" color="text.secondary">
-            📅 Polls INR/SNAD cases from <strong>last 30 days</strong> via Post-Order API
-          </Typography>
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<DownloadIcon />}
+            onClick={handleExportINRCases}
+            disabled={filteredCases.length === 0}
+          >
+            Download CSV ({filteredCases.length})
+          </Button>
         </Stack>
 
         {/* Filters */}
@@ -628,7 +740,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {cases.length === 0 ? (
+                {filteredCases.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} align="center">
                       <Typography variant="body2" color="text.secondary" py={2}>
@@ -637,7 +749,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  cases.map((c) => (
+                  filteredCases.map((c) => (
                     <TableRow key={c._id} hover>
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -751,20 +863,32 @@ export default function DisputesPage({ initialTab = 0 }) {
         </Alert>
 
         {/* Controls Row 1: Fetch Button & Info */}
-        <Stack direction="row" spacing={2} mb={2} alignItems="center">
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={disputesFetching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
-            onClick={fetchDisputesFromEbay}
-            disabled={disputesFetching}
-          >
-            {disputesFetching ? 'Fetching...' : 'Fetch Payment Disputes from eBay'}
-          </Button>
+        <Stack direction="row" spacing={2} mb={2} alignItems="center" justifyContent="space-between">
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={disputesFetching ? <CircularProgress size={20} color="inherit" />: <RefreshIcon />}
+              onClick={fetchDisputesFromEbay}
+              disabled={disputesFetching}
+            >
+              {disputesFetching ? 'Fetching...' : 'Fetch Payment Disputes from eBay'}
+            </Button>
+            
+            <Typography variant="caption" color="text.secondary">
+              📅 Polls payment disputes via Fulfillment API
+            </Typography>
+          </Stack>
           
-          <Typography variant="caption" color="text.secondary">
-            📅 Polls payment disputes via Fulfillment API
-          </Typography>
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<DownloadIcon />}
+            onClick={handleExportPaymentDisputes}
+            disabled={filteredDisputes.length === 0}
+          >
+            Download CSV ({filteredDisputes.length})
+          </Button>
         </Stack>
 
         {/* Filters */}
@@ -875,7 +999,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {disputes.length === 0 ? (
+                {filteredDisputes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} align="center">
                       <Typography variant="body2" color="text.secondary" py={2}>
@@ -884,7 +1008,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  disputes.map((d) => (
+                  filteredDisputes.map((d) => (
                     <TableRow key={d._id} hover>
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>

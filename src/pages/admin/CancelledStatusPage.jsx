@@ -24,7 +24,10 @@ import {
 import CancelIcon from '@mui/icons-material/Cancel';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ChatIcon from '@mui/icons-material/Chat';
+import DownloadIcon from '@mui/icons-material/Download';
+import { Button } from '@mui/material';
 import api from '../../lib/api';
+import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ChatModal from '../../components/ChatModal';
 
 export default function CancelledStatusPage({
@@ -142,6 +145,30 @@ export default function CancelledStatusPage({
               variant="outlined"
             />
           )}
+          
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<DownloadIcon />}
+            onClick={() => {
+              const csvData = prepareCSVData(orders, {
+                'Order ID': 'orderId',
+                'Seller': (o) => o.seller?.user?.username || '',
+                'Buyer Name': 'shippingFullName',
+                'Product': 'productName',
+                'Cancel State': 'cancelState',
+                'Date Sold': (o) => o.dateSold ? new Date(o.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+                'Marketplace': 'purchaseMarketplaceId',
+                'Total': (o) => o.pricingSummary?.total?.value || '',
+                'Worksheet Status': 'worksheetStatus',
+              });
+              downloadCSV(csvData, 'Cancelled_Orders');
+            }}
+            disabled={orders.length === 0}
+            size="small"
+          >
+            Download CSV ({orders.length})
+          </Button>
         </Stack>
 
         {!hideDateFilter && (
