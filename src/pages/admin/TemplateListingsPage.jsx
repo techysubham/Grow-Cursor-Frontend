@@ -664,9 +664,22 @@ export default function TemplateListingsPage() {
           ...result.autoFilledData.coreFields
         };
         
+        // Apply custom column defaults for missing values
+        const customFields = { ...result.autoFilledData.customFields };
+        
+        if (template?.customColumns && template.customColumns.length > 0) {
+          template.customColumns.forEach(col => {
+            // If column has a defaultValue and the field is missing/empty, apply it
+            if (col.defaultValue && !customFields[col.name]) {
+              customFields[col.name] = col.defaultValue;
+              console.log(`✨ Applied column default for ${col.name}: ${col.defaultValue}`);
+            }
+          });
+        }
+        
         return {
           ...mergedCoreFields,
-          customFields: result.autoFilledData.customFields,
+          customFields,
           customLabel: result.sku,
           _asinReference: result.asin
         };
