@@ -105,6 +105,7 @@ import ColumnCreatorPage from '../pages/admin/ColumnCreatorPage.jsx';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import ManageTemplatesPage from '../pages/admin/ManageTemplatesPage.jsx';
 import TemplateListingsPage from '../pages/admin/TemplateListingsPage.jsx';
+import TemplateListingAnalyticsPage from '../pages/admin/TemplateListingAnalyticsPage.jsx';
 import SelectSellerPage from '../pages/admin/SelectSellerPage.jsx';
 import SellerTemplatesPage from '../pages/admin/SellerTemplatesPage.jsx';
 import TemplateDatabasePage from '../pages/admin/TemplateDatabasePage.jsx';
@@ -1275,6 +1276,7 @@ export default function AdminLayout({ user, onLogout }) {
           {(isSuper || isAnyLister) && (
             <>
               <Route path="/template-listings" element={<TemplateListingsPage />} />
+              <Route path="/template-listing-analytics" element={<TemplateListingAnalyticsPage />} />
               <Route path="/select-seller" element={<SelectSellerPage />} />
               <Route path="/seller-templates" element={<SellerTemplatesPage />} />
             </>

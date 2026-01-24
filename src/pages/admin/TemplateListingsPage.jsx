@@ -24,6 +24,7 @@ import PricingConfigSection from '../../components/PricingConfigSection.jsx';
 import BulkImportASINsDialog from '../../components/BulkImportASINsDialog.jsx';
 import BulkReactivateDialog from '../../components/BulkReactivateDialog.jsx';
 import BulkDeactivateDialog from '../../components/BulkDeactivateDialog.jsx';
+import TemplateListingStatsCard from '../../components/TemplateListingStatsCard.jsx';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
 
@@ -933,6 +934,15 @@ export default function TemplateListingsPage() {
           {template?.name || 'Template Listings'}
         </Typography>
       </Breadcrumbs>
+
+      {/* Statistics Card */}
+      {templateId && sellerId && (
+        <TemplateListingStatsCard
+          templateId={templateId}
+          sellerId={sellerId}
+          onViewDetails={() => navigate(`/admin/template-listing-analytics?templateId=${templateId}&sellerId=${sellerId}`)}
+        />
+      )}
 
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h6">
