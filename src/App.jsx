@@ -90,9 +90,12 @@ export default function App() {
               user.role === 'hradmin' ||
               user.role === 'hr' ||
               user.role === 'operationhead' ||
-              // --- FIX IS HERE: Add new roles to this check ---
               user.role === 'hoc' ||
-              user.role === 'compliancemanager'
+              user.role === 'compliancemanager' ||
+              // Lister roles - access to template listing workflow only
+              user.role === 'lister' ||
+              user.role === 'advancelister' ||
+              user.role === 'trainee'
             ) ? (
               <AdminLayout user={user} onLogout={logout} />
             ) : (
