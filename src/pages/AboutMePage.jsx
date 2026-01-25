@@ -185,8 +185,8 @@ export default function AboutMePage() {
         <Paper sx={{ p: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
             <Typography variant="h6">My Profile</Typography>
-            <Button onClick={onSubmit} variant="contained" disabled={saving || uploading.profilePic || uploading.aadhar || uploading.pan}>
-              {(uploading.profilePic || uploading.aadhar || uploading.pan) ? 'Uploading...' : 'Save'}
+            <Button onClick={onSubmit} variant="contained" disabled={saving || uploading.profilePic || uploading.aadhar || uploading.pan} startIcon={saving && <CircularProgress size={20} color="inherit" />}>
+              {(uploading.profilePic || uploading.aadhar || uploading.pan) ? 'Uploading...' : saving ? 'Saving...' : 'Save'}
             </Button>
           </Stack>
           <Box component="form" onSubmit={onSubmit}>
@@ -299,8 +299,8 @@ export default function AboutMePage() {
         <Paper sx={{ p: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
             <Typography variant="h6">My Task List</Typography>
-            <Button onClick={onSubmit} variant="contained" disabled={saving}>
-              Save
+            <Button onClick={onSubmit} variant="contained" disabled={saving} startIcon={saving && <CircularProgress size={20} color="inherit" />}>
+              {saving ? 'Saving...' : 'Save'}
             </Button>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -330,8 +330,8 @@ export default function AboutMePage() {
         <Paper sx={{ p: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
             <Typography variant="h6">Primary Task</Typography>
-            <Button onClick={onSubmit} variant="contained" disabled={saving}>
-              Save
+            <Button onClick={onSubmit} variant="contained" disabled={saving} startIcon={saving && <CircularProgress size={20} color="inherit" />}>
+              {saving ? 'Saving...' : 'Save'}
             </Button>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -355,8 +355,8 @@ export default function AboutMePage() {
         <Paper sx={{ p: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
             <Typography variant="h6">Secondary Task</Typography>
-            <Button onClick={onSubmit} variant="contained" disabled={saving}>
-              Save
+            <Button onClick={onSubmit} variant="contained" disabled={saving} startIcon={saving && <CircularProgress size={20} color="inherit" />}>
+              {saving ? 'Saving...' : 'Save'}
             </Button>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>

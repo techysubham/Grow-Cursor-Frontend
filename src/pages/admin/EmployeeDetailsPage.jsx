@@ -23,7 +23,8 @@ import {
   Snackbar,
   Alert,
   Tabs,
-  Tab
+  Tab,
+  CircularProgress
 } from '@mui/material';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import SearchIcon from '@mui/icons-material/Search';
@@ -797,8 +798,14 @@ export default function EmployeeDetailsPage() {
         {isEditing && (
           <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button onClick={() => setIsEditing(false)}>Cancel</Button>
-            <Button onClick={handleSave} variant="contained" color="success" disabled={saving}>
-              Save Changes
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              color="success"
+              disabled={saving}
+              startIcon={saving && <CircularProgress size={20} color="inherit" />}
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogActions>
         )}
@@ -1070,6 +1077,7 @@ export default function EmployeeDetailsPage() {
                 variant="contained"
                 color="success"
                 disabled={savingSecrets}
+                startIcon={savingSecrets && <CircularProgress size={20} color="inherit" />}
               >
                 {savingSecrets ? 'Saving...' : 'Save Changes'}
               </Button>
