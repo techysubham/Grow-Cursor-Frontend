@@ -21,7 +21,9 @@ import {
   Divider,
   Tooltip,
   Snackbar,
-  Alert
+  Alert,
+  Tabs,
+  Tab
 } from '@mui/material';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import SearchIcon from '@mui/icons-material/Search';
@@ -29,7 +31,51 @@ import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import LaunchIcon from '@mui/icons-material/Launch';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import PersonIcon from '@mui/icons-material/Person';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import StarIcon from '@mui/icons-material/Star';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import SecurityIcon from '@mui/icons-material/Security';
 import { listEmployeeProfiles, updateEmployeeProfile, getEmployeeFileUrl, deleteEmployeeProfile } from '../../lib/api.js';
+
+// TabPanel component for managing tab content
+function TabPanel({ children, value, index }) {
+  return (
+    <Box
+      role="tabpanel"
+      hidden={value !== index}
+      sx={{ pt: 2 }}
+    >
+      {value === index && children}
+    </Box>
+  );
+}
+
+
+// Helper function to sanitize payload - remove empty strings from enum fields
+function sanitizePayload(payload) {
+  const sanitized = { ...payload };
+
+  // Handle gender: if empty string, set to "other" instead of deleting
+  if (sanitized.gender === '' || sanitized.gender === null || sanitized.gender === undefined) {
+    sanitized.gender = 'other';
+  }
+
+  // Remove empty workingMode (still delete this one)
+  if (sanitized.workingMode === '' || sanitized.workingMode === null || sanitized.workingMode === undefined) {
+    delete sanitized.workingMode;
+  }
+
+  // Remove empty optional fields
+  const optionalFields = ['workingHours', 'dateOfBirth', 'dateOfJoining'];
+  optionalFields.forEach(field => {
+    if (sanitized[field] === '' || sanitized[field] === null) {
+      delete sanitized[field];
+    }
+  });
+
+  return sanitized;
+}
 
 
 export default function EmployeeDetailsPage() {
@@ -49,7 +95,13 @@ export default function EmployeeDetailsPage() {
     address: '',
     email: '',
     aadharNumber: '',
-    panNumber: ''
+    panNumber: '',
+    bankAccountNumber: '',
+    bankIFSC: '',
+    bankName: '',
+    myTaskList: '',
+    primaryTask: '',
+    secondaryTask: ''
   });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -60,6 +112,10 @@ export default function EmployeeDetailsPage() {
   const [deleteConfirmStep, setDeleteConfirmStep] = useState(1);
   const [deletingProfile, setDeletingProfile] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+  const [secretsOpen, setSecretsOpen] = useState(false);
+  const [isEditingSecrets, setIsEditingSecrets] = useState(false);
+  const [savingSecrets, setSavingSecrets] = useState(false);
 
   const loadProfiles = async () => {
     try {
@@ -89,10 +145,17 @@ export default function EmployeeDetailsPage() {
       address: profile.address || '',
       email: profile.email || '',
       aadharNumber: profile.aadharNumber || '',
-      panNumber: profile.panNumber || ''
+      panNumber: profile.panNumber || '',
+      bankAccountNumber: profile.bankAccountNumber || '',
+      bankIFSC: profile.bankIFSC || '',
+      bankName: profile.bankName || '',
+      myTaskList: profile.myTaskList || '',
+      primaryTask: profile.primaryTask || '',
+      secondaryTask: profile.secondaryTask || ''
     });
     setEditOpen(true);
     setIsEditing(false);
+    setActiveTab(0); // Reset to Profile tab
   };
 
   const closeEdit = () => {
@@ -125,9 +188,6 @@ export default function EmployeeDetailsPage() {
     if (!editForm.workingMode || editForm.workingMode.trim() === '') {
       errors.workingMode = 'Working Mode is required';
     }
-    if (!editForm.gender || editForm.gender.trim() === '') {
-      errors.gender = 'Gender is required';
-    }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -138,21 +198,35 @@ export default function EmployeeDetailsPage() {
 
     // Validate before saving
     if (!validateForm()) {
-      setSnack({ open: true, message: 'Please fill in all required fields', severity: 'error' });
+      // Get list of missing fields
+      const missingFields = Object.keys(validationErrors).map(field => {
+        // Make field names more readable
+        const fieldNames = {
+          name: 'Name',
+          email: 'Email',
+          role: 'Role',
+          department: 'Department',
+          workingMode: 'Working Mode'
+        };
+        return fieldNames[field] || field;
+      });
+
+      // Auto-switch to Profile tab (tab 0) where all required fields are
+      setActiveTab(0);
+
+      // Show specific error message
+      const errorMsg = missingFields.length === 1
+        ? `${missingFields[0]} is required (Profile tab)`
+        : `Please fill in: ${missingFields.join(', ')} (Profile tab)`;
+
+      setSnack({ open: true, message: errorMsg, severity: 'error' });
       return;
     }
 
     setSaving(true);
     try {
-      // Sanitize payload: remove empty strings for enum fields to avoid validation errors
-      const payload = { ...editForm };
-      if (!payload.workingMode) delete payload.workingMode;
-      if (!payload.gender) delete payload.gender;
-      if (!payload.workingHours) delete payload.workingHours; // Optional but good practice
-
-      // Also handle dates if they are empty
-      if (!payload.dateOfBirth) delete payload.dateOfBirth;
-      if (!payload.dateOfJoining) delete payload.dateOfJoining;
+      // Sanitize payload using helper function
+      const payload = sanitizePayload(editForm);
 
       // Send sanitized fields
       await updateEmployeeProfile(editingProfile._id, payload);
@@ -167,6 +241,47 @@ export default function EmployeeDetailsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveSecrets = async () => {
+    if (!editingProfile) return;
+
+    setSavingSecrets(true);
+    try {
+      // Sanitize payload using helper function
+      const payload = sanitizePayload(editForm);
+
+      await updateEmployeeProfile(editingProfile._id, payload);
+      await loadProfiles();
+      setIsEditingSecrets(false);
+      setSnack({ open: true, message: 'Secret details updated successfully!', severity: 'success' });
+    } catch (err) {
+      console.error('Failed to update secrets', err);
+      const errorMsg = err.response?.data?.details || err.response?.data?.error || 'Failed to update secret details.';
+      setSnack({ open: true, message: errorMsg, severity: 'error' });
+    } finally {
+      setSavingSecrets(false);
+    }
+  };
+
+  const handleCancelSecretsEdit = () => {
+    // Reset to original values
+    if (editingProfile) {
+      setEditForm({
+        ...editForm,
+        aadharNumber: editingProfile.aadharNumber || '',
+        panNumber: editingProfile.panNumber || '',
+        bankAccountNumber: editingProfile.bankAccountNumber || '',
+        bankIFSC: editingProfile.bankIFSC || '',
+        bankName: editingProfile.bankName || ''
+      });
+    }
+    setIsEditingSecrets(false);
+  };
+
+  const handleCloseSecrets = () => {
+    setSecretsOpen(false);
+    setIsEditingSecrets(false);
   };
 
   const openDeleteDialog = (profile) => {
@@ -294,308 +409,390 @@ export default function EmployeeDetailsPage() {
         </Grid>
       </Paper>
 
-      <Dialog open={editOpen} onClose={closeEdit} maxWidth="md" fullWidth>
+      <Dialog
+        open={editOpen}
+        onClose={closeEdit}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            height: '80vh',
+            maxHeight: '80vh',
+          }
+        }}
+      >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', m: 0, p: 2 }}>
           <Typography variant="h6" component="div">Manage Employee - {editingProfile?.user?.username}</Typography>
           <Box>
             {!isEditing && (
-              <Button
-                startIcon={<EditIcon />}
-                onClick={handleStartEdit}
-                variant="contained"
-                color="primary"
-                size="small"
-                sx={{ mr: 2 }}
-              >
-                Edit
-              </Button>
+              <>
+                <Button
+                  startIcon={<SecurityIcon />}
+                  onClick={() => setSecretsOpen(true)}
+                  variant="outlined"
+                  color="secondary"
+                  size="small"
+                  sx={{ mr: 1 }}
+                >
+                  Secrets
+                </Button>
+                <Button
+                  startIcon={<EditIcon />}
+                  onClick={handleStartEdit}
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  sx={{ mr: 2 }}
+                >
+                  Edit
+                </Button>
+              </>
             )}
             <IconButton onClick={closeEdit}>
               <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" color="primary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
-                Professional Details
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    select
-                    label="Role"
-                    value={editForm.role}
-                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                    fullWidth
-                    size="small"
-                    disabled={!isEditing}
-                    required
-                    error={!!validationErrors.role}
-                    helperText={validationErrors.role}
-                    sx={{
-                      '& .MuiFormLabel-asterisk': {
-                        color: 'red',
-                      },
-                    }}
-                  >
-                    <MenuItem value="productadmin">Product Research Admin</MenuItem>
-                    <MenuItem value="listingadmin">Listing Admin</MenuItem>
-                    <MenuItem value="compatibilityadmin">Compatibility Admin</MenuItem>
-                    <MenuItem value="compatibilityeditor">Compatibility Editor</MenuItem>
-                    <MenuItem value="fulfillmentadmin">Fulfillment Admin</MenuItem>
-                    <MenuItem value="hradmin">HR Admin</MenuItem>
-                    <MenuItem value="hr">HR</MenuItem>
-                    <MenuItem value="operationhead">Operation Head</MenuItem>
-                    <MenuItem value="lister">Lister</MenuItem>
-                    <MenuItem value="advancelister">Advance Lister</MenuItem>
-                    <MenuItem value="trainee">Trainee</MenuItem>
-                    <MenuItem value="seller">Seller</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    select
-                    label="Department"
-                    value={editForm.department}
-                    onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                    fullWidth
-                    size="small"
-                    disabled={!isEditing}
-                    required
-                    error={!!validationErrors.department}
-                    helperText={validationErrors.department}
-                    sx={{
-                      '& .MuiFormLabel-asterisk': {
-                        color: 'red',
-                      },
-                    }}
-                  >
-                    <MenuItem value="">Select Department</MenuItem>
-                    <MenuItem value="Product Research">Product Research Department</MenuItem>
-                    <MenuItem value="Listing">Listing Department</MenuItem>
-                    <MenuItem value="Compatibility">Compatibility Department</MenuItem>
-                    <MenuItem value="HR">HR Department</MenuItem>
-                    <MenuItem value="Operations">Operations Department</MenuItem>
-                    <MenuItem value="Executives">Executives Department</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    select
-                    label="Working Mode"
-                    value={editForm.workingMode}
-                    onChange={(e) => setEditForm({ ...editForm, workingMode: e.target.value })}
-                    fullWidth
-                    size="small"
-                    disabled={!isEditing}
-                    required
-                    error={!!validationErrors.workingMode}
-                    helperText={validationErrors.workingMode}
-                    sx={{
-                      '& .MuiFormLabel-asterisk': {
-                        color: 'red',
-                      },
-                    }}
-                  >
-                    <MenuItem value="">Select</MenuItem>
-                    <MenuItem value="remote">Remote</MenuItem>
-                    <MenuItem value="office">Office</MenuItem>
-                    <MenuItem value="hybrid">Hybrid</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Working Hours"
-                    value={editForm.workingHours}
-                    onChange={(e) => setEditForm({ ...editForm, workingHours: e.target.value })}
-                    fullWidth
-                    size="small"
-                    placeholder="e.g., 9 AM - 6 PM"
-                    disabled={!isEditing}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Date of Joining"
-                    type="date"
-                    value={editForm.dateOfJoining ? editForm.dateOfJoining.split('T')[0] : ''}
-                    onChange={(e) => setEditForm({ ...editForm, dateOfJoining: e.target.value })}
-                    disabled={!isEditing}
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-              </Grid>
-            </Grid>
+        <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: 'calc(80vh - 140px)' }}>
+          {/* Tabs Navigation */}
+          <Tabs
+            value={activeTab}
+            onChange={(e, newValue) => setActiveTab(newValue)}
+            variant="fullWidth"
+            sx={{
+              borderBottom: 1,
+              borderColor: 'divider',
+              backgroundColor: 'background.paper',
+              zIndex: 10,
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              minHeight: 64,
+              '& .MuiTab-root': {
+                minHeight: 64,
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                textTransform: 'none',
+                transition: 'none',
+              },
+            }}
+          >
+            <Tab icon={<PersonIcon />} label="Profile" iconPosition="start" />
+            <Tab icon={<AssignmentIcon />} label="My Task List" iconPosition="start" />
+            <Tab icon={<StarIcon />} label="Primary Task" iconPosition="start" />
+            <Tab icon={<BookmarkIcon />} label="Secondary Task" iconPosition="start" />
+          </Tabs>
 
-            <Grid item xs={12}>
-              <Divider />
-            </Grid>
-
-            {/* Personal Details */}
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" color="primary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
-                Personal Details
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Full Name"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    disabled={!isEditing}
-                    size="small"
-                    required
-                    error={!!validationErrors.name}
-                    helperText={validationErrors.name}
-                    sx={{
-                      '& .MuiFormLabel-asterisk': {
-                        color: 'red',
-                      },
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Email"
-                    value={editForm.email}
-                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    disabled={!isEditing}
-                    size="small"
-                    required
-                    error={!!validationErrors.email}
-                    helperText={validationErrors.email}
-                    sx={{
-                      '& .MuiFormLabel-asterisk': {
-                        color: 'red',
-                      },
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Phone"
-                    value={editForm.phoneNumber}
-                    onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
-                    disabled={!isEditing}
-                    size="small"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Gender"
-                    value={editForm.gender}
-                    onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
-                    disabled={!isEditing}
-                    size="small"
-                    required
-                    error={!!validationErrors.gender}
-                    helperText={validationErrors.gender}
-                    sx={{
-                      '& .MuiFormLabel-asterisk': {
-                        color: 'red',
-                      },
-                    }}
-                  >
-                    <MenuItem value="">Select</MenuItem>
-                    <MenuItem value="male">Male</MenuItem>
-                    <MenuItem value="female">Female</MenuItem>
-                    <MenuItem value="other">Other</MenuItem>
-                    <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Date of Birth"
-                    type="date"
-                    value={editForm.dateOfBirth ? editForm.dateOfBirth.split('T')[0] : ''}
-                    onChange={(e) => setEditForm({ ...editForm, dateOfBirth: e.target.value })}
-                    disabled={!isEditing}
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
+          {/* Tab Panels - Scrollable area */}
+          <Box sx={{ p: 3, overflow: 'auto', flex: 1 }}>
+            {/* TAB 0: Profile */}
+            <TabPanel value={activeTab} index={0}>
+              <Grid container spacing={3}>
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Address"
-                    value={editForm.address}
-                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                    multiline
-                    rows={2}
-                    disabled={!isEditing}
-                    size="small"
-                  />
-                </Grid>
-
-
-
-                {/* Documents */}
-                <Grid item xs={12}>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mt: 1, mb: 1 }}>Documents</Typography>
+                  <Typography variant="subtitle2" color="primary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+                    Professional Details
+                  </Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
-                      <Stack direction="row" spacing={1} alignItems="flex-start">
-                        <TextField
-                          fullWidth
-                          label="Aadhar Number"
-                          value={editForm.aadharNumber}
-                          onChange={(e) => setEditForm({ ...editForm, aadharNumber: e.target.value })}
-                          disabled={!isEditing}
-                          size="small"
-                        />
-                        {editingProfile?.hasAadhar && (
-                          <Tooltip title="View Aadhar Card">
-                            <Button
-                              variant="outlined"
-                              onClick={() => window.open(getEmployeeFileUrl(editingProfile._id, 'aadhar'), '_blank')}
-                              sx={{ height: 40, minWidth: 40, px: 2 }}
-                            >
-                              <LaunchIcon fontSize="small" />
-                            </Button>
-                          </Tooltip>
-                        )}
-                      </Stack>
+                      <TextField
+                        select
+                        label="Role"
+                        value={editForm.role}
+                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                        fullWidth
+                        size="small"
+                        disabled={!isEditing}
+                        required
+                        error={!!validationErrors.role}
+                        helperText={validationErrors.role}
+                        sx={{
+                          '& .MuiFormLabel-asterisk': {
+                            color: 'red',
+                          },
+                        }}
+                      >
+                        <MenuItem value="productadmin">Product Research Admin</MenuItem>
+                        <MenuItem value="listingadmin">Listing Admin</MenuItem>
+                        <MenuItem value="compatibilityadmin">Compatibility Admin</MenuItem>
+                        <MenuItem value="compatibilityeditor">Compatibility Editor</MenuItem>
+                        <MenuItem value="fulfillmentadmin">Fulfillment Admin</MenuItem>
+                        <MenuItem value="hradmin">HR Admin</MenuItem>
+                        <MenuItem value="hr">HR</MenuItem>
+                        <MenuItem value="operationhead">Operation Head</MenuItem>
+                        <MenuItem value="lister">Lister</MenuItem>
+                        <MenuItem value="advancelister">Advance Lister</MenuItem>
+                        <MenuItem value="trainee">Trainee</MenuItem>
+                        <MenuItem value="seller">Seller</MenuItem>
+                      </TextField>
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                      <Stack direction="row" spacing={1} alignItems="flex-start">
-                        <TextField
-                          fullWidth
-                          label="PAN Number"
-                          value={editForm.panNumber}
-                          onChange={(e) => setEditForm({ ...editForm, panNumber: e.target.value })}
-                          disabled={!isEditing}
-                          size="small"
-                        />
-                        {editingProfile?.hasPan && (
-                          <Tooltip title="View PAN Card">
-                            <Button
-                              variant="outlined"
-                              onClick={() => window.open(getEmployeeFileUrl(editingProfile._id, 'pan'), '_blank')}
-                              sx={{ height: 40, minWidth: 40, px: 2 }}
-                            >
-                              <LaunchIcon fontSize="small" />
-                            </Button>
-                          </Tooltip>
-                        )}
-                      </Stack>
+                      <TextField
+                        select
+                        label="Department"
+                        value={editForm.department}
+                        onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                        fullWidth
+                        size="small"
+                        disabled={!isEditing}
+                        required
+                        error={!!validationErrors.department}
+                        helperText={validationErrors.department}
+                        sx={{
+                          '& .MuiFormLabel-asterisk': {
+                            color: 'red',
+                          },
+                        }}
+                      >
+                        <MenuItem value="">Select Department</MenuItem>
+                        <MenuItem value="Product Research">Product Research Department</MenuItem>
+                        <MenuItem value="Listing">Listing Department</MenuItem>
+                        <MenuItem value="Compatibility">Compatibility Department</MenuItem>
+                        <MenuItem value="HR">HR Department</MenuItem>
+                        <MenuItem value="Operations">Operations Department</MenuItem>
+                        <MenuItem value="Executives">Executives Department</MenuItem>
+                      </TextField>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        select
+                        label="Working Mode"
+                        value={editForm.workingMode}
+                        onChange={(e) => setEditForm({ ...editForm, workingMode: e.target.value })}
+                        fullWidth
+                        size="small"
+                        disabled={!isEditing}
+                        required
+                        error={!!validationErrors.workingMode}
+                        helperText={validationErrors.workingMode}
+                        sx={{
+                          '& .MuiFormLabel-asterisk': {
+                            color: 'red',
+                          },
+                        }}
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        <MenuItem value="remote">Remote</MenuItem>
+                        <MenuItem value="office">Office</MenuItem>
+                        <MenuItem value="hybrid">Hybrid</MenuItem>
+                      </TextField>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        label="Working Hours"
+                        value={editForm.workingHours}
+                        onChange={(e) => setEditForm({ ...editForm, workingHours: e.target.value })}
+                        fullWidth
+                        size="small"
+                        placeholder="e.g., 9 AM - 6 PM"
+                        disabled={!isEditing}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Date of Joining"
+                        type="date"
+                        value={editForm.dateOfJoining ? editForm.dateOfJoining.split('T')[0] : ''}
+                        onChange={(e) => setEditForm({ ...editForm, dateOfJoining: e.target.value })}
+                        disabled={!isEditing}
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
                     </Grid>
                   </Grid>
                 </Grid>
 
-              </Grid>
+                <Grid item xs={12}>
+                  <Divider />
+                </Grid>
 
-            </Grid>
-          </Grid>
+                {/* Personal Details */}
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" color="primary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+                    Personal Details
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Full Name"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        disabled={!isEditing}
+                        size="small"
+                        required
+                        error={!!validationErrors.name}
+                        helperText={validationErrors.name}
+                        sx={{
+                          '& .MuiFormLabel-asterisk': {
+                            color: 'red',
+                          },
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        disabled={!isEditing}
+                        size="small"
+                        required
+                        error={!!validationErrors.email}
+                        helperText={validationErrors.email}
+                        sx={{
+                          '& .MuiFormLabel-asterisk': {
+                            color: 'red',
+                          },
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Phone"
+                        value={editForm.phoneNumber}
+                        onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+                        disabled={!isEditing}
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Gender"
+                        value={editForm.gender}
+                        onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                        disabled={!isEditing}
+                        size="small"
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        <MenuItem value="male">Male</MenuItem>
+                        <MenuItem value="female">Female</MenuItem>
+                        <MenuItem value="other">Other</MenuItem>
+                        <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
+                      </TextField>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Date of Birth"
+                        type="date"
+                        value={editForm.dateOfBirth ? editForm.dateOfBirth.split('T')[0] : ''}
+                        onChange={(e) => setEditForm({ ...editForm, dateOfBirth: e.target.value })}
+                        disabled={!isEditing}
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Address"
+                        value={editForm.address}
+                        onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                        multiline
+                        rows={2}
+                        disabled={!isEditing}
+                        size="small"
+                      />
+                    </Grid>
+
+                  </Grid>
+
+                </Grid>
+              </Grid>
+            </TabPanel>
+
+            {/* TAB 1: My Task List */}
+            <TabPanel value={activeTab} index={1}>
+              <Box sx={{ maxWidth: 800, mx: 'auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="h6" gutterBottom>
+                  My Task List
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Enter each task on a new line. Use • for bullets.
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  label="Task List"
+                  placeholder="• Task 1&#10;• Task 2&#10;• Task 3"
+                  value={editForm.myTaskList}
+                  onChange={(e) => setEditForm({ ...editForm, myTaskList: e.target.value })}
+                  disabled={!isEditing}
+                  variant="outlined"
+                  sx={{
+                    flex: 1,
+                    '& .MuiInputBase-root': {
+                      fontFamily: 'monospace',
+                      fontSize: '0.95rem',
+                      height: '100%',
+                      alignItems: 'flex-start'
+                    }
+                  }}
+                />
+              </Box>
+            </TabPanel>
+
+            {/* TAB 2: Primary Task */}
+            <TabPanel value={activeTab} index={2}>
+              <Box sx={{ maxWidth: 800, mx: 'auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="h6" gutterBottom>
+                  Primary Task
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Describe the primary task or responsibility for this employee.
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  label="Primary Task"
+                  placeholder="Describe the primary task in detail..."
+                  value={editForm.primaryTask}
+                  onChange={(e) => setEditForm({ ...editForm, primaryTask: e.target.value })}
+                  disabled={!isEditing}
+                  variant="outlined"
+                  sx={{
+                    flex: 1,
+                    '& .MuiInputBase-root': {
+                      height: '100%',
+                      alignItems: 'flex-start'
+                    }
+                  }}
+                />
+              </Box>
+            </TabPanel>
+
+            {/* TAB 3: Secondary Task */}
+            <TabPanel value={activeTab} index={3}>
+              <Box sx={{ maxWidth: 800, mx: 'auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="h6" gutterBottom>
+                  Secondary Task
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Describe the secondary task or additional responsibilities.
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  label="Secondary Task"
+                  placeholder="Describe the secondary task in detail..."
+                  value={editForm.secondaryTask}
+                  onChange={(e) => setEditForm({ ...editForm, secondaryTask: e.target.value })}
+                  disabled={!isEditing}
+                  variant="outlined"
+                  sx={{
+                    flex: 1,
+                    '& .MuiInputBase-root': {
+                      height: '100%',
+                      alignItems: 'flex-start'
+                    }
+                  }}
+                />
+              </Box>
+            </TabPanel>
+          </Box>
         </DialogContent>
         {isEditing && (
           <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -709,6 +906,177 @@ export default function EmployeeDetailsPage() {
               startIcon={<DeleteForeverIcon />}
             >
               {deleting ? 'Deleting...' : 'Yes, Delete Permanently'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Secrets Modal */}
+      <Dialog
+        open={secretsOpen}
+        onClose={handleCloseSecrets}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', m: 0, p: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SecurityIcon />
+            <Typography variant="h6" component="div">Sensitive Documents</Typography>
+          </Box>
+          <Box>
+            {!isEditingSecrets && (
+              <Button
+                startIcon={<EditIcon />}
+                onClick={() => setIsEditingSecrets(true)}
+                variant="contained"
+                color="primary"
+                size="small"
+                sx={{ mr: 2 }}
+              >
+                Edit
+              </Button>
+            )}
+            <IconButton onClick={handleCloseSecrets}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 3 }}>
+          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold', color: 'text.secondary' }}>
+            Employee: {editingProfile?.user?.username}
+          </Typography>
+
+          <Grid container spacing={3}>
+            {/* Aadhar Card */}
+            <Grid item xs={12}>
+              <Paper elevation={2} sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  🪪 Aadhar Card
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <TextField
+                  fullWidth
+                  label="Aadhar Number"
+                  value={editForm.aadharNumber || ''}
+                  onChange={(e) => setEditForm({ ...editForm, aadharNumber: e.target.value })}
+                  size="small"
+                  disabled={!isEditingSecrets}
+                  placeholder={!isEditingSecrets && !editForm.aadharNumber ? 'Not provided' : ''}
+                  sx={{ mb: 2 }}
+                />
+                {editingProfile?.hasAadhar ? (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<LaunchIcon />}
+                    onClick={() => window.open(getEmployeeFileUrl(editingProfile._id, 'aadhar'), '_blank')}
+                    fullWidth
+                  >
+                    View Aadhar Document
+                  </Button>
+                ) : (
+                  <Alert severity="info">No Aadhar document uploaded</Alert>
+                )}
+              </Paper>
+            </Grid>
+
+            {/* PAN Card */}
+            <Grid item xs={12}>
+              <Paper elevation={2} sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  💳 PAN Card
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <TextField
+                  fullWidth
+                  label="PAN Number"
+                  value={editForm.panNumber || ''}
+                  onChange={(e) => setEditForm({ ...editForm, panNumber: e.target.value })}
+                  size="small"
+                  disabled={!isEditingSecrets}
+                  placeholder={!isEditingSecrets && !editForm.panNumber ? 'Not provided' : ''}
+                  sx={{ mb: 2 }}
+                />
+                {editingProfile?.hasPan ? (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<LaunchIcon />}
+                    onClick={() => window.open(getEmployeeFileUrl(editingProfile._id, 'pan'), '_blank')}
+                    fullWidth
+                  >
+                    View PAN Document
+                  </Button>
+                ) : (
+                  <Alert severity="info">No PAN document uploaded</Alert>
+                )}
+              </Paper>
+            </Grid>
+
+            {/* Bank Details */}
+            <Grid item xs={12}>
+              <Paper elevation={2} sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  🏦 Bank Details
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Bank Account Number"
+                      value={editForm.bankAccountNumber || ''}
+                      onChange={(e) => setEditForm({ ...editForm, bankAccountNumber: e.target.value })}
+                      size="small"
+                      disabled={!isEditingSecrets}
+                      placeholder={!isEditingSecrets && !editForm.bankAccountNumber ? 'Not provided' : ''}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Bank IFSC Code"
+                      value={editForm.bankIFSC || ''}
+                      onChange={(e) => setEditForm({ ...editForm, bankIFSC: e.target.value })}
+                      size="small"
+                      disabled={!isEditingSecrets}
+                      placeholder={!isEditingSecrets && !editForm.bankIFSC ? 'Not provided' : ''}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Bank Name"
+                      value={editForm.bankName || ''}
+                      onChange={(e) => setEditForm({ ...editForm, bankName: e.target.value })}
+                      size="small"
+                      disabled={!isEditingSecrets}
+                      placeholder={!isEditingSecrets && !editForm.bankName ? 'Not provided' : ''}
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          {isEditingSecrets ? (
+            <>
+              <Button onClick={handleCancelSecretsEdit} disabled={savingSecrets}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveSecrets}
+                variant="contained"
+                color="success"
+                disabled={savingSecrets}
+              >
+                {savingSecrets ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={handleCloseSecrets} variant="outlined">
+              Close
             </Button>
           )}
         </DialogActions>
