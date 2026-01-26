@@ -36,6 +36,52 @@ import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ChatModal from '../../components/ChatModal';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
 
+// LogsCell component for editable logs field with save functionality
+function LogsCell({ value, onSave, id }) {
+  const [localValue, setLocalValue] = useState(value || '');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setLocalValue(value || '');
+  }, [value]);
+
+  const handleSave = async () => {
+    if (localValue === (value || '')) return; // No changes
+    setSaving(true);
+    try {
+      await onSave(id, localValue);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error('Failed to save logs:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <TextField
+      size="small"
+      multiline
+      maxRows={3}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={handleSave}
+      disabled={saving}
+      placeholder="Add logs..."
+      sx={{
+        minWidth: 120,
+        '& .MuiInputBase-input': { fontSize: '0.75rem' },
+        '& .MuiOutlinedInput-root': {
+          backgroundColor: saved ? '#e8f5e9' : 'transparent',
+          transition: 'background-color 0.3s'
+        }
+      }}
+    />
+  );
+}
+
 export default function ReturnRequestedPage({
   dateFilter: dateFilterProp,
   hideDateFilter = false,
@@ -289,6 +335,22 @@ export default function ReturnRequestedPage({
     return new Date(responseDate) < new Date();
   };
 
+  // Handler for saving return logs
+  const handleSaveReturnLogs = async (returnId, logs) => {
+    try {
+      await api.patch(`/ebay/returns/${returnId}/logs`, { logs });
+      // Update local state
+      setReturns(prevReturns =>
+        prevReturns.map(ret =>
+          ret.returnId === returnId ? { ...ret, logs } : ret
+        )
+      );
+    } catch (err) {
+      console.error('Failed to save return logs:', err);
+      throw err;
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -370,6 +432,7 @@ export default function ReturnRequestedPage({
               'Status': (r) => r.currentStatus || r.returnRequest?.currentType || '',
               'RMA Number': 'RMANumber',
               'Created Date': (r) => r.creationDate ? new Date(r.creationDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+              'Logs': 'logs',
             });
             downloadCSV(csvData, 'Return_Requests');
           }}
@@ -590,13 +653,14 @@ export default function ReturnRequestedPage({
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Status</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Worksheet Status</strong></TableCell>
+                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Logs</strong></TableCell>
                 <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }} align="center"><strong>Chat</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {returns.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} align="center">
+                  <TableCell colSpan={13} align="center">
                     <Typography variant="body2" color="text.secondary" py={2}>
                       No return requests found. Click "Fetch Returns from eBay" to load data.
                     </Typography>
@@ -740,6 +804,13 @@ export default function ReturnRequestedPage({
                           <MenuItem value="resolved">Resolved</MenuItem>
                         </Select>
                       </FormControl>
+                    </TableCell>
+                    <TableCell>
+                      <LogsCell
+                        value={ret.logs}
+                        id={ret.returnId}
+                        onSave={handleSaveReturnLogs}
+                      />
                     </TableCell>
                     <TableCell align="center">
                       <Tooltip title="Chat with buyer">

@@ -61,9 +61,13 @@ import PersonIcon from '@mui/icons-material/Person'; // <--- Add this
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'; // <--- Add this
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
-
+import DownloadIcon from '@mui/icons-material/Download';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import BlockIcon from '@mui/icons-material/Block';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import api from '../../lib/api';
+import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 
 // Remark dropdown options
 const REMARK_OPTIONS = [
@@ -556,6 +560,33 @@ function ChatDialog({ open, onClose, order }) {
               } 
             }}
           />
+          <Tooltip title="Use delivery template">
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                const nameToUse = order.shippingFullName || order.buyer?.username || 'Buyer';
+                const firstName = nameToUse.split(' ')[0];
+                setNewMessage(`Hi ${firstName},
+
+Just a quick update, we hope your package was successfully delivered and in satisfactory condition.
+
+We hope everything arrived safely and that you’re happy with your purchase. If you’re satisfied, we’d really appreciate it if you could leave us a 5-star feedback,  it truly helps our business grow and continue providing great service.
+
+If you have any concerns and need assistance regarding your order, please don't hesitate to reach out first and we'd be happy to help.
+
+Thank you so much for your trust and support.`);
+              }}
+              disabled={sending}
+              sx={{ 
+                minWidth: { xs: 'auto', sm: 100 },
+                px: { xs: 1, sm: 2 },
+                fontSize: { xs: '0.7rem', sm: '0.875rem' }
+              }}
+            >
+              {isMobileChat ? '📝' : 'Template'}
+            </Button>
+          </Tooltip>
           <Button
             variant="contained"
             sx={{ px: { xs: 2, sm: 3 }, minWidth: { xs: 'auto', sm: 80 } }}
@@ -930,6 +961,10 @@ function FulfillmentDashboard() {
   // Backfill Ad Fees state
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillResults, setBackfillResults] = useState(null);
+
+  // Auto-message state
+  const [autoMessageLoading, setAutoMessageLoading] = useState(false);
+  const [autoMessageStats, setAutoMessageStats] = useState(null);
 
   // Editing item status
   const [editingItemStatus, setEditingItemStatus] = useState({});
@@ -2087,6 +2122,88 @@ function FulfillmentDashboard() {
     );
   };
 
+  // CSV Export Handler
+  const handleExportOrders = () => {
+    if (orders.length === 0) {
+      setSnackbarMsg('No orders to export');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    const csvData = prepareCSVData(orders, {
+      'Order ID': 'orderId',
+      'Legacy Order ID': 'legacyOrderId',
+      'Seller': (o) => o.seller?.user?.username || '',
+      'Date Sold': (o) => o.dateSold ? new Date(o.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+      'Product Name': 'productName',
+      'Item Number': 'itemNumber',
+      'Buyer Name': 'shippingFullName',
+      'Buyer Username': (o) => o.buyer?.username || '',
+      'Marketplace': 'purchaseMarketplaceId',
+      'Subtotal (USD)': 'subtotalUSD',
+      'Shipping (USD)': 'shippingUSD',
+      'Sales Tax (USD)': 'salesTaxUSD',
+      'Discount (USD)': 'discountUSD',
+      'Transaction Fees (USD)': 'transactionFeesUSD',
+      'Ad Fees': 'adFeeGeneral',
+      'Order Earnings': 'orderEarnings',
+      'Payment Status': 'orderPaymentStatus',
+      'Fulfillment Status': 'orderFulfillmentStatus',
+      'Tracking Number': 'trackingNumber',
+      'Shipping Address': (o) => [o.shippingAddressLine1, o.shippingAddressLine2, o.shippingCity, o.shippingState, o.shippingPostalCode, o.shippingCountry].filter(Boolean).join(', '),
+      'Amazon Order ID': 'azOrderId',
+      'Remark': 'remark',
+      'Notes': 'fulfillmentNotes',
+    });
+    downloadCSV(csvData, 'Fulfillment_Orders');
+
+    setSnackbarMsg(`Exported ${orders.length} orders to CSV`);
+    setSnackbarSeverity('success');
+    setSnackbarOpen(true);
+  };
+
+  // Auto-message handlers
+  const handleSendAutoMessages = async () => {
+    setAutoMessageLoading(true);
+    try {
+      const res = await api.post('/ebay/orders/send-auto-messages');
+      const { sent, failed, processed } = res.data;
+      setSnackbarMsg(`Auto-messages: ${sent} sent, ${failed} failed (${processed} processed)`);
+      setSnackbarSeverity(sent > 0 ? 'success' : 'info');
+      setSnackbarOpen(true);
+      // Reload orders to reflect updated status
+      await fetchOrders();
+    } catch (err) {
+      console.error('Auto-message error:', err);
+      setSnackbarMsg('Failed to send auto-messages: ' + (err.response?.data?.error || err.message));
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setAutoMessageLoading(false);
+    }
+  };
+
+  const handleToggleAutoMessage = async (orderId, disabled) => {
+    try {
+      await api.patch(`/ebay/orders/${orderId}/auto-message-toggle`, { disabled });
+      // Update local state
+      setOrders(prevOrders =>
+        prevOrders.map(o =>
+          o.orderId === orderId ? { ...o, autoMessageDisabled: disabled } : o
+        )
+      );
+      setSnackbarMsg(`Auto-message ${disabled ? 'disabled' : 'enabled'} for order`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (err) {
+      console.error('Toggle auto-message error:', err);
+      setSnackbarMsg('Failed to toggle auto-message');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
   return (
     <Box sx={{
       display: 'flex',
@@ -2165,6 +2282,29 @@ function FulfillmentDashboard() {
                 (Page {currentPage}/{totalPages})
               </Typography>
             )}
+            {orders.length > 0 && (
+              <Button
+                variant="outlined"
+                color="success"
+                size="small"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportOrders}
+                sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
+              >
+                {isSmallMobile ? 'CSV' : 'Download CSV'}
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              color="info"
+              size="small"
+              startIcon={autoMessageLoading ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+              onClick={handleSendAutoMessages}
+              disabled={autoMessageLoading}
+              sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
+            >
+              {isSmallMobile ? 'Auto Msg' : 'Send Auto Messages'}
+            </Button>
           </Stack>
         </Stack>
 
@@ -2795,9 +2935,35 @@ function FulfillmentDashboard() {
                     )}
                     {visibleColumns.includes('orderId') && (
                       <TableCell>
-                        <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
-                          {order.orderId || order.legacyOrderId || '-'}
-                        </Typography>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
+                            {order.orderId || order.legacyOrderId || '-'}
+                          </Typography>
+                          
+                          {/* Auto-Message Status Indicator */}
+                          {order.autoMessageSent ? (
+                            <Tooltip title={`Auto-message sent at ${new Date(order.autoMessageSentAt).toLocaleString()}`}>
+                              <CheckCircleIcon color="success" sx={{ fontSize: 16 }} />
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title={order.autoMessageDisabled ? "Auto-message disabled (click to enable)" : "Auto-message pending (click to disable)"}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleAutoMessage(order.orderId, !order.autoMessageDisabled);
+                                }}
+                                sx={{ p: 0.5 }}
+                              >
+                                {order.autoMessageDisabled ? (
+                                  <BlockIcon color="action" sx={{ fontSize: 16 }} />
+                                ) : (
+                                  <AccessTimeIcon color="primary" sx={{ fontSize: 16 }} />
+                                )}
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Stack>
                       </TableCell>
                     )}
                     {visibleColumns.includes('dateSold') && <TableCell>{formatDate(order.dateSold, order.purchaseMarketplaceId)}</TableCell>}

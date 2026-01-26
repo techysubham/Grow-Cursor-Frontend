@@ -126,6 +126,68 @@ export default function CancelledStatusPage({
     return `$${num.toFixed(2)}`;
   };
 
+  // Handler for saving order logs
+  const handleSaveOrderLogs = async (orderId, logs) => {
+    try {
+      await api.patch(`/ebay/orders/${orderId}/logs`, { logs });
+      // Update local state
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.orderId === orderId ? { ...order, logs } : order
+        )
+      );
+    } catch (err) {
+      console.error('Failed to save order logs:', err);
+      throw err;
+    }
+  };
+
+  // LogsCell component for editable logs field with save functionality
+  const LogsCell = ({ value, onSave, id }) => {
+    const [localValue, setLocalValue] = React.useState(value || '');
+    const [saving, setSaving] = React.useState(false);
+    const [saved, setSaved] = React.useState(false);
+
+    React.useEffect(() => {
+      setLocalValue(value || '');
+    }, [value]);
+
+    const handleSave = async () => {
+      if (localValue === (value || '')) return; // No changes
+      setSaving(true);
+      try {
+        await onSave(id, localValue);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } catch (err) {
+        console.error('Failed to save logs:', err);
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    return (
+      <TextField
+        size="small"
+        multiline
+        maxRows={3}
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={handleSave}
+        disabled={saving}
+        placeholder="Add logs..."
+        sx={{
+          minWidth: 120,
+          '& .MuiInputBase-input': { fontSize: '0.75rem' },
+          '& .MuiOutlinedInput-root': {
+            backgroundColor: saved ? '#e8f5e9' : 'transparent',
+            transition: 'background-color 0.3s'
+          }
+        }}
+      />
+    );
+  };
+
   return (
     <Box>
       {/* HEADER SECTION */}
@@ -161,6 +223,7 @@ export default function CancelledStatusPage({
                 'Marketplace': 'purchaseMarketplaceId',
                 'Total': (o) => o.pricingSummary?.total?.value || '',
                 'Worksheet Status': 'worksheetStatus',
+                'Logs': 'logs',
               });
               downloadCSV(csvData, 'Cancelled_Orders');
             }}
@@ -284,6 +347,7 @@ export default function CancelledStatusPage({
                 <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Cancel Status</TableCell>
                 <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Refunds</TableCell>
                 <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Worksheet Status</TableCell>
+                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Logs</TableCell>
                 <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }} align="center">Chat</TableCell>
               </TableRow>
             </TableHead>
@@ -459,6 +523,13 @@ export default function CancelledStatusPage({
                         <MenuItem value="resolved">Resolved</MenuItem>
                       </Select>
                     </FormControl>
+                    </TableCell>
+                    <TableCell>
+                      <LogsCell
+                        value={order.logs}
+                        id={order.orderId}
+                        onSave={handleSaveOrderLogs}
+                      />
                     </TableCell>
                     <TableCell align="center">
                       <Tooltip title="Chat with buyer">

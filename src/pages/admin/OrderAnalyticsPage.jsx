@@ -16,9 +16,13 @@ import {
   Stack,
   Chip,
   FormControl,
+  FormControlLabel,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  useTheme,
+  Collapse,
+  Switch
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
@@ -39,6 +43,7 @@ export default function OrderAnalyticsPage() {
     to: ''
   });
   const [selectedSeller, setSelectedSeller] = useState('');
+  const [excludeLowValue, setExcludeLowValue] = useState(false);
 
   // Summary statistics - only count
   const [totalOrders, setTotalOrders] = useState(0);
@@ -50,7 +55,7 @@ export default function OrderAnalyticsPage() {
   // Auto-fetch when date filter or seller changes
   useEffect(() => {
     fetchStatistics();
-  }, [dateFilter, selectedSeller]);
+  }, [dateFilter, selectedSeller, excludeLowValue]);
 
   const fetchSellers = async () => {
     try {
@@ -78,6 +83,7 @@ export default function OrderAnalyticsPage() {
       }
       
       if (selectedSeller) params.sellerId = selectedSeller;
+      params.excludeLowValue = excludeLowValue;
 
       const statsResponse = await api.get('/orders/daily-statistics', { params });
 
@@ -316,6 +322,23 @@ export default function OrderAnalyticsPage() {
               ))}
             </Select>
           </FormControl>
+          
+          <FormControlLabel
+            control={
+              <Switch
+                checked={excludeLowValue}
+                onChange={(e) => setExcludeLowValue(e.target.checked)}
+                color="primary"
+                size="small"
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                Exclude &lt; $3 Orders
+              </Typography>
+            }
+            sx={{ mx: 1 }}
+          />
           
           <Button
             variant="outlined"
