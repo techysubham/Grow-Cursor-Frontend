@@ -91,6 +91,7 @@ export default function EmployeeDetailsPage() {
     name: '',
     phoneNumber: '',
     dateOfBirth: '',
+    bloodGroup: '',
     dateOfJoining: '',
     gender: '',
     address: '',
@@ -141,6 +142,7 @@ export default function EmployeeDetailsPage() {
       name: profile.name || '',
       phoneNumber: profile.phoneNumber || '',
       dateOfBirth: profile.dateOfBirth || '',
+      bloodGroup: profile.bloodGroup || '',
       dateOfJoining: profile.dateOfJoining || '',
       gender: profile.gender || '',
       address: profile.address || '',
@@ -685,6 +687,27 @@ export default function EmployeeDetailsPage() {
                         size="small"
                         InputLabelProps={{ shrink: true }}
                       />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Blood Group"
+                        value={editForm.bloodGroup}
+                        onChange={(e) => setEditForm({ ...editForm, bloodGroup: e.target.value })}
+                        disabled={!isEditing}
+                        size="small"
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        <MenuItem value="A+">A+</MenuItem>
+                        <MenuItem value="A-">A-</MenuItem>
+                        <MenuItem value="B+">B+</MenuItem>
+                        <MenuItem value="B-">B-</MenuItem>
+                        <MenuItem value="AB+">AB+</MenuItem>
+                        <MenuItem value="AB-">AB-</MenuItem>
+                        <MenuItem value="O+">O+</MenuItem>
+                        <MenuItem value="O-">O-</MenuItem>
+                      </TextField>
                     </Grid>
                     <Grid item xs={12}>
                       <TextField

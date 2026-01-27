@@ -21,6 +21,7 @@ export default function AboutMePage() {
     name: '',
     phoneNumber: '',
     dateOfBirth: '',
+    bloodGroup: '',
     dateOfJoining: '',
     gender: '',
     address: '',
@@ -60,6 +61,7 @@ export default function AboutMePage() {
           name: p?.name || '',
           phoneNumber: p?.phoneNumber || '',
           dateOfBirth: p?.dateOfBirth ? p.dateOfBirth.substring(0, 10) : '',
+          bloodGroup: p?.bloodGroup || '',
           dateOfJoining: p?.dateOfJoining ? p.dateOfJoining.substring(0, 10) : '',
           gender: p?.gender || '',
           address: p?.address || '',
@@ -280,6 +282,19 @@ export default function AboutMePage() {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField label="Date of Birth" name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={onChange} fullWidth InputLabelProps={{ shrink: true }} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField select label="Blood Group" name="bloodGroup" value={form.bloodGroup} onChange={onChange} fullWidth>
+                  <MenuItem value="">Select</MenuItem>
+                  <MenuItem value="A+">A+</MenuItem>
+                  <MenuItem value="A-">A-</MenuItem>
+                  <MenuItem value="B+">B+</MenuItem>
+                  <MenuItem value="B-">B-</MenuItem>
+                  <MenuItem value="AB+">AB+</MenuItem>
+                  <MenuItem value="AB-">AB-</MenuItem>
+                  <MenuItem value="O+">O+</MenuItem>
+                  <MenuItem value="O-">O-</MenuItem>
+                </TextField>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField label="Date of Joining" name="dateOfJoining" type="date" value={form.dateOfJoining} onChange={onChange} fullWidth InputLabelProps={{ shrink: true }} />
