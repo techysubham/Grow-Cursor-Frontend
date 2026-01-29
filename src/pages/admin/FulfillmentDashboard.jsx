@@ -61,6 +61,8 @@ import PersonIcon from '@mui/icons-material/Person'; // <--- Add this
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'; // <--- Add this
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
+import InfoIcon from '@mui/icons-material/Info';
+
 
 
 import api from '../../lib/api';
@@ -77,6 +79,48 @@ const REMARK_OPTIONS = [
   { _id: '8', name: 'Refund' },
   { _id: '9', name: 'Return started' }
 ];
+
+// Message templates for each remark status
+const REMARK_MESSAGE_TEMPLATES = {
+  'Delivered': `Hello,
+Thanks for your patience, we hope your package was delivered successfully and in satisfactory condition.
+If there are any issues with your order, please let us know so we can take care of it quickly.
+If you are satisfied, please leave us positive feedback with five stars.
+Thanks again and have a wonderful day.`,
+
+  'In-transit': `Hi, We're pleased to let you know that your order is currently in transit and will be delivered shortly.
+Thank you for your trust and support.`,
+
+  'Not yet shipped': `Hello, Thank you for your patience! Your order is currently being processed.
+Once shipped, we will update you with the tracking ID so you can monitor delivery.
+If you have any questions, feel free to contact us.`,
+
+  'Shipped': `Dear {{buyer_first_name}},
+Your package is on its way! The tracking number is {{tracking_number}} with {{shipping_carrier}}.
+It will arrive soon. Thank you for your patience!`,
+
+  'Out for delivery': `Hello, your order is out for delivery and expected to arrive today.
+We're coordinating with our shipping partner to ensure smooth delivery.
+Thank you for your patience!`,
+
+  'Delayed': `Hi, We sincerely apologize for the delay.
+Due to operational or weather issues, your delivery is delayed but will arrive soon.
+We appreciate your patience and understanding.`,
+
+  'Re-ordered': `Hi, Your order is currently being processed again.
+Once shipped, we will update you with a tracking ID.
+Please contact us if you need any assistance.`,
+
+  'Refund': `Dear Buyer,
+We've successfully processed your refund.
+The amount should reflect in your account shortly depending on your payment provider.
+If you need assistance, feel free to contact us.`,
+
+  'Return started': `Hello, Please package and label your return and drop it off at any UPS location.
+As soon as we receive the item, we will process your refund or replacement.
+Thank you!`
+};
+
 
 // --- IMAGE VIEWER DIALOG ---
 function ImageDialog({ open, onClose, images }) {
@@ -1019,6 +1063,12 @@ function FulfillmentDashboard() {
     to: ''
   }));
 
+  // Remark message confirmation dialog state
+  const [remarkConfirmOpen, setRemarkConfirmOpen] = useState(false);
+  const [pendingRemarkUpdate, setPendingRemarkUpdate] = useState(null); // { orderId, remarkValue, order }
+  const [sendingRemarkMessage, setSendingRemarkMessage] = useState(false);
+
+
   // Persist filter state to sessionStorage whenever it changes
   useEffect(() => {
     const stateToSave = {
@@ -1086,6 +1136,151 @@ function FulfillmentDashboard() {
       console.error('Error deleting preset:', e);
     }
   };
+
+  // Helper function to replace template variables
+  const replaceTemplateVariables = (template, order) => {
+    if (!template || !order) return template;
+    
+    // Extract buyer first name
+    const buyerFullName = order.buyer?.buyerRegistrationAddress?.fullName || order.shippingFullName || 'Buyer';
+    const buyerFirstName = buyerFullName.split(' ')[0];
+    
+    // Extract tracking info
+    const trackingNumber = order.trackingNumber || '[tracking number]';
+    const shippingCarrier = order.shippingCarrier || 'the shipping carrier';
+    
+    // Replace variables
+    return template
+      .replace(/\{\{buyer_first_name\}\}/g, buyerFirstName)
+      .replace(/\{\{tracking_number\}\}/g, trackingNumber)
+      .replace(/\{\{shipping_carrier\}\}/g, shippingCarrier);
+  };
+
+  // Function to send auto-message based on remark
+  const sendAutoMessageForRemark = async (order, remarkValue) => {
+    // Get template for this remark
+    const template = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    if (!template) {
+      console.log('No template found for remark:', remarkValue);
+      return false;
+    }
+    
+    // Replace variables in template
+    const messageBody = replaceTemplateVariables(template, order);
+    
+    try {
+      // Send message using the same endpoint as manual messages
+      await api.post('/ebay/send-message', {
+        orderId: order.orderId,
+        buyerUsername: order.buyer?.username,
+        itemId: order.itemNumber || order.lineItems?.[0]?.legacyItemId,
+        body: messageBody,
+        subject: `Regarding Order #${order.orderId}`
+      });
+      
+      console.log(`Auto-message sent for remark: ${remarkValue}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to send auto-message:', error);
+      throw error;
+    }
+  };
+
+  // Handle remark confirmation - user clicked "Yes, Send Message"
+  const handleConfirmRemarkMessage = async () => {
+    if (!pendingRemarkUpdate) return;
+    
+    const { orderId, remarkValue, order } = pendingRemarkUpdate;
+    setSendingRemarkMessage(true);
+    
+    try {
+      // First update the remark field
+      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: remarkValue });
+      
+      // Update local state
+      setOrders(prev => prev.map(o => {
+        if (o._id === orderId) {
+          return { ...o, remark: remarkValue };
+        }
+        return o;
+      }));
+      
+      // Then send the auto-message
+      const messageSent = await sendAutoMessageForRemark(order, remarkValue);
+      
+      if (messageSent) {
+        setSnackbarMsg(`Remark updated to "${remarkValue}" and message sent to buyer`);
+        setSnackbarSeverity('success');
+      }
+      setSnackbarOpen(true);
+      
+    } catch (error) {
+      console.error('Error in remark update/message:', error);
+      setSnackbarMsg('Failed to update remark or send message: ' + (error.response?.data?.error || error.message));
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setSendingRemarkMessage(false);
+      setRemarkConfirmOpen(false);
+      setPendingRemarkUpdate(null);
+    }
+  };
+
+  // Handle remark confirmation - user clicked "No, Skip"
+  const handleSkipRemarkMessage = async () => {
+    if (!pendingRemarkUpdate) return;
+    
+    const { orderId, remarkValue } = pendingRemarkUpdate;
+    
+    try {
+      // Just update the remark without sending message
+      await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: remarkValue });
+      
+      // Update local state
+      setOrders(prev => prev.map(o => {
+        if (o._id === orderId) {
+          return { ...o, remark: remarkValue };
+        }
+        return o;
+      }));
+      
+      setSnackbarMsg(`Remark updated to "${remarkValue}" (message not sent)`);
+      setSnackbarSeverity('info');
+      setSnackbarOpen(true);
+      
+    } catch (error) {
+      console.error('Error updating remark:', error);
+      setSnackbarMsg('Failed to update remark');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setRemarkConfirmOpen(false);
+      setPendingRemarkUpdate(null);
+    }
+  };
+
+  // Handle remark update - intercept to show confirmation
+  const handleRemarkUpdate = (orderId, remarkValue) => {
+    // Find the order
+    const order = orders.find(o => o._id === orderId);
+    if (!order) {
+      console.error('Order not found:', orderId);
+      return;
+    }
+    
+    // Check if there's a template for this remark
+    const hasTemplate = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    
+    if (hasTemplate) {
+      // Show confirmation dialog
+      setPendingRemarkUpdate({ orderId, remarkValue, order });
+      setRemarkConfirmOpen(true);
+    } else {
+      // No template, just update normally
+      updateManualField(orderId, 'remark', remarkValue);
+    }
+  };
+
 
   const updateManualField = async (orderId, field, value) => {
     try {
@@ -3497,10 +3692,11 @@ function FulfillmentDashboard() {
                         <AutoSaveSelect
                           value={order.remark || ''}
                           options={REMARK_OPTIONS}
-                          onSave={(val) => updateManualField(order._id, 'remark', val)}
+                          onSave={(val) => handleRemarkUpdate(order._id, val)}
                         />
                       </TableCell>
                     )}
+
 
                   </TableRow>
                 );
@@ -3570,6 +3766,88 @@ function FulfillmentDashboard() {
         onClose={() => setImageDialogOpen(false)}
         images={selectedImages}
       />
+
+      {/* Remark Message Confirmation Dialog */}
+      <Dialog
+        open={remarkConfirmOpen}
+        onClose={() => {
+          if (!sendingRemarkMessage) {
+            setRemarkConfirmOpen(false);
+            setPendingRemarkUpdate(null);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <ChatIcon color="primary" />
+            <Typography variant="h6">Send Message to Buyer?</Typography>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Alert severity="info" icon={<InfoIcon />}>
+              You're updating the remark to <strong>"{pendingRemarkUpdate?.remarkValue}"</strong>
+            </Alert>
+            
+            <Box>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Would you like to automatically send this message to the buyer?
+              </Typography>
+              <Paper 
+                elevation={0} 
+                sx={{ 
+                  mt: 1.5, 
+                  p: 2, 
+                  bgcolor: 'grey.50', 
+                  border: '1px solid', 
+                  borderColor: 'divider',
+                  borderRadius: 1
+                }}
+              >
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    whiteSpace: 'pre-wrap',
+                    fontFamily: 'inherit',
+                    lineHeight: 1.6
+                  }}
+                >
+                  {pendingRemarkUpdate && REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue] 
+                    ? replaceTemplateVariables(
+                        REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue], 
+                        pendingRemarkUpdate.order
+                      )
+                    : ''}
+                </Typography>
+              </Paper>
+            </Box>
+
+            <Typography variant="caption" color="text.secondary">
+              💡 Tip: The message will be sent through the eBay messaging system
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button 
+            onClick={handleSkipRemarkMessage}
+            disabled={sendingRemarkMessage}
+            color="inherit"
+          >
+            No, Skip
+          </Button>
+          <Button 
+            onClick={handleConfirmRemarkMessage}
+            variant="contained"
+            disabled={sendingRemarkMessage}
+            startIcon={sendingRemarkMessage ? <CircularProgress size={20} /> : <SendIcon />}
+          >
+            {sendingRemarkMessage ? 'Sending...' : 'Yes, Send Message'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
 
       {/* Snackbar for polling results */}
       <Snackbar
