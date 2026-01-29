@@ -52,6 +52,52 @@ function TabPanel({ children, value, index }) {
   );
 }
 
+// LogsCell component for editable logs field with save functionality
+function LogsCell({ value, onSave, id }) {
+  const [localValue, setLocalValue] = useState(value || '');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setLocalValue(value || '');
+  }, [value]);
+
+  const handleSave = async () => {
+    if (localValue === (value || '')) return; // No changes
+    setSaving(true);
+    try {
+      await onSave(id, localValue);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error('Failed to save logs:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <TextField
+      size="small"
+      multiline
+      maxRows={3}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={handleSave}
+      disabled={saving}
+      placeholder="Add logs..."
+      sx={{
+        minWidth: 120,
+        '& .MuiInputBase-input': { fontSize: '0.75rem' },
+        '& .MuiOutlinedInput-root': {
+          backgroundColor: saved ? '#e8f5e9' : 'transparent',
+          transition: 'background-color 0.3s'
+        }
+      }}
+    />
+  );
+}
+
 export default function DisputesPage({ initialTab = 0 }) {
   const [tabValue, setTabValue] = useState(initialTab);
   useEffect(() => {
@@ -475,6 +521,7 @@ export default function DisputesPage({ initialTab = 0 }) {
       'Claim Amount': (c) => c.claimAmount?.value ? `${c.claimAmount.currency || 'USD'} ${c.claimAmount.value}` : '',
       'Created Date': (c) => formatDate(c.creationDate),
       'Response Due': (c) => formatDate(c.sellerResponseDueDate),
+      'Logs': 'logs',
     });
     downloadCSV(csvData, 'INR_Cases');
   };
@@ -491,6 +538,22 @@ export default function DisputesPage({ initialTab = 0 }) {
       'Response Due': (d) => formatDate(d.respondByDate),
     });
     downloadCSV(csvData, 'Payment_Disputes');
+  };
+
+  // Handler for saving case logs
+  const handleSaveCaseLogs = async (caseId, logs) => {
+    try {
+      await api.patch(`/ebay/cases/${caseId}/logs`, { logs });
+      // Update local state
+      setCases(prevCases =>
+        prevCases.map(c =>
+          c.caseId === caseId ? { ...c, logs } : c
+        )
+      );
+    } catch (err) {
+      console.error('Failed to save case logs:', err);
+      throw err;
+    }
   };
 
   return (
@@ -736,13 +799,14 @@ export default function DisputesPage({ initialTab = 0 }) {
                   <TableCell><strong>Claim Amount</strong></TableCell>
                   <TableCell><strong>Created (PST)</strong></TableCell>
                   <TableCell><strong>Response Due (PST)</strong></TableCell>
+                  <TableCell><strong>Logs</strong></TableCell>
                   <TableCell align="center"><strong>Chat</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredCases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} align="center">
+                    <TableCell colSpan={11} align="center">
                       <Typography variant="body2" color="text.secondary" py={2}>
                         No INR cases found. Click "Fetch INR Cases from eBay" to load data.
                       </Typography>
@@ -830,6 +894,13 @@ export default function DisputesPage({ initialTab = 0 }) {
                             />
                           )}
                         </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <LogsCell
+                          value={c.logs}
+                          id={c.caseId}
+                          onSave={handleSaveCaseLogs}
+                        />
                       </TableCell>
                       <TableCell align="center">
                         <Tooltip title="Chat with buyer">

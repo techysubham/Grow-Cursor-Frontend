@@ -25,6 +25,8 @@ import BulkImportASINsDialog from '../../components/BulkImportASINsDialog.jsx';
 import BulkReactivateDialog from '../../components/BulkReactivateDialog.jsx';
 import BulkDeactivateDialog from '../../components/BulkDeactivateDialog.jsx';
 import TemplateListingStatsCard from '../../components/TemplateListingStatsCard.jsx';
+import ActionFieldEditor from '../../components/ActionFieldEditor.jsx';
+import TemplateCustomizationDialog from '../../components/TemplateCustomizationDialog.jsx';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
 
@@ -79,6 +81,9 @@ export default function TemplateListingsPage() {
 
   // Core field defaults dialog state
   const [defaultsDialog, setDefaultsDialog] = useState(false);
+  
+  // Template customization dialog state
+  const [customizationDialog, setCustomizationDialog] = useState(false);
 
   const [listingFormData, setListingFormData] = useState({
     action: 'Add',
@@ -215,7 +220,11 @@ export default function TemplateListingsPage() {
 
   const fetchTemplate = async () => {
     try {
-      const { data } = await api.get(`/listing-templates/${templateId}`);
+      // Fetch effective template if sellerId is provided (includes seller overrides)
+      const endpoint = sellerId 
+        ? `/template-overrides/${templateId}/effective?sellerId=${sellerId}`
+        : `/listing-templates/${templateId}`;
+      const { data } = await api.get(endpoint);
       setTemplate(data);
     } catch (err) {
       setError('Failed to fetch template');
@@ -945,9 +954,24 @@ export default function TemplateListingsPage() {
       )}
 
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h6">
-          {template ? `${template.name} - Listings` : 'Template Listings'}
-        </Typography>
+        <Stack direction="row" alignItems="center" spacing={2}>
+          <Typography variant="h6">
+            {template ? `${template.name} - Listings` : 'Template Listings'}
+          </Typography>
+          {template?._isOverridden && (
+            <Chip label="Customized" color="primary" size="small" />
+          )}
+        </Stack>
+        {sellerId && templateId && (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<SettingsIcon />}
+            onClick={() => setCustomizationDialog(true)}
+          >
+            Customize Template
+          </Button>
+        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
@@ -986,9 +1010,12 @@ export default function TemplateListingsPage() {
         >
           Deactivate by SKU
         </Button>
-        <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
-          Download CSV
-        </Button>
+        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+          <ActionFieldEditor templateId={templateId} sellerId={sellerId} />
+          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
+            Download CSV
+          </Button>
+        </Box>
         <Button
           variant="outlined"
           onClick={() => setHistoryDialog(true)}
@@ -1918,6 +1945,19 @@ export default function TemplateListingsPage() {
           fetchListings();
           setSuccess('Listings deactivated successfully');
         }}
+      />
+      
+      {/* Template Customization Dialog */}
+      <TemplateCustomizationDialog
+        open={customizationDialog}
+        onClose={() => {
+          setCustomizationDialog(false);
+          // Refresh template to show updated override status
+          fetchTemplate();
+        }}
+        templateId={templateId}
+        sellerId={sellerId}
+        templateName={template?.name}
       />
     </Box>
   );

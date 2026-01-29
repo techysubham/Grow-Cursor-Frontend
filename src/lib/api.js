@@ -65,6 +65,11 @@ export async function updateEmployeeAdminFields(profileId, payload) {
   return data;
 }
 
+export async function deleteEmployeeProfile(profileId) {
+  const { data } = await api.delete(`/employee-profiles/${profileId}`);
+  return data;
+}
+
 // File Upload APIs
 export async function uploadEmployeeFile(fileType, file) {
   const formData = new FormData();

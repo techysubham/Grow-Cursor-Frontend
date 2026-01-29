@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
-import { AppBar, Toolbar, IconButton, Box, Paper, Typography, Grid, TextField, MenuItem, Button, Stack, Snackbar, Alert, Tabs, Tab } from '@mui/material';
+import { AppBar, Toolbar, IconButton, Box, Paper, Typography, Grid, TextField, MenuItem, Button, Stack, Snackbar, Alert, Tabs, Tab, Badge } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonIcon from '@mui/icons-material/Person';
 import ChatIcon from '@mui/icons-material/Chat';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import StarIcon from '@mui/icons-material/Star';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
 import { useLocation, useNavigate } from 'react-router-dom';
 import InternalMessagesPage from './admin/InternalMessagesPage.jsx';
 import { getMyProfile, updateMyProfile, uploadEmployeeFile, getMyFileUrl } from '../lib/api.js';
@@ -18,6 +21,7 @@ export default function AboutMePage() {
     name: '',
     phoneNumber: '',
     dateOfBirth: '',
+    bloodGroup: '',
     dateOfJoining: '',
     gender: '',
     address: '',
@@ -26,7 +30,10 @@ export default function AboutMePage() {
     bankIFSC: '',
     bankName: '',
     aadharNumber: '',
-    panNumber: ''
+    panNumber: '',
+    myTaskList: '',
+    primaryTask: '',
+    secondaryTask: ''
   });
 
   // Track file existence with boolean flags
@@ -54,6 +61,7 @@ export default function AboutMePage() {
           name: p?.name || '',
           phoneNumber: p?.phoneNumber || '',
           dateOfBirth: p?.dateOfBirth ? p.dateOfBirth.substring(0, 10) : '',
+          bloodGroup: p?.bloodGroup || '',
           dateOfJoining: p?.dateOfJoining ? p.dateOfJoining.substring(0, 10) : '',
           gender: p?.gender || '',
           address: p?.address || '',
@@ -62,7 +70,10 @@ export default function AboutMePage() {
           bankIFSC: p?.bankIFSC || '',
           bankName: p?.bankName || '',
           aadharNumber: p?.aadharNumber || '',
-          panNumber: p?.panNumber || ''
+          panNumber: p?.panNumber || '',
+          myTaskList: p?.myTaskList || '',
+          primaryTask: p?.primaryTask || '',
+          secondaryTask: p?.secondaryTask || ''
         });
 
         // Set file flags from profile data
@@ -147,6 +158,12 @@ export default function AboutMePage() {
 
   const isInAdminLayout = location.pathname.startsWith('/admin/');
 
+  // Check completion status
+  const isProfileComplete = form.name && form.email && form.phoneNumber && form.gender;
+  const isTaskListComplete = form.myTaskList && form.myTaskList.trim().length > 0;
+  const isPrimaryTaskComplete = form.primaryTask && form.primaryTask.trim().length > 0;
+  const isSecondaryTaskComplete = form.secondaryTask && form.secondaryTask.trim().length > 0;
+
   return (
     <Box maxWidth="1200px" mx="auto">
       {!isInAdminLayout && (
@@ -160,11 +177,30 @@ export default function AboutMePage() {
         </AppBar>
       )}
 
-      {/* Tabs for Profile and Chat */}
+      {/* Tabs for Profile, Tasks, and Chat */}
       <Paper sx={{ mb: 2 }}>
         <Tabs value={currentTab} onChange={(e, newValue) => setCurrentTab(newValue)} variant="fullWidth">
-          <Tab icon={<PersonIcon />} label="My Profile" />
-          <Tab icon={<ChatIcon />} label="Team Chat" />
+          <Tab icon={
+            <Badge color="error" variant="dot" invisible={isProfileComplete}>
+              <PersonIcon />
+            </Badge>
+          } label="Profile" iconPosition="start" />
+          <Tab icon={
+            <Badge color="error" variant="dot" invisible={isTaskListComplete}>
+              <AssignmentIcon />
+            </Badge>
+          } label="My Task List" iconPosition="start" />
+          <Tab icon={
+            <Badge color="error" variant="dot" invisible={isPrimaryTaskComplete}>
+              <StarIcon />
+            </Badge>
+          } label="Primary Task" iconPosition="start" />
+          <Tab icon={
+            <Badge color="error" variant="dot" invisible={isSecondaryTaskComplete}>
+              <BookmarkIcon />
+            </Badge>
+          } label="Secondary Task" iconPosition="start" />
+          <Tab icon={<ChatIcon />} label="Team Chat" iconPosition="start" />
         </Tabs>
       </Paper>
 
@@ -173,8 +209,8 @@ export default function AboutMePage() {
         <Paper sx={{ p: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
             <Typography variant="h6">My Profile</Typography>
-            <Button onClick={onSubmit} variant="contained" disabled={saving || uploading.profilePic || uploading.aadhar || uploading.pan}>
-              {(uploading.profilePic || uploading.aadhar || uploading.pan) ? 'Uploading...' : 'Save'}
+            <Button onClick={onSubmit} variant="contained" disabled={saving || uploading.profilePic || uploading.aadhar || uploading.pan} startIcon={saving && <CircularProgress size={20} color="inherit" />}>
+              {(uploading.profilePic || uploading.aadhar || uploading.pan) ? 'Uploading...' : saving ? 'Saving...' : 'Save'}
             </Button>
           </Stack>
           <Box component="form" onSubmit={onSubmit}>
@@ -248,6 +284,19 @@ export default function AboutMePage() {
                 <TextField label="Date of Birth" name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={onChange} fullWidth InputLabelProps={{ shrink: true }} />
               </Grid>
               <Grid item xs={12} sm={6}>
+                <TextField select label="Blood Group" name="bloodGroup" value={form.bloodGroup} onChange={onChange} fullWidth>
+                  <MenuItem value="">Select</MenuItem>
+                  <MenuItem value="A+">A+</MenuItem>
+                  <MenuItem value="A-">A-</MenuItem>
+                  <MenuItem value="B+">B+</MenuItem>
+                  <MenuItem value="B-">B-</MenuItem>
+                  <MenuItem value="AB+">AB+</MenuItem>
+                  <MenuItem value="AB-">AB-</MenuItem>
+                  <MenuItem value="O+">O+</MenuItem>
+                  <MenuItem value="O-">O-</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
                 <TextField label="Date of Joining" name="dateOfJoining" type="date" value={form.dateOfJoining} onChange={onChange} fullWidth InputLabelProps={{ shrink: true }} />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -282,8 +331,89 @@ export default function AboutMePage() {
         </Paper>
       )}
 
-      {/* Tab 2: Team Chat */}
+      {/* Tab 1: My Task List */}
       {currentTab === 1 && (
+        <Paper sx={{ p: 3 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="h6">My Task List</Typography>
+            <Button onClick={onSubmit} variant="contained" disabled={saving} startIcon={saving && <CircularProgress size={20} color="inherit" />}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Enter each task on a new line. Use • for bullets.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={15}
+            label="Task List"
+            placeholder="• Task 1&#10;• Task 2&#10;• Task 3"
+            value={form.myTaskList}
+            onChange={(e) => setForm({ ...form, myTaskList: e.target.value })}
+            variant="outlined"
+            sx={{
+              '& .MuiInputBase-root': {
+                fontFamily: 'monospace',
+                fontSize: '0.95rem'
+              }
+            }}
+          />
+        </Paper>
+      )}
+
+      {/* Tab 2: Primary Task */}
+      {currentTab === 2 && (
+        <Paper sx={{ p: 3 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="h6">Primary Task</Typography>
+            <Button onClick={onSubmit} variant="contained" disabled={saving} startIcon={saving && <CircularProgress size={20} color="inherit" />}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Describe your primary task or responsibility.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={15}
+            label="Primary Task"
+            placeholder="Describe your primary task in detail..."
+            value={form.primaryTask}
+            onChange={(e) => setForm({ ...form, primaryTask: e.target.value })}
+            variant="outlined"
+          />
+        </Paper>
+      )}
+
+      {/* Tab 3: Secondary Task */}
+      {currentTab === 3 && (
+        <Paper sx={{ p: 3 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="h6">Secondary Task</Typography>
+            <Button onClick={onSubmit} variant="contained" disabled={saving} startIcon={saving && <CircularProgress size={20} color="inherit" />}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Describe your secondary task or additional responsibilities.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={15}
+            label="Secondary Task"
+            placeholder="Describe your secondary task in detail..."
+            value={form.secondaryTask}
+            onChange={(e) => setForm({ ...form, secondaryTask: e.target.value })}
+            variant="outlined"
+          />
+        </Paper>
+      )}
+
+      {/* Tab 4: Team Chat */}
+      {currentTab === 4 && (
         <Box sx={{ height: '75vh' }}>
           <InternalMessagesPage />
         </Box>
