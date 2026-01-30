@@ -64,6 +64,7 @@ import FulfillmentNotesPage from '../pages/admin/FulfillmentNotesPage.jsx';
 import ConversationTrackingPage from '../pages/admin/ConversationTrackingPage.jsx';
 // CancelledStatusPage is now embedded in Issues and Resolutions (DisputesPage)
 import DisputesPage from '../pages/admin/DisputesPage.jsx';
+import AccountHealthReportPage from '../pages/admin/AccountHealthReportPage.jsx';
 import PayoneerSheetPage from '../pages/admin/PayoneerSheetPage.jsx';
 import BankAccountsPage from '../pages/admin/BankAccountsPage.jsx';
 import TransactionPage from '../pages/admin/TransactionPage.jsx';
@@ -868,6 +869,15 @@ export default function AdminLayout({ user, onLogout }) {
                   </ListItemButton>
                   <ListItemButton 
                     component={Link} 
+                    to="/admin/account-health" 
+                    onClick={() => setMobileOpen(false)}
+                    selected={location.pathname === '/admin/account-health'}
+                    sx={selectedMenuItemStyle}
+                  >
+                    <ListItemText primary="Account Health Report" />
+                  </ListItemButton>
+                  <ListItemButton 
+                    component={Link} 
                     to="/admin/message-received" 
                     onClick={() => setMobileOpen(false)}
                     selected={location.pathname === '/admin/message-received'}
@@ -939,6 +949,9 @@ export default function AdminLayout({ user, onLogout }) {
               </MenuItem>
               <MenuItem component={Link} to="/admin/disputes" onClick={() => setOrdersAnchorEl(null)}>
                 Issues and Resolutions
+              </MenuItem>
+              <MenuItem component={Link} to="/admin/account-health" onClick={() => setOrdersAnchorEl(null)}>
+                Account Health Report
               </MenuItem>
               <MenuItem component={Link} to="/admin/message-received" onClick={() => setOrdersAnchorEl(null)}>
                 Buyer Messages
@@ -1321,6 +1334,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/cancelled-status" element={<DisputesPage initialTab={3} />} />
               <Route path="/return-requested" element={<DisputesPage initialTab={2} />} />
               <Route path="/disputes" element={<DisputesPage />} />
+              <Route path="/account-health" element={<AccountHealthReportPage />} />
               <Route path="/message-received" element={<BuyerChatPage />} />
               <Route path="/conversation-management" element={<ConversationManagementPage />} />
               <Route path="/amazon-accounts" element={<ManageAmazonAccountsPage />} />
