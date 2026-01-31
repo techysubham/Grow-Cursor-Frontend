@@ -2510,7 +2510,8 @@ function FulfillmentDashboard() {
         if (dateFilter.to) params.endDate = dateFilter.to;
       }
 
-      // Fetch ALL orders with current filters (no pagination)
+      // Fetch ALL orders with current filters (no pagination limit)
+      params.limit = 999999; // Ensure we get all results, not just paginated 50
       const { data } = await api.get('/ebay/stored-orders', { params });
       const allOrders = data?.orders || [];
 
