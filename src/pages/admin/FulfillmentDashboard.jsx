@@ -78,13 +78,11 @@ import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 const REMARK_OPTIONS = [
   { _id: '1', name: 'Delivered' },
   { _id: '2', name: 'In-transit' },
-  { _id: '3', name: 'Not yet shipped' },
+  { _id: '3', name: 'Processing' },
   { _id: '4', name: 'Shipped' },
   { _id: '5', name: 'Out for delivery' },
   { _id: '6', name: 'Delayed' },
-  { _id: '7', name: 'Re-ordered' },
-  { _id: '8', name: 'Refund' },
-  { _id: '9', name: 'Return started' }
+  { _id: '7', name: 'Refund' }
 ];
 
 // --- CHAT TEMPLATES ---
@@ -169,37 +167,33 @@ If there are any issues with your order, please let us know so we can take care 
 If you are satisfied, please leave us positive feedback with five stars.
 Thanks again and have a wonderful day.`,
 
-  'In-transit': `Hi, We're pleased to let you know that your order is currently in transit and will be delivered shortly.
+  'In-transit': `Hi {{buyer_first_name}}, We're pleased to let you know that your order is currently in transit and will be delivered shortly.
 Thank you for your trust and support.`,
 
-  'Not yet shipped': `Hello, Thank you for your patience! Your order is currently being processed.
-Once shipped, we will update you with the tracking ID so you can monitor delivery.
-If you have any questions, feel free to contact us.`,
+  'Processing': `Hi {{buyer_first_name}},
+
+We're pleased to inform you that your order has been processed.
+
+Also, we are actively monitoring your order to ensure it reaches you smoothly and tracking number will be updated on your eBay order page as soon as they become available.
+
+We truly appreciate your patience and understanding.`,
 
   'Shipped': `Dear {{buyer_first_name}},
 Your package is on its way! The tracking number is {{tracking_number}} with {{shipping_carrier}}.
 It will arrive soon. Thank you for your patience!`,
 
-  'Out for delivery': `Hello, your order is out for delivery and expected to arrive today.
+  'Out for delivery': `Hello {{buyer_first_name}}, your order is out for delivery and expected to arrive today.
 We're coordinating with our shipping partner to ensure smooth delivery.
 Thank you for your patience!`,
 
-  'Delayed': `Hi, We sincerely apologize for the delay.
+  'Delayed': `Hi {{buyer_first_name}}, We sincerely apologize for the delay.
 Due to operational or weather issues, your delivery is delayed but will arrive soon.
 We appreciate your patience and understanding.`,
 
-  'Re-ordered': `Hi, Your order is currently being processed again.
-Once shipped, we will update you with a tracking ID.
-Please contact us if you need any assistance.`,
-
-  'Refund': `Dear Buyer,
+  'Refund': `Dear {{buyer_first_name}},
 We've successfully processed your refund.
 The amount should reflect in your account shortly depending on your payment provider.
-If you need assistance, feel free to contact us.`,
-
-  'Return started': `Hello, Please package and label your return and drop it off at any UPS location.
-As soon as we receive the item, we will process your refund or replacement.
-Thank you!`
+If you need assistance, feel free to contact us.`
 };
 
 
@@ -1251,6 +1245,10 @@ function FulfillmentDashboard() {
   const [columnPresets, setColumnPresets] = useState([]);
   const [newPresetName, setNewPresetName] = useState('');
   const [presetsLoading, setPresetsLoading] = useState(false);
+
+  // CSV Export Dialog State
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [selectedExportColumns, setSelectedExportColumns] = useState([]); // Array of column IDs
 
   const [dateFilter, setDateFilter] = useState(() => getInitialState('dateFilter', {
     mode: 'none', // 'none' | 'single' | 'range'
@@ -2478,8 +2476,34 @@ function FulfillmentDashboard() {
     );
   };
 
-  // CSV Export Handler
-  const handleExportOrders = async () => {
+  // Open the Export Dialog
+  const handleOpenExportDialog = () => {
+    // Initialize with ALL columns selected by default
+    setSelectedExportColumns(ALL_COLUMNS.map(col => col.id));
+    setExportDialogOpen(true);
+  };
+
+  // Toggle column selection in Export Dialog
+  const handleToggleExportColumn = (columnId) => {
+    setSelectedExportColumns(prev => {
+      if (prev.includes(columnId)) {
+        return prev.filter(id => id !== columnId);
+      } else {
+        return [...prev, columnId];
+      }
+    });
+  };
+
+  const handleToggleAllExportColumns = () => {
+    if (selectedExportColumns.length === ALL_COLUMNS.length) {
+      setSelectedExportColumns([]); // Deselect all
+    } else {
+      setSelectedExportColumns(ALL_COLUMNS.map(col => col.id)); // Select all
+    }
+  };
+
+  // Execute CSV Export with selected columns
+  const handleExecuteExport = async () => {
     if (orders.length === 0) {
       setSnackbarMsg('No orders to export');
       setSnackbarSeverity('warning');
@@ -2487,9 +2511,15 @@ function FulfillmentDashboard() {
       return;
     }
 
+    if (selectedExportColumns.length === 0) {
+        alert("Please select at least one column to export.");
+        return;
+    }
+
     try {
       // Show loading state
       setLoading(true);
+      setExportDialogOpen(false); // Close dialog immediately
 
       // Build params with all current filters, but without pagination limits
       const params = {};
@@ -2511,7 +2541,7 @@ function FulfillmentDashboard() {
       }
 
       // Fetch ALL orders with current filters (no pagination limit)
-      params.limit = 999999; // Ensure we get all results, not just paginated 50
+      params.limit = 999999; // Ensure we get all results
       const { data } = await api.get('/ebay/stored-orders', { params });
       const allOrders = data?.orders || [];
 
@@ -2523,34 +2553,139 @@ function FulfillmentDashboard() {
         return;
       }
 
-      const csvData = prepareCSVData(allOrders, {
-      'Order ID': 'orderId',
-      'Legacy Order ID': 'legacyOrderId',
-      'Seller': (o) => o.seller?.user?.username || '',
-      'Date Sold': (o) => o.dateSold ? new Date(o.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
-      'Product Name': 'productName',
-      'Item Number': 'itemNumber',
-      'Buyer Name': 'shippingFullName',
-      'Buyer Username': (o) => o.buyer?.username || '',
-      'Marketplace': 'purchaseMarketplaceId',
-      'Subtotal (USD)': 'subtotalUSD',
-      'Shipping (USD)': 'shippingUSD',
-      'Sales Tax (USD)': 'salesTaxUSD',
-      'Discount (USD)': 'discountUSD',
-      'Transaction Fees (USD)': 'transactionFeesUSD',
-      'Ad Fees': 'adFeeGeneral',
-      'Order Earnings': 'orderEarnings',
-      'Payment Status': 'orderPaymentStatus',
-      'Fulfillment Status': 'orderFulfillmentStatus',
-      'Tracking Number': 'trackingNumber',
-      'Shipping Address': (o) => [o.shippingAddressLine1, o.shippingAddressLine2, o.shippingCity, o.shippingState, o.shippingPostalCode, o.shippingCountry].filter(Boolean).join(', '),
-      'Amazon Order ID': 'azOrderId',
-      'Remark': 'remark',
-      'Notes': 'fulfillmentNotes',
+      // Define ALL possible column definitions
+      const allColumnDefs = {
+        'Order ID': 'orderId',
+        'Legacy Order ID': 'legacyOrderId',
+        'Seller': (o) => o.seller?.user?.username || '',
+        'Date Sold': (o) => o.dateSold ? new Date(o.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+        'Product Name': 'productName',
+        'Item Number': 'itemNumber',
+        'Buyer Name': 'shippingFullName',
+        'Buyer Username': (o) => o.buyer?.username || '',
+        'Marketplace': 'purchaseMarketplaceId',
+        'Subtotal (USD)': 'subtotalUSD',
+        'Shipping (USD)': 'shippingUSD',
+        'Sales Tax (USD)': 'salesTaxUSD',
+        'Discount (USD)': 'discountUSD',
+        'Transaction Fees (USD)': 'transactionFeesUSD',
+        'Ad Fees': 'adFeeGeneral',
+        'Cancel Status': 'cancelState',
+        'Refunds': (o) => o.refunds?.map(r => `${r.orderPaymentStatus === 'FULLY_REFUNDED' ? 'Full' : 'Partial'}: $${(Number(r.amount?.value || r.refundAmount?.value || 0) * (o.conversionRate || 1)).toFixed(2)}`).join('; ') || '',
+        'Refund Item': 'refundItemAmount',
+        'Refund Tax': 'refundTaxAmount',
+        'Refund Total': 'refundTotalToBuyer',
+        'Order Total (After Refund)': 'orderTotalAfterRefund',
+        'Order Earnings': 'orderEarnings',
+        'Payment Status': 'orderPaymentStatus',
+        'Fulfillment Status': 'orderFulfillmentStatus',
+        'Tracking Number': 'trackingNumber',
+        'Shipping Address': (o) => [o.shippingAddressLine1, o.shippingAddressLine2, o.shippingCity, o.shippingState, o.shippingPostalCode, o.shippingCountry].filter(Boolean).join(', '),
+        'Amazon Acc': 'amazonAccount',
+        'Arriving': 'arrivingDate',
+        'Before Tax': 'beforeTax',
+        'Estimated Tax': 'estimatedTax',
+        'Az OrderID': 'azOrderId',
+        'Amazon Refund': 'amazonRefund',
+        'Card Name': 'cardName',
+        'Notes': 'fulfillmentNotes',
+        'Messaging': 'messagingStatus', 
+        'Remark': 'remark'
+      };
+
+      // Filter Column Defs based on selectedExportColumns
+      // We need to map our internal IDs (from ALL_COLUMNS) to the keys in allColumnDefs or construct a new object
+      // Let's assume a mapping or just look up by ID.
+      // Wait, ALL_COLUMNS has `id` and `label`. `allColumnDefs` keys are Labels (mostly).
+      // Let's create a direct mapping object for cleaner lookups.
+      
+      const columnIdToCsvKey = {
+        'seller': 'Seller',
+        'orderId': 'Order ID',
+        'dateSold': 'Date Sold',
+        // 'shipBy': 'Ship By', // Not in prev CSV but we can add if needed
+        // 'deliveryDate': 'Delivery Date', // Not in prev CSV
+        'productName': 'Product Name',
+        'buyerName': 'Buyer Name',
+        'shippingAddress': 'Shipping Address',
+        'marketplace': 'Marketplace',
+        'subtotal': 'Subtotal (USD)',
+        'shipping': 'Shipping (USD)',
+        'salesTax': 'Sales Tax (USD)',
+        'discount': 'Discount (USD)',
+        'transactionFees': 'Transaction Fees (USD)',
+        'adFeeGeneral': 'Ad Fees',
+        'cancelStatus': 'Cancel Status',
+        'refunds': 'Refunds',
+        'refundItemAmount': 'Refund Item',
+        'refundTaxAmount': 'Refund Tax',
+        'refundTotalToBuyer': 'Refund Total',
+        'orderTotalAfterRefund': 'Order Total (After Refund)',
+        'orderEarnings': 'Order Earnings',
+        'trackingNumber': 'Tracking Number',
+        'amazonAccount': 'Amazon Acc',
+        'arriving': 'Arriving',
+        'beforeTax': 'Before Tax',
+        'estimatedTax': 'Estimated Tax',
+        'azOrderId': 'Az OrderID',
+        'amazonRefund': 'Amazon Refund',
+        'cardName': 'Card Name',
+        'notes': 'Notes',
+        'messagingStatus': 'Messaging',
+        'remark': 'Remark'
+      };
+
+      // Also there are some columns in CSV that were not in ALL_COLUMNS list like 'Legacy Order ID', 'Buyer Username', 'Item Number', 'Payment Status', 'Fulfillment Status'
+      // We should probably allow exporting them too. 
+      // For now, let's stick to the ones visible in the UI + the standard ones requested. 
+      // Actually, let's just use the selected columns from the UI list as the primary driver.
+      
+      const dynamicCsvColumns = {};
+      
+      // Always include some basics if they are not in the list? Or strictly follow selection?
+      // Strict selection is better for "customizable".
+      
+      selectedExportColumns.forEach(colId => {
+          const csvKey = columnIdToCsvKey[colId];
+          if (csvKey && allColumnDefs[csvKey]) {
+              dynamicCsvColumns[csvKey] = allColumnDefs[csvKey];
+          }
       });
+      
+      // Add extra always-useful columns if the user selected the main "Order ID" or similar?
+      // Or just add them to the selection list? 
+      // Let's just stick to the map.
+      // But wait, what about 'Legacy Order ID', 'Buyer Username', 'Item Number', 'Payment Status'?
+      // I should add them to ALL_COLUMNS if I want them selectable, or just bundle them?
+      // The user said "option to choose the columns and not just everything".
+      // I'll add the missing significant ones to the logic:
+      
+      // If 'orderId' is selected, maybe include 'Legacy Order ID'? 
+      // If 'productName' is selected, include 'Item Number'?
+      // If 'buyerName' is selected, include 'Buyer Username'?
+      
+      if (selectedExportColumns.includes('orderId')) {
+          dynamicCsvColumns['Legacy Order ID'] = allColumnDefs['Legacy Order ID'];
+      }
+      if (selectedExportColumns.includes('productName')) {
+           dynamicCsvColumns['Item Number'] = allColumnDefs['Item Number'];
+      }
+      if (selectedExportColumns.includes('buyerName')) {
+          dynamicCsvColumns['Buyer Username'] = allColumnDefs['Buyer Username'];
+      }
+      
+      // Payment Status and Fulfillment Status are useful context, maybe add if 'marketplace' or 'orderId' is present?
+      // Let's just add them if 'orderId' is there, usually that implies a full record export.
+       if (selectedExportColumns.includes('orderId')) {
+          dynamicCsvColumns['Payment Status'] = allColumnDefs['Payment Status'];
+          dynamicCsvColumns['Fulfillment Status'] = allColumnDefs['Fulfillment Status'];
+      }
+
+
+      const csvData = prepareCSVData(allOrders, dynamicCsvColumns);
       downloadCSV(csvData, 'Fulfillment_Orders');
 
-      setSnackbarMsg(`Exported ${allOrders.length} orders to CSV`);
+      setSnackbarMsg(`Exported ${allOrders.length} orders with ${Object.keys(dynamicCsvColumns).length} columns`);
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
     } catch (error) {
@@ -2688,7 +2823,7 @@ function FulfillmentDashboard() {
                 color="success"
                 size="small"
                 startIcon={<DownloadIcon />}
-                onClick={handleExportOrders}
+                onClick={handleOpenExportDialog}
                 sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
               >
                 {isSmallMobile ? 'CSV' : 'Download CSV'}
@@ -4216,6 +4351,52 @@ function FulfillmentDashboard() {
           >
             {sendingRemarkMessage ? 'Sending...' : 'Yes, Send Message'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+
+      {/* CSV Export Column Selection Dialog */}
+      <Dialog
+        open={exportDialogOpen}
+        onClose={() => setExportDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">Select Columns to Export</Typography>
+                <Box>
+                    <Button size="small" onClick={handleToggleAllExportColumns}>
+                        {selectedExportColumns.length === ALL_COLUMNS.length ? "Deselect All" : "Select All"}
+                    </Button>
+                </Box>
+            </Stack>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 2, height: 400 }}>
+             <Stack spacing={1}>
+                {ALL_COLUMNS.map((col) => (
+                    <Box key={col.id} sx={{ display: 'flex', alignItems: 'center' }}>
+                         <Checkbox 
+                            checked={selectedExportColumns.includes(col.id)}
+                            onChange={() => handleToggleExportColumn(col.id)}
+                            size="small"
+                         />
+                         <Typography variant="body2">{col.label}</Typography>
+                    </Box>
+                ))}
+             </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setExportDialogOpen(false)} color="inherit">Cancel</Button>
+             <Button 
+                onClick={handleExecuteExport} 
+                variant="contained" 
+                color="primary"
+                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+                disabled={loading || selectedExportColumns.length === 0}
+            >
+                {loading ? 'Exporting...' : 'Export CSV'}
+             </Button>
         </DialogActions>
       </Dialog>
 
