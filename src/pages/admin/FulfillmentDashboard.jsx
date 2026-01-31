@@ -163,7 +163,7 @@ const CHAT_TEMPLATES = [
 ];
 // Message templates for each remark status
 const REMARK_MESSAGE_TEMPLATES = {
-  'Delivered': `Hello,
+  'Delivered': `Hello {{buyer_first_name}},
 Thanks for your patience, we hope your package was delivered successfully and in satisfactory condition.
 If there are any issues with your order, please let us know so we can take care of it quickly.
 If you are satisfied, please leave us positive feedback with five stars.
