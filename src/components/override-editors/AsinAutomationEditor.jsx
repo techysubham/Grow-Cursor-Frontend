@@ -65,7 +65,8 @@ const TRANSFORM_OPTIONS = [
   { value: 'pipeSeparated', label: 'Pipe Separated (Array → String)' },
   { value: 'removeSymbol', label: 'Remove Currency Symbols' },
   { value: 'htmlFormat', label: 'HTML Format (Array → <ul>)' },
-  { value: 'truncate80', label: 'Truncate to 80 characters' }
+  { value: 'truncate80', label: 'Truncate to 80 characters' },
+  { value: 'truncate60', label: 'Truncate to 60 characters' }
 ];
 
 // Example prompts for common fields
