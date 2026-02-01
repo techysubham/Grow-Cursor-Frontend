@@ -78,6 +78,7 @@ export default function TemplateListingsPage() {
   const [bulkResults, setBulkResults] = useState([]);
   const [loadingBulk, setLoadingBulk] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+  const [processingLog, setProcessingLog] = useState([]);
 
   // Core field defaults dialog state
   const [defaultsDialog, setDefaultsDialog] = useState(false);
@@ -559,6 +560,7 @@ export default function TemplateListingsPage() {
     setAsinSuccess('');
     setLoadingBulk(true);
     setBulkProgress({ current: 0, total: 0 });
+    setProcessingLog([]);
 
     try {
       // Parse ASINs using flexible parser (supports commas, newlines, spaces, tabs, etc.)
@@ -583,12 +585,50 @@ export default function TemplateListingsPage() {
       }
 
       setBulkProgress({ current: 0, total: asins.length });
+      setProcessingLog([`🚀 Starting bulk autofill for ${asins.length} ASINs...`]);
 
-      const { data } = await api.post('/template-listings/bulk-autofill-from-asins', {
-        asins,
-        templateId,
-        sellerId
-      });
+      // Process in smaller batches to show progress
+      const BATCH_SIZE = 5;
+      let allResults = [];
+      
+      for (let i = 0; i < asins.length; i += BATCH_SIZE) {
+        const batchAsins = asins.slice(i, i + BATCH_SIZE);
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(asins.length / BATCH_SIZE);
+        
+        setProcessingLog(prev => [
+          ...prev,
+          `📦 Processing batch ${batchNum}/${totalBatches} (${batchAsins.length} ASINs)...`
+        ]);
+        
+        const { data } = await api.post('/template-listings/bulk-autofill-from-asins', {
+          asins: batchAsins,
+          templateId,
+          sellerId
+        });
+        
+        allResults = [...allResults, ...data.results];
+        setBulkProgress({ current: i + batchAsins.length, total: asins.length });
+        
+        // Log batch completion
+        const batchSuccess = data.results.filter(r => r.status === 'success').length;
+        const batchFailed = data.results.filter(r => r.status === 'error').length;
+        const batchDupes = data.results.filter(r => r.status === 'duplicate').length;
+        
+        setProcessingLog(prev => [
+          ...prev,
+          `✅ Batch ${batchNum} complete: ${batchSuccess} success, ${batchFailed} failed, ${batchDupes} duplicates (${data.processingTime})`
+        ]);
+      }
+      
+      // Calculate totals
+      const data = {
+        results: allResults,
+        total: asins.length,
+        successful: allResults.filter(r => r.status === 'success').length,
+        failed: allResults.filter(r => r.status === 'error').length,
+        duplicates: allResults.filter(r => r.status === 'duplicate').length
+      };
 
       // Add auto-generated SKUs to results
       const resultsWithSKUs = data.results.map(result => ({
@@ -597,8 +637,12 @@ export default function TemplateListingsPage() {
       }));
 
       setBulkResults(resultsWithSKUs);
+      setProcessingLog(prev => [
+        ...prev,
+        `🎉 All batches complete! Total: ${data.successful} successful, ${data.failed} failed, ${data.duplicates} duplicates`
+      ]);
       setAsinSuccess(
-        `Processed ${data.total} ASIN(s): ${data.successful} successful, ${data.failed} failed${data.duplicates > 0 ? `, ${data.duplicates} duplicates` : ''} (${data.processingTime})`
+        `✅ Processed ${data.total} ASIN(s): ${data.successful} successful, ${data.failed} failed${data.duplicates > 0 ? `, ${data.duplicates} duplicates` : ''}`
       );
     } catch (err) {
       setAsinError(err.response?.data?.error || 'Failed to process bulk ASINs');
@@ -1287,8 +1331,59 @@ export default function TemplateListingsPage() {
               
               {loadingBulk && (
                 <Box sx={{ mt: 2 }}>
-                  <LinearProgress />
+                  <Stack spacing={1}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={(bulkProgress.current / bulkProgress.total) * 100} 
+                        sx={{ flexGrow: 1, height: 8, borderRadius: 1 }}
+                      />
+                      <Typography variant="body2" sx={{ minWidth: 80, textAlign: 'right' }}>
+                        {bulkProgress.current}/{bulkProgress.total}
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                      {Math.round((bulkProgress.current / bulkProgress.total) * 100)}% complete
+                    </Typography>
+                  </Stack>
                 </Box>
+              )}
+              
+              {/* Processing Log */}
+              {processingLog.length > 0 && (
+                <Paper 
+                  variant="outlined" 
+                  sx={{ 
+                    mt: 2, 
+                    p: 2, 
+                    maxHeight: 200, 
+                    overflowY: 'auto',
+                    bgcolor: 'grey.50',
+                    fontFamily: 'monospace',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                    Processing Log
+                  </Typography>
+                  {processingLog.map((log, idx) => (
+                    <Typography 
+                      key={idx} 
+                      variant="body2" 
+                      sx={{ 
+                        mb: 0.5,
+                        fontFamily: 'monospace',
+                        fontSize: '0.8rem',
+                        color: log.includes('❌') || log.includes('failed') ? 'error.main' :
+                               log.includes('✅') || log.includes('complete') ? 'success.main' :
+                               log.includes('📦') ? 'primary.main' :
+                               'text.secondary'
+                      }}
+                    >
+                      {log}
+                    </Typography>
+                  ))}
+                </Paper>
               )}
               
               {asinError && (
