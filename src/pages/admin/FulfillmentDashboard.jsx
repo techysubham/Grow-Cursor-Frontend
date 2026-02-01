@@ -35,7 +35,8 @@ import {
   useTheme,
   Collapse,
   Menu,
-  ListSubheader
+  ListSubheader,
+  Switch
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -1136,6 +1137,7 @@ function FulfillmentDashboard() {
   //const [searchSoldDate, setSearchSoldDate] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [searchPaymentStatus, setSearchPaymentStatus] = useState(() => getInitialState('searchPaymentStatus', ''));
+  const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
   const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
   
   // Close filters by default on mobile
@@ -1272,6 +1274,7 @@ function FulfillmentDashboard() {
       searchItemId,
       searchMarketplace,
       searchPaymentStatus,
+      excludeLowValue,
       filtersExpanded,
       currentPage,
       dateFilter,
@@ -1282,7 +1285,7 @@ function FulfillmentDashboard() {
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, searchPaymentStatus, filtersExpanded, currentPage, dateFilter, visibleColumns]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemId, searchMarketplace, searchPaymentStatus, excludeLowValue, filtersExpanded, currentPage, dateFilter, visibleColumns]);
 
   // Fetch column presets on mount
   useEffect(() => {
@@ -1515,6 +1518,7 @@ function FulfillmentDashboard() {
     searchItemId,
     searchMarketplace,
     searchPaymentStatus,
+    excludeLowValue,
     dateFilter
   });
 
@@ -1557,6 +1561,7 @@ function FulfillmentDashboard() {
       prevFilters.current.searchItemId !== searchItemId ||
       prevFilters.current.searchMarketplace !== searchMarketplace ||
       prevFilters.current.searchPaymentStatus !== searchPaymentStatus ||
+      prevFilters.current.excludeLowValue !== excludeLowValue ||
       JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter);
 
     // Update prev filters
@@ -1567,6 +1572,7 @@ function FulfillmentDashboard() {
       searchItemId,
       searchMarketplace,
       searchPaymentStatus,
+      excludeLowValue,
       dateFilter
     };
 
@@ -1584,7 +1590,7 @@ function FulfillmentDashboard() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemId, searchMarketplace, searchPaymentStatus, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemId, searchMarketplace, searchPaymentStatus, excludeLowValue, dateFilter]);
 
   // Handle order earnings change (update local state)
   const handleOrderEarningsChange = (orderId, orderIdStr, value) => {
@@ -1671,6 +1677,7 @@ function FulfillmentDashboard() {
       if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
+      params.excludeLowValue = excludeLowValue;
 
       // --- NEW DATE LOGIC START ---
       if (dateFilter.mode === 'single' && dateFilter.single) {
@@ -2940,6 +2947,24 @@ function FulfillmentDashboard() {
               </FormControl>
             </Stack>
 
+            {/* Row 3.5: Exclude Low Value Toggle */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={excludeLowValue}
+                  onChange={(e) => setExcludeLowValue(e.target.checked)}
+                  color="primary"
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                  Exclude &lt; $3 Orders
+                </Typography>
+              }
+              sx={{ mx: 1 }}
+            />
+
             {/* Row 4: Backfill & Column Selector */}
             <Stack direction="row" spacing={1} alignItems="center">
               <Tooltip title={selectedSeller ? "Backfill Ad Fees" : "Select a seller first"}>
@@ -3062,6 +3087,23 @@ function FulfillmentDashboard() {
                 <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
               </Select>
             </FormControl>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={excludeLowValue}
+                  onChange={(e) => setExcludeLowValue(e.target.checked)}
+                  color="primary"
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                  Exclude &lt; $3 Orders
+                </Typography>
+              }
+              sx={{ mx: 1 }}
+            />
 
             {/* Column Selector Button */}
             <Tooltip title="Select Columns">
