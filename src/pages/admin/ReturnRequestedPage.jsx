@@ -428,7 +428,21 @@ export default function ReturnRequestedPage({
               'Order ID': 'orderId',
               'Seller': (r) => r.seller?.user?.username || '',
               'Buyer': 'buyerUsername',
-              'Reason': (r) => r.returnReason?.value || r.returnReason || '',
+              'Reason': (r) => {
+                const reason = r.returnReason?.value || r.returnReason || '';
+                const reasonLabels = {
+                  'WRONG_SIZE': 'Does not fit',
+                  'DOES_NOT_FIT': "Doesn't fit my vehicle",
+                  'NOT_AS_DESCRIBED': 'Not As Described',
+                  'DEFECTIVE_ITEM': 'Defective Item',
+                  'NO_LONGER_NEED_ITEM': 'No Longer Needed',
+                  'ORDERED_ACCIDENTALLY': 'Ordered Accidentally',
+                  'ARRIVED_DAMAGED': 'Arrived Damaged',
+                  'MISSING_PARTS': 'Missing Parts',
+                  'OTHER': 'Other'
+                };
+                return reasonLabels[reason] || reason;
+              },
               'Status': (r) => r.currentStatus || r.returnRequest?.currentType || '',
               'RMA Number': 'RMANumber',
               'Created Date': (r) => r.creationDate ? new Date(r.creationDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
@@ -491,7 +505,8 @@ export default function ReturnRequestedPage({
                     <Chip 
                       key={value} 
                       label={{
-                        'WRONG_SIZE': 'Wrong Size',
+                        'WRONG_SIZE': 'Does not fit',
+                        'DOES_NOT_FIT': "Doesn't fit my vehicle",
                         'NOT_AS_DESCRIBED': 'Not As Described',
                         'DEFECTIVE_ITEM': 'Defective Item',
                         'NO_LONGER_NEED_ITEM': 'No Longer Needed',
@@ -506,7 +521,8 @@ export default function ReturnRequestedPage({
                 </Box>
               )}
             >
-              <MenuItem value="WRONG_SIZE">Wrong Size</MenuItem>
+              <MenuItem value="WRONG_SIZE">Does not fit</MenuItem>
+              <MenuItem value="DOES_NOT_FIT">Doesn't fit my vehicle</MenuItem>
               <MenuItem value="NOT_AS_DESCRIBED">Not As Described</MenuItem>
               <MenuItem value="DEFECTIVE_ITEM">Defective Item</MenuItem>
               <MenuItem value="NO_LONGER_NEED_ITEM">No Longer Needed</MenuItem>
@@ -774,7 +790,17 @@ export default function ReturnRequestedPage({
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" fontSize="0.7rem">
-                        {ret.returnReason || '-'}
+                        {{
+                          'WRONG_SIZE': 'Does not fit',
+                          'DOES_NOT_FIT': "Doesn't fit my vehicle",
+                          'NOT_AS_DESCRIBED': 'Not As Described',
+                          'DEFECTIVE_ITEM': 'Defective Item',
+                          'NO_LONGER_NEED_ITEM': 'No Longer Needed',
+                          'ORDERED_ACCIDENTALLY': 'Ordered Accidentally',
+                          'ARRIVED_DAMAGED': 'Arrived Damaged',
+                          'MISSING_PARTS': 'Missing Parts',
+                          'OTHER': 'Other'
+                        }[ret.returnReason] || ret.returnReason || '-'}
                       </Typography>
                     </TableCell>
                     <TableCell>
