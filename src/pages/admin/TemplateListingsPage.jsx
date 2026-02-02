@@ -27,6 +27,7 @@ import BulkDeactivateDialog from '../../components/BulkDeactivateDialog.jsx';
 import TemplateListingStatsCard from '../../components/TemplateListingStatsCard.jsx';
 import ActionFieldEditor from '../../components/ActionFieldEditor.jsx';
 import TemplateCustomizationDialog from '../../components/TemplateCustomizationDialog.jsx';
+import AsinReviewModal from '../../components/AsinReviewModal.jsx';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
 
@@ -85,6 +86,10 @@ export default function TemplateListingsPage() {
   
   // Template customization dialog state
   const [customizationDialog, setCustomizationDialog] = useState(false);
+  
+  // ASIN Review Modal state
+  const [reviewModal, setReviewModal] = useState(false);
+  const [previewItems, setPreviewItems] = useState([]);
 
   const [listingFormData, setListingFormData] = useState({
     action: 'Add',
@@ -573,8 +578,8 @@ export default function TemplateListingsPage() {
         return;
       }
 
-      if (asins.length > 50) {
-        setAsinError('Maximum 50 ASINs allowed per batch');
+      if (asins.length > 80) {
+        setAsinError('Maximum 80 ASINs allowed per batch');
         setLoadingBulk(false);
         return;
       }
@@ -589,7 +594,7 @@ export default function TemplateListingsPage() {
 
       // Process in smaller batches to show progress
       const BATCH_SIZE = 5;
-      let allResults = [];
+      let allPreviewItems = [];
       
       for (let i = 0; i < asins.length; i += BATCH_SIZE) {
         const batchAsins = asins.slice(i, i + BATCH_SIZE);
@@ -601,49 +606,47 @@ export default function TemplateListingsPage() {
           `📦 Processing batch ${batchNum}/${totalBatches} (${batchAsins.length} ASINs)...`
         ]);
         
-        const { data } = await api.post('/template-listings/bulk-autofill-from-asins', {
-          asins: batchAsins,
+        const batchStartTime = Date.now();
+        
+        const { data } = await api.post('/template-listings/bulk-preview', {
           templateId,
-          sellerId
+          sellerId,
+          asins: batchAsins
         });
         
-        allResults = [...allResults, ...data.results];
+        const batchDuration = ((Date.now() - batchStartTime) / 1000).toFixed(1);
+        
+        allPreviewItems = [...allPreviewItems, ...data.items];
         setBulkProgress({ current: i + batchAsins.length, total: asins.length });
         
         // Log batch completion
-        const batchSuccess = data.results.filter(r => r.status === 'success').length;
-        const batchFailed = data.results.filter(r => r.status === 'error').length;
-        const batchDupes = data.results.filter(r => r.status === 'duplicate').length;
+        const batchSuccess = data.items.filter(item => item.status !== 'error').length;
+        const batchFailed = data.items.filter(item => item.status === 'error').length;
+        const batchWarnings = data.items.filter(item => item.status === 'warning').length;
         
         setProcessingLog(prev => [
           ...prev,
-          `✅ Batch ${batchNum} complete: ${batchSuccess} success, ${batchFailed} failed, ${batchDupes} duplicates (${data.processingTime})`
+          `✅ Batch ${batchNum} complete: ${batchSuccess} success, ${batchFailed} failed${batchWarnings > 0 ? `, ${batchWarnings} warnings` : ''} (${batchDuration}s)`
         ]);
       }
       
-      // Calculate totals
-      const data = {
-        results: allResults,
-        total: asins.length,
-        successful: allResults.filter(r => r.status === 'success').length,
-        failed: allResults.filter(r => r.status === 'error').length,
-        duplicates: allResults.filter(r => r.status === 'duplicate').length
-      };
-
-      // Add auto-generated SKUs to results
-      const resultsWithSKUs = data.results.map(result => ({
-        ...result,
-        sku: generateSKUFromASIN(result.asin) // Auto-generated SKU: GRW25 + last 5 chars
-      }));
-
-      setBulkResults(resultsWithSKUs);
+      // Calculate final totals
+      const successful = allPreviewItems.filter(item => item.status !== 'error').length;
+      const failed = allPreviewItems.filter(item => item.status === 'error').length;
+      const withWarnings = allPreviewItems.filter(item => item.status === 'warning').length;
+      
+      setPreviewItems(allPreviewItems);
       setProcessingLog(prev => [
         ...prev,
-        `🎉 All batches complete! Total: ${data.successful} successful, ${data.failed} failed, ${data.duplicates} duplicates`
+        `🎉 All batches complete! Total: ${successful} successful, ${failed} failed${withWarnings > 0 ? `, ${withWarnings} warnings` : ''}`
       ]);
       setAsinSuccess(
-        `✅ Processed ${data.total} ASIN(s): ${data.successful} successful, ${data.failed} failed${data.duplicates > 0 ? `, ${data.duplicates} duplicates` : ''}`
+        `✅ Processed ${asins.length} ASIN(s): ${successful} successful, ${failed} failed${withWarnings > 0 ? `, ${withWarnings} warnings` : ''}`
       );
+      
+      // Open review modal
+      setReviewModal(true);
+      
     } catch (err) {
       setAsinError(err.response?.data?.error || 'Failed to process bulk ASINs');
       console.error(err);
@@ -678,6 +681,53 @@ export default function TemplateListingsPage() {
       console.error('Retry error:', err);
     } finally {
       setLoadingBulk(false);
+    }
+  };
+
+  // Save listings from review modal
+  const handleSaveFromReview = async (listings) => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { data } = await api.post('/template-listings/bulk-save', {
+        templateId,
+        sellerId,
+        listings,
+        options: {
+          skipDuplicates: true
+        }
+      });
+
+      // Update processing log with final results
+      setProcessingLog(prev => [
+        ...prev,
+        `💾 Saving ${listings.length} listings to database...`,
+        `✅ Save completed: ${data.created} created, ${data.reactivated || 0} reactivated, ${data.failed} failed, ${data.skipped} skipped`
+      ]);
+
+      setSuccess(
+        `Bulk save completed: ${data.created} created, ${data.reactivated || 0} reactivated, ${data.failed} failed, ${data.skipped} skipped`
+      );
+
+      // Refresh listings table
+      await fetchListings(pagination.page);
+
+      // Close review modal and reset state
+      setReviewModal(false);
+      setPreviewItems([]);
+      setAsinInput('');
+
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save listings');
+      setProcessingLog(prev => [
+        ...prev,
+        `❌ Save failed: ${err.response?.data?.error || err.message}`
+      ]);
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1832,27 +1882,45 @@ export default function TemplateListingsPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => {
-            setAddEditDialog(false);
-            setBulkMode(false);
-            setBulkResults([]);
-            setAsinInput('');
-          }}>
-            Cancel
-          </Button>
-          {bulkMode && bulkResults.length > 0 ? (
+          {/* Show only OK button if save was successful, otherwise show normal buttons */}
+          {!reviewModal && processingLog.some(log => log.includes('Save completed')) ? (
             <Button 
-              onClick={handleBulkSave} 
-              variant="contained" 
-              disabled={loading || bulkResults.filter(r => r.status === 'success').length === 0}
+              onClick={() => {
+                setAddEditDialog(false);
+                setBulkMode(false);
+                setBulkResults([]);
+                setAsinInput('');
+                setProcessingLog([]);
+              }}
+              variant="contained"
             >
-              Save All ({bulkResults.filter(r => r.status === 'success').length} valid)
+              OK
             </Button>
-          ) : !bulkMode ? (
-            <Button onClick={handleSaveListing} variant="contained" disabled={loading}>
-              {editingListing ? 'Update' : 'Create'}
-            </Button>
-          ) : null}
+          ) : (
+            <>
+              <Button onClick={() => {
+                setAddEditDialog(false);
+                setBulkMode(false);
+                setBulkResults([]);
+                setAsinInput('');
+              }}>
+                Cancel
+              </Button>
+              {bulkMode && bulkResults.length > 0 ? (
+                <Button 
+                  onClick={handleBulkSave} 
+                  variant="contained" 
+                  disabled={loading || bulkResults.filter(r => r.status === 'success').length === 0}
+                >
+                  Save All ({bulkResults.filter(r => r.status === 'success').length} valid)
+                </Button>
+              ) : !bulkMode ? (
+                <Button onClick={handleSaveListing} variant="contained" disabled={loading}>
+                  {editingListing ? 'Update' : 'Create'}
+                </Button>
+              ) : null}
+            </>
+          )}
         </DialogActions>
       </Dialog>
 
@@ -2053,6 +2121,24 @@ export default function TemplateListingsPage() {
         templateId={templateId}
         sellerId={sellerId}
         templateName={template?.name}
+      />
+      
+      {/* ASIN Review Modal */}
+      <AsinReviewModal
+        open={reviewModal}
+        onClose={() => {
+          setReviewModal(false);
+          setPreviewItems([]);
+        }}
+        previewItems={previewItems}
+        onSave={handleSaveFromReview}
+        templateColumns={[
+          ...(template?.customColumns?.map(col => ({ ...col, type: 'custom' })) || []),
+          { name: 'title', label: 'Title', type: 'core' },
+          { name: 'description', label: 'Description', type: 'core' },
+          { name: 'startPrice', label: 'Start Price', type: 'core' },
+          { name: 'quantity', label: 'Quantity', type: 'core' }
+        ]}
       />
     </Box>
   );
