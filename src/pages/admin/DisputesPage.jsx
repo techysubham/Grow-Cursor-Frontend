@@ -41,7 +41,7 @@ import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ReturnRequestedPage from './ReturnRequestedPage.jsx';
 import CancelledStatusPage from './CancelledStatusPage.jsx';
 import WorksheetPage from './WorksheetPage.jsx';
-import ChatModal from '../../components/ChatModal';
+import ColumnSelector from '../../components/ColumnSelector';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
 
 function TabPanel({ children, value, index }) {
@@ -128,7 +128,38 @@ export default function DisputesPage({ initialTab = 0 }) {
   // Payment Dispute Filters
   const [pdStatusFilter, setPdStatusFilter] = useState('');
   const [pdSellerFilter, setPdSellerFilter] = useState('');
+
   const [pdReasonFilter, setPdReasonFilter] = useState('');
+
+  // Column Selectors
+  const ALL_INR_COLUMNS = [
+    { id: 'caseId', label: 'Case ID' },
+    { id: 'type', label: 'Type' },
+    { id: 'seller', label: 'Seller' },
+    { id: 'buyer', label: 'Buyer' },
+    { id: 'item', label: 'Item' },
+    { id: 'status', label: 'Status' },
+    { id: 'claimAmount', label: 'Claim Amount' },
+    { id: 'created', label: 'Created (PST)' },
+    { id: 'responseDue', label: 'Response Due (PST)' },
+    { id: 'logs', label: 'Logs' },
+    { id: 'chat', label: 'Chat' },
+  ];
+  const [inrVisibleColumns, setInrVisibleColumns] = useState(ALL_INR_COLUMNS.map(c => c.id));
+
+  const ALL_DISPUTE_COLUMNS = [
+    { id: 'disputeId', label: 'Dispute ID' },
+    { id: 'reason', label: 'Reason' },
+    { id: 'seller', label: 'Seller' },
+    { id: 'buyer', label: 'Buyer' },
+    { id: 'amount', label: 'Amount' },
+    { id: 'status', label: 'Status' },
+    { id: 'created', label: 'Created (PST)' },
+    { id: 'responseDue', label: 'Response Due (PST)' },
+    { id: 'logs', label: 'Logs' },
+    { id: 'chat', label: 'Chat' },
+  ];
+  const [disputeVisibleColumns, setDisputeVisibleColumns] = useState(ALL_DISPUTE_COLUMNS.map(c => c.id));
   
   // Selected items for chat and order details modal
   const [selectedCase, setSelectedCase] = useState(null);
@@ -698,6 +729,13 @@ export default function DisputesPage({ initialTab = 0 }) {
           >
             Download CSV ({filteredCases.length})
           </Button>
+           <ColumnSelector
+              allColumns={ALL_INR_COLUMNS}
+              visibleColumns={inrVisibleColumns}
+              onColumnChange={setInrVisibleColumns}
+              onReset={() => setInrVisibleColumns(ALL_INR_COLUMNS.map(c => c.id))}
+              page="disputes-inr"
+          />
         </Stack>
 
         {/* Filters */}
@@ -790,17 +828,17 @@ export default function DisputesPage({ initialTab = 0 }) {
             <Table size="small" sx={{ minWidth: 1200 }}>
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableCell><strong>Case ID</strong></TableCell>
-                  <TableCell><strong>Type</strong></TableCell>
-                  <TableCell><strong>Seller</strong></TableCell>
-                  <TableCell><strong>Buyer</strong></TableCell>
-                  <TableCell><strong>Item</strong></TableCell>
-                  <TableCell><strong>Status</strong></TableCell>
-                  <TableCell><strong>Claim Amount</strong></TableCell>
-                  <TableCell><strong>Created (PST)</strong></TableCell>
-                  <TableCell><strong>Response Due (PST)</strong></TableCell>
-                  <TableCell><strong>Logs</strong></TableCell>
-                  <TableCell align="center"><strong>Chat</strong></TableCell>
+            {inrVisibleColumns.includes('caseId') && <TableCell><strong>Case ID</strong></TableCell>}
+            {inrVisibleColumns.includes('type') && <TableCell><strong>Type</strong></TableCell>}
+            {inrVisibleColumns.includes('seller') && <TableCell><strong>Seller</strong></TableCell>}
+            {inrVisibleColumns.includes('buyer') && <TableCell><strong>Buyer</strong></TableCell>}
+            {inrVisibleColumns.includes('item') && <TableCell><strong>Item</strong></TableCell>}
+            {inrVisibleColumns.includes('status') && <TableCell><strong>Status</strong></TableCell>}
+            {inrVisibleColumns.includes('claimAmount') && <TableCell><strong>Claim Amount</strong></TableCell>}
+            {inrVisibleColumns.includes('created') && <TableCell><strong>Created (PST)</strong></TableCell>}
+            {inrVisibleColumns.includes('responseDue') && <TableCell><strong>Response Due (PST)</strong></TableCell>}
+            {inrVisibleColumns.includes('logs') && <TableCell><strong>Logs</strong></TableCell>}
+            {inrVisibleColumns.includes('chat') && <TableCell align="center"><strong>Chat</strong></TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -815,7 +853,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                 ) : (
                   filteredCases.map((c) => (
                     <TableRow key={c._id} hover>
-                      <TableCell>
+                      {inrVisibleColumns.includes('caseId') && <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
                           <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                             {c.caseId || '-'}
@@ -824,22 +862,22 @@ export default function DisputesPage({ initialTab = 0 }) {
                             <ContentCopyIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         </Stack>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {inrVisibleColumns.includes('type') && <TableCell>
                         <Chip 
                           label={c.caseType || 'INR'} 
                           color={getCaseTypeColor(c.caseType)}
                           size="small"
                           sx={{ fontSize: '0.7rem' }}
                         />
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {inrVisibleColumns.includes('seller') && <TableCell>
                         <Typography variant="body2">{c.seller?.user?.username || '-'}</Typography>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {inrVisibleColumns.includes('buyer') && <TableCell>
                         <Typography variant="body2">{c.buyerUsername || '-'}</Typography>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {inrVisibleColumns.includes('item') && <TableCell>
                         <Tooltip title={c.itemTitle || 'N/A'}>
                           <Typography 
                             variant="body2" 
@@ -853,28 +891,28 @@ export default function DisputesPage({ initialTab = 0 }) {
                             {c.itemTitle || c.itemId || '-'}
                           </Typography>
                         </Tooltip>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {inrVisibleColumns.includes('status') && <TableCell>
                         <Chip 
                           label={c.status || 'Unknown'} 
                           color={getCaseStatusColor(c.status)}
                           size="small"
                           sx={{ fontSize: '0.7rem' }}
                         />
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {inrVisibleColumns.includes('claimAmount') && <TableCell>
                         <Typography variant="body2">
                           {c.claimAmount?.value 
                             ? `${c.claimAmount.currency || 'USD'} ${c.claimAmount.value}` 
                             : '-'}
                         </Typography>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {inrVisibleColumns.includes('created') && <TableCell>
                         <Typography variant="body2" fontSize="0.75rem">
                           {formatDate(c.creationDate)}
                         </Typography>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {inrVisibleColumns.includes('responseDue') && <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
                           <Typography 
                             variant="body2" 
@@ -894,15 +932,15 @@ export default function DisputesPage({ initialTab = 0 }) {
                             />
                           )}
                         </Stack>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {inrVisibleColumns.includes('logs') && <TableCell>
                         <LogsCell
                           value={c.logs}
                           id={c.caseId}
                           onSave={handleSaveCaseLogs}
                         />
-                      </TableCell>
-                      <TableCell align="center">
+                      </TableCell>}
+                      {inrVisibleColumns.includes('chat') && <TableCell align="center">
                         <Tooltip title="Chat with buyer">
                           <IconButton 
                             size="small" 
@@ -912,7 +950,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                             <ChatIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                      </TableCell>
+                      </TableCell>}
                     </TableRow>
                   ))
                 )}
@@ -951,15 +989,25 @@ export default function DisputesPage({ initialTab = 0 }) {
             </Typography>
           </Stack>
           
-          <Button
-            variant="outlined"
-            color="success"
-            startIcon={<DownloadIcon />}
-            onClick={handleExportPaymentDisputes}
-            disabled={filteredDisputes.length === 0}
-          >
-            Download CSV ({filteredDisputes.length})
-          </Button>
+          <Stack direction="row" spacing={2} alignItems="center">
+
+            <Button
+              variant="outlined"
+              color="success"
+              startIcon={<DownloadIcon />}
+              onClick={handleExportPaymentDisputes}
+              disabled={filteredDisputes.length === 0}
+            >
+              Download CSV ({filteredDisputes.length})
+            </Button>
+            <ColumnSelector
+                allColumns={ALL_DISPUTE_COLUMNS}
+                visibleColumns={disputeVisibleColumns}
+                onColumnChange={setDisputeVisibleColumns}
+                onReset={() => setDisputeVisibleColumns(ALL_DISPUTE_COLUMNS.map(c => c.id))}
+                page="disputes-pd"
+            />
+          </Stack>
         </Stack>
 
         {/* Filters */}
@@ -1057,16 +1105,16 @@ export default function DisputesPage({ initialTab = 0 }) {
             <Table size="small" sx={{ minWidth: 1200 }}>
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableCell><strong>Dispute ID</strong></TableCell>
-                  <TableCell><strong>Order ID</strong></TableCell>
-                  <TableCell><strong>Seller</strong></TableCell>
-                  <TableCell><strong>Buyer</strong></TableCell>
-                  <TableCell><strong>Reason</strong></TableCell>
-                  <TableCell><strong>Status</strong></TableCell>
-                  <TableCell><strong>Amount</strong></TableCell>
-                  <TableCell><strong>Open Date (PST)</strong></TableCell>
-                  <TableCell><strong>Respond By (PST)</strong></TableCell>
-                  <TableCell><strong>Resolution</strong></TableCell>
+                  {disputeVisibleColumns.includes('disputeId') && <TableCell><strong>Dispute ID</strong></TableCell>}
+                  {disputeVisibleColumns.includes('orderId') && <TableCell><strong>Order ID</strong></TableCell>}
+                  {disputeVisibleColumns.includes('seller') && <TableCell><strong>Seller</strong></TableCell>}
+                  {disputeVisibleColumns.includes('buyer') && <TableCell><strong>Buyer</strong></TableCell>}
+                  {disputeVisibleColumns.includes('reason') && <TableCell><strong>Reason</strong></TableCell>}
+                  {disputeVisibleColumns.includes('status') && <TableCell><strong>Status</strong></TableCell>}
+                  {disputeVisibleColumns.includes('amount') && <TableCell><strong>Amount</strong></TableCell>}
+                  {disputeVisibleColumns.includes('openedDate') && <TableCell><strong>Open Date (PST)</strong></TableCell>}
+                  {disputeVisibleColumns.includes('responseDue') && <TableCell><strong>Respond By (PST)</strong></TableCell>}
+                  {disputeVisibleColumns.includes('outcome') && <TableCell><strong>Resolution</strong></TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1081,7 +1129,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                 ) : (
                   filteredDisputes.map((d) => (
                     <TableRow key={d._id} hover>
-                      <TableCell>
+                      {disputeVisibleColumns.includes('disputeId') && <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
                           <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                             {d.paymentDisputeId || '-'}
@@ -1090,8 +1138,8 @@ export default function DisputesPage({ initialTab = 0 }) {
                             <ContentCopyIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         </Stack>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {disputeVisibleColumns.includes('orderId') && <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
                           <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                             {d.orderId || '-'}
@@ -1100,14 +1148,14 @@ export default function DisputesPage({ initialTab = 0 }) {
                             <ContentCopyIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         </Stack>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {disputeVisibleColumns.includes('seller') && <TableCell>
                         <Typography variant="body2">{d.seller?.user?.username || '-'}</Typography>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {disputeVisibleColumns.includes('buyer') && <TableCell>
                         <Typography variant="body2">{d.buyerUsername || '-'}</Typography>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {disputeVisibleColumns.includes('reason') && <TableCell>
                         <Tooltip title={d.reason || 'N/A'}>
                           <Typography 
                             variant="body2" 
@@ -1122,28 +1170,28 @@ export default function DisputesPage({ initialTab = 0 }) {
                             {d.reason?.replace(/_/g, ' ') || '-'}
                           </Typography>
                         </Tooltip>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {disputeVisibleColumns.includes('status') && <TableCell>
                         <Chip 
                           label={d.paymentDisputeStatus?.replace(/_/g, ' ') || 'Unknown'} 
                           color={getDisputeStatusColor(d.paymentDisputeStatus)}
                           size="small"
                           sx={{ fontSize: '0.65rem' }}
                         />
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {disputeVisibleColumns.includes('amount') && <TableCell>
                         <Typography variant="body2">
                           {d.amount?.value 
                             ? `${d.amount.currency || 'USD'} ${d.amount.value}` 
                             : '-'}
                         </Typography>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {disputeVisibleColumns.includes('openedDate') && <TableCell>
                         <Typography variant="body2" fontSize="0.75rem">
                           {formatDate(d.openDate)}
                         </Typography>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {disputeVisibleColumns.includes('responseDue') && <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
                           <Typography 
                             variant="body2" 
@@ -1170,12 +1218,12 @@ export default function DisputesPage({ initialTab = 0 }) {
                             />
                           )}
                         </Stack>
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>}
+                      {disputeVisibleColumns.includes('outcome') && <TableCell>
                         <Typography variant="body2" fontSize="0.75rem">
                           {d.resolution || d.sellerProtectionDecision || '-'}
                         </Typography>
-                      </TableCell>
+                      </TableCell>}
                     </TableRow>
                   ))
                 )}

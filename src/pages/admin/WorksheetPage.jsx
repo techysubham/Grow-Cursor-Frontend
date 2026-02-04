@@ -23,6 +23,7 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import api from '../../lib/api';
+import ColumnSelector from '../../components/ColumnSelector';
 
 const CATEGORIES = [
   { key: 'cancellations', label: 'Cancellations' },
@@ -48,6 +49,12 @@ export default function WorksheetPage({
   const [summary, setSummary] = useState(null);
   const [sellers, setSellers] = useState([]);
   const [sellerFilter, setSellerFilter] = useState('');
+
+  const ALL_COLUMNS = [
+    { id: 'date', label: 'Date' },
+    ...CATEGORIES.map(c => ({ id: c.key, label: c.label }))
+  ];
+  const [visibleColumns, setVisibleColumns] = useState(ALL_COLUMNS.map(c => c.id));
 
   const [internalDateFilter, setInternalDateFilter] = useState({
     mode: 'single',
@@ -255,6 +262,13 @@ export default function WorksheetPage({
           >
             Refresh
           </Button>
+          <ColumnSelector
+              allColumns={ALL_COLUMNS}
+              visibleColumns={visibleColumns}
+              onColumnChange={setVisibleColumns}
+              onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
+              page="worksheet"
+          />
         </Stack>
       )}
 
@@ -337,6 +351,13 @@ export default function WorksheetPage({
             >
               Refresh
             </Button>
+            <ColumnSelector
+                allColumns={ALL_COLUMNS}
+                visibleColumns={visibleColumns}
+                onColumnChange={setVisibleColumns}
+                onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
+                page="worksheet"
+            />
           </Stack>
         </Paper>
       )}
@@ -395,7 +416,7 @@ export default function WorksheetPage({
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell
+                  {visibleColumns.includes('date') && <TableCell
                     sx={{
                       fontWeight: 'bold',
                       bgcolor: 'primary.main',
@@ -407,9 +428,9 @@ export default function WorksheetPage({
                     }}
                   >
                     Date
-                  </TableCell>
+                  </TableCell>}
                   {CATEGORIES.map((category) => (
-                    <TableCell
+                    visibleColumns.includes(category.key) && <TableCell
                       key={category.key}
                       align="center"
                       colSpan={category.key === 'inquiries' ? 1 : STATUS_COLUMNS.length}
@@ -425,7 +446,7 @@ export default function WorksheetPage({
                   ))}
                 </TableRow>
                 <TableRow>
-                  <TableCell
+                  {visibleColumns.includes('date') && <TableCell
                     sx={{
                       fontWeight: 'bold',
                       bgcolor: 'primary.dark',
@@ -434,9 +455,9 @@ export default function WorksheetPage({
                       left: 0,
                       zIndex: 3
                     }}
-                  />
+                  />}
                   {CATEGORIES.map((category) => (
-                    <React.Fragment key={category.key}>
+                    visibleColumns.includes(category.key) && <React.Fragment key={category.key}>
                       {category.key === 'inquiries' ? (
                         <TableCell
                           key={`${category.key}-total`}
@@ -485,7 +506,7 @@ export default function WorksheetPage({
                   <>
                     {tableData.map((row) => (
                       <TableRow key={row.date} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                        <TableCell
+                        {visibleColumns.includes('date') && <TableCell
                           sx={{
                             fontWeight: 'medium',
                             position: 'sticky',
@@ -504,9 +525,9 @@ export default function WorksheetPage({
                               </Typography>
                             )}
                           </Box>
-                        </TableCell>
+                        </TableCell>}
                         {CATEGORIES.map((category) => (
-                          <React.Fragment key={`${row.date}-${category.key}`}>
+                          visibleColumns.includes(category.key) && <React.Fragment key={`${row.date}-${category.key}`}>
                             {category.key === 'inquiries' ? (
                               <TableCell
                                 key={`${row.date}-${category.key}-total`}
@@ -539,7 +560,7 @@ export default function WorksheetPage({
                     ))}
 
                     <TableRow sx={{ bgcolor: 'grey.100' }}>
-                      <TableCell
+                      {visibleColumns.includes('date') && <TableCell
                         sx={{
                           fontWeight: 'bold',
                           position: 'sticky',
@@ -549,9 +570,9 @@ export default function WorksheetPage({
                         }}
                       >
                         TOTAL
-                      </TableCell>
+                      </TableCell>}
                       {CATEGORIES.map((category) => (
-                        <React.Fragment key={`total-${category.key}`}>
+                        visibleColumns.includes(category.key) && <React.Fragment key={`total-${category.key}`}>
                           {category.key === 'inquiries' ? (
                             <TableCell
                               key={`total-${category.key}-total`}

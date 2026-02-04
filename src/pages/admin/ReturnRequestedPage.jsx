@@ -35,6 +35,7 @@ import api from '../../lib/api';
 import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ChatModal from '../../components/ChatModal';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
+import ColumnSelector from '../../components/ColumnSelector';
 
 // LogsCell component for editable logs field with save functionality
 function LogsCell({ value, onSave, id }) {
@@ -94,6 +95,23 @@ export default function ReturnRequestedPage({
   const [error, setError] = useState('');
   const [selectedReturn, setSelectedReturn] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+
+  const ALL_COLUMNS = [
+    { id: 'returnId', label: 'Return ID' },
+    { id: 'createdDate', label: 'Created Date (PST)' },
+    { id: 'responseDue', label: 'Response Due (PST)' },
+    { id: 'orderId', label: 'Order ID' },
+    { id: 'seller', label: 'Seller' },
+    { id: 'buyer', label: 'Buyer' },
+    { id: 'item', label: 'Item' },
+    { id: 'reason', label: 'Reason' },
+    { id: 'status', label: 'Status' },
+    { id: 'refundAmount', label: 'Refund Amount' },
+    { id: 'worksheetStatus', label: 'Worksheet Status' },
+    { id: 'logs', label: 'Logs' },
+    { id: 'chat', label: 'Chat' },
+  ];
+  const [visibleColumns, setVisibleColumns] = useState(ALL_COLUMNS.map(c => c.id));
   
   // Pagination state
   const [page, setPage] = useState(1);
@@ -454,6 +472,13 @@ export default function ReturnRequestedPage({
         >
           Download CSV ({returns.length})
         </Button>
+        <ColumnSelector
+            allColumns={ALL_COLUMNS}
+            visibleColumns={visibleColumns}
+            onColumnChange={setVisibleColumns}
+            onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
+            page="return-requested"
+        />
       </Stack>
 
       {/* Controls Row 2: Filters */}
@@ -658,19 +683,19 @@ export default function ReturnRequestedPage({
           >
             <TableHead>
               <TableRow>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Return ID</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Created Date (PST)</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Response Due (PST)</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Order ID</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Seller</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Buyer</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Item</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Reason</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Status</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Worksheet Status</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Logs</strong></TableCell>
-                <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }} align="center"><strong>Chat</strong></TableCell>
+                {visibleColumns.includes('returnId') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Return ID</strong></TableCell>}
+                {visibleColumns.includes('createdDate') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Created Date (PST)</strong></TableCell>}
+                {visibleColumns.includes('responseDue') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Response Due (PST)</strong></TableCell>}
+                {visibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Order ID</strong></TableCell>}
+                {visibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Seller</strong></TableCell>}
+                {visibleColumns.includes('buyer') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Buyer</strong></TableCell>}
+                {visibleColumns.includes('item') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Item</strong></TableCell>}
+                {visibleColumns.includes('reason') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Reason</strong></TableCell>}
+                {visibleColumns.includes('status') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Status</strong></TableCell>}
+                {visibleColumns.includes('refundAmount') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>}
+                {visibleColumns.includes('worksheetStatus') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Worksheet Status</strong></TableCell>}
+                {visibleColumns.includes('logs') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Logs</strong></TableCell>}
+                {visibleColumns.includes('chat') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }} align="center"><strong>Chat</strong></TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -685,7 +710,7 @@ export default function ReturnRequestedPage({
               ) : (
                 returns.map((ret) => (
                   <TableRow key={ret._id} hover>
-                    <TableCell>
+                    {visibleColumns.includes('returnId') && <TableCell>
                       <Stack direction="row" alignItems="center" spacing={0.5}>
                         <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                           {ret.returnId || '-'}
@@ -694,13 +719,13 @@ export default function ReturnRequestedPage({
                           <ContentCopyIcon sx={{ fontSize: 14 }} />
                         </IconButton>
                       </Stack>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('createdDate') && <TableCell>
                       <Typography variant="body2" fontSize="0.75rem">
                         {formatDate(ret.creationDate)}
                       </Typography>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('responseDue') && <TableCell>
                       <Stack direction="row" alignItems="center" spacing={0.5}>
                         <Typography 
                           variant="body2" 
@@ -737,8 +762,8 @@ export default function ReturnRequestedPage({
                           />
                         )}
                       </Stack>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('orderId') && <TableCell>
                       <Stack direction="row" alignItems="center" spacing={0.5}>
                         <Button
                           variant="text"
@@ -761,14 +786,14 @@ export default function ReturnRequestedPage({
                           </IconButton>
                         )}
                       </Stack>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('seller') && <TableCell>
                       <Typography variant="body2">{ret.seller?.user?.username || '-'}</Typography>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('buyer') && <TableCell>
                       <Typography variant="body2">{ret.buyerUsername || '-'}</Typography>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('item') && <TableCell>
                       <Tooltip title={ret.itemTitle || 'N/A'}>
                         <Typography 
                           variant="body2" 
@@ -787,8 +812,8 @@ export default function ReturnRequestedPage({
                           Qty: {ret.returnQuantity}
                         </Typography>
                       )}
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('reason') && <TableCell>
                       <Typography variant="body2" fontSize="0.7rem">
                         {{
                           'WRONG_SIZE': 'Does not fit',
@@ -802,23 +827,23 @@ export default function ReturnRequestedPage({
                           'OTHER': 'Other'
                         }[ret.returnReason] || ret.returnReason || '-'}
                       </Typography>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('status') && <TableCell>
                       <Chip 
                         label={ret.returnStatus || 'Unknown'} 
                         color={getStatusColor(ret.returnStatus)}
                         size="small"
                         sx={{ fontSize: '0.7rem' }}
                       />
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('refundAmount') && <TableCell>
                       <Typography variant="body2">
                         {ret.refundAmount?.value 
                           ? `${ret.refundAmount.currency} ${ret.refundAmount.value}` 
                           : '-'}
                       </Typography>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('worksheetStatus') && <TableCell>
                       <FormControl size="small" fullWidth>
                         <Select
                           value={ret.worksheetStatus || 'open'}
@@ -830,15 +855,15 @@ export default function ReturnRequestedPage({
                           <MenuItem value="resolved">Resolved</MenuItem>
                         </Select>
                       </FormControl>
-                    </TableCell>
-                    <TableCell>
-                      <LogsCell
-                        value={ret.logs}
+                    </TableCell>}
+                    {visibleColumns.includes('logs') && <TableCell>
+                      <LogsCell 
+                        value={ret.logs} 
                         id={ret.returnId}
                         onSave={handleSaveReturnLogs}
                       />
-                    </TableCell>
-                    <TableCell align="center">
+                    </TableCell>}
+                    {visibleColumns.includes('chat') && <TableCell align="center">
                       <Tooltip title="Chat with buyer">
                         <IconButton 
                           size="small" 
@@ -848,7 +873,7 @@ export default function ReturnRequestedPage({
                           <ChatIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                    </TableCell>
+                    </TableCell>}
                   </TableRow>
                 ))
               )}

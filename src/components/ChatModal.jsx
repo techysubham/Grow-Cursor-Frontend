@@ -1,12 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Dialog, Box, Typography, Stack, TextField, Button, Paper,
-  CircularProgress, IconButton, Grid, FormControl, InputLabel, Select, MenuItem, Chip
+  CircularProgress, IconButton, Grid, FormControl, InputLabel, Select, MenuItem, Chip,
+  Menu, ListSubheader, Tooltip
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import api from '../lib/api';
+import { CHAT_TEMPLATES, personalizeTemplate } from '../constants/chatTemplates';
 
 /**
  * Reusable Chat Modal Component with Case Management
@@ -35,6 +38,7 @@ export default function ChatModal({
   const [notes, setNotes] = useState(initialNotes);
   const [status, setStatus] = useState(initialStatus);
   const [savingResolution, setSavingResolution] = useState(false);
+  const [templateAnchorEl, setTemplateAnchorEl] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -101,7 +105,22 @@ export default function ChatModal({
     } finally {
       setSavingResolution(false);
     }
+
   }
+
+  const handleTemplateClick = (event) => {
+    setTemplateAnchorEl(event.currentTarget);
+  };
+  
+  const handleTemplateClose = () => {
+    setTemplateAnchorEl(null);
+  };
+
+  const handleSelectTemplate = (templateText) => {
+    const personalizedText = personalizeTemplate(templateText, buyerName);
+    setNewMessage(personalizedText);
+    handleTemplateClose();
+  };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -115,11 +134,27 @@ export default function ChatModal({
       <Box sx={{ display: 'flex', height: '80vh' }}>
         {/* LEFT: CHAT */}
         <Box sx={{ width: '60%', borderRight: 1, borderColor: 'divider', display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#f5f5f5' }}>
-            <Typography variant="h6">Chat History</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {buyerName} ({buyerUsername})
-            </Typography>
+          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h6">Chat History</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {buyerName} ({buyerUsername})
+              </Typography>
+            </Box>
+            <Tooltip title="Choose a response template">
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleTemplateClick}
+                sx={{ 
+                  bgcolor: 'white',
+                  textTransform: 'none'
+                }}
+                endIcon={<ExpandMoreIcon />}
+              >
+                Templates
+              </Button>
+            </Tooltip>
           </Box>
           <Box sx={{ flex: 1, overflowY: 'auto', p: 2, bgcolor: '#f0f2f5' }}>
             {loading ? (
@@ -189,6 +224,60 @@ export default function ChatModal({
             >
               {sendingMsg ? <CircularProgress size={20} /> : <SendIcon />}
             </Button>
+            <Menu
+              anchorEl={templateAnchorEl}
+              open={Boolean(templateAnchorEl)}
+              onClose={handleTemplateClose}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+              PaperProps={{ style: { maxHeight: 400, width: 320 } }}
+            >
+              {CHAT_TEMPLATES.map((group, index) => (
+                <Box key={index}>
+                  <ListSubheader 
+                    sx={{ 
+                      bgcolor: '#f5f5f5', 
+                      fontWeight: 'bold', 
+                      lineHeight: '32px',
+                      color: 'primary.main',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    {group.category}
+                  </ListSubheader>
+                  {group.items.map((item, idx) => (
+                    <MenuItem 
+                      key={idx} 
+                      onClick={() => handleSelectTemplate(item.text)}
+                      sx={{ 
+                        fontSize: '0.85rem', 
+                        whiteSpace: 'normal', 
+                        py: 1, 
+                        borderBottom: '1px solid #f0f0f0',
+                        display: 'block'
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                        {item.label}
+                      </Typography>
+                      <Typography 
+                        variant="caption" 
+                        color="text.secondary" 
+                        sx={{ 
+                          display: '-webkit-box', 
+                          WebkitLineClamp: 2, 
+                          WebkitBoxOrient: 'vertical', 
+                          overflow: 'hidden',
+                          fontSize: '0.75rem' 
+                        }}
+                      >
+                        {item.text}
+                      </Typography>
+                    </MenuItem>
+                  ))}
+                </Box>
+              ))}
+            </Menu>
           </Box>
         </Box>
 

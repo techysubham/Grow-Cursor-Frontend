@@ -21,6 +21,7 @@ import {
   InputLabel,
   TextField
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ChatIcon from '@mui/icons-material/Chat';
@@ -29,6 +30,7 @@ import { Button } from '@mui/material';
 import api from '../../lib/api';
 import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ChatModal from '../../components/ChatModal';
+import ColumnSelector from '../../components/ColumnSelector';
 
 export default function CancelledStatusPage({
   dateFilter: dateFilterProp,
@@ -38,6 +40,40 @@ export default function CancelledStatusPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  
+  // Filters
+  const [sellers, setSellers] = useState([]);
+  const [sellerFilter, setSellerFilter] = useState('');
+  const [itemsFilter, setItemsFilter] = useState(''); // repurposing for marketplace filter to match API if needed, or just new param
+  const [marketplaceFilter, setMarketplaceFilter] = useState('');
+
+  const MARKETPLACES = [
+    'EBAY_US',
+    'EBAY_GB',
+    'EBAY_DE',
+    'EBAY_AU',
+    'EBAY_CA',
+    'EBAY_FR',
+    'EBAY_IT',
+    'EBAY_ES'
+  ];
+
+  const ALL_COLUMNS = [
+    { id: 'sl', label: 'SL No' },
+    { id: 'seller', label: 'Seller' },
+    { id: 'orderId', label: 'Order ID' },
+    { id: 'dateSold', label: 'Date Sold' },
+    { id: 'productName', label: 'Product Name' },
+    { id: 'buyerName', label: 'Buyer Name' },
+    { id: 'marketplace', label: 'Marketplace' },
+    { id: 'total', label: 'Total' },
+    { id: 'cancelStatus', label: 'Cancel Status' },
+    { id: 'refunds', label: 'Refunds' },
+    { id: 'worksheetStatus', label: 'Worksheet Status' },
+    { id: 'logs', label: 'Logs' },
+    { id: 'chat', label: 'Chat' },
+  ];
+  const [visibleColumns, setVisibleColumns] = useState(ALL_COLUMNS.map(c => c.id));
   const [internalDateFilter, setInternalDateFilter] = useState({
     mode: 'all',
     single: '',
@@ -51,7 +87,20 @@ export default function CancelledStatusPage({
 
   useEffect(() => {
     fetchCancelledOrders();
-  }, [dateFilter]);
+  }, [dateFilter, sellerFilter, marketplaceFilter]);
+
+  // Fetch sellers on mount
+  useEffect(() => {
+    async function fetchSellers() {
+      try {
+        const res = await api.get('/sellers/all');
+        setSellers(res.data || []);
+      } catch (e) {
+        console.error('Failed to fetch sellers:', e);
+      }
+    }
+    fetchSellers();
+  }, []);
 
   const handleWorksheetStatusChange = async (orderId, newStatus) => {
     try {
@@ -82,6 +131,12 @@ export default function CancelledStatusPage({
       }
       // mode 'all' = no date params, shows all orders
       
+      // mode 'all' = no date params, shows all orders
+      
+      // Add filters
+      if (sellerFilter) params.sellerId = sellerFilter;
+      if (marketplaceFilter) params.marketplace = marketplaceFilter;
+
       // NEW: Use the dedicated endpoint that filters server-side (30-day window)
       const res = await api.get('/ebay/cancelled-orders', { params });
       const cancelledOrders = res.data.orders || [];
@@ -228,10 +283,61 @@ export default function CancelledStatusPage({
               downloadCSV(csvData, 'Cancelled_Orders');
             }}
             disabled={orders.length === 0}
-            size="small"
           >
             Download CSV ({orders.length})
           </Button>
+          <ColumnSelector
+              allColumns={ALL_COLUMNS}
+              visibleColumns={visibleColumns}
+              onColumnChange={setVisibleColumns}
+              onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
+              page="cancelled-status"
+          />
+        </Stack>
+
+        {/* Filters Row */}
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 2 }} flexWrap="wrap" useFlexGap>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Seller</InputLabel>
+              <Select
+                value={sellerFilter}
+                onChange={(e) => setSellerFilter(e.target.value)}
+                label="Seller"
+              >
+                <MenuItem value="">All Sellers</MenuItem>
+                {sellers.map((s) => (
+                  <MenuItem key={s._id} value={s._id}>
+                    {s.user?.username || s._id}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Marketplace</InputLabel>
+              <Select
+                value={marketplaceFilter}
+                onChange={(e) => setMarketplaceFilter(e.target.value)}
+                label="Marketplace"
+              >
+                <MenuItem value="">All Marketplaces</MenuItem>
+                {MARKETPLACES.map((m) => (
+                  <MenuItem key={m} value={m}>
+                    {m}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+             <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={fetchCancelledOrders}
+              disabled={loading}
+              size="small"
+            >
+              Refresh
+            </Button>
         </Stack>
 
         {!hideDateFilter && (
@@ -334,21 +440,21 @@ export default function CancelledStatusPage({
           <Table size="small" stickyHeader sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>SL No</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Seller</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Order ID</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Date Sold</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Product Name</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Buyer Name</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Marketplace</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }} align="right">
+                {visibleColumns.includes('sl') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>SL No</TableCell>}
+                {visibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Seller</TableCell>}
+                {visibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Order ID</TableCell>}
+                {visibleColumns.includes('dateSold') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Date Sold</TableCell>}
+                {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Product Name</TableCell>}
+                {visibleColumns.includes('buyerName') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Buyer Name</TableCell>}
+                {visibleColumns.includes('marketplace') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Marketplace</TableCell>}
+                {visibleColumns.includes('total') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }} align="right">
                   Total
-                </TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Cancel Status</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Refunds</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Worksheet Status</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Logs</TableCell>
-                <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }} align="center">Chat</TableCell>
+                </TableCell>}
+                {visibleColumns.includes('cancelStatus') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Cancel Status</TableCell>}
+                {visibleColumns.includes('refunds') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Refunds</TableCell>}
+                {visibleColumns.includes('worksheetStatus') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Worksheet Status</TableCell>}
+                {visibleColumns.includes('logs') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Logs</TableCell>}
+                {visibleColumns.includes('chat') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }} align="center">Chat</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -360,16 +466,16 @@ export default function CancelledStatusPage({
                     '&:hover': { backgroundColor: 'action.selected' },
                   }}
                 >
-                  <TableCell>{idx + 1}</TableCell>
-                  <TableCell>
+                  {visibleColumns.includes('sl') && <TableCell>{idx + 1}</TableCell>}
+                  {visibleColumns.includes('seller') && <TableCell>
                     <Typography variant="body2" fontWeight="medium">
                       {order.seller?.user?.username ||
                         order.seller?.user?.email ||
                         order.sellerId ||
                         '-'}
                     </Typography>
-                  </TableCell>
-                  <TableCell>
+                  </TableCell>}
+                  {visibleColumns.includes('orderId') && <TableCell>
                     <Typography
                       variant="body2"
                       fontWeight="medium"
@@ -377,9 +483,9 @@ export default function CancelledStatusPage({
                     >
                       {order.orderId || order.legacyOrderId || '-'}
                     </Typography>
-                  </TableCell>
-                  <TableCell>{formatDate(order.dateSold)}</TableCell>
-                  <TableCell sx={{ maxWidth: 250, pr: 1 }}>
+                  </TableCell>}
+                  {visibleColumns.includes('dateSold') && <TableCell>{formatDate(order.dateSold)}</TableCell>}
+                  {visibleColumns.includes('productName') && <TableCell sx={{ maxWidth: 250, pr: 1 }}>
                     <Box
                       sx={{
                         display: 'flex',
@@ -413,8 +519,8 @@ export default function CancelledStatusPage({
                         <ContentCopyIcon fontSize="small" />
                       </IconButton>
                     </Box>
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 150, pr: 1 }}>
+                  </TableCell>}
+                  {visibleColumns.includes('buyerName') && <TableCell sx={{ maxWidth: 150, pr: 1 }}>
                     <Box
                       sx={{
                         display: 'flex',
@@ -448,13 +554,13 @@ export default function CancelledStatusPage({
                         <ContentCopyIcon fontSize="small" />
                       </IconButton>
                     </Box>
-                  </TableCell>
-                  <TableCell>
+                  </TableCell>}
+                  {visibleColumns.includes('marketplace') && <TableCell>
                     <Typography variant="body2">
                       {order.purchaseMarketplaceId || '-'}
                     </Typography>
-                  </TableCell>
-                  <TableCell align="right">
+                  </TableCell>}
+                  {visibleColumns.includes('total') && <TableCell align="right">
                     <Typography variant="body2" fontWeight="medium">
                       {formatCurrency(
                         (order.subtotal || 0) +
@@ -463,8 +569,8 @@ export default function CancelledStatusPage({
                           (order.discount || 0)
                       )}
                     </Typography>
-                  </TableCell>
-                  <TableCell>
+                  </TableCell>}
+                  {visibleColumns.includes('cancelStatus') && <TableCell>
                     <Chip
                       label={order.cancelState || 'NONE_REQUESTED'}
                       size="small"
@@ -482,8 +588,8 @@ export default function CancelledStatusPage({
                           fontWeight: order.cancelState === 'IN_PROGRESS' ? 'bold' : 'normal'
                         }}
                     />
-                  </TableCell>
-                  <TableCell>
+                  </TableCell>}
+                  {visibleColumns.includes('refunds') && <TableCell>
                     {order.refunds && order.refunds.length > 0 ? (
                       <Tooltip
                         title={
@@ -510,8 +616,8 @@ export default function CancelledStatusPage({
                         -
                       </Typography>
                     )}
-                  </TableCell>
-                  <TableCell>
+                  </TableCell>}
+                  {visibleColumns.includes('worksheetStatus') && <TableCell>
                     <FormControl size="small" fullWidth>
                       <Select
                         value={order.worksheetStatus || 'open'}
@@ -523,15 +629,15 @@ export default function CancelledStatusPage({
                         <MenuItem value="resolved">Resolved</MenuItem>
                       </Select>
                     </FormControl>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell>}
+                    {visibleColumns.includes('logs') && <TableCell>
                       <LogsCell
                         value={order.logs}
                         id={order.orderId}
                         onSave={handleSaveOrderLogs}
                       />
-                    </TableCell>
-                    <TableCell align="center">
+                    </TableCell>}
+                    {visibleColumns.includes('chat') && <TableCell align="center">
                       <Tooltip title="Chat with buyer">
                         <IconButton 
                           size="small" 
@@ -541,7 +647,7 @@ export default function CancelledStatusPage({
                           <ChatIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                    </TableCell>
+                    </TableCell>}
                   </TableRow>
               ))}
             </TableBody>
