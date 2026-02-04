@@ -592,60 +592,130 @@ export default function TemplateListingsPage() {
       setBulkProgress({ current: 0, total: asins.length });
       setProcessingLog([`🚀 Starting bulk autofill for ${asins.length} ASINs...`]);
 
-      // Process in smaller batches to show progress
-      const BATCH_SIZE = 5;
-      let allPreviewItems = [];
+      // Open modal immediately with loading state for all ASINs
+      const loadingItems = asins.map(asin => ({
+        id: `loading-${asin}`,
+        asin,
+        sku: `${sellerId}-${asin}`,
+        status: 'loading',
+        sourceData: null,
+        generatedListing: null,
+        pricingCalculation: null,
+        warnings: [],
+        errors: []
+      }));
+      
+      setPreviewItems(loadingItems);
+      setReviewModal(true);
+
+      // Process in parallel batches for progressive loading
+      const BATCH_SIZE = 10; // Larger batches, processed in parallel
+      const batches = [];
       
       for (let i = 0; i < asins.length; i += BATCH_SIZE) {
-        const batchAsins = asins.slice(i, i + BATCH_SIZE);
-        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-        const totalBatches = Math.ceil(asins.length / BATCH_SIZE);
-        
-        setProcessingLog(prev => [
-          ...prev,
-          `📦 Processing batch ${batchNum}/${totalBatches} (${batchAsins.length} ASINs)...`
-        ]);
-        
-        const batchStartTime = Date.now();
-        
-        const { data } = await api.post('/template-listings/bulk-preview', {
-          templateId,
-          sellerId,
-          asins: batchAsins
-        });
-        
-        const batchDuration = ((Date.now() - batchStartTime) / 1000).toFixed(1);
-        
-        allPreviewItems = [...allPreviewItems, ...data.items];
-        setBulkProgress({ current: i + batchAsins.length, total: asins.length });
-        
-        // Log batch completion
-        const batchSuccess = data.items.filter(item => item.status !== 'error').length;
-        const batchFailed = data.items.filter(item => item.status === 'error').length;
-        const batchWarnings = data.items.filter(item => item.status === 'warning').length;
-        
-        setProcessingLog(prev => [
-          ...prev,
-          `✅ Batch ${batchNum} complete: ${batchSuccess} success, ${batchFailed} failed${batchWarnings > 0 ? `, ${batchWarnings} warnings` : ''} (${batchDuration}s)`
-        ]);
+        batches.push(asins.slice(i, i + BATCH_SIZE));
       }
+      
+      setProcessingLog(prev => [
+        ...prev,
+        `📦 Processing ${batches.length} batches in parallel (${BATCH_SIZE} ASINs each)...`
+      ]);
+      
+      const startTime = Date.now();
+      
+      // Process all batches in parallel
+      const batchPromises = batches.map(async (batchAsins, batchIndex) => {
+        const batchNum = batchIndex + 1;
+        
+        setProcessingLog(prev => [
+          ...prev,
+          `⏳ Batch ${batchNum}/${batches.length} started (${batchAsins.length} ASINs)...`
+        ]);
+        
+        try {
+          const { data } = await api.post('/template-listings/bulk-preview', {
+            templateId,
+            sellerId,
+            asins: batchAsins
+          });
+          
+          return {
+            batchNum,
+            success: true,
+            items: data.items,
+            batchAsins
+          };
+        } catch (error) {
+          return {
+            batchNum,
+            success: false,
+            error: error.message,
+            batchAsins
+          };
+        }
+      });
+      
+      // Update preview items as each batch completes
+      let completedCount = 0;
+      
+      for (const promise of batchPromises) {
+        promise.then(result => {
+          if (result.success) {
+            // Update preview items with completed batch
+            setPreviewItems(prev => {
+              const updated = [...prev];
+              result.items.forEach(item => {
+                const index = updated.findIndex(i => i.asin === item.asin);
+                if (index !== -1) {
+                  updated[index] = item;
+                }
+              });
+              return updated;
+            });
+            
+            completedCount += result.batchAsins.length;
+            setBulkProgress({ current: completedCount, total: asins.length });
+            
+            const batchDuration = ((Date.now() - startTime) / 1000).toFixed(1);
+            
+            setProcessingLog(prev => [
+              ...prev,
+              `✅ Batch ${result.batchNum}/${batches.length} complete (${result.items.length} ASINs, ${batchDuration}s)`
+            ]);
+          } else {
+            setProcessingLog(prev => [
+              ...prev,
+              `❌ Batch ${result.batchNum}/${batches.length} failed: ${result.error}`
+            ]);
+          }
+        });
+      }
+      
+      // Wait for all batches to complete
+      const allResults = await Promise.allSettled(batchPromises);
+      
+      let allPreviewItems = [];
+      allResults.forEach(result => {
+        if (result.status === 'fulfilled' && result.value.success) {
+          allPreviewItems = [...allPreviewItems, ...result.value.items];
+        }
+      });
+      
+      const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
+      setBulkProgress({ current: asins.length, total: asins.length });
       
       // Calculate final totals
       const successful = allPreviewItems.filter(item => item.status !== 'error').length;
       const failed = allPreviewItems.filter(item => item.status === 'error').length;
-      const withWarnings = allPreviewItems.filter(item => item.status === 'warning').length;
+      const warnings = allPreviewItems.filter(item => item.status === 'warning').length;
       
       setPreviewItems(allPreviewItems);
       setProcessingLog(prev => [
         ...prev,
-        `🎉 All batches complete! Total: ${successful} successful, ${failed} failed${withWarnings > 0 ? `, ${withWarnings} warnings` : ''}`
+        `🎉 All batches complete! ${successful} successful, ${failed} failed, ${warnings} warnings (${totalDuration}s total)`
       ]);
-      setAsinSuccess(
-        `✅ Processed ${asins.length} ASIN(s): ${successful} successful, ${failed} failed${withWarnings > 0 ? `, ${withWarnings} warnings` : ''}`
-      );
       
-      // Open review modal
-      setReviewModal(true);
+      setAsinSuccess(`Preview generated for ${successful} listing(s). Review and save.`);
       
     } catch (err) {
       setAsinError(err.response?.data?.error || 'Failed to process bulk ASINs');

@@ -13,7 +13,9 @@ import {
   Paper,
   Divider,
   Alert,
-  Stack
+  Stack,
+  Skeleton,
+  CircularProgress
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -22,7 +24,8 @@ import {
   Save as SaveIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
-  CheckCircle as CheckIcon
+  CheckCircle as CheckIcon,
+  HourglassEmpty as LoadingIcon
 } from '@mui/icons-material';
 
 export default function AsinReviewModal({ 
@@ -106,9 +109,9 @@ export default function AsinReviewModal({
   const handleSaveAll = async () => {
     setSaving(true);
     try {
-      // Convert edited items to array format
+      // Convert edited items to array format (exclude errors and loading items)
       const listingsToSave = previewItems
-        .filter(item => item.status !== 'error')
+        .filter(item => item.status !== 'error' && item.status !== 'loading')
         .map(item => editedItems[item.id] || item.generatedListing);
       
       await onSave(listingsToSave);
@@ -131,7 +134,10 @@ export default function AsinReviewModal({
 
   const getStatusIcon = (status) => {
     switch (status) {
+      case 'loading':
+        return <CircularProgress size={20} />;
       case 'ready':
+      case 'success':
         return <CheckIcon color="success" />;
       case 'warning':
         return <WarningIcon color="warning" />;
@@ -144,7 +150,10 @@ export default function AsinReviewModal({
 
   const getStatusColor = (status) => {
     switch (status) {
+      case 'loading':
+        return 'info';
       case 'ready':
+      case 'success':
         return 'success';
       case 'warning':
         return 'warning';
@@ -209,9 +218,9 @@ export default function AsinReviewModal({
               variant="contained"
               startIcon={<SaveIcon />}
               onClick={handleSaveAll}
-              disabled={saving || previewItems.every(i => i.status === 'error')}
+              disabled={saving || previewItems.every(i => i.status === 'error' || i.status === 'loading')}
             >
-              {saving ? 'Saving...' : `Save All (${previewItems.filter(i => i.status !== 'error').length})`}
+              {saving ? 'Saving...' : `Save All (${previewItems.filter(i => i.status !== 'error' && i.status !== 'loading').length})`}
             </Button>
             <IconButton onClick={handleClose}>
               <CloseIcon />
@@ -264,7 +273,38 @@ export default function AsinReviewModal({
             </Typography>
             <Divider sx={{ mb: 2 }} />
 
-            {currentItem.sourceData ? (
+            {currentItem.status === 'loading' ? (
+              // Loading skeleton for source data
+              <Stack spacing={2}>
+                <Box>
+                  <Skeleton variant="text" width="30%" />
+                  <Skeleton variant="text" width="60%" />
+                </Box>
+                <Box>
+                  <Skeleton variant="text" width="40%" />
+                  <Skeleton variant="rectangular" height={40} />
+                </Box>
+                <Box>
+                  <Skeleton variant="text" width="30%" />
+                  <Skeleton variant="text" width="50%" />
+                </Box>
+                <Box>
+                  <Skeleton variant="text" width="25%" />
+                  <Skeleton variant="text" width="40%" />
+                </Box>
+                <Box>
+                  <Skeleton variant="rectangular" height={150} />
+                </Box>
+                <Grid container spacing={1}>
+                  <Grid item xs={6}>
+                    <Skeleton variant="rectangular" height={120} />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Skeleton variant="rectangular" height={120} />
+                  </Grid>
+                </Grid>
+              </Stack>
+            ) : currentItem.sourceData ? (
               <Stack spacing={2}>
                 <Box>
                   <Typography variant="caption" color="text.secondary">
@@ -363,7 +403,23 @@ export default function AsinReviewModal({
             </Typography>
             <Divider sx={{ mb: 2 }} />
 
-            {currentItem.generatedListing ? (
+            {currentItem.status === 'loading' ? (
+              // Loading skeleton for generated listing
+              <Stack spacing={2}>
+                <Skeleton variant="rectangular" height={56} />
+                <Skeleton variant="rectangular" height={56} />
+                <Skeleton variant="rectangular" height={56} />
+                <Skeleton variant="rectangular" height={120} />
+                <Skeleton variant="rectangular" height={56} />
+                <Skeleton variant="rectangular" height={56} />
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <CircularProgress />
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                    Generating listing for ASIN: {currentItem.asin}
+                  </Typography>
+                </Box>
+              </Stack>
+            ) : currentItem.generatedListing ? (
               <Stack spacing={2}>
                 {/* SKU */}
                 <TextField
