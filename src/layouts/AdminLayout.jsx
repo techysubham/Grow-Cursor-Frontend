@@ -44,6 +44,7 @@ import UserCredentialsPage from '../pages/admin/UserCredentialsPage.jsx';
 import ListingSheetPage from '../pages/admin/ListingSheetPage.jsx';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import TaskIcon from '@mui/icons-material/Task';
+import EditIcon from '@mui/icons-material/Edit';
 
 import TaskListPage from '../pages/admin/TaskListPage.jsx';
 import StockLedgerPage from '../pages/admin/StockLedgerPage.jsx';
@@ -82,6 +83,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboard.jsx';
+import EditListingsDashboard from '../pages/listings/EditListingsDashboard.jsx';
 
 import ConversationManagementPage from '../pages/admin/ConversationManagementPage.jsx';
 import ManageAmazonAccountsPage from '../pages/admin/ManageAmazonAccountsPage.jsx';
@@ -753,20 +755,36 @@ export default function AdminLayout({ user, onLogout }) {
         )}
 
         {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/compatibility-dashboard"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/compatibility-dashboard'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon>
-                <NavIcon icon={DashboardIcon} label="Compatibility Dashboard" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Compat. Dashboard" />}
-            </ListItemButton>
-          </ListItem>
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/admin/compatibility-dashboard"
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/compatibility-dashboard'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={DashboardIcon} label="Compatibility Dashboard" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Compat. Dashboard" />}
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/admin/edit-listings"
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/edit-listings'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={EditIcon} label="Edit Listings" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Edit Listings" />}
+              </ListItemButton>
+            </ListItem>
+          </>
         )}
 
         {/* Orders Dept Dropdown - UPDATED FOR HOC & COMPLIANCE MANAGER */}
@@ -1339,7 +1357,10 @@ export default function AdminLayout({ user, onLogout }) {
           )}
 
           {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
-            <Route path="/compatibility-dashboard" element={<CompatibilityDashboard />} />
+            <>
+              <Route path="/compatibility-dashboard" element={<CompatibilityDashboard />} />
+              <Route path="/edit-listings" element={<EditListingsDashboard />} />
+            </>
           )}
 
           {/* UPDATED ROUTES FOR ORDERS DEPT */}
