@@ -22,6 +22,7 @@ import BulkListingPreview from '../../components/BulkListingPreview.jsx';
 import CoreFieldDefaultsDialog from '../../components/CoreFieldDefaultsDialog.jsx';
 import PricingConfigSection from '../../components/PricingConfigSection.jsx';
 import BulkImportASINsDialog from '../../components/BulkImportASINsDialog.jsx';
+import BulkImportSKUsDialog from '../../components/BulkImportSKUsDialog.jsx';
 import BulkReactivateDialog from '../../components/BulkReactivateDialog.jsx';
 import BulkDeactivateDialog from '../../components/BulkDeactivateDialog.jsx';
 import TemplateListingStatsCard from '../../components/TemplateListingStatsCard.jsx';
@@ -52,6 +53,9 @@ export default function TemplateListingsPage() {
 
   // Bulk ASIN import state
   const [bulkImportDialog, setBulkImportDialog] = useState(false);
+  
+  // Bulk SKU import state
+  const [bulkImportSKUsDialog, setBulkImportSKUsDialog] = useState(false);
   
   // SKU status management state
   const [reactivateDialog, setReactivateDialog] = useState(false);
@@ -1160,6 +1164,14 @@ export default function TemplateListingsPage() {
         </Button>
         <Button 
           variant="outlined" 
+          startIcon={<UploadIcon />} 
+          onClick={() => setBulkImportSKUsDialog(true)}
+          disabled={!sellerId || !templateId || batchFilter !== 'active'}
+        >
+          Bulk Import SKUs
+        </Button>
+        <Button 
+          variant="outlined" 
           color="success"
           onClick={() => setReactivateDialog(true)}
           disabled={!sellerId || !templateId}
@@ -2153,6 +2165,18 @@ export default function TemplateListingsPage() {
         onImportComplete={() => {
           fetchListings();
           setSuccess('ASINs imported successfully');
+        }}
+      />
+      
+      {/* Bulk Import SKUs Dialog */}
+      <BulkImportSKUsDialog
+        open={bulkImportSKUsDialog}
+        onClose={() => setBulkImportSKUsDialog(false)}
+        templateId={templateId}
+        sellerId={sellerId}
+        onImportComplete={() => {
+          fetchListings();
+          setSuccess('SKUs imported successfully');
         }}
       />
       
