@@ -220,9 +220,9 @@ export default function AsinReviewModal({
               variant="contained"
               startIcon={<SaveIcon />}
               onClick={handleSaveAll}
-              disabled={saving || previewItems.every(i => i.status === 'error' || i.status === 'loading')}
+              disabled={saving || previewItems.every(i => ['error', 'loading', 'blocked'].includes(i.status))}
             >
-              {saving ? 'Saving...' : `Save All (${previewItems.filter(i => i.status !== 'error' && i.status !== 'loading').length})`}
+              {saving ? 'Saving...' : `Save All (${previewItems.filter(i => !['error', 'loading', 'blocked'].includes(i.status)).length})`}
             </Button>
             <IconButton onClick={handleClose}>
               <CloseIcon />
