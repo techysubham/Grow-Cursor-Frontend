@@ -1,17 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
-  Alert, LinearProgress, Typography, Box, Stack, Chip, Paper
+  Alert, LinearProgress, Typography, Box, Stack, Chip, Paper,
+  FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { Upload as UploadIcon } from '@mui/icons-material';
 import api from '../lib/api.js';
 
-export default function BulkImportASINsDialog({ open, onClose, templateId, sellerId, onImportComplete }) {
+export default function BulkImportASINsDialog({ open, onClose, templateId: propTemplateId, sellerId, onImportComplete }) {
   const [asinInput, setAsinInput] = useState('');
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(null);
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(propTemplateId || '');
+  
+  // Fetch templates when dialog opens if no templateId provided
+  useEffect(() => {
+    if (open && !propTemplateId && sellerId) {
+      fetchTemplates();
+    }
+    if (propTemplateId) {
+      setSelectedTemplateId(propTemplateId);
+    }
+  }, [open, propTemplateId, sellerId]);
+  
+  const fetchTemplates = async () => {
+    try {
+      const response = await api.get('/listing-templates');
+      setTemplates(response.data || []);
+      if (response.data?.length > 0) {
+        setSelectedTemplateId(response.data[0]._id);
+      }
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+      setError('Failed to load templates');
+    }
+  };
 
   const parseASINs = () => {
     if (!asinInput.trim()) return [];
@@ -43,7 +69,7 @@ export default function BulkImportASINsDialog({ open, onClose, templateId, selle
 
     try {
       const response = await api.post('/template-listings/bulk-import-asins', {
-        templateId,
+        templateId: selectedTemplateId,
         sellerId,
         asins
       });
@@ -96,6 +122,24 @@ export default function BulkImportASINsDialog({ open, onClose, templateId, selle
             <Alert severity="info" sx={{ mb: 2 }}>
               Import existing ASINs from your previous database. Listings will be created with placeholder data and marked as "draft". You can enrich them with product data later.
             </Alert>
+            
+            {!propTemplateId && templates.length > 0 && (
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Select Template</InputLabel>
+                <Select
+                  value={selectedTemplateId}
+                  label="Select Template"
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  disabled={importing}
+                >
+                  {templates.map((template) => (
+                    <MenuItem key={template._id} value={template._id}>
+                      {template.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
 
             <TextField
               fullWidth
@@ -218,7 +262,7 @@ export default function BulkImportASINsDialog({ open, onClose, templateId, selle
             <Button 
               onClick={handleImport} 
               variant="contained" 
-              disabled={importing || asinCount === 0}
+              disabled={importing || asinCount === 0 || !selectedTemplateId}
             >
               {importing ? 'Importing...' : `Import ${asinCount} ASIN${asinCount !== 1 ? 's' : ''}`}
             </Button>

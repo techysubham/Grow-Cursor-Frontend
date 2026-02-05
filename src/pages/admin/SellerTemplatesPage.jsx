@@ -24,9 +24,16 @@ import {
   ArrowBack as ArrowBackIcon,
   Add as AddIcon,
   Search as SearchIcon,
-  ViewList as ViewListIcon
+  ViewList as ViewListIcon,
+  Upload as UploadIcon,
+  CheckCircle as ReactivateIcon,
+  Cancel as DeactivateIcon
 } from '@mui/icons-material';
 import api from '../../lib/api';
+import BulkImportASINsDialog from '../../components/BulkImportASINsDialog.jsx';
+import BulkImportSKUsDialog from '../../components/BulkImportSKUsDialog.jsx';
+import BulkReactivateDialog from '../../components/BulkReactivateDialog.jsx';
+import BulkDeactivateDialog from '../../components/BulkDeactivateDialog.jsx';
 
 export default function SellerTemplatesPage() {
   const navigate = useNavigate();
@@ -40,6 +47,14 @@ export default function SellerTemplatesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Bulk operation dialogs
+  const [bulkImportASINsDialog, setBulkImportASINsDialog] = useState(false);
+  const [bulkImportSKUsDialog, setBulkImportSKUsDialog] = useState(false);
+  const [reactivateDialog, setReactivateDialog] = useState(false);
+  const [deactivateDialog, setDeactivateDialog] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     if (!sellerId) {
@@ -123,6 +138,30 @@ export default function SellerTemplatesPage() {
     if (!seller) return 'Unknown';
     return seller.user?.username || seller.user?.email || 'Unknown Seller';
   };
+  
+  const handleOpenBulkDialog = (dialogType, templateId = null) => {
+    setSelectedTemplateId(templateId);
+    switch (dialogType) {
+      case 'importASINs':
+        setBulkImportASINsDialog(true);
+        break;
+      case 'importSKUs':
+        setBulkImportSKUsDialog(true);
+        break;
+      case 'reactivate':
+        setReactivateDialog(true);
+        break;
+      case 'deactivate':
+        setDeactivateDialog(true);
+        break;
+    }
+  };
+  
+  const handleDialogSuccess = (message) => {
+    setSuccess(message);
+    fetchListingCounts(templates);
+    setTimeout(() => setSuccess(''), 3000);
+  };
 
   if (loading) {
     return (
@@ -165,6 +204,50 @@ export default function SellerTemplatesPage() {
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
           {error}
         </Alert>
+      )}
+      
+      {success && (
+        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
+      )}
+      
+      {/* Bulk Operation Buttons */}
+      {templates.length > 0 && (
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+            <Button
+              variant="outlined"
+              startIcon={<UploadIcon />}
+              onClick={() => handleOpenBulkDialog('importASINs')}
+            >
+              Bulk Import ASINs
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<UploadIcon />}
+              onClick={() => handleOpenBulkDialog('importSKUs')}
+            >
+              Bulk Import SKUs
+            </Button>
+            <Button
+              variant="outlined"
+              color="success"
+              startIcon={<ReactivateIcon />}
+              onClick={() => handleOpenBulkDialog('reactivate')}
+            >
+              Relist by SKU
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeactivateIcon />}
+              onClick={() => handleOpenBulkDialog('deactivate')}
+            >
+              Delist by SKU
+            </Button>
+          </Stack>
+        </Paper>
       )}
 
       {/* Search Bar */}
@@ -257,6 +340,42 @@ export default function SellerTemplatesPage() {
           </Table>
         </TableContainer>
       )}
+      
+      {/* Bulk Import ASINs Dialog */}
+      <BulkImportASINsDialog
+        open={bulkImportASINsDialog}
+        onClose={() => setBulkImportASINsDialog(false)}
+        templateId={selectedTemplateId}
+        sellerId={sellerId}
+        onImportComplete={() => handleDialogSuccess('ASINs imported successfully')}
+      />
+      
+      {/* Bulk Import SKUs Dialog */}
+      <BulkImportSKUsDialog
+        open={bulkImportSKUsDialog}
+        onClose={() => setBulkImportSKUsDialog(false)}
+        templateId={selectedTemplateId}
+        sellerId={sellerId}
+        onImportComplete={() => handleDialogSuccess('SKUs imported successfully')}
+      />
+      
+      {/* Bulk Reactivate Dialog */}
+      <BulkReactivateDialog
+        open={reactivateDialog}
+        onClose={() => setReactivateDialog(false)}
+        templateId={selectedTemplateId}
+        sellerId={sellerId}
+        onSuccess={() => handleDialogSuccess('Listings reactivated successfully')}
+      />
+      
+      {/* Bulk Deactivate Dialog */}
+      <BulkDeactivateDialog
+        open={deactivateDialog}
+        onClose={() => setDeactivateDialog(false)}
+        templateId={selectedTemplateId}
+        sellerId={sellerId}
+        onSuccess={() => handleDialogSuccess('Listings deactivated successfully')}
+      />
     </Box>
   );
 }

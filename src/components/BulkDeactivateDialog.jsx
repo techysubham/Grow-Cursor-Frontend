@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -13,15 +13,42 @@ import {
   List,
   ListItem,
   ListItemText,
-  Divider
+  Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import api from '../lib/api';
 
-export default function BulkDeactivateDialog({ open, onClose, onSuccess, templateId, sellerId }) {
+export default function BulkDeactivateDialog({ open, onClose, onSuccess, templateId: propTemplateId, sellerId }) {
   const [skuInput, setSkuInput] = useState('');
   const [csvFile, setCsvFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(propTemplateId || '');
+  
+  useEffect(() => {
+    if (open && !propTemplateId && sellerId) {
+      fetchTemplates();
+    }
+    if (propTemplateId) {
+      setSelectedTemplateId(propTemplateId);
+    }
+  }, [open, propTemplateId, sellerId]);
+  
+  const fetchTemplates = async () => {
+    try {
+      const response = await api.get('/listing-templates');
+      setTemplates(response.data || []);
+      if (response.data?.length > 0) {
+        setSelectedTemplateId(response.data[0]._id);
+      }
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+    }
+  };
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -54,7 +81,7 @@ export default function BulkDeactivateDialog({ open, onClose, onSuccess, templat
         .filter(Boolean);
 
       const response = await api.post('/template-listings/bulk-deactivate', { 
-        templateId, 
+        templateId: selectedTemplateId, 
         sellerId, 
         skus 
       });
@@ -85,6 +112,24 @@ export default function BulkDeactivateDialog({ open, onClose, onSuccess, templat
       <DialogContent>
         {!results ? (
           <>
+            {!propTemplateId && templates.length > 0 && (
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Select Template</InputLabel>
+                <Select
+                  value={selectedTemplateId}
+                  label="Select Template"
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  disabled={loading}
+                >
+                  {templates.map((template) => (
+                    <MenuItem key={template._id} value={template._id}>
+                      {template.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+            
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Enter SKUs to deactivate (comma or newline separated), or upload a CSV file
             </Typography>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -18,16 +18,43 @@ import {
   Paper,
   Alert,
   CircularProgress,
-  Chip
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import api from '../lib/api';
 
-export default function BulkReactivateDialog({ open, onClose, onSuccess, templateId, sellerId }) {
+export default function BulkReactivateDialog({ open, onClose, onSuccess, templateId: propTemplateId, sellerId }) {
   const [skuInput, setSkuInput] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [selectedListings, setSelectedListings] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [reactivating, setReactivating] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(propTemplateId || '');
+  
+  useEffect(() => {
+    if (open && !propTemplateId && sellerId) {
+      fetchTemplates();
+    }
+    if (propTemplateId) {
+      setSelectedTemplateId(propTemplateId);
+    }
+  }, [open, propTemplateId, sellerId]);
+  
+  const fetchTemplates = async () => {
+    try {
+      const response = await api.get('/listing-templates');
+      setTemplates(response.data || []);
+      if (response.data?.length > 0) {
+        setSelectedTemplateId(response.data[0]._id);
+      }
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+    }
+  };
 
   const handleSearch = async () => {
     if (!skuInput.trim()) return;
@@ -40,7 +67,7 @@ export default function BulkReactivateDialog({ open, onClose, onSuccess, templat
         .filter(Boolean);
 
       const response = await api.post('/template-listings/search-inactive-skus', { 
-        templateId, 
+        templateId: selectedTemplateId, 
         sellerId, 
         skus 
       });
@@ -103,6 +130,24 @@ export default function BulkReactivateDialog({ open, onClose, onSuccess, templat
     <Dialog open={open} onClose={handleReset} maxWidth="lg" fullWidth>
       <DialogTitle>Relist Inactive Listings by SKU</DialogTitle>
       <DialogContent>
+        {!propTemplateId && templates.length > 0 && (
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Select Template</InputLabel>
+            <Select
+              value={selectedTemplateId}
+              label="Select Template"
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              disabled={loading || reactivating}
+            >
+              {templates.map((template) => (
+                <MenuItem key={template._id} value={template._id}>
+                  {template.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Enter SKUs (comma or newline separated) to search for inactive listings
