@@ -3,7 +3,7 @@ import {
   Box, Paper, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Chip, IconButton, Dialog, 
   Stack, TextField, Button, FormControl, InputLabel, Select, MenuItem,
-  CircularProgress, Alert, Grid, InputAdornment
+  CircularProgress, Alert, Grid, InputAdornment, Menu, ListSubheader, Tooltip
 } from '@mui/material';
 import ChatIcon from '@mui/icons-material/Chat';
 import CloseIcon from '@mui/icons-material/Close';
@@ -11,7 +11,11 @@ import SendIcon from '@mui/icons-material/Send';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import api from '../../lib/api';
+import { CHAT_TEMPLATES, personalizeTemplate } from '../../constants/chatTemplates';
+import ColumnSelector from '../../components/ColumnSelector';
+
 
 // --- RESOLUTION MODAL COMPONENT (Unchanged logic, kept for completeness) ---
 function ResolutionDialog({ open, onClose, metaItem, onSave }) {
@@ -22,6 +26,7 @@ function ResolutionDialog({ open, onClose, metaItem, onSave }) {
   const [notes, setNotes] = useState(metaItem?.notes || '');
   const [status, setStatus] = useState(metaItem?.status || 'Open');
   const [savingResolution, setSavingResolution] = useState(false);
+  const [templateAnchorEl, setTemplateAnchorEl] = useState(null);
 
   useEffect(() => {
     if (open && metaItem) {
@@ -88,16 +93,44 @@ function ResolutionDialog({ open, onClose, metaItem, onSave }) {
     }
   }
 
+  const handleTemplateClick = (event) => {
+    setTemplateAnchorEl(event.currentTarget);
+  };
+  
+  const handleTemplateClose = () => {
+    setTemplateAnchorEl(null);
+  };
+
+  const handleSelectTemplate = (templateText) => {
+    const nameToUse = metaItem?.buyerName || metaItem?.buyerUsername || 'Buyer';
+    const personalizedText = personalizeTemplate(templateText, nameToUse);
+    setNewMessage(personalizedText);
+    handleTemplateClose();
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xl" fullWidth>
       <Box sx={{ display: 'flex', height: '80vh' }}>
         {/* LEFT: CHAT */}
         <Box sx={{ width: '60%', borderRight: 1, borderColor: 'divider', display: 'flex', flexDirection: 'column' }}>
-           <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#f5f5f5' }}>
-             <Typography variant="h6">Chat History</Typography>
-             <Typography variant="caption" color="text.secondary">
-               {metaItem?.buyerName} ({metaItem?.buyerUsername})
-             </Typography>
+           <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             <Box>
+               <Typography variant="h6">Chat History</Typography>
+               <Typography variant="caption" color="text.secondary">
+                 {metaItem?.buyerName} ({metaItem?.buyerUsername})
+               </Typography>
+             </Box>
+             <Tooltip title="Choose a response template">
+               <Button
+                 variant="outlined"
+                 size="small"
+                 onClick={handleTemplateClick}
+                 sx={{ bgcolor: 'white', textTransform: 'none' }}
+                 endIcon={<ExpandMoreIcon/>}
+               >
+                 Templates
+               </Button>
+             </Tooltip>
            </Box>
            <Box sx={{ flex: 1, overflowY: 'auto', p: 2, bgcolor: '#f0f2f5' }}>
              <Stack spacing={2}>
@@ -119,6 +152,60 @@ function ResolutionDialog({ open, onClose, metaItem, onSave }) {
              <Button variant="contained" onClick={handleSendMessage} disabled={sendingMsg}>
                 {sendingMsg ? <CircularProgress size={20}/> : <SendIcon/>}
              </Button>
+             <Menu
+                anchorEl={templateAnchorEl}
+                open={Boolean(templateAnchorEl)}
+                onClose={handleTemplateClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                PaperProps={{ style: { maxHeight: 400, width: 320 } }}
+              >
+                {CHAT_TEMPLATES.map((group, index) => (
+                  <Box key={index}>
+                    <ListSubheader 
+                      sx={{ 
+                        bgcolor: '#f5f5f5', 
+                        fontWeight: 'bold', 
+                        lineHeight: '32px',
+                        color: 'primary.main',
+                        fontSize: '0.75rem'
+                      }}
+                    >
+                      {group.category}
+                    </ListSubheader>
+                    {group.items.map((item, idx) => (
+                      <MenuItem 
+                        key={idx} 
+                        onClick={() => handleSelectTemplate(item.text)}
+                        sx={{ 
+                          fontSize: '0.85rem', 
+                          whiteSpace: 'normal', 
+                          py: 1, 
+                          borderBottom: '1px solid #f0f0f0',
+                          display: 'block'
+                        }}
+                      >
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                          {item.label}
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          color="text.secondary" 
+                          sx={{ 
+                            display: '-webkit-box', 
+                            WebkitLineClamp: 2, 
+                            WebkitBoxOrient: 'vertical', 
+                            overflow: 'hidden',
+                            fontSize: '0.75rem' 
+                          }}
+                        >
+                          {item.text}
+                        </Typography>
+                      </MenuItem>
+                    ))}
+                  </Box>
+                ))}
+              </Menu>
            </Box>
         </Box>
 
@@ -190,6 +277,19 @@ export default function ConversationManagementPage() {
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null);
 
+  // Column Definitions
+  const ALL_COLUMNS = [
+    { id: 'sl', label: 'SL No' },
+    { id: 'seller', label: 'Seller' },
+    { id: 'orderId', label: 'Order ID' },
+    { id: 'username', label: 'Username' },
+    { id: 'buyerName', label: 'Buyer Name' },
+    { id: 'about', label: 'Conversation About' },
+    { id: 'case', label: 'Case' },
+    { id: 'action', label: 'Action' },
+  ];
+  const [visibleColumns, setVisibleColumns] = useState(ALL_COLUMNS.map(c => c.id));
+
   // --- FILTERS STATE ---
   const [searchText, setSearchText] = useState('');
   const [filterSeller, setFilterSeller] = useState('All');
@@ -246,6 +346,15 @@ export default function ConversationManagementPage() {
          }}>
             Reset Filters
          </Button>
+         <Box ml={2}>
+           <ColumnSelector
+               allColumns={ALL_COLUMNS}
+               visibleColumns={visibleColumns}
+               onColumnChange={setVisibleColumns}
+               onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
+               page="conversation-management"
+           />
+         </Box>
       </Stack>
 
       {/* --- FILTER BAR --- */}
@@ -334,52 +443,52 @@ export default function ConversationManagementPage() {
           <Table>
             <TableHead sx={{ bgcolor: '#eee' }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>SL No</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Seller</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Order ID</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Buyer Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Conversation About</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Case</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Action</TableCell>
+                {visibleColumns.includes('sl') && <TableCell sx={{ fontWeight: 'bold' }}>SL No</TableCell>}
+                {visibleColumns.includes('seller') && <TableCell sx={{ fontWeight: 'bold' }}>Seller</TableCell>}
+                {visibleColumns.includes('orderId') && <TableCell sx={{ fontWeight: 'bold' }}>Order ID</TableCell>}
+                {visibleColumns.includes('username') && <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>}
+                {visibleColumns.includes('buyerName') && <TableCell sx={{ fontWeight: 'bold' }}>Buyer Name</TableCell>}
+                {visibleColumns.includes('about') && <TableCell sx={{ fontWeight: 'bold' }}>Conversation About</TableCell>}
+                {visibleColumns.includes('case') && <TableCell sx={{ fontWeight: 'bold' }}>Case</TableCell>}
+                {visibleColumns.includes('action') && <TableCell align="center" sx={{ fontWeight: 'bold' }}>Action</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredItems.map((item, index) => (
                 <TableRow key={item._id} hover>
                   {/* SERIAL NUMBER */}
-                  <TableCell>{index + 1}</TableCell>
+                  {visibleColumns.includes('sl') && <TableCell>{index + 1}</TableCell>}
                   
                   {/* SELLER NAME (Added) */}
-                  <TableCell>
+                  {visibleColumns.includes('seller') && <TableCell>
                       <Chip label={item.sellerName || 'Unknown'} size="small" variant="outlined" />
-                  </TableCell>
+                  </TableCell>}
 
-                  <TableCell>
+                  {visibleColumns.includes('orderId') && <TableCell>
                     {item.orderId ? (
                         <Chip label={item.orderId} size="small" variant="outlined" sx={{ bgcolor: '#fafafa' }} />
                     ) : (
                         <Typography color="text.secondary">-</Typography>
                     )}
-                  </TableCell>
-                  <TableCell>{item.buyerUsername}</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>{item.buyerName}</TableCell>
-                  <TableCell>
+                  </TableCell>}
+                  {visibleColumns.includes('username') && <TableCell>{item.buyerUsername}</TableCell>}
+                  {visibleColumns.includes('buyerName') && <TableCell sx={{ fontWeight: 'bold' }}>{item.buyerName}</TableCell>}
+                  {visibleColumns.includes('about') && <TableCell>
                     <Chip label={item.category} color="primary" size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 'bold' }} />
-                  </TableCell>
-                  <TableCell>
+                  </TableCell>}
+                  {visibleColumns.includes('case') && <TableCell>
                     <Chip 
                         label={item.caseStatus} 
                         color={item.caseStatus === 'Case Opened' ? 'error' : 'success'} 
                         size="small" 
                         variant="outlined"
                     />
-                  </TableCell>
-                  <TableCell align="center">
+                  </TableCell>}
+                  {visibleColumns.includes('action') && <TableCell align="center">
                     <IconButton color="primary" onClick={() => setSelectedItem(item)}>
                       <ChatIcon />
                     </IconButton>
-                  </TableCell>
+                  </TableCell>}
                 </TableRow>
               ))}
             </TableBody>
