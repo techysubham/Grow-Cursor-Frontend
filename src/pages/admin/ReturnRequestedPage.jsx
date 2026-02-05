@@ -24,6 +24,8 @@ import {
   Pagination,
   TextField,
   OutlinedInput,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -101,6 +103,7 @@ export default function ReturnRequestedPage({
     { id: 'createdDate', label: 'Created Date (PST)' },
     { id: 'responseDue', label: 'Response Due (PST)' },
     { id: 'orderId', label: 'Order ID' },
+    { id: 'productName', label: 'Product Name' },
     { id: 'seller', label: 'Seller' },
     { id: 'buyer', label: 'Buyer' },
     { id: 'item', label: 'Item' },
@@ -112,21 +115,22 @@ export default function ReturnRequestedPage({
     { id: 'chat', label: 'Chat' },
   ];
   const [visibleColumns, setVisibleColumns] = useState(ALL_COLUMNS.map(c => c.id));
-  
+
   // Pagination state
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalReturns, setTotalReturns] = useState(0);
   const limit = 50; // Items per page
-  
+
   // Snackbar state for sync results
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
-  
+
   // Filter states
   const [statusFilter, setStatusFilter] = useState('');
   const [sellerFilter, setSellerFilter] = useState('');
   const [reasonFilter, setReasonFilter] = useState([]);
+  const [urgentOnly, setUrgentOnly] = useState(false);
   const [internalDateFilter, setInternalDateFilter] = useState({
     mode: 'all',
     single: '',
@@ -137,7 +141,7 @@ export default function ReturnRequestedPage({
     () => dateFilterProp ?? internalDateFilter,
     [dateFilterProp, internalDateFilter]
   );
-  
+
   const hasFetchedInitialData = useRef(false);
 
   // Fetch sellers on mount
@@ -161,14 +165,14 @@ export default function ReturnRequestedPage({
       return;
     }
     loadStoredReturns();
-  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, page]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, urgentOnly, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     if (hasFetchedInitialData.current) {
       setPage(1);
     }
-  }, [statusFilter, sellerFilter, reasonFilter, dateFilter]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, urgentOnly]);
 
   async function loadStoredReturns() {
     setLoading(true);
@@ -181,6 +185,7 @@ export default function ReturnRequestedPage({
       if (statusFilter) params.status = statusFilter;
       if (sellerFilter) params.sellerId = sellerFilter;
       if (reasonFilter.length > 0) params.reason = reasonFilter.join(',');
+      if (urgentOnly) params.urgentOnly = 'true';
       if (dateFilter.mode === 'single' && dateFilter.single) {
         params.startDate = dateFilter.single;
         params.endDate = dateFilter.single;
@@ -188,13 +193,13 @@ export default function ReturnRequestedPage({
         if (dateFilter.from) params.startDate = dateFilter.from;
         if (dateFilter.to) params.endDate = dateFilter.to;
       }
-      
+
       const res = await api.get('/ebay/stored-returns', { params });
       const returnData = res.data.returns || [];
       const pagination = res.data.pagination || {};
-      
+
       console.log(`Loaded ${returnData.length} returns from database (Page ${pagination.currentPage}/${pagination.totalPages})`);
-      
+
       setReturns(returnData);
       setTotalPages(pagination.totalPages || 1);
       setTotalReturns(pagination.totalReturns || 0);
@@ -212,11 +217,11 @@ export default function ReturnRequestedPage({
     try {
       const res = await api.post('/ebay/fetch-returns');
       const { totalNewReturns, totalUpdatedReturns, results, errors } = res.data;
-      
+
       // Build snackbar message with per-seller breakdown and update details
       let msgParts = [];
       let updateDetailsParts = [];
-      
+
       if (results && results.length > 0) {
         results.forEach(r => {
           if (r.newReturns > 0 || r.updatedReturns > 0) {
@@ -224,7 +229,7 @@ export default function ReturnRequestedPage({
             if (r.newReturns > 0) parts.push(`${r.newReturns} new`);
             if (r.updatedReturns > 0) parts.push(`${r.updatedReturns} updated`);
             msgParts.push(`${r.sellerName}: ${parts.join(', ')}`);
-            
+
             // Collect update details for snackbar
             if (r.updateDetails && r.updateDetails.length > 0) {
               r.updateDetails.forEach(ud => {
@@ -243,7 +248,7 @@ export default function ReturnRequestedPage({
           }
         });
       }
-      
+
       // Build final snackbar message
       let finalMsg = '';
       if (msgParts.length > 0) {
@@ -256,14 +261,14 @@ export default function ReturnRequestedPage({
       } else {
         finalMsg = `✅ ${totalNewReturns} new, ${totalUpdatedReturns} updated`;
       }
-      
+
       setSnackbarMsg(finalMsg);
       setSnackbarOpen(true);
-      
+
       if (errors && errors.length > 0) {
         setError(`⚠️ Errors: ${errors.join(', ')}`);
       }
-      
+
       // Reload returns from database
       await loadStoredReturns();
     } catch (e) {
@@ -278,6 +283,7 @@ export default function ReturnRequestedPage({
     setStatusFilter('');
     setSellerFilter('');
     setReasonFilter([]);
+    setUrgentOnly(false);
     setInternalDateFilter({ mode: 'all', single: '', from: '', to: '' });
   };
 
@@ -285,8 +291,8 @@ export default function ReturnRequestedPage({
     try {
       await api.patch(`/ebay/returns/${returnId}/worksheet-status`, { worksheetStatus: newStatus });
       // Update local state
-      setReturns(prevReturns => 
-        prevReturns.map(ret => 
+      setReturns(prevReturns =>
+        prevReturns.map(ret =>
           ret.returnId === returnId ? { ...ret, worksheetStatus: newStatus } : ret
         )
       );
@@ -335,8 +341,18 @@ export default function ReturnRequestedPage({
     statusFilter ||
     sellerFilter ||
     reasonFilter.length > 0 ||
+    urgentOnly ||
     (!hideDateFilter &&
       (dateFilter.mode !== 'all' || dateFilter.single || dateFilter.from || dateFilter.to));
+
+  // Check if response due date is within next 24 hours (urgent for filter)
+  const isResponseUrgent24hrs = (responseDate) => {
+    if (!responseDate) return false;
+    const now = new Date();
+    const dueDate = new Date(responseDate);
+    const oneDayFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    return dueDate <= oneDayFromNow && dueDate >= now;
+  };
 
   // Check if response due date is within next 2 days (urgent)
   const isResponseUrgent = (responseDate) => {
@@ -377,20 +393,20 @@ export default function ReturnRequestedPage({
         ...(embedded
           ? { width: '100%', maxWidth: '100%' }
           : {
-              height: 'calc(100vh - 100px)',
-              overflow: 'hidden',
-              width: '100%',
-              maxWidth: '100%',
-              p: 3
-            })
+            height: 'calc(100vh - 100px)',
+            overflow: 'hidden',
+            width: '100%',
+            maxWidth: '100%',
+            p: 3
+          })
       }}
     >
       <Stack direction="row" alignItems="center" spacing={2} mb={3} sx={{ flexShrink: 0 }}>
         <AssignmentReturnIcon sx={{ fontSize: 32, color: 'primary.main' }} />
         <Typography variant="h4">Return Requests</Typography>
-        <Chip 
-          label={`${totalReturns} total returns`} 
-          color="info" 
+        <Chip
+          label={`${totalReturns} total returns`}
+          color="info"
           variant="outlined"
           sx={{ ml: 'auto' }}
         />
@@ -409,9 +425,9 @@ export default function ReturnRequestedPage({
         onClose={() => setSnackbarOpen(false)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert 
-          onClose={() => setSnackbarOpen(false)} 
-          severity="success" 
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity="success"
           sx={{ whiteSpace: 'pre-line', maxWidth: 600 }}
         >
           {snackbarMsg}
@@ -430,12 +446,12 @@ export default function ReturnRequestedPage({
           >
             {fetching ? 'Fetching...' : 'Fetch Returns from eBay'}
           </Button>
-          
+
           <Typography variant="caption" color="text.secondary">
             📅 Polls returns from <strong>last 30 days</strong> from eBay
           </Typography>
         </Stack>
-        
+
         <Button
           variant="outlined"
           color="success"
@@ -473,11 +489,11 @@ export default function ReturnRequestedPage({
           Download CSV ({returns.length})
         </Button>
         <ColumnSelector
-            allColumns={ALL_COLUMNS}
-            visibleColumns={visibleColumns}
-            onColumnChange={setVisibleColumns}
-            onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
-            page="return-requested"
+          allColumns={ALL_COLUMNS}
+          visibleColumns={visibleColumns}
+          onColumnChange={setVisibleColumns}
+          onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
+          page="return-requested"
         />
       </Stack>
 
@@ -527,8 +543,8 @@ export default function ReturnRequestedPage({
               renderValue={(selected) => (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {selected.map((value) => (
-                    <Chip 
-                      key={value} 
+                    <Chip
+                      key={value}
                       label={{
                         'WRONG_SIZE': 'Does not fit',
                         'DOES_NOT_FIT': "Doesn't fit my vehicle",
@@ -540,7 +556,7 @@ export default function ReturnRequestedPage({
                         'MISSING_PARTS': 'Missing Parts',
                         'OTHER': 'Other'
                       }[value] || value}
-                      size="small" 
+                      size="small"
                     />
                   ))}
                 </Box>
@@ -644,6 +660,22 @@ export default function ReturnRequestedPage({
               Clear Filters
             </Button>
           )}
+
+          {/* Urgent Only Switch */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={urgentOnly}
+                onChange={(e) => setUrgentOnly(e.target.checked)}
+                color="error"
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ fontWeight: urgentOnly ? 'bold' : 'normal', color: urgentOnly ? 'error.main' : 'inherit' }}>
+                🔥 Urgent (Due in 48hrs)
+              </Typography>
+            }
+          />
         </Stack>
       </Paper>
 
@@ -653,10 +685,10 @@ export default function ReturnRequestedPage({
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer 
+        <TableContainer
           component={Paper}
-          sx={{ 
-            flexGrow: 1, 
+          sx={{
+            flexGrow: 1,
             overflow: 'auto',
             ...(embedded ? {} : { maxHeight: 'calc(100% - 50px)' }),
             width: '100%',
@@ -677,7 +709,7 @@ export default function ReturnRequestedPage({
             },
           }}
         >
-          <Table 
+          <Table
             size="small"
             stickyHeader
           >
@@ -687,6 +719,7 @@ export default function ReturnRequestedPage({
                 {visibleColumns.includes('createdDate') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Created Date (PST)</strong></TableCell>}
                 {visibleColumns.includes('responseDue') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Response Due (PST)</strong></TableCell>}
                 {visibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Order ID</strong></TableCell>}
+                {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100, minWidth: 300 }}><strong>Product Name</strong></TableCell>}
                 {visibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Seller</strong></TableCell>}
                 {visibleColumns.includes('buyer') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Buyer</strong></TableCell>}
                 {visibleColumns.includes('item') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Item</strong></TableCell>}
@@ -701,7 +734,7 @@ export default function ReturnRequestedPage({
             <TableBody>
               {returns.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={13} align="center">
+                  <TableCell colSpan={14} align="center">
                     <Typography variant="body2" color="text.secondary" py={2}>
                       No return requests found. Click "Fetch Returns from eBay" to load data.
                     </Typography>
@@ -727,8 +760,8 @@ export default function ReturnRequestedPage({
                     </TableCell>}
                     {visibleColumns.includes('responseDue') && <TableCell>
                       <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <Typography 
-                          variant="body2" 
+                        <Typography
+                          variant="body2"
                           fontSize="0.75rem"
                           color={ret.returnStatus !== 'CLOSED' && isResponseOverdue(ret.responseDate) ? 'error' : 'inherit'}
                           fontWeight={ret.returnStatus !== 'CLOSED' && (isResponseOverdue(ret.responseDate) || isResponseUrgent(ret.responseDate)) ? 'bold' : 'normal'}
@@ -736,29 +769,29 @@ export default function ReturnRequestedPage({
                           {formatDate(ret.responseDate)}
                         </Typography>
                         {ret.returnStatus !== 'CLOSED' && isResponseOverdue(ret.responseDate) && (
-                          <Chip 
-                            label="OVERDUE" 
-                            size="small" 
-                            sx={{ 
-                              fontSize: '0.6rem', 
+                          <Chip
+                            label="OVERDUE"
+                            size="small"
+                            sx={{
+                              fontSize: '0.6rem',
                               height: 18,
                               backgroundColor: '#fbdbc4ff',
                               color: 'black',
                               fontWeight: 'bold'
-                            }} 
+                            }}
                           />
                         )}
                         {ret.returnStatus !== 'CLOSED' && !isResponseOverdue(ret.responseDate) && isResponseUrgent(ret.responseDate) && (
-                          <Chip 
-                            label="URGENT" 
-                            size="small" 
-                            sx={{ 
-                              fontSize: '0.6rem', 
+                          <Chip
+                            label="URGENT"
+                            size="small"
+                            sx={{
+                              fontSize: '0.6rem',
                               height: 18,
                               backgroundColor: '#dc3545',
                               color: 'white',
                               fontWeight: 'bold'
-                            }} 
+                            }}
                           />
                         )}
                       </Stack>
@@ -769,8 +802,8 @@ export default function ReturnRequestedPage({
                           variant="text"
                           size="small"
                           onClick={() => setSelectedOrderId(ret.orderId)}
-                          sx={{ 
-                            fontFamily: 'monospace', 
+                          sx={{
+                            fontFamily: 'monospace',
                             fontSize: '0.75rem',
                             textTransform: 'none',
                             p: 0,
@@ -787,6 +820,18 @@ export default function ReturnRequestedPage({
                         )}
                       </Stack>
                     </TableCell>}
+                    {visibleColumns.includes('productName') && <TableCell>
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Typography variant="body2">
+                          {ret.productName || '-'}
+                        </Typography>
+                        {ret.productName && (
+                          <IconButton size="small" onClick={() => handleCopy(ret.productName)}>
+                            <ContentCopyIcon sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        )}
+                      </Stack>
+                    </TableCell>}
                     {visibleColumns.includes('seller') && <TableCell>
                       <Typography variant="body2">{ret.seller?.user?.username || '-'}</Typography>
                     </TableCell>}
@@ -795,11 +840,11 @@ export default function ReturnRequestedPage({
                     </TableCell>}
                     {visibleColumns.includes('item') && <TableCell>
                       <Tooltip title={ret.itemTitle || 'N/A'}>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            maxWidth: 150, 
-                            overflow: 'hidden', 
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            maxWidth: 150,
+                            overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
                           }}
@@ -829,8 +874,8 @@ export default function ReturnRequestedPage({
                       </Typography>
                     </TableCell>}
                     {visibleColumns.includes('status') && <TableCell>
-                      <Chip 
-                        label={ret.returnStatus || 'Unknown'} 
+                      <Chip
+                        label={ret.returnStatus || 'Unknown'}
                         color={getStatusColor(ret.returnStatus)}
                         size="small"
                         sx={{ fontSize: '0.7rem' }}
@@ -838,8 +883,8 @@ export default function ReturnRequestedPage({
                     </TableCell>}
                     {visibleColumns.includes('refundAmount') && <TableCell>
                       <Typography variant="body2">
-                        {ret.refundAmount?.value 
-                          ? `${ret.refundAmount.currency} ${ret.refundAmount.value}` 
+                        {ret.refundAmount?.value
+                          ? `${ret.refundAmount.currency} ${ret.refundAmount.value}`
                           : '-'}
                       </Typography>
                     </TableCell>}
@@ -857,16 +902,16 @@ export default function ReturnRequestedPage({
                       </FormControl>
                     </TableCell>}
                     {visibleColumns.includes('logs') && <TableCell>
-                      <LogsCell 
-                        value={ret.logs} 
+                      <LogsCell
+                        value={ret.logs}
                         id={ret.returnId}
                         onSave={handleSaveReturnLogs}
                       />
                     </TableCell>}
                     {visibleColumns.includes('chat') && <TableCell align="center">
                       <Tooltip title="Chat with buyer">
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           color="primary"
                           onClick={() => setSelectedReturn(ret)}
                         >
@@ -881,7 +926,7 @@ export default function ReturnRequestedPage({
           </Table>
         </TableContainer>
       )}
-      
+
       {/* Pagination Controls */}
       {!loading && returns.length > 0 && totalPages > 1 && (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, mt: 2, py: 1 }}>

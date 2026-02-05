@@ -19,7 +19,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  TextField
+  TextField,
+  Pagination
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -40,12 +41,18 @@ export default function CancelledStatusPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
-  
+
   // Filters
   const [sellers, setSellers] = useState([]);
   const [sellerFilter, setSellerFilter] = useState('');
   const [itemsFilter, setItemsFilter] = useState(''); // repurposing for marketplace filter to match API if needed, or just new param
   const [marketplaceFilter, setMarketplaceFilter] = useState('');
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const limit = 50; // Items per page
 
   const MARKETPLACES = [
     'EBAY_US',
@@ -87,6 +94,11 @@ export default function CancelledStatusPage({
 
   useEffect(() => {
     fetchCancelledOrders();
+  }, [dateFilter, sellerFilter, marketplaceFilter, page]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
   }, [dateFilter, sellerFilter, marketplaceFilter]);
 
   // Fetch sellers on mount
@@ -106,8 +118,8 @@ export default function CancelledStatusPage({
     try {
       await api.patch(`/ebay/orders/${orderId}/worksheet-status`, { worksheetStatus: newStatus });
       // Update local state
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
           order.orderId === orderId ? { ...order, worksheetStatus: newStatus } : order
         )
       );
@@ -121,7 +133,10 @@ export default function CancelledStatusPage({
     setLoading(true);
     setError('');
     try {
-      const params = {};
+      const params = {
+        page: page,
+        limit: limit
+      };
       if (dateFilter.mode === 'single' && dateFilter.single) {
         params.startDate = dateFilter.single;
         params.endDate = dateFilter.single;
@@ -130,9 +145,7 @@ export default function CancelledStatusPage({
         if (dateFilter.to) params.endDate = dateFilter.to;
       }
       // mode 'all' = no date params, shows all orders
-      
-      // mode 'all' = no date params, shows all orders
-      
+
       // Add filters
       if (sellerFilter) params.sellerId = sellerFilter;
       if (marketplaceFilter) params.marketplace = marketplaceFilter;
@@ -140,11 +153,13 @@ export default function CancelledStatusPage({
       // NEW: Use the dedicated endpoint that filters server-side (30-day window)
       const res = await api.get('/ebay/cancelled-orders', { params });
       const cancelledOrders = res.data.orders || [];
-      
-      console.log(`Loaded ${cancelledOrders.length} IN_PROGRESS orders (filtered server-side)`);
-      console.log(`Filter date: ${res.data.filterDate}`);
-      
+      const pagination = res.data.pagination || {};
+
+      console.log(`Loaded ${cancelledOrders.length} IN_PROGRESS orders (Page ${pagination.currentPage}/${pagination.totalPages})`);
+
       setOrders(cancelledOrders);
+      setTotalPages(pagination.totalPages || 1);
+      setTotalOrders(pagination.totalOrders || 0);
     } catch (e) {
       console.error('Failed to fetch cancelled orders:', e);
       setError(e.response?.data?.error || e.message);
@@ -262,7 +277,7 @@ export default function CancelledStatusPage({
               variant="outlined"
             />
           )}
-          
+
           <Button
             variant="outlined"
             color="success"
@@ -287,57 +302,57 @@ export default function CancelledStatusPage({
             Download CSV ({orders.length})
           </Button>
           <ColumnSelector
-              allColumns={ALL_COLUMNS}
-              visibleColumns={visibleColumns}
-              onColumnChange={setVisibleColumns}
-              onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
-              page="cancelled-status"
+            allColumns={ALL_COLUMNS}
+            visibleColumns={visibleColumns}
+            onColumnChange={setVisibleColumns}
+            onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
+            page="cancelled-status"
           />
         </Stack>
 
         {/* Filters Row */}
         <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 2 }} flexWrap="wrap" useFlexGap>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Seller</InputLabel>
-              <Select
-                value={sellerFilter}
-                onChange={(e) => setSellerFilter(e.target.value)}
-                label="Seller"
-              >
-                <MenuItem value="">All Sellers</MenuItem>
-                {sellers.map((s) => (
-                  <MenuItem key={s._id} value={s._id}>
-                    {s.user?.username || s._id}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Marketplace</InputLabel>
-              <Select
-                value={marketplaceFilter}
-                onChange={(e) => setMarketplaceFilter(e.target.value)}
-                label="Marketplace"
-              >
-                <MenuItem value="">All Marketplaces</MenuItem>
-                {MARKETPLACES.map((m) => (
-                  <MenuItem key={m} value={m}>
-                    {m}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-             <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={fetchCancelledOrders}
-              disabled={loading}
-              size="small"
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Seller</InputLabel>
+            <Select
+              value={sellerFilter}
+              onChange={(e) => setSellerFilter(e.target.value)}
+              label="Seller"
             >
-              Refresh
-            </Button>
+              <MenuItem value="">All Sellers</MenuItem>
+              {sellers.map((s) => (
+                <MenuItem key={s._id} value={s._id}>
+                  {s.user?.username || s._id}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Marketplace</InputLabel>
+            <Select
+              value={marketplaceFilter}
+              onChange={(e) => setMarketplaceFilter(e.target.value)}
+              label="Marketplace"
+            >
+              <MenuItem value="">All Marketplaces</MenuItem>
+              {MARKETPLACES.map((m) => (
+                <MenuItem key={m} value={m}>
+                  {m}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={fetchCancelledOrders}
+            disabled={loading}
+            size="small"
+          >
+            Refresh
+          </Button>
         </Stack>
 
         {!hideDateFilter && (
@@ -415,9 +430,9 @@ export default function CancelledStatusPage({
           </Typography>
         </Paper>
       ) : (
-        <TableContainer 
+        <TableContainer
           component={Paper}
-          sx={{ 
+          sx={{
             maxHeight: 'calc(100vh - 300px)',
             overflow: 'auto',
             '&::-webkit-scrollbar': {
@@ -564,9 +579,9 @@ export default function CancelledStatusPage({
                     <Typography variant="body2" fontWeight="medium">
                       {formatCurrency(
                         (order.subtotal || 0) +
-                          (order.shipping || 0) +
-                          (order.salesTax || 0) -
-                          (order.discount || 0)
+                        (order.shipping || 0) +
+                        (order.salesTax || 0) -
+                        (order.discount || 0)
                       )}
                     </Typography>
                   </TableCell>}
@@ -578,15 +593,15 @@ export default function CancelledStatusPage({
                         order.cancelState === 'CANCELED'
                           ? 'error'
                           : order.cancelState === 'CANCEL_REQUESTED'
-                          ? 'warning'
-                          : 'success'
+                            ? 'warning'
+                            : 'success'
                       }
                       sx={{
-                          fontSize: '0.7rem',
-                          backgroundColor: order.cancelState === 'IN_PROGRESS' ? '#ffd700' : undefined,
-                          color: order.cancelState === 'IN_PROGRESS' ? '#000' : undefined,
-                          fontWeight: order.cancelState === 'IN_PROGRESS' ? 'bold' : 'normal'
-                        }}
+                        fontSize: '0.7rem',
+                        backgroundColor: order.cancelState === 'IN_PROGRESS' ? '#ffd700' : undefined,
+                        color: order.cancelState === 'IN_PROGRESS' ? '#000' : undefined,
+                        fontWeight: order.cancelState === 'IN_PROGRESS' ? 'bold' : 'normal'
+                      }}
                     />
                   </TableCell>}
                   {visibleColumns.includes('refunds') && <TableCell>
@@ -629,30 +644,47 @@ export default function CancelledStatusPage({
                         <MenuItem value="resolved">Resolved</MenuItem>
                       </Select>
                     </FormControl>
-                    </TableCell>}
-                    {visibleColumns.includes('logs') && <TableCell>
-                      <LogsCell
-                        value={order.logs}
-                        id={order.orderId}
-                        onSave={handleSaveOrderLogs}
-                      />
-                    </TableCell>}
-                    {visibleColumns.includes('chat') && <TableCell align="center">
-                      <Tooltip title="Chat with buyer">
-                        <IconButton 
-                          size="small" 
-                          color="primary"
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          <ChatIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>}
-                  </TableRow>
+                  </TableCell>}
+                  {visibleColumns.includes('logs') && <TableCell>
+                    <LogsCell
+                      value={order.logs}
+                      id={order.orderId}
+                      onSave={handleSaveOrderLogs}
+                    />
+                  </TableCell>}
+                  {visibleColumns.includes('chat') && <TableCell align="center">
+                    <Tooltip title="Chat with buyer">
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => setSelectedOrder(order)}
+                      >
+                        <ChatIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>}
+                </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && orders.length > 0 && totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, mt: 2, py: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, totalOrders)} of {totalOrders} orders
+          </Typography>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(e, value) => setPage(value)}
+            color="primary"
+            showFirstButton
+            showLastButton
+          />
+        </Box>
       )}
 
       {/* Chat Modal */}
