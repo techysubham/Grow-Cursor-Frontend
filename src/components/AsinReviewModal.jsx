@@ -360,7 +360,7 @@ export default function AsinReviewModal({
                   </Typography>
                 </Box>
 
-                {currentItem.sourceData.images?.length > 0 && (
+                {currentItem.sourceData?.images?.length > 0 && (
                   <Box>
                     <Typography variant="caption" color="text.secondary" gutterBottom>
                       Images ({currentItem.sourceData.images.length})
