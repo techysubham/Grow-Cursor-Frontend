@@ -100,11 +100,39 @@ export default function AsinAutomationEditor({
   });
   
   useEffect(() => {
-    // Use override if exists, otherwise use base
-    const effectiveConfig = isOverridden && overrideConfig 
-      ? overrideConfig 
-      : baseConfig;
-    setConfig(effectiveConfig || { enabled: false, fieldConfigs: [] });
+    // Always start with base template configs to ensure nothing is lost
+    const baseFieldConfigs = baseConfig?.fieldConfigs || [];
+    
+    if (isOverridden && overrideConfig) {
+      // Merge: Start with base configs, then apply override customizations
+      const overrideFieldConfigs = overrideConfig.fieldConfigs || [];
+      
+      // Create a map of override configs by ebayField for quick lookup
+      const overrideMap = new Map(
+        overrideFieldConfigs.map(fc => [fc.ebayField, fc])
+      );
+      
+      // Merge: Use override for matching fields, keep base for non-matching
+      const mergedConfigs = baseFieldConfigs.map(baseConfig => {
+        const override = overrideMap.get(baseConfig.ebayField);
+        return override || baseConfig;
+      });
+      
+      // Add any override configs that don't exist in base (seller-added custom fields)
+      overrideFieldConfigs.forEach(overrideConfig => {
+        if (!baseFieldConfigs.find(bc => bc.ebayField === overrideConfig.ebayField)) {
+          mergedConfigs.push(overrideConfig);
+        }
+      });
+      
+      setConfig({
+        enabled: overrideConfig.enabled !== undefined ? overrideConfig.enabled : baseConfig?.enabled || false,
+        fieldConfigs: mergedConfigs
+      });
+    } else {
+      // No override - use base config as-is
+      setConfig(baseConfig || { enabled: false, fieldConfigs: [] });
+    }
   }, [baseConfig, overrideConfig, isOverridden]);
   
   const handleToggleEnabled = (checked) => {
