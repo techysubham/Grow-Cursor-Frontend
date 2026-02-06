@@ -1397,40 +1397,12 @@ export default function TemplateListingsPage() {
                         const stats = getParsingStats(asinInput);
                         if (stats.total === 0) return 'Enter ASINs (max 50) - supports any format: commas, newlines, spaces, tabs';
                         
-                        return (
-                          <Stack direction="row" spacing={1} alignItems="center" component="span">
-                            <Chip 
-                              size="small" 
-                              label={`${stats.uniqueValid} valid ASIN${stats.uniqueValid !== 1 ? 's' : ''}`} 
-                              color="success" 
-                              sx={{ height: 20 }}
-                            />
-                            {stats.invalid > 0 && (
-                              <Chip 
-                                size="small" 
-                                label={`${stats.invalid} invalid`} 
-                                color="warning" 
-                                sx={{ height: 20 }}
-                              />
-                            )}
-                            {stats.duplicates > 0 && (
-                              <Chip 
-                                size="small" 
-                                label={`${stats.duplicates} duplicate${stats.duplicates !== 1 ? 's' : ''}`} 
-                                color="info" 
-                                sx={{ height: 20 }}
-                              />
-                            )}
-                            {stats.uniqueValid > 50 && (
-                              <Chip 
-                                size="small" 
-                                label="Exceeds limit (50 max)" 
-                                color="error" 
-                                sx={{ height: 20 }}
-                              />
-                            )}
-                          </Stack>
-                        );
+                        const parts = [];
+                        parts.push(`✓ ${stats.uniqueValid} valid ASIN${stats.uniqueValid !== 1 ? 's' : ''}`);
+                        if (stats.invalid > 0) parts.push(`⚠ ${stats.invalid} invalid`);
+                        if (stats.duplicates > 0) parts.push(`ℹ ${stats.duplicates} duplicate${stats.duplicates !== 1 ? 's' : ''}`);
+                        if (stats.uniqueValid > 50) parts.push(`❌ Exceeds limit (50 max)`);
+                        return parts.join(' • ');
                       })()
                       : ''
                   }
