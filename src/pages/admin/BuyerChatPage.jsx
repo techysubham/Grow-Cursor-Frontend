@@ -21,85 +21,14 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import MarkAsUnreadIcon from '@mui/icons-material/MarkAsUnread';
 import MenuIcon from '@mui/icons-material/Menu';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SettingsIcon from '@mui/icons-material/Settings';
 import api from '../../lib/api';
+import TemplateManagementModal from '../../components/TemplateManagementModal';
 
 // Session storage key for persisting state
 const CHAT_STORAGE_KEY = 'buyer_chat_page_state';
 
-// --- CHAT TEMPLATES ---
-const CHAT_TEMPLATES = [
-  {
-    category: 'ORDER / INVENTORY ISSUES',
-    items: [
-      { label: 'Out of Stock', text: "Hi, during our final quality check, we found the item did not meet our standards and it was the last one in stock. Please cancel the order so we can issue a full refund immediately." },
-      { label: 'Quality Check Failed', text: "Hi, during our quality inspection, the item did not pass our standards. We won't ship it in this condition. We can offer an alternative or a full refund—please confirm your preference." },
-      { label: 'Alternative Offered', text: "Hi, we have an updated/new design available. We can ship it at no extra cost. Please confirm if you'd like to proceed with the alternative." },
-      { label: 'Wrong Item Sent', text: "Hi, we're sorry for the mix-up. We can send the correct item or issue a refund. Please confirm your preferred option." },
-      { label: 'Defective Item', text: "Hi, we're sorry the item arrived defective. We can offer a replacement or a full refund. Please let us know how you'd like to proceed." },
-      { label: 'Missing Item', text: "Hi, we're sorry an item was missing from your order. We can send a replacement or process a refund—please confirm your preference." },
-      { label: 'Damaged in Transit', text: "Hi, our shipping partner informed us your item was damaged in transit. We can issue a full refund or send a replacement. Please confirm your choice." }
-    ]
-  },
-  {
-    category: 'SHIPPING & DELIVERY PROBLEMS',
-    items: [
-      { label: 'Lost in Transit', text: "Hi, our shipping partner confirmed your package was lost in transit. We can offer a full refund or a replacement. Please confirm your preference." },
-      { label: 'Fake Tracking Issue', text: "Hi, our shipping partner accidentally provided an incorrect tracking ID. Your item is still in transit and we will provide the correct tracking shortly." },
-      { label: 'Wrong Tracking ID', text: "Hi, the tracking ID uploaded earlier was incorrect due to a system error. We will share the correct tracking details shortly." },
-      { label: 'Late Delivery', text: "Hi, we apologize for the delay due to carrier or weather issues. Your order is in transit and will arrive soon. Thank you for your patience." },
-      { label: 'Delivery Proof Available', text: "Hi, according to our shipping partner, your package was delivered. We have proof of delivery. Please check nearby areas or neighbors and let us know." },
-      { label: 'Delivered to Neighbor', text: "Hi, sometimes packages are delivered to neighbors, mailrooms, or reception areas. Please check those places and update us." },
-      { label: 'Carrier Delay', text: "Hi, there is an operational delay with the carrier hub. Your order is still on the way and we are monitoring it closely." }
-    ]
-  },
-  {
-    category: 'CANCELLATION & CHANGES',
-    items: [
-      { label: 'Cancel Requested', text: "Hi, we received your cancellation request. We'll check with the shipping partner and update you shortly." },
-      { label: 'Cancel Declined (Shipped)', text: "Hi, the order has already shipped and cannot be canceled. You can return it after delivery for a refund." },
-      { label: 'Cancel Accepted', text: "Hi, your cancellation request has been accepted. Your refund will be processed shortly." },
-      { label: 'Order Change Request', text: "Hi, your order has already shipped and changes are not possible. We can assist with return or replacement after delivery." }
-    ]
-  },
-  {
-    category: 'RETURNS & REPLACEMENTS',
-    items: [
-      { label: 'Return Case Opened', text: "Hi, we're sorry for the issue. We can offer a refund or replacement. Please confirm your preferred resolution." },
-      { label: 'Return Label Sent', text: "Hi, please package the item and drop it off using the prepaid return label. Once shipped, we will process your refund or replacement." },
-      { label: 'Replacement Offered', text: "Hi, we can send a replacement item at no extra cost. Please confirm if you'd like to proceed." },
-      { label: 'Replacement Shipped', text: "Hi, your replacement item has been shipped. We will update you with tracking details shortly." },
-      { label: 'Return Case Close Request', text: "Hi, kindly close the return case so we can process your refund/replacement immediately. Open cases affect our seller rating." }
-    ]
-  },
-  {
-    category: 'REFUND HANDLING',
-    items: [
-      { label: 'Full Refund Offered', text: "Hi, we can issue a full refund immediately. Please confirm so we can proceed." },
-      { label: 'Partial Refund Offered', text: "Hi, we can offer a partial refund if you'd like to keep the item. Please confirm your preference." },
-      { label: 'Refund Processed', text: "Hi, your refund has been processed and should reflect in your account shortly." },
-      { label: 'Refund Pending', text: "Hi, your refund is pending and will be processed as soon as the return is confirmed or the case is closed." }
-    ]
-  },
-  {
-    category: 'BUYER COMPLAINT CASES',
-    items: [
-      { label: 'Item Not Received (INR)', text: "Hi, according to our shipping partner, the package was delivered. Please check nearby areas and neighbors. Kindly close the INR case so we can proceed with a refund or replacement." },
-      { label: 'Return Case Open', text: "Hi, we request you to close the return case so we can process your refund or replacement without delay." },
-      { label: 'Negative Feedback Request', text: "Hi, we kindly request you to revise or remove negative feedback as we are ready to resolve this issue for you." },
-      { label: 'Feedback Revision Request', text: "Hi, we appreciate your feedback. If we resolved your issue, kindly revise your feedback—it really helps our store." }
-    ]
-  },
-  {
-    category: 'COMMUNICATION / ADMIN',
-    items: [
-      { label: 'Welcome Message', text: "Hi, thank you for shopping with us! Your order is being processed and we'll update you with tracking soon." },
-      { label: 'Awareness Message', text: "Hi, your order is currently being processed/in transit. Thank you for your patience and support." },
-      { label: 'Wrong Message Sent', text: "Hi, we apologize for the incorrect message sent earlier. Please ignore it—your order is being handled correctly." },
-      { label: 'System Error Message', text: "Hi, due to a system error, some details were updated incorrectly. We are correcting this and will update you shortly." },
-      { label: 'Amazon Packaging Explanation', text: "Hi, we use Amazon shipping services, which is why the item may arrive in Amazon packaging. The product was shipped from our warehouse." }
-    ]
-  }
-];
+// CHAT_TEMPLATES are now fetched from API - see chatTemplates state in component
 
 // Helper to get initial state from sessionStorage
 const getInitialState = (key, defaultValue) => {
@@ -164,6 +93,9 @@ export default function BuyerChatPage() {
   const [markingUnread, setMarkingUnread] = useState(false);
   const [copiedText, setCopiedText] = useState('');
   const [templateAnchorEl, setTemplateAnchorEl] = useState(null);
+  const [chatTemplates, setChatTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
 
   // Responsive hooks
   const theme = useTheme();
@@ -275,6 +207,20 @@ export default function BuyerChatPage() {
 
 
 
+  async function loadChatTemplates() {
+    setTemplatesLoading(true);
+    try {
+      const { data } = await api.get('/chat-templates');
+      if (data.templates && data.templates.length > 0) {
+        setChatTemplates(data.templates);
+      }
+    } catch (e) {
+      console.error('Failed to load chat templates:', e);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }
+
   async function fetchSellers() {
     try {
       const { data } = await api.get('/sellers/all');
@@ -295,6 +241,7 @@ export default function BuyerChatPage() {
       hasFetchedInitialData.current = true;
       fetchSellers();
       loadThreads(true);
+      loadChatTemplates();
 
       // If we have a restored selectedThread, load its messages
       if (selectedThread && !selectedThread.isNew) {
@@ -1228,52 +1175,86 @@ export default function BuyerChatPage() {
                     },
                   }}
                 >
-                  {CHAT_TEMPLATES.map((group, index) => (
-                    <Box key={index}>
-                      <ListSubheader 
-                        sx={{ 
-                          bgcolor: '#f5f5f5', 
-                          fontWeight: 'bold', 
-                          lineHeight: '32px',
-                          color: 'primary.main',
-                          fontSize: '0.75rem'
-                        }}
-                      >
-                        {group.category}
-                      </ListSubheader>
-                      {group.items.map((item, idx) => (
-                        <MenuItem 
-                          key={idx} 
-                          onClick={() => handleSelectTemplate(item.text)}
+                  {/* Manage Templates Button */}
+                  <MenuItem 
+                    onClick={() => { handleTemplateClose(); setManageTemplatesOpen(true); }}
+                    sx={{ 
+                      borderBottom: '2px solid #e0e0e0',
+                      bgcolor: '#f9f9ff',
+                      py: 1.5
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <SettingsIcon fontSize="small" color="primary" />
+                      <Typography variant="subtitle2" color="primary">Manage Templates</Typography>
+                    </Stack>
+                  </MenuItem>
+
+                  {templatesLoading ? (
+                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                      <CircularProgress size={20} />
+                    </Box>
+                  ) : chatTemplates.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+                      No templates available. Click "Manage Templates" to add some.
+                    </Typography>
+                  ) : (
+                    chatTemplates.map((group, index) => (
+                      <Box key={index}>
+                        <ListSubheader 
                           sx={{ 
-                            fontSize: '0.85rem', 
-                            whiteSpace: 'normal', 
-                            py: 1, 
-                            borderBottom: '1px solid #f0f0f0',
-                            display: 'block'
+                            bgcolor: '#f5f5f5', 
+                            fontWeight: 'bold', 
+                            lineHeight: '32px',
+                            color: 'primary.main',
+                            fontSize: '0.75rem'
                           }}
                         >
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
-                            {item.label}
-                          </Typography>
-                          <Typography 
-                            variant="caption" 
-                            color="text.secondary" 
+                          {group.category}
+                        </ListSubheader>
+                        {group.items.map((item, idx) => (
+                          <MenuItem 
+                            key={item._id || idx} 
+                            onClick={() => handleSelectTemplate(item.text)}
                             sx={{ 
-                              display: '-webkit-box', 
-                              WebkitLineClamp: 2, 
-                              WebkitBoxOrient: 'vertical', 
-                              overflow: 'hidden',
-                              fontSize: '0.75rem' 
+                              fontSize: '0.85rem', 
+                              whiteSpace: 'normal', 
+                              py: 1, 
+                              borderBottom: '1px solid #f0f0f0',
+                              display: 'block'
                             }}
                           >
-                            {item.text}
-                          </Typography>
-                        </MenuItem>
-                      ))}
-                    </Box>
-                  ))}
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                              {item.label}
+                            </Typography>
+                            <Typography 
+                              variant="caption" 
+                              color="text.secondary" 
+                              sx={{ 
+                                display: '-webkit-box', 
+                                WebkitLineClamp: 2, 
+                                WebkitBoxOrient: 'vertical', 
+                                overflow: 'hidden',
+                                fontSize: '0.75rem' 
+                              }}
+                            >
+                              {item.text}
+                            </Typography>
+                          </MenuItem>
+                        ))}
+                      </Box>
+                    ))
+                  )}
                 </Menu>
+
+                {/* Template Management Modal */}
+                <TemplateManagementModal
+                  open={manageTemplatesOpen}
+                  onClose={() => {
+                    setManageTemplatesOpen(false);
+                    loadChatTemplates();
+                  }}
+                />
 
                 {/* MAIN CONTENT - Responsive padding */}
                 <Stack spacing={1.5} sx={{ 

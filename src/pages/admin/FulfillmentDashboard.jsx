@@ -65,6 +65,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew'; // <--- Add this
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoIcon from '@mui/icons-material/Info';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 
 import DownloadIcon from '@mui/icons-material/Download';
@@ -75,6 +76,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ColumnSelector from '../../components/ColumnSelector';
 import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import api from '../../lib/api';
+import TemplateManagementModal from '../../components/TemplateManagementModal';
 
 // Remark dropdown options
 const REMARK_OPTIONS = [
@@ -399,7 +401,31 @@ function ChatDialog({ open, onClose, order }) {
 
   // --- TEMPLATE MENU STATE ---
   const [templateAnchorEl, setTemplateAnchorEl] = useState(null);
+  const [chatTemplates, setChatTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   
+  // Load chat templates on mount
+  useEffect(() => {
+    loadChatTemplates();
+  }, []);
+
+  async function loadChatTemplates() {
+    setTemplatesLoading(true);
+    try {
+      const { data } = await api.get('/chat-templates');
+      if (data.templates && data.templates.length > 0) {
+        setChatTemplates(data.templates);
+      }
+    } catch (e) {
+      console.error('Failed to load chat templates:', e);
+      // Fallback to hardcoded templates
+      setChatTemplates(CHAT_TEMPLATES);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }
+
   const handleTemplateClick = (event) => {
     setTemplateAnchorEl(event.currentTarget);
   };
@@ -660,51 +686,76 @@ function ChatDialog({ open, onClose, order }) {
               },
             }}
           >
-            {CHAT_TEMPLATES.map((group, index) => (
-              <Box key={index}>
-                <ListSubheader 
-                  sx={{ 
-                    bgcolor: '#f5f5f5', 
-                    fontWeight: 'bold', 
-                    lineHeight: '32px',
-                    color: 'primary.main',
-                    fontSize: '0.75rem'
-                  }}
-                >
-                  {group.category}
-                </ListSubheader>
-                {group.items.map((item, idx) => (
-                  <MenuItem 
-                    key={idx} 
-                    onClick={() => handleSelectTemplate(item.text)}
+            {/* Manage Templates Button */}
+            <MenuItem 
+              onClick={() => { handleTemplateClose(); setManageTemplatesOpen(true); }}
+              sx={{ 
+                borderBottom: '2px solid #e0e0e0',
+                bgcolor: '#f9f9ff',
+                py: 1.5
+              }}
+            >
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <SettingsIcon fontSize="small" color="primary" />
+                <Typography variant="subtitle2" color="primary">Manage Templates</Typography>
+              </Stack>
+            </MenuItem>
+
+            {templatesLoading ? (
+              <Box sx={{ p: 2, textAlign: 'center' }}>
+                <CircularProgress size={20} />
+              </Box>
+            ) : chatTemplates.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+                No templates available. Click "Manage Templates" to add some.
+              </Typography>
+            ) : (
+              chatTemplates.map((group, index) => (
+                <Box key={index}>
+                  <ListSubheader 
                     sx={{ 
-                      fontSize: '0.85rem', 
-                      whiteSpace: 'normal', 
-                      py: 1, 
-                      borderBottom: '1px solid #f0f0f0',
-                      display: 'block'
+                      bgcolor: '#f5f5f5', 
+                      fontWeight: 'bold', 
+                      lineHeight: '32px',
+                      color: 'primary.main',
+                      fontSize: '0.75rem'
                     }}
                   >
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
-                      {item.label}
-                    </Typography>
-                    <Typography 
-                      variant="caption" 
-                      color="text.secondary" 
+                    {group.category}
+                  </ListSubheader>
+                  {group.items.map((item, idx) => (
+                    <MenuItem 
+                      key={item._id || idx} 
+                      onClick={() => handleSelectTemplate(item.text)}
                       sx={{ 
-                        display: '-webkit-box', 
-                        WebkitLineClamp: 2, 
-                        WebkitBoxOrient: 'vertical', 
-                        overflow: 'hidden',
-                        fontSize: '0.75rem' 
+                        fontSize: '0.85rem', 
+                        whiteSpace: 'normal', 
+                        py: 1, 
+                        borderBottom: '1px solid #f0f0f0',
+                        display: 'block'
                       }}
                     >
-                      {item.text}
-                    </Typography>
-                  </MenuItem>
-                ))}
-              </Box>
-            ))}
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                        {item.label}
+                      </Typography>
+                      <Typography 
+                        variant="caption" 
+                        color="text.secondary" 
+                        sx={{ 
+                          display: '-webkit-box', 
+                          WebkitLineClamp: 2, 
+                          WebkitBoxOrient: 'vertical', 
+                          overflow: 'hidden',
+                          fontSize: '0.75rem' 
+                        }}
+                      >
+                        {item.text}
+                      </Typography>
+                    </MenuItem>
+                  ))}
+                </Box>
+              ))
+            )}
           </Menu>
           <Button
             variant="contained"
@@ -717,6 +768,15 @@ function ChatDialog({ open, onClose, order }) {
           </Button>
         </Box>
       </DialogContent>
+
+      {/* Template Management Modal */}
+      <TemplateManagementModal
+        open={manageTemplatesOpen}
+        onClose={() => {
+          setManageTemplatesOpen(false);
+          loadChatTemplates();
+        }}
+      />
     </Dialog>
   );
 }

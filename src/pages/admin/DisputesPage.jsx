@@ -43,6 +43,8 @@ import CancelledStatusPage from './CancelledStatusPage.jsx';
 import WorksheetPage from './WorksheetPage.jsx';
 import ColumnSelector from '../../components/ColumnSelector';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
+import ChatModal from '../../components/ChatModal';
+
 
 function TabPanel({ children, value, index }) {
   return (
