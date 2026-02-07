@@ -18,6 +18,7 @@ import {
   Calculate as CalculatorIcon
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
+import { getAuthToken } from '../../lib/api.js';
 import BulkListingPreview from '../../components/BulkListingPreview.jsx';
 import CoreFieldDefaultsDialog from '../../components/CoreFieldDefaultsDialog.jsx';
 import PricingConfigSection from '../../components/PricingConfigSection.jsx';
@@ -612,120 +613,110 @@ export default function TemplateListingsPage() {
       setPreviewItems(loadingItems);
       setReviewModal(true);
 
-      // Process in parallel batches for progressive loading
-      const BATCH_SIZE = 10; // Larger batches, processed in parallel
-      const batches = [];
-      
-      for (let i = 0; i < asins.length; i += BATCH_SIZE) {
-        batches.push(asins.slice(i, i + BATCH_SIZE));
-      }
-      
+      // Use SSE streaming for real-time updates
       setProcessingLog(prev => [
         ...prev,
-        `📦 Processing ${batches.length} batches in parallel (${BATCH_SIZE} ASINs each)...`
+        `📡 Starting SSE stream for ${asins.length} ASINs...`
       ]);
       
       const startTime = Date.now();
       
-      // Process all batches in parallel
-      const batchPromises = batches.map(async (batchAsins, batchIndex) => {
-        const batchNum = batchIndex + 1;
-        
-        setProcessingLog(prev => [
-          ...prev,
-          `⏳ Batch ${batchNum}/${batches.length} started (${batchAsins.length} ASINs)...`
-        ]);
+      // Build SSE URL with auth token
+      const asinParam = asins.join(',');
+      const authToken = getAuthToken();
+      const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&token=${encodeURIComponent(authToken)}`;
+      
+      // Create EventSource for SSE
+      const eventSource = new EventSource(api.defaults.baseURL + sseUrl);
+      
+      eventSource.onmessage = (event) => {
+        if (event.data === '[DONE]') {
+          eventSource.close();
+          const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
+          setProcessingLog(prev => [
+            ...prev,
+            `🎉 Stream complete! Total time: ${totalDuration}s`
+          ]);
+          setLoadingBulk(false);
+          return;
+        }
         
         try {
-          const { data } = await api.post('/template-listings/bulk-preview', {
-            templateId,
-            sellerId,
-            asins: batchAsins
-          });
+          const message = JSON.parse(event.data);
           
-          return {
-            batchNum,
-            success: true,
-            items: data.items,
-            batchAsins
-          };
-        } catch (error) {
-          return {
-            batchNum,
-            success: false,
-            error: error.message,
-            batchAsins
-          };
-        }
-      });
-      
-      // Update preview items as each batch completes
-      let completedCount = 0;
-      
-      for (const promise of batchPromises) {
-        promise.then(result => {
-          if (result.success) {
-            // Update preview items with completed batch
-            setPreviewItems(prev => {
-              const updated = [...prev];
-              result.items.forEach(item => {
-                const index = updated.findIndex(i => i.asin === item.asin);
+          switch (message.type) {
+            case 'started':
+              setProcessingLog(prev => [
+                ...prev,
+                `🚀 Processing ${message.total} ASINs in parallel...`
+              ]);
+              break;
+              
+            case 'item':
+              // Update preview items with completed item
+              setPreviewItems(prev => {
+                const updated = [...prev];
+                const index = updated.findIndex(i => i.asin === message.item.asin);
                 if (index !== -1) {
-                  updated[index] = item;
+                  updated[index] = message.item;
                 }
+                return updated;
               });
-              return updated;
-            });
-            
-            completedCount += result.batchAsins.length;
-            setBulkProgress({ current: completedCount, total: asins.length });
-            
-            const batchDuration = ((Date.now() - startTime) / 1000).toFixed(1);
-            
-            setProcessingLog(prev => [
-              ...prev,
-              `✅ Batch ${result.batchNum}/${batches.length} complete (${result.items.length} ASINs, ${batchDuration}s)`
-            ]);
-          } else {
-            setProcessingLog(prev => [
-              ...prev,
-              `❌ Batch ${result.batchNum}/${batches.length} failed: ${result.error}`
-            ]);
+              
+              // Update progress
+              setBulkProgress({ current: message.progress, total: message.total });
+              
+              const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
+              const statusIcon = message.item.status === 'success' ? '✅' : 
+                                 message.item.status === 'error' ? '❌' : 
+                                 message.item.status === 'blocked' ? '🚫' : '⚠️';
+              
+              setProcessingLog(prev => [
+                ...prev,
+                `${statusIcon} ${message.item.asin} (${message.progress}/${message.total}, ${elapsedTime}s)`
+              ]);
+              break;
+              
+            case 'complete':
+              const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+              setProcessingLog(prev => [
+                ...prev,
+                `✨ All ${message.total} ASINs processed in ${totalTime}s`
+              ]);
+              break;
+              
+            case 'error':
+              setProcessingLog(prev => [
+                ...prev,
+                `❌ Stream error: ${message.error}`
+              ]);
+              setError(message.error);
+              break;
           }
-        });
-      }
-      
-      // Wait for all batches to complete
-      const allResults = await Promise.allSettled(batchPromises);
-      
-      let allPreviewItems = [];
-      allResults.forEach(result => {
-        if (result.status === 'fulfilled' && result.value.success) {
-          allPreviewItems = [...allPreviewItems, ...result.value.items];
+        } catch (parseError) {
+          console.error('Error parsing SSE message:', parseError);
         }
-      });
+      };
       
-      const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
-      setBulkProgress({ current: asins.length, total: asins.length });
+      eventSource.onerror = (error) => {
+        console.error('SSE connection error:', error);
+        eventSource.close();
+        setLoadingBulk(false);
+        setProcessingLog(prev => [
+          ...prev,
+          `❌ Connection error - stream interrupted`
+        ]);
+        setError('Connection lost. Some items may not have loaded.');
+      };
       
-      // Calculate final totals
-      const successful = allPreviewItems.filter(item => item.status !== 'error').length;
-      const failed = allPreviewItems.filter(item => item.status === 'error').length;
-      const warnings = allPreviewItems.filter(item => item.status === 'warning').length;
-      
-      setPreviewItems(allPreviewItems);
-      setProcessingLog(prev => [
-        ...prev,
-        `🎉 All batches complete! ${successful} successful, ${failed} failed, ${warnings} warnings (${totalDuration}s total)`
-      ]);
-      
-      setAsinSuccess(`Preview generated for ${successful} listing(s). Review and save.`);
+      // Store event source for cleanup
+      window._currentEventSource = eventSource;
       
     } catch (err) {
       setAsinError(err.response?.data?.error || 'Failed to process bulk ASINs');
       console.error(err);
     } finally {
-      setLoadingBulk(false);
+      // Note: setLoadingBulk(false) is handled by SSE events
     }
   };
 
@@ -2193,8 +2184,14 @@ export default function TemplateListingsPage() {
       <AsinReviewModal
         open={reviewModal}
         onClose={() => {
+          // Clean up EventSource if still active
+          if (window._currentEventSource) {
+            window._currentEventSource.close();
+            window._currentEventSource = null;
+          }
           setReviewModal(false);
           setPreviewItems([]);
+          setLoadingBulk(false);
         }}
         previewItems={previewItems}
         onSave={handleSaveFromReview}
