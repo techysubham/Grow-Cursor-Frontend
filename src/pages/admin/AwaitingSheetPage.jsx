@@ -100,6 +100,12 @@ export default function AwaitingSheetPage() {
                             sx={{ fontWeight: 'bold' }}
                         />
                         <Chip
+                            label={`Already in use: ${data.totals?.alreadyInUse || 0}`}
+                            color="error"
+                            variant="outlined"
+                            sx={{ fontWeight: 'bold' }}
+                        />
+                        <Chip
                             label={`Sellers: ${data.totalSellers}`}
                             color="default"
                             variant="outlined"
@@ -143,6 +149,9 @@ export default function AwaitingSheetPage() {
                                 </TableCell>
                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
                                     In-transit
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
+                                    Already in use
                                 </TableCell>
                             </TableRow>
                         </TableHead>
@@ -196,6 +205,15 @@ export default function AwaitingSheetPage() {
                                             color={row.inTransitCount > 0 ? 'info' : 'default'}
                                             size="small"
                                             variant={row.inTransitCount > 0 ? 'filled' : 'outlined'}
+                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
+                                        />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Chip
+                                            label={row.alreadyInUseCount}
+                                            color={row.alreadyInUseCount > 0 ? 'error' : 'default'}
+                                            size="small"
+                                            variant={row.alreadyInUseCount > 0 ? 'filled' : 'outlined'}
                                             sx={{ fontWeight: 'bold', minWidth: 40 }}
                                         />
                                     </TableCell>

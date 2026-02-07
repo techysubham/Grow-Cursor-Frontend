@@ -70,7 +70,8 @@ const ALL_COLUMNS = [
   { id: 'cardName', label: 'Card Name' },
   { id: 'notes', label: 'Notes' },
   { id: 'messagingStatus', label: 'Messaging' },
-  { id: 'remark', label: 'Remark' }
+  { id: 'remark', label: 'Remark' },
+  { id: 'alreadyInUse', label: 'Already in use' }
 ];
 
 // ... (Rest of the file remains unchanged until ManualTrackingCell)
@@ -749,6 +750,29 @@ export default function AwaitingShipmentPage() {
         return order.cancelState && order.cancelState !== 'NONE_REQUESTED' ? (
           <Chip label={order.cancelState} size="small" color={order.cancelState === 'CANCELED' ? 'error' : 'warning'} />
         ) : '-';
+      case 'alreadyInUse':
+        return (
+          <FormControl size="small" sx={{ minWidth: 70 }}>
+            <Select
+              value={order.alreadyInUse || 'No'}
+              onChange={async (e) => {
+                const newValue = e.target.value;
+                try {
+                  await api.patch(`/ebay/orders/${order._id}/manual-fields`, { alreadyInUse: newValue });
+                  setOrders(prev => prev.map(o => o._id === order._id ? { ...o, alreadyInUse: newValue } : o));
+                  showSnack('success', 'Updated!');
+                } catch (err) {
+                  showSnack('error', 'Failed to update');
+                }
+              }}
+              size="small"
+              sx={{ fontSize: '0.75rem' }}
+            >
+              <MenuItem value="Yes">Yes</MenuItem>
+              <MenuItem value="No">No</MenuItem>
+            </Select>
+          </FormControl>
+        );
 
       // Default fallback
       default:
