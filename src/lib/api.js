@@ -18,6 +18,10 @@ export function setAuthToken(token) {
   }
 }
 
+export function getAuthToken() {
+  return currentToken;
+}
+
 // Add response interceptor to handle 401 errors globally
 api.interceptors.response.use(
   (response) => response,
