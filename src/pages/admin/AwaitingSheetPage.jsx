@@ -41,6 +41,7 @@ const getCellBg = (value, type) => {
     if (type === 'trackingLeft') return value > 0 ? '#fff3e0' : 'transparent'; // orange if pending
     if (type === 'delivered') return value > 0 ? '#c8e6c9' : 'transparent'; // green
     if (type === 'inTransit') return value > 0 ? '#e3f2fd' : 'transparent'; // blue
+    if (type === 'notYetShipped') return value > 0 ? '#fff8e1' : 'transparent'; // light yellow
     if (type === 'alreadyInUse') return value > 0 ? '#ffebee' : 'transparent'; // red
     return 'transparent';
 };
@@ -101,6 +102,7 @@ export default function AwaitingSheetPage() {
                         <Typography variant="body2"><strong>Uploaded:</strong> {(data.totals?.uploadTracking || 0) - (data.totals?.trackingId || 0)}</Typography>
                         <Typography variant="body2"><strong>Delivered:</strong> {data.totals?.delivered || 0}</Typography>
                         <Typography variant="body2"><strong>In-transit:</strong> {data.totals?.inTransit || 0}</Typography>
+                        <Typography variant="body2"><strong>Not Yet Shipped:</strong> {data.totals?.notYetShipped || 0}</Typography>
                         <Typography variant="body2"><strong>Already in use:</strong> {data.totals?.alreadyInUse || 0}</Typography>
                         <Typography variant="body2"><strong>Amazon:</strong> {data.totals?.amazon || 0}</Typography>
                         <Typography variant="body2"><strong>UPS/USPS:</strong> {data.totals?.upsUsps || 0}</Typography>
@@ -132,6 +134,7 @@ export default function AwaitingSheetPage() {
                                 <TableCell sx={headerStyle} align="center">Tracking ID Uploaded</TableCell>
                                 <TableCell sx={headerStyle} align="center">Delivered</TableCell>
                                 <TableCell sx={headerStyle} align="center">In-transit</TableCell>
+                                <TableCell sx={headerStyle} align="center">Not Yet Shipped</TableCell>
                                 <TableCell sx={headerStyle} align="center">Already in use</TableCell>
                                 <TableCell sx={headerStyle} align="center">Amazon</TableCell>
                                 <TableCell sx={headerStyle} align="center">UPS/USPS</TableCell>
@@ -156,6 +159,9 @@ export default function AwaitingSheetPage() {
                                         </TableCell>
                                         <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.inTransitCount, 'inTransit') }} align="center">
                                             {row.inTransitCount}
+                                        </TableCell>
+                                        <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.notYetShippedCount, 'notYetShipped') }} align="center">
+                                            {row.notYetShippedCount}
                                         </TableCell>
                                         <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.alreadyInUseCount, 'alreadyInUse') }} align="center">
                                             {row.alreadyInUseCount}
