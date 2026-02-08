@@ -12,14 +12,41 @@ import {
     TableRow,
     CircularProgress,
     Alert,
-    Chip,
     Stack
 } from '@mui/material';
 import api from '../../lib/api';
 
+// Common cell style for spreadsheet look
+const cellStyle = {
+    border: '1px solid #e0e0e0',
+    padding: '8px 12px',
+    fontWeight: 500,
+    fontSize: '0.875rem'
+};
+
+const headerStyle = {
+    ...cellStyle,
+    backgroundColor: '#1976d2',
+    color: 'white',
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap'
+};
+
+// Helper function to get cell background color based on value and type
+const getCellBg = (value, type) => {
+    if (type === 'amazon') return value > 0 ? '#fff3e0' : 'transparent'; // light orange
+    if (type === 'upsUsps') return value > 0 ? '#e3f2fd' : 'transparent'; // light blue
+    if (type === 'blank') return value > 0 ? '#ffebee' : '#e8f5e9'; // light red or light green
+    if (type === 'status') return value ? '#c8e6c9' : 'transparent'; // green for done
+    if (type === 'trackingLeft') return value > 0 ? '#fff3e0' : 'transparent'; // orange if pending
+    if (type === 'delivered') return value > 0 ? '#c8e6c9' : 'transparent'; // green
+    if (type === 'inTransit') return value > 0 ? '#e3f2fd' : 'transparent'; // blue
+    if (type === 'alreadyInUse') return value > 0 ? '#ffebee' : 'transparent'; // red
+    return 'transparent';
+};
+
 export default function AwaitingSheetPage() {
     const [date, setDate] = useState(() => {
-        // Default to today in YYYY-MM-DD format
         const today = new Date();
         return today.toISOString().split('T')[0];
     });
@@ -68,66 +95,17 @@ export default function AwaitingSheetPage() {
                 </Stack>
 
                 {data && (
-                    <Stack direction="row" spacing={2} sx={{ mt: 2 }} flexWrap="wrap" useFlexGap>
-                        <Chip
-                            label={`Upload Tracking: ${data.totals?.uploadTracking || 0}`}
-                            color="primary"
-                            variant="outlined"
-                            sx={{ fontWeight: 'bold' }}
-                        />
-                        <Chip
-                            label={`Tracking Left: ${data.totals?.trackingId || 0}`}
-                            color="warning"
-                            variant="outlined"
-                            sx={{ fontWeight: 'bold' }}
-                        />
-                        <Chip
-                            label={`Tracking ID Uploaded: ${(data.totals?.uploadTracking || 0) - (data.totals?.trackingId || 0)}`}
-                            color="secondary"
-                            variant="outlined"
-                            sx={{ fontWeight: 'bold' }}
-                        />
-                        <Chip
-                            label={`Delivered: ${data.totals?.delivered || 0}`}
-                            color="success"
-                            variant="outlined"
-                            sx={{ fontWeight: 'bold' }}
-                        />
-                        <Chip
-                            label={`In-transit: ${data.totals?.inTransit || 0}`}
-                            color="info"
-                            variant="outlined"
-                            sx={{ fontWeight: 'bold' }}
-                        />
-                        <Chip
-                            label={`Already in use: ${data.totals?.alreadyInUse || 0}`}
-                            color="error"
-                            variant="outlined"
-                            sx={{ fontWeight: 'bold' }}
-                        />
-                        <Chip
-                            label={`Amazon: ${data.totals?.amazon || 0}`}
-                            color="warning"
-                            variant="outlined"
-                            sx={{ fontWeight: 'bold' }}
-                        />
-                        <Chip
-                            label={`UPS/USPS: ${data.totals?.upsUsps || 0}`}
-                            color="info"
-                            variant="outlined"
-                            sx={{ fontWeight: 'bold' }}
-                        />
-                        <Chip
-                            label={`Blank: ${data.totals?.blank || 0}`}
-                            color="default"
-                            variant="outlined"
-                            sx={{ fontWeight: 'bold' }}
-                        />
-                        <Chip
-                            label={`Sellers: ${data.totalSellers}`}
-                            color="default"
-                            variant="outlined"
-                        />
+                    <Stack direction="row" spacing={3} sx={{ mt: 2 }} flexWrap="wrap" useFlexGap>
+                        <Typography variant="body2"><strong>Upload Tracking:</strong> {data.totals?.uploadTracking || 0}</Typography>
+                        <Typography variant="body2"><strong>Tracking Left:</strong> {data.totals?.trackingId || 0}</Typography>
+                        <Typography variant="body2"><strong>Uploaded:</strong> {(data.totals?.uploadTracking || 0) - (data.totals?.trackingId || 0)}</Typography>
+                        <Typography variant="body2"><strong>Delivered:</strong> {data.totals?.delivered || 0}</Typography>
+                        <Typography variant="body2"><strong>In-transit:</strong> {data.totals?.inTransit || 0}</Typography>
+                        <Typography variant="body2"><strong>Already in use:</strong> {data.totals?.alreadyInUse || 0}</Typography>
+                        <Typography variant="body2"><strong>Amazon:</strong> {data.totals?.amazon || 0}</Typography>
+                        <Typography variant="body2"><strong>UPS/USPS:</strong> {data.totals?.upsUsps || 0}</Typography>
+                        <Typography variant="body2"><strong>Blank:</strong> {data.totals?.blank || 0}</Typography>
+                        <Typography variant="body2"><strong>Sellers:</strong> {data.totalSellers}</Typography>
                     </Stack>
                 )}
             </Paper>
@@ -143,148 +121,60 @@ export default function AwaitingSheetPage() {
                     <CircularProgress />
                 </Box>
             ) : data && data.summary.length > 0 ? (
-                <TableContainer component={Paper}>
-                    <Table size="small">
+                <TableContainer component={Paper} sx={{ border: '1px solid #e0e0e0' }}>
+                    <Table size="small" sx={{ borderCollapse: 'collapse' }}>
                         <TableHead>
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }}>
-                                    #
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }}>
-                                    Store Name
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    Upload Tracking
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    Tracking Left
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    Tracking ID Uploaded
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    Delivered
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    In-transit
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    Already in use
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    Amazon
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    UPS/USPS
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    Blank
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
-                                    Status
-                                </TableCell>
+                                <TableCell sx={headerStyle} align="center">#</TableCell>
+                                <TableCell sx={headerStyle}>Store Name</TableCell>
+                                <TableCell sx={headerStyle} align="center">Upload Tracking</TableCell>
+                                <TableCell sx={headerStyle} align="center">Tracking Left</TableCell>
+                                <TableCell sx={headerStyle} align="center">Tracking ID Uploaded</TableCell>
+                                <TableCell sx={headerStyle} align="center">Delivered</TableCell>
+                                <TableCell sx={headerStyle} align="center">In-transit</TableCell>
+                                <TableCell sx={headerStyle} align="center">Already in use</TableCell>
+                                <TableCell sx={headerStyle} align="center">Amazon</TableCell>
+                                <TableCell sx={headerStyle} align="center">UPS/USPS</TableCell>
+                                <TableCell sx={headerStyle} align="center">Blank</TableCell>
+                                <TableCell sx={headerStyle} align="center">Status</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {data.summary.map((row, index) => (
-                                <TableRow key={row.sellerId} hover>
-                                    <TableCell>{index + 1}</TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight="medium">
-                                            {row.sellerName}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.uploadTrackingCount}
-                                            color="primary"
-                                            size="small"
-                                            variant="outlined"
-                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.trackingIdCount}
-                                            color={row.trackingIdCount > 10 ? 'error' : row.trackingIdCount > 5 ? 'warning' : 'default'}
-                                            size="small"
-                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.uploadTrackingCount - row.trackingIdCount}
-                                            color="secondary"
-                                            size="small"
-                                            variant="outlined"
-                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.deliveredCount}
-                                            color={row.deliveredCount > 0 ? 'success' : 'default'}
-                                            size="small"
-                                            variant={row.deliveredCount > 0 ? 'filled' : 'outlined'}
-                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.inTransitCount}
-                                            color={row.inTransitCount > 0 ? 'info' : 'default'}
-                                            size="small"
-                                            variant={row.inTransitCount > 0 ? 'filled' : 'outlined'}
-                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.alreadyInUseCount}
-                                            color={row.alreadyInUseCount > 0 ? 'error' : 'default'}
-                                            size="small"
-                                            variant={row.alreadyInUseCount > 0 ? 'filled' : 'outlined'}
-                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.amazonCount}
-                                            color={row.amazonCount > 0 ? 'warning' : 'default'}
-                                            size="small"
-                                            variant={row.amazonCount > 0 ? 'filled' : 'outlined'}
-                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.upsUspsCount}
-                                            color={row.upsUspsCount > 0 ? 'info' : 'default'}
-                                            size="small"
-                                            variant={row.upsUspsCount > 0 ? 'filled' : 'outlined'}
-                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.blankCount}
-                                            color={row.blankCount > 0 ? 'default' : 'default'}
-                                            size="small"
-                                            variant="outlined"
-                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip
-                                            label={row.blankCount === 0 && row.trackingIdCount > 0 ? 'Done' : ''}
-                                            color={row.blankCount === 0 && row.trackingIdCount > 0 ? 'success' : 'default'}
-                                            size="small"
-                                            variant={row.blankCount === 0 && row.trackingIdCount > 0 ? 'filled' : 'outlined'}
-                                            sx={{ fontWeight: 'bold', minWidth: 50 }}
-                                        />
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            {data.summary.map((row, index) => {
+                                const isDone = row.blankCount === 0 && row.trackingIdCount > 0;
+                                return (
+                                    <TableRow key={row.sellerId} sx={{ '&:nth-of-type(even)': { backgroundColor: '#fafafa' } }}>
+                                        <TableCell sx={cellStyle} align="center">{index + 1}</TableCell>
+                                        <TableCell sx={{ ...cellStyle, fontWeight: 600 }}>{row.sellerName}</TableCell>
+                                        <TableCell sx={cellStyle} align="center">{row.uploadTrackingCount}</TableCell>
+                                        <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.trackingIdCount, 'trackingLeft') }} align="center">
+                                            {row.trackingIdCount}
+                                        </TableCell>
+                                        <TableCell sx={cellStyle} align="center">{row.uploadTrackingCount - row.trackingIdCount}</TableCell>
+                                        <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.deliveredCount, 'delivered') }} align="center">
+                                            {row.deliveredCount}
+                                        </TableCell>
+                                        <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.inTransitCount, 'inTransit') }} align="center">
+                                            {row.inTransitCount}
+                                        </TableCell>
+                                        <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.alreadyInUseCount, 'alreadyInUse') }} align="center">
+                                            {row.alreadyInUseCount}
+                                        </TableCell>
+                                        <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.amazonCount, 'amazon') }} align="center">
+                                            {row.amazonCount}
+                                        </TableCell>
+                                        <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.upsUspsCount, 'upsUsps') }} align="center">
+                                            {row.upsUspsCount}
+                                        </TableCell>
+                                        <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(row.blankCount, 'blank') }} align="center">
+                                            {row.blankCount}
+                                        </TableCell>
+                                        <TableCell sx={{ ...cellStyle, backgroundColor: getCellBg(isDone, 'status'), color: isDone ? '#2e7d32' : 'inherit', fontWeight: isDone ? 'bold' : 'normal' }} align="center">
+                                            {isDone ? 'Done' : ''}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </TableContainer>
