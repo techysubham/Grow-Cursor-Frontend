@@ -106,6 +106,24 @@ export default function AwaitingSheetPage() {
                             sx={{ fontWeight: 'bold' }}
                         />
                         <Chip
+                            label={`Amazon: ${data.totals?.amazon || 0}`}
+                            color="warning"
+                            variant="outlined"
+                            sx={{ fontWeight: 'bold' }}
+                        />
+                        <Chip
+                            label={`UPS/USPS: ${data.totals?.upsUsps || 0}`}
+                            color="info"
+                            variant="outlined"
+                            sx={{ fontWeight: 'bold' }}
+                        />
+                        <Chip
+                            label={`Blank: ${data.totals?.blank || 0}`}
+                            color="default"
+                            variant="outlined"
+                            sx={{ fontWeight: 'bold' }}
+                        />
+                        <Chip
                             label={`Sellers: ${data.totalSellers}`}
                             color="default"
                             variant="outlined"
@@ -152,6 +170,18 @@ export default function AwaitingSheetPage() {
                                 </TableCell>
                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
                                     Already in use
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
+                                    Amazon
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
+                                    UPS/USPS
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
+                                    Blank
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.main', color: 'white' }} align="center">
+                                    Status
                                 </TableCell>
                             </TableRow>
                         </TableHead>
@@ -215,6 +245,42 @@ export default function AwaitingSheetPage() {
                                             size="small"
                                             variant={row.alreadyInUseCount > 0 ? 'filled' : 'outlined'}
                                             sx={{ fontWeight: 'bold', minWidth: 40 }}
+                                        />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Chip
+                                            label={row.amazonCount}
+                                            color={row.amazonCount > 0 ? 'warning' : 'default'}
+                                            size="small"
+                                            variant={row.amazonCount > 0 ? 'filled' : 'outlined'}
+                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
+                                        />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Chip
+                                            label={row.upsUspsCount}
+                                            color={row.upsUspsCount > 0 ? 'info' : 'default'}
+                                            size="small"
+                                            variant={row.upsUspsCount > 0 ? 'filled' : 'outlined'}
+                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
+                                        />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Chip
+                                            label={row.blankCount}
+                                            color={row.blankCount > 0 ? 'default' : 'default'}
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ fontWeight: 'bold', minWidth: 40 }}
+                                        />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Chip
+                                            label={row.blankCount === 0 && row.trackingIdCount > 0 ? 'Done' : ''}
+                                            color={row.blankCount === 0 && row.trackingIdCount > 0 ? 'success' : 'default'}
+                                            size="small"
+                                            variant={row.blankCount === 0 && row.trackingIdCount > 0 ? 'filled' : 'outlined'}
+                                            sx={{ fontWeight: 'bold', minWidth: 50 }}
                                         />
                                     </TableCell>
                                 </TableRow>
