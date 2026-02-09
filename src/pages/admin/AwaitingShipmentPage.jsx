@@ -421,6 +421,7 @@ export default function AwaitingShipmentPage() {
   const [searchOrderId, setSearchOrderId] = useState('');
   const [searchBuyerName, setSearchBuyerName] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState('');
+  const [shipByDate, setShipByDate] = useState('');
 
   const [visibleColumns, setVisibleColumns] = useState([
     'seller', 'orderId', 'marketplace', 'dateSold', 'shipBy', 'productName', 'buyerName', 'shippingAddress', 'trackingNumber', 'notes'
@@ -476,7 +477,7 @@ export default function AwaitingShipmentPage() {
   useEffect(() => {
     fetchAwaitingOrders();
     // eslint-disable-next-line
-  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace]);
+  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace, shipByDate]);
 
   // Handlers
   const handleSellerChange = (e) => {
@@ -491,6 +492,7 @@ export default function AwaitingShipmentPage() {
     setDebouncedBuyerName('');
     setSelectedSeller('');
     setSearchMarketplace('');
+    setShipByDate('');
     setPage(1);
   };
 
@@ -509,6 +511,7 @@ export default function AwaitingShipmentPage() {
       if (debouncedBuyerName) params.searchBuyerName = debouncedBuyerName;
       if (selectedSeller) params.sellerId = selectedSeller;
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
+      if (shipByDate) params.shipByDate = shipByDate;
 
       // SMART CHECK: If params haven't changed since last fetch, STOP.
       const paramsString = JSON.stringify(params);
@@ -859,6 +862,20 @@ export default function AwaitingShipmentPage() {
                 <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
               </Select>
             </FormControl>
+
+            {/* 5. SHIP BY DATE FILTER */}
+            <TextField
+              type="date"
+              size="small"
+              label="Ship By Date"
+              value={shipByDate}
+              onChange={(e) => {
+                setShipByDate(e.target.value);
+                setPage(1);
+              }}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 160 }}
+            />
 
             <Button variant="outlined" onClick={handleClearFilters} size="small">Clear</Button>
 
