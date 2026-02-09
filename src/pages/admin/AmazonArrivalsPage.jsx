@@ -29,6 +29,9 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 import api from '../../lib/api';
 
 export default function AmazonArrivalsPage() {
@@ -52,6 +55,10 @@ export default function AmazonArrivalsPage() {
   const [searchMarketplace, setSearchMarketplace] = useState('');
   const [amazonAccounts, setAmazonAccounts] = useState([]);
   const [selectedAmazonAccount, setSelectedAmazonAccount] = useState('');
+  const [arrivalDateFrom, setArrivalDateFrom] = useState('');
+  const [arrivalDateTo, setArrivalDateTo] = useState('');
+  const [editingArrivalDate, setEditingArrivalDate] = useState({}); // { [orderId]: 'YYYY-MM-DD' }
+  const [savingArrivalDateId, setSavingArrivalDateId] = useState(null);
 
   // Debounced Values
   const [debouncedOrderId, setDebouncedOrderId] = useState('');
@@ -92,13 +99,13 @@ export default function AmazonArrivalsPage() {
   // 3. Reset to Page 1 when filters or sort change
   useEffect(() => {
     setPage(1);
-  }, [selectedSeller, debouncedOrderId, searchMarketplace, selectedAmazonAccount, arrivalSort]);
+  }, [selectedSeller, debouncedOrderId, searchMarketplace, selectedAmazonAccount, arrivalSort, arrivalDateFrom, arrivalDateTo]);
 
   // 4. Fetch Orders
   useEffect(() => {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, selectedSeller, debouncedOrderId, searchMarketplace, selectedAmazonAccount, arrivalSort]);
+  }, [page, selectedSeller, debouncedOrderId, searchMarketplace, selectedAmazonAccount, arrivalSort, arrivalDateFrom, arrivalDateTo]);
 
   async function fetchOrders() {
     try {
@@ -114,6 +121,8 @@ export default function AmazonArrivalsPage() {
       if (selectedSeller) params.sellerId = selectedSeller;
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (selectedAmazonAccount) params.amazonAccount = selectedAmazonAccount;
+      if (arrivalDateFrom) params.arrivalStartDate = arrivalDateFrom;
+      if (arrivalDateTo) params.arrivalEndDate = arrivalDateTo;
 
       // SMART CHECK: If params haven't changed since last fetch, STOP.
       const paramsString = JSON.stringify(params);
@@ -186,6 +195,44 @@ export default function AmazonArrivalsPage() {
     }
   };
 
+  const startEditArrivalDate = (orderId, currentDate) => {
+    setEditingArrivalDate(prev => ({ ...prev, [orderId]: (currentDate || '').slice(0, 10) }));
+  };
+
+  const cancelEditArrivalDate = (orderId) => {
+    setEditingArrivalDate(prev => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
+  };
+
+  const saveArrivalDate = async (order) => {
+    const nextDate = editingArrivalDate[order._id];
+    const currentDate = (order.arrivingDate || '').slice(0, 10);
+    if (!nextDate || nextDate === currentDate) {
+      cancelEditArrivalDate(order._id);
+      return;
+    }
+
+    try {
+      setSavingArrivalDateId(order._id);
+      const { data } = await api.patch(`/ebay/orders/${order._id}/manual-fields`, {
+        arrivingDate: nextDate
+      });
+      const updatedOrder = data?.order;
+      setOrders(prev =>
+        prev.map(o => (o._id === order._id ? { ...o, arrivingDate: updatedOrder?.arrivingDate || nextDate } : o))
+      );
+      cancelEditArrivalDate(order._id);
+      showSnack('success', '✅ Arrival date updated');
+    } catch (err) {
+      showSnack('error', err?.response?.data?.error || 'Failed to update arrival date');
+    } finally {
+      setSavingArrivalDateId(null);
+    }
+  };
+
   const formatArrivingDate = (dateStr) => {
     if (!dateStr || !/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return '-';
     try {
@@ -248,6 +295,26 @@ export default function AmazonArrivalsPage() {
               ))}
             </Select>
           </FormControl>
+
+          <TextField
+            type="date"
+            size="small"
+            label="Arrival From"
+            value={arrivalDateFrom}
+            onChange={(e) => setArrivalDateFrom(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ minWidth: { xs: '100%', sm: 170 } }}
+          />
+
+          <TextField
+            type="date"
+            size="small"
+            label="Arrival To"
+            value={arrivalDateTo}
+            onChange={(e) => setArrivalDateTo(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ minWidth: { xs: '100%', sm: 170 } }}
+          />
 
           <TextField
             size="small"
@@ -408,12 +475,54 @@ export default function AmazonArrivalsPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={formatArrivingDate(order.arrivingDate)}
-                        size="small"
-                        color={getDateColor(order.arrivingDate)}
-                        sx={{ fontWeight: 600 }}
-                      />
+                      {editingArrivalDate[order._id] !== undefined ? (
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <TextField
+                            type="date"
+                            size="small"
+                            value={editingArrivalDate[order._id]}
+                            onChange={(e) =>
+                              setEditingArrivalDate(prev => ({ ...prev, [order._id]: e.target.value }))
+                            }
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ minWidth: 145 }}
+                          />
+                          <IconButton
+                            size="small"
+                            color="success"
+                            disabled={savingArrivalDateId === order._id}
+                            onClick={() => saveArrivalDate(order)}
+                          >
+                            <CheckIcon sx={{ fontSize: '1rem' }} />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="inherit"
+                            disabled={savingArrivalDateId === order._id}
+                            onClick={() => cancelEditArrivalDate(order._id)}
+                          >
+                            <CloseIcon sx={{ fontSize: '1rem' }} />
+                          </IconButton>
+                        </Stack>
+                      ) : (
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Chip
+                            label={formatArrivingDate(order.arrivingDate)}
+                            size="small"
+                            color={getDateColor(order.arrivingDate)}
+                            sx={{ fontWeight: 600 }}
+                          />
+                          <Tooltip title="Edit arrival date">
+                            <IconButton
+                              size="small"
+                              onClick={() => startEditArrivalDate(order._id, order.arrivingDate)}
+                              sx={{ p: 0.5 }}
+                            >
+                              <EditIcon sx={{ fontSize: '0.95rem' }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      )}
                     </TableCell>
                     <TableCell>
                       {order.amazonAccount || '-'}
