@@ -87,21 +87,28 @@ export default function AccountHealthReportPage() {
     async function fetchSellers() {
       try {
         const res = await api.get('/sellers/all');
-        setSellers(res.data || []);
+        const sellerList = res.data || [];
+        setSellers(sellerList);
+        if (!sellerFilter && sellerList.length > 0) {
+          setSellerFilter(sellerList[0]._id);
+        }
       } catch (e) {
         console.error('Failed to fetch sellers:', e);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchSellers();
   }, []);
 
   // Load SNAD details
   useEffect(() => {
+    if (!sellerFilter) return;
     loadDetails();
   }, [sellerFilter, dateFilter]);
 
   // Load evaluation windows
   useEffect(() => {
+    if (!sellerFilter) return;
     loadEvaluationWindows();
   }, [sellerFilter]);
 
@@ -176,11 +183,11 @@ export default function AccountHealthReportPage() {
   }
 
   // Market Avg Editing
-  const [editingMarketAvg, setEditingMarketAvg] = useState(null); // { idx, value }
+  const [editingMarketAvg, setEditingMarketAvg] = useState(null); // { key, value }
   const [savingMarketAvg, setSavingMarketAvg] = useState(false);
 
-  async function handleUpdateMarketAvg(idx, effectiveDate) {
-    if (!editingMarketAvg || editingMarketAvg.idx !== idx) return;
+  async function handleUpdateMarketAvg(rowKey, effectiveDate, sellerId) {
+    if (!editingMarketAvg || editingMarketAvg.key !== rowKey) return;
     
     // Don't save if value hasn't changed (optional optimization, but user logic says "new avg used going forward")
     // Use parseFloat to compare
@@ -189,7 +196,8 @@ export default function AccountHealthReportPage() {
     try {
       await api.post('/account-health/evaluation-windows/market-avg', {
         value: editingMarketAvg.value,
-        effectiveDate: effectiveDate // This window's end date is the effective date for 'going forward' logic
+        effectiveDate: effectiveDate, // This window's end date is the effective date for 'going forward' logic
+        sellerId: sellerId || sellerFilter
       });
       
       setSnackbarMsg('Market Average updated successfully');
@@ -207,7 +215,9 @@ export default function AccountHealthReportPage() {
   }
 
   const handleClearFilters = () => {
-    setSellerFilter('');
+    if (sellers.length > 0) {
+      setSellerFilter(sellers[0]._id);
+    }
     setDateFilter({ mode: 'all', from: '', to: '' });
   };
 
@@ -249,7 +259,21 @@ export default function AccountHealthReportPage() {
     }
   };
 
-  const hasActiveFilters = sellerFilter || dateFilter.mode !== 'all';
+  const getDisplayWindowEnd = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() - 1);
+    return d.toISOString();
+  };
+
+  const getDisplayWindowStart = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString();
+  };
+
+  const hasActiveFilters = dateFilter.mode !== 'all' || (sellers.length > 0 && sellerFilter !== sellers[0]._id);
 
   // CSV Export for SNAD Details
   const handleExportDetails = () => {
@@ -269,7 +293,7 @@ export default function AccountHealthReportPage() {
   // CSV Export for Evaluation Windows
   const handleExportWindows = () => {
     const csvData = prepareCSVData(windows, {
-      'Evaluation Window': (w) => `${formatWindowDate(w.evaluationWindowStart)} - ${formatWindowDate(w.evaluationWindowEnd)}`,
+      'Evaluation Window': (w) => `${formatWindowDate(getDisplayWindowStart(w.evaluationWindowStart))} - ${formatWindowDate(getDisplayWindowEnd(w.evaluationWindowEnd))}`,
       'Total Sales': 'totalSales',
       'BBE Rate (%)': 'bbeRate',
       'Market Avg': 'marketAvg',
@@ -401,7 +425,6 @@ export default function AccountHealthReportPage() {
               onChange={(e) => setSellerFilter(e.target.value)}
               label="Seller"
             >
-              <MenuItem value="">All Sellers</MenuItem>
               {sellers.map((s) => (
                 <MenuItem key={s._id} value={s._id}>
                   {s.user?.username || s._id}
@@ -748,11 +771,20 @@ export default function AccountHealthReportPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  windowsWithStatus.map((w, idx) => (
-                    <TableRow key={idx} hover>
+                  windowsWithStatus.map((w, idx) => {
+                    const rowKey = `${w.sellerId || w.seller?._id || 'unknown'}-${w.evaluationWindowEnd || w.windowEnd || idx}`;
+                    // Show next evaluation cycle date (current row date + 7 days).
+                    const nextEvaluationDate = (() => {
+                      if (!w.evaluationDate) return null;
+                      const d = new Date(w.evaluationDate);
+                      d.setDate(d.getDate() + 7);
+                      return d.toISOString();
+                    })();
+                    return (
+                    <TableRow key={rowKey} hover>
                       <TableCell>
                         <Typography variant="body2">
-                          {formatWindowDate(w.evaluationWindowStart)} - {formatWindowDate(w.evaluationWindowEnd)}
+                          {formatWindowDate(getDisplayWindowStart(w.evaluationWindowStart))} - {formatWindowDate(getDisplayWindowEnd(w.evaluationWindowEnd))}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -769,21 +801,21 @@ export default function AccountHealthReportPage() {
                           {w.bbeRate}%
                         </Typography>
                       </TableCell>
-                      <TableCell 
-                        onClick={() => setEditingMarketAvg({ idx, value: w.marketAvg })}
+                      <TableCell
+                        onClick={() => setEditingMarketAvg({ key: rowKey, value: w.marketAvg })}
                         sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#f0f0f0' } }}
                       >
-                        {editingMarketAvg?.idx === idx ? (
+                        {editingMarketAvg?.key === rowKey ? (
                           <TextField
                             autoFocus
                             size="small"
                             type="number"
                             value={editingMarketAvg.value}
                             onChange={(e) => setEditingMarketAvg({ ...editingMarketAvg, value: e.target.value })}
-                            onBlur={() => handleUpdateMarketAvg(idx, w.evaluationWindowEnd || w.windowEnd)}
+                            onBlur={() => handleUpdateMarketAvg(rowKey, w.evaluationWindowEnd || w.windowEnd, w.sellerId || w.seller?._id)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
-                                handleUpdateMarketAvg(idx, w.evaluationWindowEnd || w.windowEnd);
+                                handleUpdateMarketAvg(rowKey, w.evaluationWindowEnd || w.windowEnd, w.sellerId || w.seller?._id);
                               } else if (e.key === 'Escape') {
                                 setEditingMarketAvg(null);
                               }
@@ -811,13 +843,14 @@ export default function AccountHealthReportPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2">{formatDate(w.evaluationDate)}</Typography>
+                        <Typography variant="body2">{formatDate(nextEvaluationDate || w.evaluationDate)}</Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">{w.snadCount}</Typography>
                       </TableCell>
                     </TableRow>
-                  ))
+                  );
+                  })
                 )}
               </TableBody>
             </Table>

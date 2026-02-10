@@ -3,7 +3,8 @@ import {
   Box, Paper, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Chip, IconButton, Dialog, 
   Stack, TextField, Button, FormControl, InputLabel, Select, MenuItem,
-  CircularProgress, Alert, Grid, InputAdornment, Menu, ListSubheader, Tooltip
+  CircularProgress, Alert, Grid, InputAdornment, Menu, ListSubheader, Tooltip,
+  Divider, Link, useMediaQuery, useTheme
 } from '@mui/material';
 import ChatIcon from '@mui/icons-material/Chat';
 import CloseIcon from '@mui/icons-material/Close';
@@ -12,6 +13,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import PersonIcon from '@mui/icons-material/Person';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../lib/api';
 import { CHAT_TEMPLATES, personalizeTemplate } from '../../constants/chatTemplates';
 import ColumnSelector from '../../components/ColumnSelector';
@@ -19,6 +22,8 @@ import ColumnSelector from '../../components/ColumnSelector';
 
 // --- RESOLUTION MODAL COMPONENT (Unchanged logic, kept for completeness) ---
 function ResolutionDialog({ open, onClose, metaItem, onSave }) {
+  const theme = useTheme();
+  const isMobileChat = useMediaQuery(theme.breakpoints.down('sm'));
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
@@ -108,29 +113,149 @@ function ResolutionDialog({ open, onClose, metaItem, onSave }) {
     handleTemplateClose();
   };
 
+  // Helper to safely extract data from the metaItem object
+  const sellerName = metaItem?.sellerName || 'Seller';
+  const buyerName = metaItem?.buyerName || '-';
+  const buyerUsername = metaItem?.buyerUsername || '-';
+  const itemId = metaItem?.itemId || '';
+  const itemTitle = metaItem?.itemTitle || metaItem?.productName || '';
+  const orderId = metaItem?.orderId || 'N/A';
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xl" fullWidth>
-      <Box sx={{ display: 'flex', height: '80vh' }}>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="xl" 
+      fullWidth
+      fullScreen={isMobileChat}
+    >
+      <Box sx={{ display: 'flex', height: { xs: '100vh', sm: '80vh' }, flexDirection: { xs: 'column', sm: 'row' } }}>
         {/* LEFT: CHAT */}
-        <Box sx={{ width: '60%', borderRight: 1, borderColor: 'divider', display: 'flex', flexDirection: 'column' }}>
-           <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-             <Box>
-               <Typography variant="h6">Chat History</Typography>
-               <Typography variant="caption" color="text.secondary">
-                 {metaItem?.buyerName} ({metaItem?.buyerUsername})
-               </Typography>
-             </Box>
-             <Tooltip title="Choose a response template">
-               <Button
-                 variant="outlined"
-                 size="small"
-                 onClick={handleTemplateClick}
-                 sx={{ bgcolor: 'white', textTransform: 'none' }}
-                 endIcon={<ExpandMoreIcon/>}
+        <Box sx={{ width: { xs: '100%', sm: '60%' }, borderRight: { xs: 0, sm: 1 }, borderBottom: { xs: 1, sm: 0 }, borderColor: 'divider', display: 'flex', flexDirection: 'column' }}>
+           {/* --- HEADER (MATCHING FULFILLMENT DASHBOARD) --- */}
+           <Box sx={{ p: { xs: 1.5, sm: 2 }, borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', position: 'relative' }}>
+             {/* Top Right: Seller Chip & Close & Templates */}
+             <Stack
+               direction="column"
+               spacing={1}
+               alignItems="flex-end"
+               sx={{ position: 'absolute', top: { xs: 8, sm: 12 }, right: { xs: 8, sm: 12 }, zIndex: 10 }}
+             >
+               <Stack direction="row" spacing={0.5} alignItems="center">
+                 {!isMobileChat && (
+                   <Chip
+                     label={sellerName}
+                     size="small"
+                     icon={<PersonIcon style={{ fontSize: 16 }} />}
+                     sx={{
+                       bgcolor: '#e3f2fd',
+                       color: '#1565c0',
+                       fontWeight: 'bold',
+                       height: 24,
+                       fontSize: '0.75rem'
+                     }}
+                   />
+                 )}
+                 <IconButton onClick={onClose} size="small" sx={{ color: 'text.disabled' }}>
+                   <CloseIcon />
+                 </IconButton>
+               </Stack>
+
+               <Tooltip title="Choose a response template">
+                 <Button
+                   variant="outlined"
+                   size="small"
+                   onClick={handleTemplateClick}
+                   disabled={sendingMsg}
+                   sx={{ 
+                     minWidth: { xs: 'auto', sm: 100 },
+                     px: { xs: 1, sm: 2 },
+                     fontSize: { xs: '0.7rem', sm: '0.875rem' },
+                     bgcolor: 'white'
+                   }}
+                   endIcon={<ExpandMoreIcon />}
+                 >
+                   Templates
+                 </Button>
+               </Tooltip>
+             </Stack>
+
+             {/* Main Content: Buyer & Item */}
+             <Stack spacing={1} sx={{ pr: { xs: 6, sm: 12 } }}>
+               {/* 1. Buyer Info */}
+               <Stack 
+                 direction={{ xs: 'column', sm: 'row' }} 
+                 alignItems={{ xs: 'flex-start', sm: 'center' }} 
+                 spacing={{ xs: 0.5, sm: 3 }} 
+                 sx={{ mt: 0.5 }}
                >
-                 Templates
-               </Button>
-             </Tooltip>
+                 <Box>
+                   <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                     Buyer
+                   </Typography>
+                   <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+                     {buyerName}
+                   </Typography>
+                 </Box>
+
+                 {!isMobileChat && (
+                   <Divider orientation="vertical" flexItem sx={{ height: 20, alignSelf: 'center', opacity: 0.5 }} />
+                 )}
+
+                 <Box>
+                   <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                     Username
+                   </Typography>
+                   <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', px: 0.5, borderRadius: 0.5, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                     {buyerUsername}
+                   </Typography>
+                 </Box>
+               </Stack>
+
+               {/* 2. Item Link & Order ID */}
+               <Box>
+                 {itemId && (
+                   <Link
+                     href={`https://www.ebay.com/itm/${itemId}`}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     underline="hover"
+                     sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5 }}
+                   >
+                     <Typography
+                       variant="subtitle2"
+                       sx={{
+                         color: 'primary.main',
+                         fontWeight: 600,
+                         lineHeight: 1.3,
+                         fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                         display: '-webkit-box',
+                         WebkitLineClamp: isMobileChat ? 1 : 2,
+                         WebkitBoxOrient: 'vertical',
+                         overflow: 'hidden'
+                       }}
+                     >
+                       {itemTitle || `Item ID: ${itemId}`}
+                     </Typography>
+                     <OpenInNewIcon sx={{ fontSize: 14, color: 'primary.main', mt: 0.3, flexShrink: 0 }} />
+                   </Link>
+                 )}
+
+                 <Chip
+                   label={`Order: ${orderId}`}
+                   size="small"
+                   variant="outlined"
+                   sx={{
+                     borderRadius: 1,
+                     height: 20,
+                     fontSize: '0.65rem',
+                     color: 'text.secondary',
+                     borderColor: 'divider',
+                     bgcolor: '#fafafa'
+                   }}
+                 />
+               </Box>
+             </Stack>
            </Box>
            <Box sx={{ flex: 1, overflowY: 'auto', p: 2, bgcolor: '#f0f2f5' }}>
              <Stack spacing={2}>
@@ -210,7 +335,7 @@ function ResolutionDialog({ open, onClose, metaItem, onSave }) {
         </Box>
 
         {/* RIGHT: MANAGEMENT */}
-        <Box sx={{ width: '40%', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ width: { xs: '100%', sm: '40%' }, display: 'flex', flexDirection: 'column' }}>
            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between' }}>
              <Typography variant="h6">Manage Case</Typography>
              <IconButton onClick={onClose}><CloseIcon/></IconButton>
