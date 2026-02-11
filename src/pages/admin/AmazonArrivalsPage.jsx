@@ -23,16 +23,133 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ChatIcon from '@mui/icons-material/Chat';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import InfoIcon from '@mui/icons-material/Info';
 import api from '../../lib/api';
+import ChatModal from '../../components/ChatModal';
+
+const REMARK_OPTIONS = [
+  'Delivered',
+  'In-transit',
+  'Processing',
+  'Shipped',
+  'Out for delivery',
+  'Delayed',
+  'Refund',
+  'Not yet shipped'
+];
+
+const REMARK_MESSAGE_TEMPLATES = {
+  'Delivered': `Hello {{buyer_first_name}},
+Thanks for your patience, we hope your package was delivered successfully and in satisfactory condition.
+If there are any issues with your order, please let us know so we can take care of it quickly.
+If you are satisfied, please leave us positive feedback with five stars.
+Thanks again and have a wonderful day.`,
+  'In-transit': `Hi {{buyer_first_name}}, We're pleased to let you know that your order is currently in transit and will be delivered shortly.
+Thank you for your trust and support.`,
+  'Processing': `Hi {{buyer_first_name}},
+We're pleased to inform you that your order has been processed.
+Also, we are actively monitoring your order to ensure it reaches you smoothly and tracking number will be updated on your eBay order page as soon as they become available.
+Thank you for choosing us.`,
+  'Shipped': `Hi {{buyer_first_name}},
+Your order has been shipped.
+We are still waiting for the tracking number from the warehouse and it will be updated shortly.`,
+  'Out for delivery': `Hi {{buyer_first_name}},
+Your package is currently out for delivery and should arrive shortly.`,
+  'Delayed': `Hi {{buyer_first_name}},
+We apologize for the delay in your shipment.
+Your package is still in transit and should arrive soon.`,
+  'Refund': `Hi {{buyer_first_name}},
+Your refund has been processed successfully.
+Please allow a few business days for it to reflect in your account.`,
+  'Not yet shipped': `Hi {{buyer_first_name}},
+Your order has not shipped yet, but our team is actively working on it.
+We'll keep you updated as soon as it ships.`
+};
+
+function NotesCell({ order, onSave, onNotify }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempValue, setTempValue] = useState(order.fulfillmentNotes || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setTempValue(order.fulfillmentNotes || '');
+    }
+  }, [order.fulfillmentNotes, isEditing]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(order._id, tempValue);
+      setIsEditing(false);
+      onNotify('success', '✅ Notes updated');
+    } catch {
+      onNotify('error', 'Failed to update notes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <Box onClick={(e) => e.stopPropagation()} sx={{ minWidth: 180 }}>
+        <TextField
+          fullWidth
+          multiline
+          minRows={2}
+          size="small"
+          value={tempValue}
+          onChange={(e) => setTempValue(e.target.value)}
+          placeholder="Enter notes..."
+          autoFocus
+        />
+        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+          <Button size="small" variant="contained" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setTempValue(order.fulfillmentNotes || '');
+              setIsEditing(false);
+            }}
+            disabled={isSaving}
+          >
+            Cancel
+          </Button>
+        </Stack>
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
+      sx={{ cursor: 'pointer', minHeight: 24 }}
+    >
+      <Typography variant="body2" sx={{ fontSize: '0.85rem', fontStyle: !order.fulfillmentNotes ? 'italic' : 'normal', color: !order.fulfillmentNotes ? 'text.secondary' : 'text.primary' }}>
+        {order.fulfillmentNotes || '+ Add Note'}
+      </Typography>
+    </Box>
+  );
+}
 
 export default function AmazonArrivalsPage() {
   const [orders, setOrders] = useState([]);
@@ -59,6 +176,10 @@ export default function AmazonArrivalsPage() {
   const [arrivalDateTo, setArrivalDateTo] = useState('');
   const [editingArrivalDate, setEditingArrivalDate] = useState({}); // { [orderId]: 'YYYY-MM-DD' }
   const [savingArrivalDateId, setSavingArrivalDateId] = useState(null);
+  const [selectedOrderForMessage, setSelectedOrderForMessage] = useState(null);
+  const [remarkConfirmOpen, setRemarkConfirmOpen] = useState(false);
+  const [pendingRemarkUpdate, setPendingRemarkUpdate] = useState(null); // { orderId, remarkValue, order }
+  const [sendingRemarkMessage, setSendingRemarkMessage] = useState(false);
 
   // Debounced Values
   const [debouncedOrderId, setDebouncedOrderId] = useState('');
@@ -167,31 +288,104 @@ export default function AmazonArrivalsPage() {
     setArrivalSort(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
-  const handleDismissOrder = async (orderId, orderName) => {
-    const confirmed = window.confirm(
-      `Remove "${orderName}" from Amazon Arrivals?\n\n` +
-      'The order will be hidden from this page but remains in All Orders. ' +
-      'You can bring it back by setting a new arriving date.'
-    );
-    
-    if (!confirmed) return;
-    
+  const handleOpenMessageDialog = (order) => {
+    setSelectedOrderForMessage(order);
+  };
+
+  const handleCloseMessageDialog = () => {
+    setSelectedOrderForMessage(null);
+  };
+
+  const updateFulfillmentNotes = async (orderId, value) => {
+    await api.patch(`/ebay/orders/${orderId}/fulfillment-notes`, { fulfillmentNotes: value });
+    setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, fulfillmentNotes: value } : o)));
+  };
+
+  const replaceTemplateVariables = (template, order) => {
+    const buyerFullName = order?.buyer?.buyerRegistrationAddress?.fullName || order?.buyerUsername || 'Customer';
+    const buyerFirstName = buyerFullName.split(' ')[0] || 'Customer';
+    return template
+      .replace(/\{\{buyer_first_name\}\}/g, buyerFirstName)
+      .replace(/\{\{buyer_name\}\}/g, buyerFullName)
+      .replace(/\{\{order_id\}\}/g, order?.orderId || '');
+  };
+
+  const applyRemarkUpdateOnly = async (orderId, remarkValue) => {
     try {
-      const { data } = await api.patch(`/ebay/orders/${orderId}/dismiss-arrival`);
-      
-      if (data?.success) {
-        // Remove order from local state immediately (optimistic update)
-        setOrders(prev => prev.filter(o => o._id !== orderId));
-        setTotalOrders(prev => prev - 1);
-        
-        showSnack('success', '✅ Order dismissed from Amazon Arrivals');
-        
-        // Optionally refresh to get accurate pagination
-        setTimeout(() => fetchOrders(), 500);
-      }
+      const normalizedRemark = remarkValue ? remarkValue : null;
+      await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemark });
+      setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, remark: normalizedRemark } : o)));
+      return true;
     } catch (err) {
-      const errorMsg = err?.response?.data?.error || 'Failed to dismiss order';
-      showSnack('error', errorMsg);
+      showSnack('error', err?.response?.data?.error || 'Failed to update remark');
+      return false;
+    }
+  };
+
+  const sendAutoMessageForRemark = async (order, remarkValue) => {
+    const template = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    if (!template) return false;
+    const messageBody = replaceTemplateVariables(template, order);
+
+    await api.post('/ebay/send-message', {
+      orderId: order.orderId,
+      buyerUsername: order.buyer?.username || order.buyerUsername,
+      itemId: order.itemNumber || order.lineItems?.[0]?.legacyItemId,
+      body: messageBody,
+      subject: `Regarding Order #${order.orderId}`
+    });
+    return true;
+  };
+
+  const handleConfirmRemarkMessage = async () => {
+    if (!pendingRemarkUpdate) return;
+    const { orderId, remarkValue, order } = pendingRemarkUpdate;
+    setSendingRemarkMessage(true);
+    try {
+      const updated = await applyRemarkUpdateOnly(orderId, remarkValue);
+      if (!updated) return;
+
+      await sendAutoMessageForRemark(order, remarkValue);
+      showSnack('success', `✅ Remark updated to "${remarkValue}" and message sent`);
+    } catch (err) {
+      showSnack('error', err?.response?.data?.error || 'Failed to send message');
+    } finally {
+      setSendingRemarkMessage(false);
+      setRemarkConfirmOpen(false);
+      setPendingRemarkUpdate(null);
+    }
+  };
+
+  const handleSkipRemarkMessage = async () => {
+    if (!pendingRemarkUpdate) return;
+    const { orderId, remarkValue } = pendingRemarkUpdate;
+    const updated = await applyRemarkUpdateOnly(orderId, remarkValue);
+    if (updated) {
+      showSnack('success', `✅ Remark updated to "${remarkValue}" (message not sent)`);
+    }
+    setRemarkConfirmOpen(false);
+    setPendingRemarkUpdate(null);
+  };
+
+  const handleRemarkUpdate = async (orderId, remarkValue) => {
+    // allow setting remark back to default/empty without confirmation
+    if (!remarkValue) {
+      const updated = await applyRemarkUpdateOnly(orderId, '');
+      if (updated) showSnack('success', '✅ Remark cleared');
+      return;
+    }
+
+    const order = orders.find(o => o._id === orderId);
+    const hasTemplate = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    if (order && hasTemplate) {
+      setPendingRemarkUpdate({ orderId, remarkValue, order });
+      setRemarkConfirmOpen(true);
+      return;
+    }
+
+    const updated = await applyRemarkUpdateOnly(orderId, remarkValue);
+    if (updated) {
+      showSnack('success', '✅ Remark updated');
     }
   };
 
@@ -438,7 +632,8 @@ export default function AmazonArrivalsPage() {
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Order ID</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Actions</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Messaging</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -555,28 +750,35 @@ export default function AmazonArrivalsPage() {
                         )}
                       </Stack>
                     </TableCell>
-                    <TableCell sx={{ maxWidth: 200 }}>
-                      <Tooltip title={order.notes || '-'}>
-                        <Typography variant="body2" sx={{ 
-                          overflow: 'hidden', 
-                          textOverflow: 'ellipsis', 
-                          whiteSpace: 'nowrap',
-                          maxWidth: 200,
-                          fontSize: '0.85rem'
-                        }}>
-                          {order.notes || '-'}
-                        </Typography>
-                      </Tooltip>
+                    <TableCell sx={{ maxWidth: 260 }}>
+                      <NotesCell
+                        order={order}
+                        onSave={updateFulfillmentNotes}
+                        onNotify={showSnack}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <Select
+                          value={order.remark || ''}
+                          displayEmpty
+                          onChange={(e) => handleRemarkUpdate(order._id, e.target.value)}
+                        >
+                          <MenuItem value="">Select Remark</MenuItem>
+                          {REMARK_OPTIONS.map((opt) => (
+                            <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </TableCell>
                     <TableCell sx={{ textAlign: 'center' }}>
-                      <Tooltip title="Remove from Arrivals">
+                      <Tooltip title="Message Buyer">
                         <IconButton
                           size="small"
-                          onClick={() => handleDismissOrder(order._id, order.orderId || order.productName?.substring(0, 30))}
-                          color="error"
-                          sx={{ p: 0.5 }}
+                          color="primary"
+                          onClick={() => handleOpenMessageDialog(order)}
                         >
-                          <DeleteOutlineIcon sx={{ fontSize: '1.1rem' }} />
+                          <ChatIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     </TableCell>
@@ -617,6 +819,67 @@ export default function AmazonArrivalsPage() {
           {snack.message}
         </Alert>
       </Snackbar>
+
+      {selectedOrderForMessage && (
+        <ChatModal
+          open={Boolean(selectedOrderForMessage)}
+          onClose={handleCloseMessageDialog}
+          orderId={selectedOrderForMessage.orderId}
+          buyerUsername={selectedOrderForMessage.buyer?.username || selectedOrderForMessage.buyerUsername}
+          buyerName={selectedOrderForMessage.buyer?.buyerRegistrationAddress?.fullName || selectedOrderForMessage.buyerUsername || 'Buyer'}
+          itemId={selectedOrderForMessage.itemNumber || selectedOrderForMessage.lineItems?.[0]?.legacyItemId}
+          title="Amazon Arrival Chat"
+          category="Amazon Arrival"
+          caseStatus={selectedOrderForMessage.messagingStatus || 'Open'}
+        />
+      )}
+
+      <Dialog
+        open={remarkConfirmOpen}
+        onClose={() => {
+          if (!sendingRemarkMessage) {
+            setRemarkConfirmOpen(false);
+            setPendingRemarkUpdate(null);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <ChatIcon color="primary" />
+            <Typography variant="h6">Send Message to Buyer?</Typography>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Alert severity="info" icon={<InfoIcon />}>
+              You are updating the remark to <strong>"{pendingRemarkUpdate?.remarkValue}"</strong>.
+            </Alert>
+            <Typography variant="body2" color="text.secondary">
+              Send the related message template to the buyer as well?
+            </Typography>
+            <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                {pendingRemarkUpdate && REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue]
+                  ? replaceTemplateVariables(
+                      REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue],
+                      pendingRemarkUpdate.order
+                    )
+                  : ''}
+              </Typography>
+            </Paper>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={handleSkipRemarkMessage} disabled={sendingRemarkMessage} variant="outlined">
+            No, Just Update Remark
+          </Button>
+          <Button onClick={handleConfirmRemarkMessage} disabled={sendingRemarkMessage} variant="contained">
+            {sendingRemarkMessage ? 'Sending...' : 'Yes, Send Message'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

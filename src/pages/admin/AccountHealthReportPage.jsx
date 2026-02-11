@@ -259,18 +259,33 @@ export default function AccountHealthReportPage() {
     }
   };
 
-  const getDisplayWindowEnd = (dateStr) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    d.setDate(d.getDate() - 1);
-    return d.toISOString();
+  const getActualDataWindowStart = (w) => {
+    if (w?.windowStart) return w.windowStart;
+    // Fallback for legacy payloads that may not include windowStart
+    if (w?.evaluationWindowEnd) {
+      const d = new Date(w.evaluationWindowEnd);
+      d.setDate(d.getDate() - 84);
+      d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    }
+    return '';
   };
 
-  const getDisplayWindowStart = (dateStr) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    d.setDate(d.getDate() + 1);
-    return d.toISOString();
+  const getActualDataWindowEnd = (w) => {
+    if (w?.windowStart) {
+      const d = new Date(w.windowStart);
+      d.setDate(d.getDate() + 83); // 84-day inclusive window
+      d.setHours(23, 59, 59, 999);
+      return d.toISOString();
+    }
+    // Fallback for legacy payloads
+    if (w?.evaluationWindowEnd) {
+      const d = new Date(w.evaluationWindowEnd);
+      d.setDate(d.getDate() - 1);
+      d.setHours(23, 59, 59, 999);
+      return d.toISOString();
+    }
+    return '';
   };
 
   const hasActiveFilters = dateFilter.mode !== 'all' || (sellers.length > 0 && sellerFilter !== sellers[0]._id);
@@ -293,7 +308,7 @@ export default function AccountHealthReportPage() {
   // CSV Export for Evaluation Windows
   const handleExportWindows = () => {
     const csvData = prepareCSVData(windows, {
-      'Evaluation Window': (w) => `${formatWindowDate(getDisplayWindowStart(w.evaluationWindowStart))} - ${formatWindowDate(getDisplayWindowEnd(w.evaluationWindowEnd))}`,
+      'Evaluation Window': (w) => `${formatWindowDate(getActualDataWindowStart(w))} - ${formatWindowDate(getActualDataWindowEnd(w))}`,
       'Total Sales': 'totalSales',
       'BBE Rate (%)': 'bbeRate',
       'Market Avg': 'marketAvg',
@@ -784,7 +799,7 @@ export default function AccountHealthReportPage() {
                     <TableRow key={rowKey} hover>
                       <TableCell>
                         <Typography variant="body2">
-                          {formatWindowDate(getDisplayWindowStart(w.evaluationWindowStart))} - {formatWindowDate(getDisplayWindowEnd(w.evaluationWindowEnd))}
+                          {formatWindowDate(getActualDataWindowStart(w))} - {formatWindowDate(getActualDataWindowEnd(w))}
                         </Typography>
                       </TableCell>
                       <TableCell>
