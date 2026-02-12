@@ -66,6 +66,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoIcon from '@mui/icons-material/Info';
 import SettingsIcon from '@mui/icons-material/Settings';
+import SyncIcon from '@mui/icons-material/Sync';
 
 
 import DownloadIcon from '@mui/icons-material/Download';
@@ -1148,6 +1149,9 @@ function FulfillmentDashboard() {
   const [autoMessageLoading, setAutoMessageLoading] = useState(false);
   const [autoMessageStats, setAutoMessageStats] = useState(null);
 
+  // Resync window state
+  const [resyncDays, setResyncDays] = useState(10);
+
   // Editing item status
   const [editingItemStatus, setEditingItemStatus] = useState({});
 
@@ -2000,6 +2004,59 @@ function FulfillmentDashboard() {
     }
   }
 
+  // Resync recent orders (last 10 days) - catches silent eBay changes
+  async function resyncRecent() {
+    setLoading(true);
+    setError('');
+    setPollResults(null);
+    setSnackbarOrderIds([]);
+    setUpdatedOrderDetails([]);
+    setUpdatedOrderDetails([]);
+    try {
+      const { data } = await api.post('/ebay/resync-recent', { days: resyncDays });
+      setPollResults(data || null);
+
+      // Reset filters to show all sellers and go to page 1
+      setSelectedSeller('');
+      setCurrentPage(1);
+
+      // Reload orders with reset filters
+      await loadStoredOrders();
+
+      if (data && (data.totalUpdated > 0 || data.totalNew > 0)) {
+        // Collect updated order details
+        const updatedDetails = data.pollResults
+          .filter(r => r.success && r.updatedOrders && r.updatedOrders.length > 0)
+          .flatMap(r => r.updatedOrders);
+
+        const newOrderIds = data.pollResults
+          .filter(r => r.success && r.newOrders && r.newOrders.length > 0)
+          .flatMap(r => r.newOrders);
+
+        const orderIds = [
+          ...newOrderIds,
+          ...updatedDetails.map(u => u.orderId)
+        ];
+        setSnackbarOrderIds(orderIds);
+        setUpdatedOrderDetails(updatedDetails);
+
+        setSnackbarMsg(
+          `Resync Complete! Updated: ${data.totalUpdated}, New: ${data.totalNew}`
+        );
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+      } else if (data) {
+        setSnackbarMsg('Resync Complete! All orders are up to date.');
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+      }
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Failed to resync orders');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const handleCopy = useCallback((text) => {
     const val = text || '-';
     if (val === '-') return;
@@ -2811,6 +2868,40 @@ function FulfillmentDashboard() {
               >
                 {loading ? 'Updating...' : isSmallMobile ? 'Poll Updates' : 'Poll Order Updates'}
               </Button>
+
+              <Select
+                value={resyncDays}
+                onChange={(e) => setResyncDays(e.target.value)}
+                size="small"
+                sx={{
+                  height: 30,
+                  fontSize: '0.75rem',
+                  bgcolor: 'background.paper',
+                  '& .MuiSelect-select': { py: 0.5, px: 1 }
+                }}
+              >
+                <MenuItem value={3}>3 Days</MenuItem>
+                <MenuItem value={7}>7 Days</MenuItem>
+                <MenuItem value={10}>10 Days</MenuItem>
+                <MenuItem value={15}>15 Days</MenuItem>
+                <MenuItem value={30}>30 Days</MenuItem>
+              </Select>
+
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />)}
+                onClick={resyncRecent}
+                disabled={loading}
+                size="small"
+                fullWidth
+                sx={{
+                  fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                  px: { xs: 0.5, sm: 1 }
+                }}
+              >
+                {loading ? 'Syncing...' : isSmallMobile ? 'Resync' : `Resync ${resyncDays}D`}
+              </Button>
             </Stack>
 
             {/* Row 3: Filters side by side */}
@@ -2938,6 +3029,31 @@ function FulfillmentDashboard() {
               sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
             >
               {loading ? 'Updating...' : 'Poll Order Updates'}
+            </Button>
+
+            <FormControl size="small" sx={{ minWidth: 90 }}>
+              <Select
+                value={resyncDays}
+                onChange={(e) => setResyncDays(e.target.value)}
+                sx={{ height: 36, fontSize: '0.85rem' }}
+              >
+                <MenuItem value={3}>3 Days</MenuItem>
+                <MenuItem value={7}>7 Days</MenuItem>
+                <MenuItem value={10}>10 Days</MenuItem>
+                <MenuItem value={15}>15 Days</MenuItem>
+                <MenuItem value={30}>30 Days</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Button
+              variant="outlined"
+              color="warning"
+              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+              onClick={resyncRecent}
+              disabled={loading}
+              sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
+            >
+              {loading ? 'Syncing...' : `Resync ${resyncDays} Days`}
             </Button>
 
             <Tooltip title={selectedSeller ? "Fetch ad fees from eBay for all orders" : "Select a seller first"}>
@@ -3171,917 +3287,921 @@ function FulfillmentDashboard() {
       </Paper>
 
       {/* TABLE SECTION */}
-      {orders.length === 0 && !loading ? (
-        <Paper sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center' }}>
-          <ShoppingCartIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-            No orders found. Click "Poll New Orders" to fetch orders from all sellers.
-          </Typography>
-        </Paper>
-      ) : (
-        <>
-          {/* MOBILE CARD VIEW */}
-          <Box
-            sx={{
-              display: { xs: 'block', md: 'none' },
-              flexGrow: 1,
-              overflow: 'auto',
-              p: 1,
-              '&::-webkit-scrollbar': { width: '4px' },
-              '&::-webkit-scrollbar-thumb': { backgroundColor: '#888', borderRadius: '4px' }
-            }}
-          >
-            <Stack spacing={1.5}>
-              {orders.map((order, idx) => (
-                <MobileOrderCard
-                  key={order._id || idx}
-                  order={order}
-                  index={(currentPage - 1) * ordersPerPage + idx + 1}
-                  onCopy={handleCopy}
-                  onMessage={handleOpenMessageDialog}
-                  onViewImages={handleViewImages}
-                  formatCurrency={formatCurrency}
-                  thumbnailImages={thumbnailImages}
-                />
-              ))}
-            </Stack>
-          </Box>
-
-          {/* DESKTOP TABLE VIEW */}
-          <TableContainer
-            component={Paper}
-            sx={{
-              display: { xs: 'none', md: 'block' },
-              flexGrow: 1,
-              overflow: 'auto',
-              maxHeight: 'calc(100% - 50px)',
-              width: '100%',
-              '&::-webkit-scrollbar': {
-                width: '8px',
-                height: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                backgroundColor: '#f1f1f1',
-                borderRadius: '10px',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                backgroundColor: '#888',
-                borderRadius: '10px',
-                '&:hover': {
-                  backgroundColor: '#555',
-                },
-              },
-            }}
-          >
-            <Table
-              size="small"
-              stickyHeader
-              sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
+      {
+        orders.length === 0 && !loading ? (
+          <Paper sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center' }}>
+            <ShoppingCartIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+              No orders found. Click "Poll New Orders" to fetch orders from all sellers.
+            </Typography>
+          </Paper>
+        ) : (
+          <>
+            {/* MOBILE CARD VIEW */}
+            <Box
+              sx={{
+                display: { xs: 'block', md: 'none' },
+                flexGrow: 1,
+                overflow: 'auto',
+                p: 1,
+                '&::-webkit-scrollbar': { width: '4px' },
+                '&::-webkit-scrollbar-thumb': { backgroundColor: '#888', borderRadius: '4px' }
+              }}
             >
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>SL No</TableCell>
-                  {visibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>}
-                  {visibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>}
-                  {visibleColumns.includes('dateSold') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Date Sold</TableCell>}
-                  {visibleColumns.includes('shipBy') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>}
-                  {visibleColumns.includes('deliveryDate') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Delivery Date</TableCell>}
-                  {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>}
-                  {visibleColumns.includes('buyerName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>}
-                  {visibleColumns.includes('shippingAddress') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>}
-                  {visibleColumns.includes('marketplace') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>}
-                  {visibleColumns.includes('subtotal') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Subtotal</TableCell>}
-                  {visibleColumns.includes('shipping') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Shipping</TableCell>}
-                  {visibleColumns.includes('salesTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Sales Tax</TableCell>}
-                  {visibleColumns.includes('discount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Discount</TableCell>}
-                  {visibleColumns.includes('transactionFees') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Transaction Fees</TableCell>}
-                  {visibleColumns.includes('adFeeGeneral') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Ad Fee General</TableCell>}
-                  {visibleColumns.includes('cancelStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Cancel Status</TableCell>}
-                  {visibleColumns.includes('refunds') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Refunds</TableCell>}
-                  {visibleColumns.includes('refundItemAmount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Item</TableCell>}
-                  {visibleColumns.includes('refundTaxAmount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Tax</TableCell>}
-                  {visibleColumns.includes('refundTotalToBuyer') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Total</TableCell>}
-                  {visibleColumns.includes('orderTotalAfterRefund') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Order Total</TableCell>}
-                  {visibleColumns.includes('orderEarnings') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Earnings</TableCell>}
-                  {visibleColumns.includes('trackingNumber') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Tracking Number</TableCell>}
-                  {visibleColumns.includes('amazonAccount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Acc</TableCell>}
-                  {visibleColumns.includes('arriving') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Arriving</TableCell>}
-                  {visibleColumns.includes('beforeTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Before Tax</TableCell>}
-                  {visibleColumns.includes('estimatedTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Estimated Tax</TableCell>}
-                  {visibleColumns.includes('azOrderId') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Az OrderID</TableCell>}
-                  {visibleColumns.includes('amazonRefund') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Refund</TableCell>}
-                  {visibleColumns.includes('cardName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Card Name</TableCell>}
-                  {visibleColumns.includes('notes') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>}
-                  {visibleColumns.includes('messagingStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Messaging</TableCell>}
-                  {visibleColumns.includes('remark') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>}
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {orders.map((order, idx) => {
-                  const isSelected = selectedRowId === order._id;
-                  return (
-                    <TableRow
-                      key={order._id || idx}
-                      sx={{
-                        '&:nth-of-type(odd)': { backgroundColor: 'action.hover' },
-                        '&:hover': { backgroundColor: 'action.selected' },
-                      }}
-                    >
-                      <TableCell>{(currentPage - 1) * ordersPerPage + idx + 1}</TableCell>
-                      {visibleColumns.includes('seller') && (
-                        <TableCell>
-                          <Typography variant="body2" fontWeight="medium">
-                            {order.seller?.user?.username ||
-                              order.seller?.user?.email ||
-                              order.sellerId ||
-                              '-'}
-                          </Typography>
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('orderId') && (
-                        <TableCell>
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
-                              {order.orderId || order.legacyOrderId || '-'}
+              <Stack spacing={1.5}>
+                {orders.map((order, idx) => (
+                  <MobileOrderCard
+                    key={order._id || idx}
+                    order={order}
+                    index={(currentPage - 1) * ordersPerPage + idx + 1}
+                    onCopy={handleCopy}
+                    onMessage={handleOpenMessageDialog}
+                    onViewImages={handleViewImages}
+                    formatCurrency={formatCurrency}
+                    thumbnailImages={thumbnailImages}
+                  />
+                ))}
+              </Stack>
+            </Box>
+
+            {/* DESKTOP TABLE VIEW */}
+            <TableContainer
+              component={Paper}
+              sx={{
+                display: { xs: 'none', md: 'block' },
+                flexGrow: 1,
+                overflow: 'auto',
+                maxHeight: 'calc(100% - 50px)',
+                width: '100%',
+                '&::-webkit-scrollbar': {
+                  width: '8px',
+                  height: '8px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: '#f1f1f1',
+                  borderRadius: '10px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: '#888',
+                  borderRadius: '10px',
+                  '&:hover': {
+                    backgroundColor: '#555',
+                  },
+                },
+              }}
+            >
+              <Table
+                size="small"
+                stickyHeader
+                sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>SL No</TableCell>
+                    {visibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>}
+                    {visibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>}
+                    {visibleColumns.includes('dateSold') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Date Sold</TableCell>}
+                    {visibleColumns.includes('shipBy') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>}
+                    {visibleColumns.includes('deliveryDate') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Delivery Date</TableCell>}
+                    {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>}
+                    {visibleColumns.includes('buyerName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>}
+                    {visibleColumns.includes('shippingAddress') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>}
+                    {visibleColumns.includes('marketplace') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>}
+                    {visibleColumns.includes('subtotal') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Subtotal</TableCell>}
+                    {visibleColumns.includes('shipping') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Shipping</TableCell>}
+                    {visibleColumns.includes('salesTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Sales Tax</TableCell>}
+                    {visibleColumns.includes('discount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Discount</TableCell>}
+                    {visibleColumns.includes('transactionFees') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Transaction Fees</TableCell>}
+                    {visibleColumns.includes('adFeeGeneral') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Ad Fee General</TableCell>}
+                    {visibleColumns.includes('cancelStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Cancel Status</TableCell>}
+                    {visibleColumns.includes('refunds') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Refunds</TableCell>}
+                    {visibleColumns.includes('refundItemAmount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Item</TableCell>}
+                    {visibleColumns.includes('refundTaxAmount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Tax</TableCell>}
+                    {visibleColumns.includes('refundTotalToBuyer') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Total</TableCell>}
+                    {visibleColumns.includes('orderTotalAfterRefund') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Order Total</TableCell>}
+                    {visibleColumns.includes('orderEarnings') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Earnings</TableCell>}
+                    {visibleColumns.includes('trackingNumber') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Tracking Number</TableCell>}
+                    {visibleColumns.includes('amazonAccount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Acc</TableCell>}
+                    {visibleColumns.includes('arriving') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Arriving</TableCell>}
+                    {visibleColumns.includes('beforeTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Before Tax</TableCell>}
+                    {visibleColumns.includes('estimatedTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Estimated Tax</TableCell>}
+                    {visibleColumns.includes('azOrderId') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Az OrderID</TableCell>}
+                    {visibleColumns.includes('amazonRefund') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Refund</TableCell>}
+                    {visibleColumns.includes('cardName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Card Name</TableCell>}
+                    {visibleColumns.includes('notes') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>}
+                    {visibleColumns.includes('messagingStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Messaging</TableCell>}
+                    {visibleColumns.includes('remark') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>}
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {orders.map((order, idx) => {
+                    const isSelected = selectedRowId === order._id;
+                    return (
+                      <TableRow
+                        key={order._id || idx}
+                        sx={{
+                          '&:nth-of-type(odd)': { backgroundColor: 'action.hover' },
+                          '&:hover': { backgroundColor: 'action.selected' },
+                        }}
+                      >
+                        <TableCell>{(currentPage - 1) * ordersPerPage + idx + 1}</TableCell>
+                        {visibleColumns.includes('seller') && (
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {order.seller?.user?.username ||
+                                order.seller?.user?.email ||
+                                order.sellerId ||
+                                '-'}
                             </Typography>
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('orderId') && (
+                          <TableCell>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
+                                {order.orderId || order.legacyOrderId || '-'}
+                              </Typography>
 
-                            {/* Auto-Message Status Indicator */}
-                            {order.autoMessageSent ? (
-                              <Tooltip title={`Auto-message sent at ${new Date(order.autoMessageSentAt).toLocaleString()}`}>
-                                <CheckCircleIcon color="success" sx={{ fontSize: 16 }} />
-                              </Tooltip>
-                            ) : (
-                              <Tooltip title={order.autoMessageDisabled ? "Auto-message disabled (click to enable)" : "Auto-message pending (click to disable)"}>
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleAutoMessage(order.orderId, !order.autoMessageDisabled);
-                                  }}
-                                  sx={{ p: 0.5 }}
-                                >
-                                  {order.autoMessageDisabled ? (
-                                    <BlockIcon color="action" sx={{ fontSize: 16 }} />
-                                  ) : (
-                                    <AccessTimeIcon color="primary" sx={{ fontSize: 16 }} />
-                                  )}
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          </Stack>
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('dateSold') && <TableCell>{formatDate(order.dateSold, order.purchaseMarketplaceId)}</TableCell>}
-                      {visibleColumns.includes('shipBy') && <TableCell>{formatDate(order.shipByDate, order.purchaseMarketplaceId)}</TableCell>}
-                      {visibleColumns.includes('deliveryDate') && <TableCell>{formatDeliveryDate(order)}</TableCell>}
-                      {visibleColumns.includes('productName') && (
-                        <TableCell sx={{ minWidth: 300, maxWidth: 400, pr: 1 }}>
-                          <Stack spacing={1} sx={{ py: 1 }}>
-                            {order.lineItems && order.lineItems.length > 0 ? (
-                              order.lineItems.map((item, i) => (
-                                <Box
-                                  key={i}
-                                  sx={{
-                                    display: 'flex',
-                                    alignItems: 'flex-start',
-                                    gap: 1,
-                                    borderBottom: i < order.lineItems.length - 1 ? '1px dashed rgba(0,0,0,0.1)' : 'none',
-                                    pb: i < order.lineItems.length - 1 ? 1 : 0
-                                  }}
-                                >
-                                  {/* 1. QUANTITY BADGE */}
-                                  <Chip
-                                    label={`x${item.quantity}`}
-                                    size="small"
-                                    color={item.quantity > 1 ? "warning" : "default"}
-                                    sx={{
-                                      height: 24,
-                                      minWidth: 35,
-                                      fontWeight: 'bold',
-                                      borderRadius: 1,
-                                      backgroundColor: item.quantity > 1 ? '#ed6c02' : '#e0e0e0',
-                                      color: item.quantity > 1 ? '#fff' : 'rgba(0,0,0,0.87)'
-                                    }}
-                                  />
-
-                                  {/* 1.5 THUMBNAIL IMAGE (if available, only for first item) */}
-                                  {i === 0 && thumbnailImages[order._id] && (
-                                    <Box
-                                      onClick={() => handleViewImages(order)}
-                                      sx={{
-                                        width: 50,
-                                        height: 50,
-                                        cursor: 'pointer',
-                                        border: '1px solid',
-                                        borderColor: 'grey.300',
-                                        borderRadius: 1,
-                                        overflow: 'hidden',
-                                        flexShrink: 0,
-                                        position: 'relative',
-                                        '&:hover': {
-                                          borderColor: 'primary.main',
-                                          boxShadow: 2
-                                        }
-                                      }}
-                                    >
-                                      <img
-                                        src={thumbnailImages[order._id]}
-                                        alt="Product"
-                                        style={{
-                                          width: '100%',
-                                          height: '100%',
-                                          objectFit: 'cover'
-                                        }}
-                                      />
-                                      {/* Show badge if there are more images */}
-                                      {itemImages[order._id]?.count > 1 && (
-                                        <Chip
-                                          label={`+${itemImages[order._id].count - 1}`}
-                                          size="small"
-                                          sx={{
-                                            position: 'absolute',
-                                            bottom: 2,
-                                            right: 2,
-                                            height: 18,
-                                            fontSize: '0.65rem',
-                                            bgcolor: 'rgba(0,0,0,0.7)',
-                                            color: 'white',
-                                            '& .MuiChip-label': { px: 0.5 }
-                                          }}
-                                        />
-                                      )}
-                                      {/* Loading overlay */}
-                                      {loadingImages[order._id] && (
-                                        <Box
-                                          sx={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            bgcolor: 'rgba(255,255,255,0.8)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
-                                          }}
-                                        >
-                                          <CircularProgress size={20} />
-                                        </Box>
-                                      )}
-                                    </Box>
-                                  )}
-
-                                  {/* 2. PRODUCT TITLE & ID */}
-                                  <Box sx={{ flex: 1, overflow: 'hidden' }}>
-                                    <Tooltip title={item.title} arrow placement="top">
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          lineHeight: 1.2,
-                                          fontWeight: item.quantity > 1 ? '500' : '400',
-                                          display: '-webkit-box',
-                                          WebkitLineClamp: 2,
-                                          WebkitBoxOrient: 'vertical',
-                                          overflow: 'hidden'
-                                        }}
-                                      >
-                                        {item.title}
-                                      </Typography>
-                                    </Tooltip>
-                                    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
-                                      <Link
-                                        href={`https://www.ebay.com/itm/${item.legacyItemId}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        underline="hover"
-                                        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.3 }}
-                                      >
-                                        <Typography variant="caption" color="primary.main" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
-                                          ID: {item.legacyItemId}
-                                        </Typography>
-                                        <OpenInNewIcon sx={{ fontSize: 12, color: 'primary.main' }} />
-                                      </Link>
-                                      {item.sku && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                                          | SKU: {item.sku}
-                                        </Typography>
-                                      )}
-                                    </Stack>
-                                  </Box>
-
-                                  {/* 3. COPY BUTTON */}
+                              {/* Auto-Message Status Indicator */}
+                              {order.autoMessageSent ? (
+                                <Tooltip title={`Auto-message sent at ${new Date(order.autoMessageSentAt).toLocaleString()}`}>
+                                  <CheckCircleIcon color="success" sx={{ fontSize: 16 }} />
+                                </Tooltip>
+                              ) : (
+                                <Tooltip title={order.autoMessageDisabled ? "Auto-message disabled (click to enable)" : "Auto-message pending (click to disable)"}>
                                   <IconButton
                                     size="small"
-                                    onClick={() => handleCopy(item.title)}
-                                    aria-label="copy product name"
-                                    sx={{ mt: -0.5 }}
-                                  >
-                                    <ContentCopyIcon fontSize="small" sx={{ fontSize: '1rem' }} />
-                                  </IconButton>
-                                </Box>
-                              ))
-                            ) : (
-                              /* Fallback for old orders */
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Chip label="x1" size="small" />
-                                <Typography variant="body2">
-                                  {order.productName || '-'}
-                                </Typography>
-                              </Box>
-                            )}
-                          </Stack>
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('buyerName') && (
-                        <TableCell sx={{ maxWidth: 150, pr: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
-                            <Tooltip title={order.buyer?.buyerRegistrationAddress?.fullName || '-'} arrow>
-                              <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {order.buyer?.buyerRegistrationAddress?.fullName || '-'}
-                              </Typography>
-                            </Tooltip>
-                            <IconButton size="small" onClick={() => handleCopy(order.buyer?.buyerRegistrationAddress?.fullName || '-')} aria-label="copy buyer name">
-                              <ContentCopyIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('shippingAddress') && (
-                        <TableCell sx={{ maxWidth: 300 }}>
-                          <Collapse in={expandedShippingId === order._id} timeout="auto">
-                            <Stack spacing={0.5}>
-                              {/* Full Name */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingFullName || '-'} arrow>
-                                  <Typography variant="body2" fontWeight="medium" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingFullName || '-'}
-                                  </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingFullName)} aria-label="copy name">
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                              {/* Address Line 1 */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingAddressLine1 || '-'} arrow>
-                                  <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingAddressLine1 || '-'}
-                                  </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingAddressLine1)} aria-label="copy address">
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                              {/* Address Line 2 */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingAddressLine2 || '-'} arrow>
-                                  <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingAddressLine2 || '-'}
-                                  </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingAddressLine2)} aria-label="copy address line 2">
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                              {/* City */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingCity || '-'} arrow>
-                                  <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingCity || '-'}
-                                  </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingCity)} aria-label="copy city">
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                              {/* State */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingState || '-'} arrow>
-                                  <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingState || '-'}
-                                  </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingState)} aria-label="copy state">
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                              {/* Postal Code */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingPostalCode || '-'} arrow>
-                                  <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingPostalCode || '-'}
-                                  </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingPostalCode)} aria-label="copy postal code">
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                              {/* Country */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingCountry || '-'} arrow>
-                                  <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {order.shippingCountry || '-'}
-                                  </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy(order.shippingCountry)} aria-label="copy country">
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                              {/* Phone */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title={order.shippingPhone || '0000000000'} arrow>
-                                  <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    📞 {'0000000000'}
-                                  </Typography>
-                                </Tooltip>
-                                <IconButton size="small" onClick={() => handleCopy('0000000000')} aria-label="copy phone">
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                              {/* Collapse Button */}
-                              <Button
-                                size="small"
-                                onClick={() => toggleShippingExpanded(order._id)}
-                                startIcon={<ExpandLessIcon />}
-                                sx={{ mt: 0.5 }}
-                              >
-                                Collapse
-                              </Button>
-                            </Stack>
-                          </Collapse>
-                          <Collapse in={expandedShippingId !== order._id} timeout="auto">
-                            <Button
-                              size="small"
-                              onClick={() => toggleShippingExpanded(order._id)}
-                              endIcon={<ExpandMoreIcon />}
-                              sx={{ textTransform: 'none' }}
-                            >
-                              {order.shippingFullName || 'View Address'}
-                            </Button>
-                          </Collapse>
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('marketplace') && (
-                        <TableCell>
-                          <Typography variant="body2">
-                            {order.purchaseMarketplaceId || '-'}
-                          </Typography>
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('subtotal') && (
-                        order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                          <TableCell align="right">
-                            <Typography variant="body2" fontWeight="medium">
-                              {formatCurrency(order.subtotalUSD)}
-                            </Typography>
-                          </TableCell>
-                        ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
-                      )}
-                      {visibleColumns.includes('shipping') && (
-                        order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                          <TableCell align="right">{formatCurrency(order.shippingUSD)}</TableCell>
-                        ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
-                      )}
-                      {visibleColumns.includes('salesTax') && (
-                        order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                          <TableCell align="right">{formatCurrency(order.salesTaxUSD)}</TableCell>
-                        ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
-                      )}
-                      {visibleColumns.includes('discount') && (
-                        order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                          <TableCell align="right">
-                            <Typography variant="body2">
-                              {formatCurrency(order.discountUSD)}
-                            </Typography>
-                          </TableCell>
-                        ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
-                      )}
-                      {visibleColumns.includes('transactionFees') && (
-                        order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                          <TableCell align="right">{formatCurrency(order.transactionFeesUSD)}</TableCell>
-                        ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
-                      )}
-                      {visibleColumns.includes('adFeeGeneral') && (
-                        order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                          <TableCell align="right">
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontWeight: order.adFeeGeneral ? 'medium' : 'normal',
-                                color: order.adFeeGeneral ? 'error.main' : 'text.secondary'
-                              }}
-                            >
-                              {order.adFeeGeneral ? formatCurrency(order.adFeeGeneral) : '-'}
-                            </Typography>
-                          </TableCell>
-                        ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
-                      )}
-                      {visibleColumns.includes('cancelStatus') && (
-                        <TableCell>
-                          <Chip
-                            label={order.cancelState || 'NONE_REQUESTED'}
-                            size="small"
-                            color={
-                              order.cancelState === 'CANCELED' ? 'error' :
-                                order.cancelState === 'CANCEL_REQUESTED' ? 'warning' :
-                                  order.cancelState === 'IN_PROGRESS' ? 'warning' :
-                                    'success'
-                            }
-                            sx={{
-                              fontSize: '0.7rem',
-                              backgroundColor: order.cancelState === 'IN_PROGRESS' ? '#ffd700' : undefined,
-                              color: order.cancelState === 'IN_PROGRESS' ? '#000' : undefined,
-                              fontWeight: order.cancelState === 'IN_PROGRESS' ? 'bold' : 'normal'
-                            }}
-                          />
-                        </TableCell>
-                      )}
-                      {/* --- REPLACEMENT FOR REFUNDS CELL --- */}
-                      {visibleColumns.includes('refunds') && (
-                        <TableCell>
-                          {order.refunds && order.refunds.length > 0 ? (
-                            <Stack spacing={0.5}>
-                              {order.refunds.map((refund, idx) => {
-                                // 1. Get Amount in USD (convert using order's conversion rate)
-                                const rawValue = refund.amount?.value || refund.refundAmount?.value || 0;
-                                const conversionRate = order.conversionRate || 1;
-                                const amountUSD = (Number(rawValue) * conversionRate).toFixed(2);
-
-                                // 2. Determine Label & Color based on Order Status
-                                // If order says 'FULLY_REFUNDED', we label it Full. Otherwise Partial.
-                                const isFull = order.orderPaymentStatus === 'FULLY_REFUNDED';
-                                const typeLabel = isFull ? 'Full' : 'Partial';
-                                const color = isFull ? 'error' : 'warning'; // Red for Full, Orange for Partial
-
-                                return (
-                                  <Chip
-                                    key={idx}
-                                    // Result: "Full: $28.17" or "Partial: $15.00" (in USD)
-                                    label={`${typeLabel}: $${amountUSD}`}
-                                    size="small"
-                                    color={color}
-                                    variant="outlined"
-                                    sx={{
-                                      fontWeight: 'bold',
-                                      fontSize: '0.75rem',
-                                      height: 24
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleAutoMessage(order.orderId, !order.autoMessageDisabled);
                                     }}
-                                  />
-                                );
-                              })}
+                                    sx={{ p: 0.5 }}
+                                  >
+                                    {order.autoMessageDisabled ? (
+                                      <BlockIcon color="action" sx={{ fontSize: 16 }} />
+                                    ) : (
+                                      <AccessTimeIcon color="primary" sx={{ fontSize: 16 }} />
+                                    )}
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                             </Stack>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
-                          )}
-                        </TableCell>
-                      )}
-                      {/* --- NEW: Refund Breakdown Columns --- */}
-                      {visibleColumns.includes('refundItemAmount') && (
-                        <TableCell align="right">
-                          {order.refundItemAmount ? (
-                            <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 'medium' }}>
-                              {formatCurrency(order.refundItemAmount)}
-                            </Typography>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
-                          )}
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('refundTaxAmount') && (
-                        <TableCell align="right">
-                          {order.refundTaxAmount ? (
-                            <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 'medium' }}>
-                              {formatCurrency(order.refundTaxAmount)}
-                            </Typography>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
-                          )}
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('refundTotalToBuyer') && (
-                        <TableCell align="right">
-                          {order.refundTotalToBuyer ? (
-                            <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 'bold' }}>
-                              {formatCurrency(order.refundTotalToBuyer)}
-                            </Typography>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
-                          )}
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('orderTotalAfterRefund') && (
-                        <TableCell align="right">
-                          {order.orderTotalAfterRefund != null ? (
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                color: order.orderTotalAfterRefund >= 0 ? 'text.primary' : 'error.main',
-                                fontWeight: 'medium'
-                              }}
-                            >
-                              {formatCurrency(order.orderTotalAfterRefund)}
-                            </Typography>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
-                          )}
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('orderEarnings') && (
-                        <TableCell align="right">
-                          {order.orderPaymentStatus === 'PARTIALLY_REFUNDED' ? (
-                            <TextField
-                              size="small"
-                              type="number"
-                              value={order.orderEarnings || ''}
-                              onChange={(e) => handleOrderEarningsChange(order._id, order.orderId, e.target.value)}
-                              onBlur={() => handleOrderEarningsSave(order._id, order.orderId)}
-                              sx={{
-                                width: 100,
-                                '& .MuiInputBase-input': {
-                                  textAlign: 'right',
-                                  fontSize: '0.875rem',
-                                  color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
-                                  fontWeight: 'bold'
-                                }
-                              }}
-                              inputProps={{ step: '0.01' }}
-                            />
-                          ) : order.orderEarnings != null ? (
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
-                                fontWeight: 'bold'
-                              }}
-                            >
-                              {formatCurrency(order.orderEarnings)}
-                            </Typography>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
-                          )}
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('trackingNumber') && (
-                        <TableCell sx={{ maxWidth: 150, pr: 1 }}>
-                          {order.trackingNumber ? (
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('dateSold') && <TableCell>{formatDate(order.dateSold, order.purchaseMarketplaceId)}</TableCell>}
+                        {visibleColumns.includes('shipBy') && <TableCell>{formatDate(order.shipByDate, order.purchaseMarketplaceId)}</TableCell>}
+                        {visibleColumns.includes('deliveryDate') && <TableCell>{formatDeliveryDate(order)}</TableCell>}
+                        {visibleColumns.includes('productName') && (
+                          <TableCell sx={{ minWidth: 300, maxWidth: 400, pr: 1 }}>
+                            <Stack spacing={1} sx={{ py: 1 }}>
+                              {order.lineItems && order.lineItems.length > 0 ? (
+                                order.lineItems.map((item, i) => (
+                                  <Box
+                                    key={i}
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: 1,
+                                      borderBottom: i < order.lineItems.length - 1 ? '1px dashed rgba(0,0,0,0.1)' : 'none',
+                                      pb: i < order.lineItems.length - 1 ? 1 : 0
+                                    }}
+                                  >
+                                    {/* 1. QUANTITY BADGE */}
+                                    <Chip
+                                      label={`x${item.quantity}`}
+                                      size="small"
+                                      color={item.quantity > 1 ? "warning" : "default"}
+                                      sx={{
+                                        height: 24,
+                                        minWidth: 35,
+                                        fontWeight: 'bold',
+                                        borderRadius: 1,
+                                        backgroundColor: item.quantity > 1 ? '#ed6c02' : '#e0e0e0',
+                                        color: item.quantity > 1 ? '#fff' : 'rgba(0,0,0,0.87)'
+                                      }}
+                                    />
+
+                                    {/* 1.5 THUMBNAIL IMAGE (if available, only for first item) */}
+                                    {i === 0 && thumbnailImages[order._id] && (
+                                      <Box
+                                        onClick={() => handleViewImages(order)}
+                                        sx={{
+                                          width: 50,
+                                          height: 50,
+                                          cursor: 'pointer',
+                                          border: '1px solid',
+                                          borderColor: 'grey.300',
+                                          borderRadius: 1,
+                                          overflow: 'hidden',
+                                          flexShrink: 0,
+                                          position: 'relative',
+                                          '&:hover': {
+                                            borderColor: 'primary.main',
+                                            boxShadow: 2
+                                          }
+                                        }}
+                                      >
+                                        <img
+                                          src={thumbnailImages[order._id]}
+                                          alt="Product"
+                                          style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover'
+                                          }}
+                                        />
+                                        {/* Show badge if there are more images */}
+                                        {itemImages[order._id]?.count > 1 && (
+                                          <Chip
+                                            label={`+${itemImages[order._id].count - 1}`}
+                                            size="small"
+                                            sx={{
+                                              position: 'absolute',
+                                              bottom: 2,
+                                              right: 2,
+                                              height: 18,
+                                              fontSize: '0.65rem',
+                                              bgcolor: 'rgba(0,0,0,0.7)',
+                                              color: 'white',
+                                              '& .MuiChip-label': { px: 0.5 }
+                                            }}
+                                          />
+                                        )}
+                                        {/* Loading overlay */}
+                                        {loadingImages[order._id] && (
+                                          <Box
+                                            sx={{
+                                              position: 'absolute',
+                                              top: 0,
+                                              left: 0,
+                                              right: 0,
+                                              bottom: 0,
+                                              bgcolor: 'rgba(255,255,255,0.8)',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center'
+                                            }}
+                                          >
+                                            <CircularProgress size={20} />
+                                          </Box>
+                                        )}
+                                      </Box>
+                                    )}
+
+                                    {/* 2. PRODUCT TITLE & ID */}
+                                    <Box sx={{ flex: 1, overflow: 'hidden' }}>
+                                      <Tooltip title={item.title} arrow placement="top">
+                                        <Typography
+                                          variant="body2"
+                                          sx={{
+                                            lineHeight: 1.2,
+                                            fontWeight: item.quantity > 1 ? '500' : '400',
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: 'vertical',
+                                            overflow: 'hidden'
+                                          }}
+                                        >
+                                          {item.title}
+                                        </Typography>
+                                      </Tooltip>
+                                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
+                                        <Link
+                                          href={`https://www.ebay.com/itm/${item.legacyItemId}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          underline="hover"
+                                          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.3 }}
+                                        >
+                                          <Typography variant="caption" color="primary.main" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
+                                            ID: {item.legacyItemId}
+                                          </Typography>
+                                          <OpenInNewIcon sx={{ fontSize: 12, color: 'primary.main' }} />
+                                        </Link>
+                                        {item.sku && (
+                                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                            | SKU: {item.sku}
+                                          </Typography>
+                                        )}
+                                      </Stack>
+                                    </Box>
+
+                                    {/* 3. COPY BUTTON */}
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleCopy(item.title)}
+                                      aria-label="copy product name"
+                                      sx={{ mt: -0.5 }}
+                                    >
+                                      <ContentCopyIcon fontSize="small" sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  </Box>
+                                ))
+                              ) : (
+                                /* Fallback for old orders */
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Chip label="x1" size="small" />
+                                  <Typography variant="body2">
+                                    {order.productName || '-'}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </Stack>
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('buyerName') && (
+                          <TableCell sx={{ maxWidth: 150, pr: 1 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
-                              <Tooltip title={order.trackingNumber} arrow>
+                              <Tooltip title={order.buyer?.buyerRegistrationAddress?.fullName || '-'} arrow>
                                 <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {order.trackingNumber}
+                                  {order.buyer?.buyerRegistrationAddress?.fullName || '-'}
                                 </Typography>
                               </Tooltip>
-                              <IconButton size="small" onClick={() => handleCopy(order.trackingNumber)} aria-label="copy tracking number">
+                              <IconButton size="small" onClick={() => handleCopy(order.buyer?.buyerRegistrationAddress?.fullName || '-')} aria-label="copy buyer name">
                                 <ContentCopyIcon fontSize="small" />
                               </IconButton>
                             </Box>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
-                          )}
-                        </TableCell>
-                      )}
-
-                      {/* 1. Amazon Account */}
-                      {visibleColumns.includes('amazonAccount') && (
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <AutoSaveSelect
-                              value={order.amazonAccount}
-                              options={amazonAccounts}
-                              onSave={(val) => updateManualField(order._id, 'amazonAccount', val)}
-                            />
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCopy(order.amazonAccount || '-')}
-                              aria-label="copy amazon account"
-                              sx={{ p: 0.5 }}
-                            >
-                              <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      )}
-
-                      {/* 2. Arriving Date */}
-                      {visibleColumns.includes('arriving') && (
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <AutoSaveDatePicker
-                              value={order.arrivingDate}
-                              onSave={(val) => updateManualField(order._id, 'arrivingDate', val)}
-                            />
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCopy(order.arrivingDate || '-')}
-                              aria-label="copy arriving date"
-                              sx={{ p: 0.5 }}
-                            >
-                              <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      )}
-
-                      {/* 3. Before Tax */}
-                      {visibleColumns.includes('beforeTax') && (
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <AutoSaveTextField
-                              type="number"
-                              value={order.beforeTax}
-                              onSave={(val) => updateManualField(order._id, 'beforeTax', val)}
-                            />
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCopy(order.beforeTax || '-')}
-                              aria-label="copy before tax"
-                              sx={{ p: 0.5 }}
-                            >
-                              <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      )}
-
-                      {/* 4. Estimated Tax */}
-                      {visibleColumns.includes('estimatedTax') && (
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <AutoSaveTextField
-                              type="number"
-                              value={order.estimatedTax}
-                              onSave={(val) => updateManualField(order._id, 'estimatedTax', val)}
-                            />
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCopy(order.estimatedTax || '-')}
-                              aria-label="copy estimated tax"
-                              sx={{ p: 0.5 }}
-                            >
-                              <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      )}
-
-                      {/* 5. Amazon Order ID */}
-                      {visibleColumns.includes('azOrderId') && (
-                        <TableCell sx={{ minWidth: 200 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <AutoSaveTextField
-                              value={order.azOrderId}
-                              onSave={(val) => updateManualField(order._id, 'azOrderId', val)}
-                              sx={{ minWidth: 150 }}
-                            />
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCopy(order.azOrderId || '-')}
-                              aria-label="copy amazon order id"
-                              sx={{ p: 0.5 }}
-                            >
-                              <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      )}
-
-                      {/* 6. Amazon Refund */}
-                      {visibleColumns.includes('amazonRefund') && (
-                        <TableCell sx={{ minWidth: 200 }}>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <AutoSaveTextField
-                              value={order.amazonRefund}
-                              type="number"
-                              onSave={(val) => updateManualField(order._id, 'amazonRefund', val)}
-                              sx={{ minWidth: 100 }}
-                            />
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCopy(order.amazonRefund || '-')}
-                              aria-label="copy amazon refund"
-                              sx={{ p: 0.5 }}
-                            >
-                              <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
-                            </IconButton>
-                            {order.beforeTaxUSD > 0 && (
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('shippingAddress') && (
+                          <TableCell sx={{ maxWidth: 300 }}>
+                            <Collapse in={expandedShippingId === order._id} timeout="auto">
+                              <Stack spacing={0.5}>
+                                {/* Full Name */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Tooltip title={order.shippingFullName || '-'} arrow>
+                                    <Typography variant="body2" fontWeight="medium" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      {order.shippingFullName || '-'}
+                                    </Typography>
+                                  </Tooltip>
+                                  <IconButton size="small" onClick={() => handleCopy(order.shippingFullName)} aria-label="copy name">
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                                {/* Address Line 1 */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Tooltip title={order.shippingAddressLine1 || '-'} arrow>
+                                    <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      {order.shippingAddressLine1 || '-'}
+                                    </Typography>
+                                  </Tooltip>
+                                  <IconButton size="small" onClick={() => handleCopy(order.shippingAddressLine1)} aria-label="copy address">
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                                {/* Address Line 2 */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Tooltip title={order.shippingAddressLine2 || '-'} arrow>
+                                    <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      {order.shippingAddressLine2 || '-'}
+                                    </Typography>
+                                  </Tooltip>
+                                  <IconButton size="small" onClick={() => handleCopy(order.shippingAddressLine2)} aria-label="copy address line 2">
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                                {/* City */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Tooltip title={order.shippingCity || '-'} arrow>
+                                    <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      {order.shippingCity || '-'}
+                                    </Typography>
+                                  </Tooltip>
+                                  <IconButton size="small" onClick={() => handleCopy(order.shippingCity)} aria-label="copy city">
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                                {/* State */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Tooltip title={order.shippingState || '-'} arrow>
+                                    <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      {order.shippingState || '-'}
+                                    </Typography>
+                                  </Tooltip>
+                                  <IconButton size="small" onClick={() => handleCopy(order.shippingState)} aria-label="copy state">
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                                {/* Postal Code */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Tooltip title={order.shippingPostalCode || '-'} arrow>
+                                    <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      {order.shippingPostalCode || '-'}
+                                    </Typography>
+                                  </Tooltip>
+                                  <IconButton size="small" onClick={() => handleCopy(order.shippingPostalCode)} aria-label="copy postal code">
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                                {/* Country */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Tooltip title={order.shippingCountry || '-'} arrow>
+                                    <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      {order.shippingCountry || '-'}
+                                    </Typography>
+                                  </Tooltip>
+                                  <IconButton size="small" onClick={() => handleCopy(order.shippingCountry)} aria-label="copy country">
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                                {/* Phone */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Tooltip title={order.shippingPhone || '0000000000'} arrow>
+                                    <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      📞 {'0000000000'}
+                                    </Typography>
+                                  </Tooltip>
+                                  <IconButton size="small" onClick={() => handleCopy('0000000000')} aria-label="copy phone">
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                                {/* Collapse Button */}
+                                <Button
+                                  size="small"
+                                  onClick={() => toggleShippingExpanded(order._id)}
+                                  startIcon={<ExpandLessIcon />}
+                                  sx={{ mt: 0.5 }}
+                                >
+                                  Collapse
+                                </Button>
+                              </Stack>
+                            </Collapse>
+                            <Collapse in={expandedShippingId !== order._id} timeout="auto">
                               <Button
                                 size="small"
-                                variant="contained"
-                                color="success"
-                                onClick={() => handleAmazonRefundReceived(order)}
-                                sx={{ minWidth: 90, fontSize: '0.7rem', py: 0.5 }}
+                                onClick={() => toggleShippingExpanded(order._id)}
+                                endIcon={<ExpandMoreIcon />}
+                                sx={{ textTransform: 'none' }}
                               >
-                                Received
+                                {order.shippingFullName || 'View Address'}
                               </Button>
-                            )}
-                          </Stack>
-                        </TableCell>
-                      )}
-
-                      {/* 7. Card Name */}
-                      {visibleColumns.includes('cardName') && (
-                        <TableCell sx={{ minWidth: 200 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <AutoSaveSelect
-                              value={order.cardName || ''}
-                              options={creditCards}
-                              onSave={(val) => updateManualField(order._id, 'cardName', val)}
-                            />
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCopy(order.cardName || '-')}
-                              aria-label="copy card name"
-                              sx={{ p: 0.5 }}
-                            >
-                              <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      )}
-
-
-                      {visibleColumns.includes('notes') && (
-                        <TableCell>
-                          <NotesCell
-                            order={order}
-                            onSave={handleSaveNote}
-                            onNotify={showNotification}
-                          />
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('messagingStatus') && (
-                        <TableCell align="center">
-                          <Stack direction="row" spacing={0.5} justifyContent="center">
-                            <Tooltip title="Message Buyer">
-                              <IconButton
-                                color="primary"
-                                size="small"
-                                onClick={() => handleOpenMessageDialog(order)}
+                            </Collapse>
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('marketplace') && (
+                          <TableCell>
+                            <Typography variant="body2">
+                              {order.purchaseMarketplaceId || '-'}
+                            </Typography>
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('subtotal') && (
+                          order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                            <TableCell align="right">
+                              <Typography variant="body2" fontWeight="medium">
+                                {formatCurrency(order.subtotalUSD)}
+                              </Typography>
+                            </TableCell>
+                          ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
+                        )}
+                        {visibleColumns.includes('shipping') && (
+                          order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                            <TableCell align="right">{formatCurrency(order.shippingUSD)}</TableCell>
+                          ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
+                        )}
+                        {visibleColumns.includes('salesTax') && (
+                          order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                            <TableCell align="right">{formatCurrency(order.salesTaxUSD)}</TableCell>
+                          ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
+                        )}
+                        {visibleColumns.includes('discount') && (
+                          order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                            <TableCell align="right">
+                              <Typography variant="body2">
+                                {formatCurrency(order.discountUSD)}
+                              </Typography>
+                            </TableCell>
+                          ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
+                        )}
+                        {visibleColumns.includes('transactionFees') && (
+                          order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                            <TableCell align="right">{formatCurrency(order.transactionFeesUSD)}</TableCell>
+                          ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
+                        )}
+                        {visibleColumns.includes('adFeeGeneral') && (
+                          order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
+                            <TableCell align="right">
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: order.adFeeGeneral ? 'medium' : 'normal',
+                                  color: order.adFeeGeneral ? 'error.main' : 'text.secondary'
+                                }}
                               >
-                                <ChatIcon />
+                                {order.adFeeGeneral ? formatCurrency(order.adFeeGeneral) : '-'}
+                              </Typography>
+                            </TableCell>
+                          ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
+                        )}
+                        {visibleColumns.includes('cancelStatus') && (
+                          <TableCell>
+                            <Chip
+                              label={order.cancelState || 'NONE_REQUESTED'}
+                              size="small"
+                              color={
+                                order.cancelState === 'CANCELED' ? 'error' :
+                                  order.cancelState === 'CANCEL_REQUESTED' ? 'warning' :
+                                    order.cancelState === 'IN_PROGRESS' ? 'warning' :
+                                      'success'
+                              }
+                              sx={{
+                                fontSize: '0.7rem',
+                                backgroundColor: order.cancelState === 'IN_PROGRESS' ? '#ffd700' : undefined,
+                                color: order.cancelState === 'IN_PROGRESS' ? '#000' : undefined,
+                                fontWeight: order.cancelState === 'IN_PROGRESS' ? 'bold' : 'normal'
+                              }}
+                            />
+                          </TableCell>
+                        )}
+                        {/* --- REPLACEMENT FOR REFUNDS CELL --- */}
+                        {visibleColumns.includes('refunds') && (
+                          <TableCell>
+                            {order.refunds && order.refunds.length > 0 ? (
+                              <Stack spacing={0.5}>
+                                {order.refunds.map((refund, idx) => {
+                                  // 1. Get Amount in USD (convert using order's conversion rate)
+                                  const rawValue = refund.amount?.value || refund.refundAmount?.value || 0;
+                                  const conversionRate = order.conversionRate || 1;
+                                  const amountUSD = (Number(rawValue) * conversionRate).toFixed(2);
+
+                                  // 2. Determine Label & Color based on Order Status
+                                  // If order says 'FULLY_REFUNDED', we label it Full. Otherwise Partial.
+                                  const isFull = order.orderPaymentStatus === 'FULLY_REFUNDED';
+                                  const typeLabel = isFull ? 'Full' : 'Partial';
+                                  const color = isFull ? 'error' : 'warning'; // Red for Full, Orange for Partial
+
+                                  return (
+                                    <Chip
+                                      key={idx}
+                                      // Result: "Full: $28.17" or "Partial: $15.00" (in USD)
+                                      label={`${typeLabel}: $${amountUSD}`}
+                                      size="small"
+                                      color={color}
+                                      variant="outlined"
+                                      sx={{
+                                        fontWeight: 'bold',
+                                        fontSize: '0.75rem',
+                                        height: 24
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </Stack>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">-</Typography>
+                            )}
+                          </TableCell>
+                        )}
+                        {/* --- NEW: Refund Breakdown Columns --- */}
+                        {visibleColumns.includes('refundItemAmount') && (
+                          <TableCell align="right">
+                            {order.refundItemAmount ? (
+                              <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 'medium' }}>
+                                {formatCurrency(order.refundItemAmount)}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">-</Typography>
+                            )}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('refundTaxAmount') && (
+                          <TableCell align="right">
+                            {order.refundTaxAmount ? (
+                              <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 'medium' }}>
+                                {formatCurrency(order.refundTaxAmount)}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">-</Typography>
+                            )}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('refundTotalToBuyer') && (
+                          <TableCell align="right">
+                            {order.refundTotalToBuyer ? (
+                              <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 'bold' }}>
+                                {formatCurrency(order.refundTotalToBuyer)}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">-</Typography>
+                            )}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('orderTotalAfterRefund') && (
+                          <TableCell align="right">
+                            {order.orderTotalAfterRefund != null ? (
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  color: order.orderTotalAfterRefund >= 0 ? 'text.primary' : 'error.main',
+                                  fontWeight: 'medium'
+                                }}
+                              >
+                                {formatCurrency(order.orderTotalAfterRefund)}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">-</Typography>
+                            )}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('orderEarnings') && (
+                          <TableCell align="right">
+                            {order.orderPaymentStatus === 'PARTIALLY_REFUNDED' ? (
+                              <TextField
+                                size="small"
+                                type="number"
+                                value={order.orderEarnings || ''}
+                                onChange={(e) => handleOrderEarningsChange(order._id, order.orderId, e.target.value)}
+                                onBlur={() => handleOrderEarningsSave(order._id, order.orderId)}
+                                sx={{
+                                  width: 100,
+                                  '& .MuiInputBase-input': {
+                                    textAlign: 'right',
+                                    fontSize: '0.875rem',
+                                    color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
+                                    fontWeight: 'bold'
+                                  }
+                                }}
+                                inputProps={{ step: '0.01' }}
+                              />
+                            ) : order.orderEarnings != null ? (
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                {formatCurrency(order.orderEarnings)}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">-</Typography>
+                            )}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('trackingNumber') && (
+                          <TableCell sx={{ maxWidth: 150, pr: 1 }}>
+                            {order.trackingNumber ? (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
+                                <Tooltip title={order.trackingNumber} arrow>
+                                  <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {order.trackingNumber}
+                                  </Typography>
+                                </Tooltip>
+                                <IconButton size="small" onClick={() => handleCopy(order.trackingNumber)} aria-label="copy tracking number">
+                                  <ContentCopyIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">-</Typography>
+                            )}
+                          </TableCell>
+                        )}
+
+                        {/* 1. Amazon Account */}
+                        {visibleColumns.includes('amazonAccount') && (
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <AutoSaveSelect
+                                value={order.amazonAccount}
+                                options={amazonAccounts}
+                                onSave={(val) => updateManualField(order._id, 'amazonAccount', val)}
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(order.amazonAccount || '-')}
+                                aria-label="copy amazon account"
+                                sx={{ p: 0.5 }}
+                              >
+                                <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
                               </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('remark') && (
-                        <TableCell>
-                          <AutoSaveSelect
-                            value={order.remark || ''}
-                            options={REMARK_OPTIONS}
-                            onSave={(val) => handleRemarkUpdate(order._id, val)}
-                          />
-                        </TableCell>
-                      )}
+                            </Box>
+                          </TableCell>
+                        )}
+
+                        {/* 2. Arriving Date */}
+                        {visibleColumns.includes('arriving') && (
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <AutoSaveDatePicker
+                                value={order.arrivingDate}
+                                onSave={(val) => updateManualField(order._id, 'arrivingDate', val)}
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(order.arrivingDate || '-')}
+                                aria-label="copy arriving date"
+                                sx={{ p: 0.5 }}
+                              >
+                                <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                        )}
+
+                        {/* 3. Before Tax */}
+                        {visibleColumns.includes('beforeTax') && (
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <AutoSaveTextField
+                                type="number"
+                                value={order.beforeTax}
+                                onSave={(val) => updateManualField(order._id, 'beforeTax', val)}
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(order.beforeTax || '-')}
+                                aria-label="copy before tax"
+                                sx={{ p: 0.5 }}
+                              >
+                                <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                        )}
+
+                        {/* 4. Estimated Tax */}
+                        {visibleColumns.includes('estimatedTax') && (
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <AutoSaveTextField
+                                type="number"
+                                value={order.estimatedTax}
+                                onSave={(val) => updateManualField(order._id, 'estimatedTax', val)}
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(order.estimatedTax || '-')}
+                                aria-label="copy estimated tax"
+                                sx={{ p: 0.5 }}
+                              >
+                                <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                        )}
+
+                        {/* 5. Amazon Order ID */}
+                        {visibleColumns.includes('azOrderId') && (
+                          <TableCell sx={{ minWidth: 200 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <AutoSaveTextField
+                                value={order.azOrderId}
+                                onSave={(val) => updateManualField(order._id, 'azOrderId', val)}
+                                sx={{ minWidth: 150 }}
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(order.azOrderId || '-')}
+                                aria-label="copy amazon order id"
+                                sx={{ p: 0.5 }}
+                              >
+                                <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                        )}
+
+                        {/* 6. Amazon Refund */}
+                        {visibleColumns.includes('amazonRefund') && (
+                          <TableCell sx={{ minWidth: 200 }}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <AutoSaveTextField
+                                value={order.amazonRefund}
+                                type="number"
+                                onSave={(val) => updateManualField(order._id, 'amazonRefund', val)}
+                                sx={{ minWidth: 100 }}
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(order.amazonRefund || '-')}
+                                aria-label="copy amazon refund"
+                                sx={{ p: 0.5 }}
+                              >
+                                <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
+                              </IconButton>
+                              {order.beforeTaxUSD > 0 && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="success"
+                                  onClick={() => handleAmazonRefundReceived(order)}
+                                  sx={{ minWidth: 90, fontSize: '0.7rem', py: 0.5 }}
+                                >
+                                  Received
+                                </Button>
+                              )}
+                            </Stack>
+                          </TableCell>
+                        )}
+
+                        {/* 7. Card Name */}
+                        {visibleColumns.includes('cardName') && (
+                          <TableCell sx={{ minWidth: 200 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <AutoSaveSelect
+                                value={order.cardName || ''}
+                                options={creditCards}
+                                onSave={(val) => updateManualField(order._id, 'cardName', val)}
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(order.cardName || '-')}
+                                aria-label="copy card name"
+                                sx={{ p: 0.5 }}
+                              >
+                                <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                        )}
 
 
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </>
-      )}
+                        {visibleColumns.includes('notes') && (
+                          <TableCell>
+                            <NotesCell
+                              order={order}
+                              onSave={handleSaveNote}
+                              onNotify={showNotification}
+                            />
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('messagingStatus') && (
+                          <TableCell align="center">
+                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                              <Tooltip title="Message Buyer">
+                                <IconButton
+                                  color="primary"
+                                  size="small"
+                                  onClick={() => handleOpenMessageDialog(order)}
+                                >
+                                  <ChatIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('remark') && (
+                          <TableCell>
+                            <AutoSaveSelect
+                              value={order.remark || ''}
+                              options={REMARK_OPTIONS}
+                              onSave={(val) => handleRemarkUpdate(order._id, val)}
+                            />
+                          </TableCell>
+                        )}
+
+
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
+        )
+      }
 
       {/* Pagination Controls - FIXED AT BOTTOM */}
-      {!loading && orders.length > 0 && totalPages > 1 && (
-        <Box sx={{
-          py: { xs: 0.75, sm: 1 },
-          px: { xs: 1, sm: 2 },
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: { xs: 0.5, sm: 2 },
-          flexShrink: 0,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'background.paper'
-        }}>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}
-          >
-            {isSmallMobile
-              ? `${(currentPage - 1) * ordersPerPage + 1}-${Math.min(currentPage * ordersPerPage, totalOrders)} of ${totalOrders}`
-              : `Showing ${(currentPage - 1) * ordersPerPage + 1} - ${Math.min(currentPage * ordersPerPage, totalOrders)} of ${totalOrders} orders`
-            }
-          </Typography>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(e, page) => setCurrentPage(page)}
-            color="primary"
-            showFirstButton={!isMobile}
-            showLastButton={!isMobile}
-            size={isSmallMobile ? 'small' : 'medium'}
-            siblingCount={isSmallMobile ? 0 : 1}
-            boundaryCount={isSmallMobile ? 1 : 1}
-          />
-        </Box>
-      )}
+      {
+        !loading && orders.length > 0 && totalPages > 1 && (
+          <Box sx={{
+            py: { xs: 0.75, sm: 1 },
+            px: { xs: 1, sm: 2 },
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: { xs: 0.5, sm: 2 },
+            flexShrink: 0,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper'
+          }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}
+            >
+              {isSmallMobile
+                ? `${(currentPage - 1) * ordersPerPage + 1}-${Math.min(currentPage * ordersPerPage, totalOrders)} of ${totalOrders}`
+                : `Showing ${(currentPage - 1) * ordersPerPage + 1} - ${Math.min(currentPage * ordersPerPage, totalOrders)} of ${totalOrders} orders`
+              }
+            </Typography>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={(e, page) => setCurrentPage(page)}
+              color="primary"
+              showFirstButton={!isMobile}
+              showLastButton={!isMobile}
+              size={isSmallMobile ? 'small' : 'medium'}
+              siblingCount={isSmallMobile ? 0 : 1}
+              boundaryCount={isSmallMobile ? 1 : 1}
+            />
+          </Box>
+        )
+      }
 
 
       <ChatDialog
@@ -4315,7 +4435,7 @@ function FulfillmentDashboard() {
           </Box>
         </MuiAlert>
       </Snackbar>
-    </Box>
+    </Box >
   );
 }
 
