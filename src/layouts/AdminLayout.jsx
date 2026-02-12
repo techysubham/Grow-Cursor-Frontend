@@ -1,3 +1,6 @@
+import WorkHRDashboard from '../pages/WorkHRDashboard.jsx';
+          {/* Work & HR Dashboard - accessible to all authenticated users */}
+          <Route path="/work-hr-dashboard" element={<WorkHRDashboard />} />
 import { useMemo, useState, useEffect, startTransition } from 'react';
 import { Link, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -230,6 +233,22 @@ export default function AdminLayout({ user, onLogout }) {
 
         {/* Divider after lister dashboard link */}
         {isAnyLister && <Divider sx={{ my: 1 }} />}
+
+        {/* Work & HR Dashboard - visible to ALL users */}
+        <ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            to="/admin/work-hr-dashboard"
+            onClick={() => setMobileOpen(false)}
+            selected={location.pathname === '/admin/work-hr-dashboard'}
+            sx={selectedMenuItemStyle}
+          >
+            <ListItemIcon>
+              <NavIcon icon={SupervisorAccountIcon} label="Work & HR Dashboard" sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
+            {sidebarOpen && <ListItemText primary="Work & HR Dashboard" />}
+          </ListItemButton>
+        </ListItem>
 
         {/* Ideas & Issues - visible to ALL users */}
         <ListItem disablePadding>
@@ -1336,6 +1355,7 @@ export default function AdminLayout({ user, onLogout }) {
         <Routes>
           {/* Ideas & Issues - accessible to ALL roles */}
           <Route path="/ideas" element={<IdeasPage />} />
+          <Route path="/work-hr-dashboard" element={<WorkHRDashboard />} />
 
           {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
           {isProductAdmin || isSuper ? (
