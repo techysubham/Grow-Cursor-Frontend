@@ -1188,6 +1188,41 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
+        {/* Leave Management - visible to ALL users for applying leaves */}
+        {(!isSuper) && (<ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            to="/admin/my-leaves"
+            onClick={() => setMobileOpen(false)}
+            selected={location.pathname === '/admin/my-leaves'}
+            sx={selectedMenuItemStyle}
+          >
+            <ListItemIcon>
+              <NavIcon icon={EventAvailableIcon} label="My Leave Requests" sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
+            {sidebarOpen && <ListItemText primary="My Leaves" />}
+          </ListItemButton>
+        </ListItem>)}
+
+        {/* Leave Admin - visible to superadmin and hradmin only */}
+        {(isSuper || isHRAdmin) && (
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/admin/leave-admin"
+              onClick={() => setMobileOpen(false)}
+              selected={location.pathname === '/admin/leave-admin'}
+              sx={selectedMenuItemStyle}
+            >
+              <ListItemIcon>
+                <NavIcon icon={AdminPanelSettingsIcon} label="Leave Management (Admin)" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
+              {sidebarOpen && <ListItemText primary="Leave Admin" />}
+            </ListItemButton>
+          </ListItem>
+        )}
+
+        {/* [Testing]Employee Details - visible to superadmin, hradmin, and operation head */}
         {(isSuper || isHRAdmin || isOperationHead) && (
           <>
             <ListItem disablePadding>
@@ -1207,39 +1242,6 @@ export default function AdminLayout({ user, onLogout }) {
           </>
         )}
 
-        {/* Leave Management - visible to ALL users for applying leaves */}
-        <ListItem disablePadding>
-          <ListItemButton
-            component={Link}
-            to="/admin/my-leaves"
-            onClick={() => setMobileOpen(false)}
-            selected={location.pathname === '/admin/my-leaves'}
-            sx={selectedMenuItemStyle}
-          >
-            <ListItemIcon>
-              <NavIcon icon={EventAvailableIcon} label="My Leave Requests" sidebarOpen={sidebarOpen} />
-            </ListItemIcon>
-            {sidebarOpen && <ListItemText primary="My Leaves" />}
-          </ListItemButton>
-        </ListItem>
-
-        {/* Leave Admin - visible to superadmin and hradmin only */}
-        {(isSuper || isHRAdmin) && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/leave-admin"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/leave-admin'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon>
-                <NavIcon icon={AdminPanelSettingsIcon} label="Leave Management (Admin)" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Leave Admin" />}
-            </ListItemButton>
-          </ListItem>
-        )}
       </List>
     </div>
   );
