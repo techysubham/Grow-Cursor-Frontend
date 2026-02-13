@@ -81,14 +81,14 @@ We'll keep you updated as soon as it ships.`
 
 function NotesCell({ order, onSave, onNotify }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [tempValue, setTempValue] = useState(order.fulfillmentNotes || '');
+  const [tempValue, setTempValue] = useState(order.notes || '');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!isEditing) {
-      setTempValue(order.fulfillmentNotes || '');
+      setTempValue(order.notes || '');
     }
-  }, [order.fulfillmentNotes, isEditing]);
+  }, [order.notes, isEditing]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -124,7 +124,7 @@ function NotesCell({ order, onSave, onNotify }) {
             size="small"
             variant="outlined"
             onClick={() => {
-              setTempValue(order.fulfillmentNotes || '');
+              setTempValue(order.notes || '');
               setIsEditing(false);
             }}
             disabled={isSaving}
@@ -144,8 +144,8 @@ function NotesCell({ order, onSave, onNotify }) {
       }}
       sx={{ cursor: 'pointer', minHeight: 24 }}
     >
-      <Typography variant="body2" sx={{ fontSize: '0.85rem', fontStyle: !order.fulfillmentNotes ? 'italic' : 'normal', color: !order.fulfillmentNotes ? 'text.secondary' : 'text.primary' }}>
-        {order.fulfillmentNotes || '+ Add Note'}
+      <Typography variant="body2" sx={{ fontSize: '0.85rem', fontStyle: !order.notes ? 'italic' : 'normal', color: !order.notes ? 'text.secondary' : 'text.primary' }}>
+        {order.notes || '+ Add Note'}
       </Typography>
     </Box>
   );
@@ -296,9 +296,9 @@ export default function AmazonArrivalsPage() {
     setSelectedOrderForMessage(null);
   };
 
-  const updateFulfillmentNotes = async (orderId, value) => {
-    await api.patch(`/ebay/orders/${orderId}/fulfillment-notes`, { fulfillmentNotes: value });
-    setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, fulfillmentNotes: value } : o)));
+  const updateSharedOrderNotes = async (orderId, value) => {
+    await api.patch(`/ebay/orders/${orderId}/notes`, { notes: value });
+    setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, notes: value } : o)));
   };
 
   const replaceTemplateVariables = (template, order) => {
@@ -753,7 +753,7 @@ export default function AmazonArrivalsPage() {
                     <TableCell sx={{ maxWidth: 260 }}>
                       <NotesCell
                         order={order}
-                        onSave={updateFulfillmentNotes}
+                        onSave={updateSharedOrderNotes}
                         onNotify={showSnack}
                       />
                     </TableCell>

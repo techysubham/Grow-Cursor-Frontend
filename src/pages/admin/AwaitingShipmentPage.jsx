@@ -25,6 +25,10 @@ import {
   Select,
   MenuItem,
   Popover,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -32,8 +36,11 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
+import ChatIcon from '@mui/icons-material/Chat';
+import InfoIcon from '@mui/icons-material/Info';
 import api from '../../lib/api';
 import ColumnSelector from '../../components/ColumnSelector';
+import ChatModal from '../../components/ChatModal';
 
 const ALL_COLUMNS = [
   { id: 'seller', label: 'Seller' },
@@ -60,6 +67,7 @@ const ALL_COLUMNS = [
   { id: 'orderEarnings', label: 'Order Earnings' },
   { id: 'trackingNumber', label: 'Tracking Number' },
   { id: 'manualTracking', label: 'Manual Tracking' },
+  { id: 'trackingId', label: 'Tracking ID' },
   { id: 'zipcode', label: 'Zipcode' },
   { id: 'amazonAccount', label: 'Amazon Acc' },
   { id: 'arriving', label: 'Arriving' },
@@ -73,6 +81,45 @@ const ALL_COLUMNS = [
   { id: 'remark', label: 'Remark' },
   { id: 'alreadyInUse', label: 'Already in use' }
 ];
+
+const REMARK_OPTIONS = [
+  'Delivered',
+  'In-transit',
+  'Processing',
+  'Shipped',
+  'Out for delivery',
+  'Delayed',
+  'Refund',
+  'Not yet shipped'
+];
+
+const REMARK_MESSAGE_TEMPLATES = {
+  'Delivered': `Hello {{buyer_first_name}},
+Thanks for your patience, we hope your package was delivered successfully and in satisfactory condition.
+If there are any issues with your order, please let us know so we can take care of it quickly.
+If you are satisfied, please leave us positive feedback with five stars.
+Thanks again and have a wonderful day.`,
+  'In-transit': `Hi {{buyer_first_name}}, We're pleased to let you know that your order is currently in transit and will be delivered shortly.
+Thank you for your trust and support.`,
+  'Processing': `Hi {{buyer_first_name}},
+We're pleased to inform you that your order has been processed.
+Also, we are actively monitoring your order to ensure it reaches you smoothly and tracking number will be updated on your eBay order page as soon as they become available.
+Thank you for choosing us.`,
+  'Shipped': `Hi {{buyer_first_name}},
+Your order has been shipped.
+We are still waiting for the tracking number from the warehouse and it will be updated shortly.`,
+  'Out for delivery': `Hi {{buyer_first_name}},
+Your package is currently out for delivery and should arrive shortly.`,
+  'Delayed': `Hi {{buyer_first_name}},
+We apologize for the delay in your shipment.
+Your package is still in transit and should arrive soon.`,
+  'Refund': `Hi {{buyer_first_name}},
+Your refund has been processed successfully.
+Please allow a few business days for it to reflect in your account.`,
+  'Not yet shipped': `Hi {{buyer_first_name}},
+Your order has not shipped yet, but our team is actively working on it.
+We'll keep you updated as soon as it ships.`
+};
 
 // ... (Rest of the file remains unchanged until ManualTrackingCell)
 
@@ -409,6 +456,10 @@ export default function AwaitingShipmentPage() {
   const [error, setError] = useState('');
   const [expandedShipping, setExpandedShipping] = useState({});
   const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
+  const [selectedOrderForMessage, setSelectedOrderForMessage] = useState(null);
+  const [remarkConfirmOpen, setRemarkConfirmOpen] = useState(false);
+  const [pendingRemarkUpdate, setPendingRemarkUpdate] = useState(null); // { orderId, remarkValue, order }
+  const [sendingRemarkMessage, setSendingRemarkMessage] = useState(false);
 
   // Pagination State
   const [page, setPage] = useState(1);
@@ -424,7 +475,7 @@ export default function AwaitingShipmentPage() {
   const [shipByDate, setShipByDate] = useState('');
 
   const [visibleColumns, setVisibleColumns] = useState([
-    'seller', 'orderId', 'marketplace', 'dateSold', 'shipBy', 'productName', 'buyerName', 'shippingAddress', 'trackingNumber', 'notes'
+    'seller', 'orderId', 'marketplace', 'dateSold', 'shipBy', 'productName', 'buyerName', 'shippingAddress', 'trackingNumber', 'trackingId', 'notes'
   ]); // Default specific to Awaiting Shipment needs, or use ALL_COLUMNS.map(c => c.id)
 
   const formatCurrency = (value) => {
@@ -548,6 +599,98 @@ export default function AwaitingShipmentPage() {
   const showSnack = (severity, message) => {
     setSnack({ open: true, severity, message });
     setTimeout(() => setSnack(prev => ({ ...prev, open: false })), 2500);
+  };
+
+  const handleOpenMessageDialog = (order) => {
+    setSelectedOrderForMessage(order);
+  };
+
+  const handleCloseMessageDialog = () => {
+    setSelectedOrderForMessage(null);
+  };
+
+  const replaceTemplateVariables = (template, order) => {
+    const buyerFullName = order?.buyer?.buyerRegistrationAddress?.fullName || order?.buyerUsername || 'Customer';
+    const buyerFirstName = buyerFullName.split(' ')[0] || 'Customer';
+    return template
+      .replace(/\{\{buyer_first_name\}\}/g, buyerFirstName)
+      .replace(/\{\{buyer_name\}\}/g, buyerFullName)
+      .replace(/\{\{order_id\}\}/g, order?.orderId || '');
+  };
+
+  const applyRemarkUpdateOnly = async (orderId, remarkValue) => {
+    try {
+      const normalizedRemark = remarkValue ? remarkValue : null;
+      await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemark });
+      setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, remark: normalizedRemark } : o)));
+      return true;
+    } catch (err) {
+      showSnack('error', err?.response?.data?.error || 'Failed to update remark');
+      return false;
+    }
+  };
+
+  const sendAutoMessageForRemark = async (order, remarkValue) => {
+    const template = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    if (!template) return false;
+
+    const messageBody = replaceTemplateVariables(template, order);
+    await api.post('/ebay/send-message', {
+      orderId: order.orderId,
+      buyerUsername: order.buyer?.username || order.buyerUsername,
+      itemId: order.itemNumber || order.lineItems?.[0]?.legacyItemId,
+      body: messageBody,
+      subject: `Regarding Order #${order.orderId}`
+    });
+    return true;
+  };
+
+  const handleConfirmRemarkMessage = async () => {
+    if (!pendingRemarkUpdate) return;
+    const { orderId, remarkValue, order } = pendingRemarkUpdate;
+    setSendingRemarkMessage(true);
+    try {
+      const updated = await applyRemarkUpdateOnly(orderId, remarkValue);
+      if (!updated) return;
+      await sendAutoMessageForRemark(order, remarkValue);
+      showSnack('success', `✅ Remark updated to "${remarkValue}" and message sent`);
+    } catch (err) {
+      showSnack('error', err?.response?.data?.error || 'Failed to send message');
+    } finally {
+      setSendingRemarkMessage(false);
+      setRemarkConfirmOpen(false);
+      setPendingRemarkUpdate(null);
+    }
+  };
+
+  const handleSkipRemarkMessage = async () => {
+    if (!pendingRemarkUpdate) return;
+    const { orderId, remarkValue } = pendingRemarkUpdate;
+    const updated = await applyRemarkUpdateOnly(orderId, remarkValue);
+    if (updated) {
+      showSnack('success', `✅ Remark updated to "${remarkValue}" (message not sent)`);
+    }
+    setRemarkConfirmOpen(false);
+    setPendingRemarkUpdate(null);
+  };
+
+  const handleRemarkUpdate = async (orderId, remarkValue) => {
+    if (!remarkValue) {
+      const updated = await applyRemarkUpdateOnly(orderId, '');
+      if (updated) showSnack('success', '✅ Remark cleared');
+      return;
+    }
+
+    const order = orders.find(o => o._id === orderId);
+    const hasTemplate = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    if (order && hasTemplate) {
+      setPendingRemarkUpdate({ orderId, remarkValue, order });
+      setRemarkConfirmOpen(true);
+      return;
+    }
+
+    const updated = await applyRemarkUpdateOnly(orderId, remarkValue);
+    if (updated) showSnack('success', '✅ Remark updated');
   };
 
   const toggleShippingExpanded = (orderId) => {
@@ -736,10 +879,54 @@ export default function AwaitingShipmentPage() {
           <NotesCell
             order={order}
             onSaved={(newNotes) => {
+              setOrders(prev => prev.map(o => (o._id === order._id ? { ...o, fulfillmentNotes: newNotes } : o)));
+            }}
+            onNotify={showSnack}
+            fieldLabel="Notes"
+            valueKey="fulfillmentNotes"
+            endpoint="fulfillment-notes"
+            payloadKey="fulfillmentNotes"
+          />
+        );
+      case 'trackingId':
+        return (
+          <NotesCell
+            order={order}
+            onSaved={(newNotes) => {
               setOrders(prev => prev.map(o => (o._id === order._id ? { ...o, notes: newNotes } : o)));
             }}
             onNotify={showSnack}
+            fieldLabel="Tracking ID"
           />
+        );
+      case 'messagingStatus':
+        return (
+          <Box sx={{ textAlign: 'center' }}>
+            <Tooltip title="Message Buyer">
+              <IconButton
+                color="primary"
+                size="small"
+                onClick={() => handleOpenMessageDialog(order)}
+              >
+                <ChatIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        );
+      case 'remark':
+        return (
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <Select
+              value={order.remark || ''}
+              displayEmpty
+              onChange={(e) => handleRemarkUpdate(order._id, e.target.value)}
+            >
+              <MenuItem value="">Select Remark</MenuItem>
+              {REMARK_OPTIONS.map((opt) => (
+                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         );
       case 'subtotal': return formatCurrency(order.subtotalUSD);
       case 'shipping': return formatCurrency(order.shippingUSD);
@@ -992,6 +1179,67 @@ export default function AwaitingShipmentPage() {
           {snack.message}
         </Alert>
       </Snackbar>
+
+      {selectedOrderForMessage && (
+        <ChatModal
+          open={Boolean(selectedOrderForMessage)}
+          onClose={handleCloseMessageDialog}
+          orderId={selectedOrderForMessage.orderId}
+          buyerUsername={selectedOrderForMessage.buyer?.username || selectedOrderForMessage.buyerUsername}
+          buyerName={selectedOrderForMessage.buyer?.buyerRegistrationAddress?.fullName || selectedOrderForMessage.buyerUsername || 'Buyer'}
+          itemId={selectedOrderForMessage.itemNumber || selectedOrderForMessage.lineItems?.[0]?.legacyItemId}
+          title="Awaiting Shipment Chat"
+          category="Awaiting Shipment"
+          caseStatus={selectedOrderForMessage.messagingStatus || 'Open'}
+        />
+      )}
+
+      <Dialog
+        open={remarkConfirmOpen}
+        onClose={() => {
+          if (!sendingRemarkMessage) {
+            setRemarkConfirmOpen(false);
+            setPendingRemarkUpdate(null);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <ChatIcon color="primary" />
+            <Typography variant="h6">Send Message to Buyer?</Typography>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Alert severity="info" icon={<InfoIcon />}>
+              You are updating the remark to <strong>"{pendingRemarkUpdate?.remarkValue}"</strong>.
+            </Alert>
+            <Typography variant="body2" color="text.secondary">
+              Send the related message template to the buyer as well?
+            </Typography>
+            <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                {pendingRemarkUpdate && REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue]
+                  ? replaceTemplateVariables(
+                      REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue],
+                      pendingRemarkUpdate.order
+                    )
+                  : ''}
+              </Typography>
+            </Paper>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={handleSkipRemarkMessage} disabled={sendingRemarkMessage} variant="outlined">
+            No, Just Update Remark
+          </Button>
+          <Button onClick={handleConfirmRemarkMessage} disabled={sendingRemarkMessage} variant="contained">
+            {sendingRemarkMessage ? 'Sending...' : 'Yes, Send Message'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -1000,15 +1248,23 @@ export default function AwaitingShipmentPage() {
 // ManualTrackingCell has been moved up
 
 
-function NotesCell({ order, onSaved, onNotify }) {
+function NotesCell({
+  order,
+  onSaved,
+  onNotify,
+  fieldLabel = 'Notes',
+  valueKey = 'notes',
+  endpoint = 'notes',
+  payloadKey = 'notes'
+}) {
   const [editing, setEditing] = React.useState(false);
-  const [value, setValue] = React.useState(order.notes || '');
+  const [value, setValue] = React.useState(order[valueKey] || '');
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
 
   useEffect(() => {
-    setValue(order.notes || '');
-  }, [order.notes]);
+    setValue(order[valueKey] || '');
+  }, [order, valueKey]);
 
   const startEdit = () => {
     setError('');
@@ -1016,7 +1272,7 @@ function NotesCell({ order, onSaved, onNotify }) {
   };
 
   const cancel = () => {
-    setValue(order.notes || '');
+    setValue(order[valueKey] || '');
     setEditing(false);
     setError('');
   };
@@ -1025,14 +1281,14 @@ function NotesCell({ order, onSaved, onNotify }) {
     setSaving(true);
     setError('');
     try {
-      const { data } = await api.patch(`/ebay/orders/${order._id}/notes`, { notes: value });
+      const { data } = await api.patch(`/ebay/orders/${order._id}/${endpoint}`, { [payloadKey]: value });
       if (data?.success) {
         onSaved(value);
         setEditing(false);
-        onNotify?.('success', 'Notes saved');
+        onNotify?.('success', `${fieldLabel} saved`);
       } else {
         setError('Failed to save');
-        onNotify?.('error', 'Failed to save notes');
+        onNotify?.('error', `Failed to save ${fieldLabel.toLowerCase()}`);
       }
     } catch (e) {
       const msg = e?.response?.data?.error || 'Save failed';
@@ -1062,10 +1318,10 @@ function NotesCell({ order, onSaved, onNotify }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <Typography variant="body2" sx={{ fontSize: '0.85rem', maxWidth: 200, wordWrap: 'break-word' }}>
-            {order.notes || '-'}
+            {order[valueKey] || '-'}
           </Typography>
           <Button size="small" onClick={startEdit} sx={{ alignSelf: 'flex-start' }}>
-            {order.notes ? 'Edit' : 'Add Notes'}
+            {order[valueKey] ? `Edit ${fieldLabel}` : `Add ${fieldLabel}`}
           </Button>
         </div>
       )}
