@@ -15,6 +15,14 @@ import {
     FormHelperText
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Chip from '@mui/material/Chip';
 import api from '../../lib/api';
 
 // Common Feed Types
@@ -32,14 +40,13 @@ const FeedUploadPage = () => {
     const [sellers, setSellers] = useState([]);
     const [selectedSeller, setSelectedSeller] = useState('');
 
+    const [tasks, setTasks] = useState([]);
+    const [loadingTasks, setLoadingTasks] = useState(false);
+
     // Fetch Sellers on mount
     useEffect(() => {
         const fetchSellers = async () => {
             try {
-                // Assuming there is an endpoint to get sellers, or we can use the existing layout context if available.
-                // For now, I'll try to fetch from /api/sellers if it exists, otherwise I might need to rely on the user to select.
-                // Let's assume a standard endpoint exists or we can mock it/ask user.
-                // Inspecting other pages might help, but I'll try a common pattern.
                 const res = await api.get('/sellers/all');
                 setSellers(res.data);
                 if (res.data.length > 0) {
@@ -52,6 +59,29 @@ const FeedUploadPage = () => {
         };
         fetchSellers();
     }, []);
+
+    // Fetch Tasks when seller changes
+    useEffect(() => {
+        if (selectedSeller) {
+            fetchTasks();
+        }
+    }, [selectedSeller]);
+
+    const fetchTasks = async () => {
+        setLoadingTasks(true);
+        try {
+            const res = await api.get('/ebay/feed/tasks', {
+                params: { sellerId: selectedSeller }
+            });
+            console.log('Fetched tasks:', res.data.tasks);
+            setTasks(res.data.tasks || []);
+        } catch (err) {
+            console.error('Failed to fetch tasks', err);
+            // Don't block UI with error, just log it
+        } finally {
+            setLoadingTasks(false);
+        }
+    };
 
     const handleFileChange = (event) => {
         if (event.target.files && event.target.files[0]) {
@@ -85,6 +115,7 @@ const FeedUploadPage = () => {
             });
 
             setResult(response.data);
+            fetchTasks(); // Refresh list
         } catch (err) {
             console.error('Upload failed', err);
             setError(err.response?.data?.error || err.message || 'Upload failed');
@@ -201,6 +232,80 @@ const FeedUploadPage = () => {
 
                 </Stack>
             </Paper>
+
+            {/* Tasks Table */}
+            <Box sx={{ mt: 4 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                    <Typography variant="h5">Recent Uploads</Typography>
+                    <Button
+                        startIcon={<RefreshIcon />}
+                        onClick={fetchTasks}
+                        disabled={loadingTasks}
+                    >
+                        Refresh
+                    </Button>
+                </Stack>
+
+                <TableContainer component={Paper}>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>Date</TableCell>
+                                <TableCell>Task ID</TableCell>
+                                <TableCell>File Name</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell>Result</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {loadingTasks ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} align="center">
+                                        <CircularProgress size={24} />
+                                    </TableCell>
+                                </TableRow>
+                            ) : tasks.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} align="center">
+                                        No recent uploads found.
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                tasks.map((task) => (
+                                    <TableRow key={task.taskId}>
+                                        <TableCell>
+                                            {new Date(task.creationDate).toLocaleString()}
+                                        </TableCell>
+                                        <TableCell>{task.taskId}</TableCell>
+                                        <TableCell>
+                                            {task.fileName || task.uploadSummary?.inputFileName || '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={task.status}
+                                                color={
+                                                    task.status === 'COMPLETED' ? 'success' :
+                                                        task.status === 'COMPLETED_WITH_ERROR' ? 'warning' :
+                                                            task.status === 'CREATED' ? 'info' :
+                                                                'error'
+                                                }
+                                                size="small"
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            {task.uploadSummary ? (
+                                                <Typography variant="body2" color="textSecondary">
+                                                    {task.uploadSummary.failureCount} failed, {task.uploadSummary.successCount} completed
+                                                </Typography>
+                                            ) : '-'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Box>
         </Box>
     );
 };
