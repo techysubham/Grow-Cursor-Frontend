@@ -583,8 +583,8 @@ export default function TemplateListingsPage() {
         return;
       }
 
-      if (asins.length > 80) {
-        setAsinError('Maximum 80 ASINs allowed per batch');
+      if (asins.length > 100) {
+        setAsinError('Maximum 100 ASINs allowed per batch');
         setLoadingBulk(false);
         return;
       }
@@ -1386,7 +1386,7 @@ export default function TemplateListingsPage() {
                     bulkMode ? 
                       (() => {
                         const stats = getParsingStats(asinInput);
-                        if (stats.total === 0) return 'Enter ASINs (max 50) - supports any format: commas, newlines, spaces, tabs';
+                        if (stats.total === 0) return 'Enter ASINs (max 100) - supports any format: commas, newlines, spaces, tabs';
                         
                         const parts = [];
                         parts.push(`✓ ${stats.uniqueValid} valid ASIN${stats.uniqueValid !== 1 ? 's' : ''}`);
@@ -1414,7 +1414,7 @@ export default function TemplateListingsPage() {
                     <Button
                       variant="contained"
                       onClick={handleBulkAutofill}
-                      disabled={loadingBulk || parseAsinCount() === 0 || parseAsinCount() > 50}
+                      disabled={loadingBulk || parseAsinCount() === 0 || parseAsinCount() > 100}
                       startIcon={loadingBulk && <CircularProgress size={16} />}
                       fullWidth
                     >

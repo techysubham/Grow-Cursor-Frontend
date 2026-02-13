@@ -164,10 +164,10 @@ export function hasValidAsins(input) {
  * Get user-friendly error message based on parsing stats
  * 
  * @param {string} input - Raw input string
- * @param {number} maxAsins - Maximum ASINs allowed (default: 50)
+ * @param {number} maxAsins - Maximum ASINs allowed (default: 100)
  * @returns {string|null} - Error message or null if valid
  */
-export function getValidationError(input, maxAsins = 50) {
+export function getValidationError(input, maxAsins = 100) {
   if (!input || !input.trim()) {
     return 'Please enter at least one ASIN';
   }
