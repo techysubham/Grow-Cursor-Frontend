@@ -120,6 +120,9 @@ import SellerTemplatesPage from '../pages/admin/SellerTemplatesPage.jsx';
 import TemplateDatabasePage from '../pages/admin/TemplateDatabasePage.jsx';
 import DescriptionIcon from '@mui/icons-material/Description';
 import HomeIcon from '@mui/icons-material/Home';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import LeaveManagementPage from '../pages/LeaveManagementPage.jsx';
+import LeaveAdminPage from '../pages/admin/LeaveAdminPage.jsx';
 
 const drawerWidth = 230;
 
@@ -1265,6 +1268,41 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
+        {/* Leave Management - visible to ALL users for applying leaves */}
+        {(!isSuper) && (<ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            to="/admin/my-leaves"
+            onClick={() => setMobileOpen(false)}
+            selected={location.pathname === '/admin/my-leaves'}
+            sx={selectedMenuItemStyle}
+          >
+            <ListItemIcon>
+              <NavIcon icon={EventAvailableIcon} label="My Leave Requests" sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
+            {sidebarOpen && <ListItemText primary="My Leaves" />}
+          </ListItemButton>
+        </ListItem>)}
+
+        {/* Leave Admin - visible to superadmin and hradmin only */}
+        {(isSuper || isHRAdmin) && (
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/admin/leave-admin"
+              onClick={() => setMobileOpen(false)}
+              selected={location.pathname === '/admin/leave-admin'}
+              sx={selectedMenuItemStyle}
+            >
+              <ListItemIcon>
+                <NavIcon icon={AdminPanelSettingsIcon} label="Leave Management (Admin)" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
+              {sidebarOpen && <ListItemText primary="Leave Admin" />}
+            </ListItemButton>
+          </ListItem>
+        )}
+
+        {/* [Testing]Employee Details - visible to superadmin, hradmin, and operation head */}
         {(isSuper || isHRAdmin || isOperationHead) && (
           <>
             <ListItem disablePadding>
@@ -1283,6 +1321,7 @@ export default function AdminLayout({ user, onLogout }) {
             </ListItem>
           </>
         )}
+
       </List>
     </div>
   );
@@ -1433,6 +1472,15 @@ export default function AdminLayout({ user, onLogout }) {
           {(isSuper || isHRAdmin) && (
             <Route path="/employee-management" element={<EmployeeManagementPage />} />
           )}
+
+          {/* Leave Management - accessible to ALL authenticated users */}
+          <Route path="/my-leaves" element={<LeaveManagementPage />} />
+
+          {/* Leave Admin - accessible to superadmin and hradmin only */}
+          {(isSuper || isHRAdmin) && (
+            <Route path="/leave-admin" element={<LeaveAdminPage />} />
+          )}
+
           {isCompatibilityAdmin && (
             <>
               <Route path="/add-compatibility-editor" element={<AddListerPage />} />
