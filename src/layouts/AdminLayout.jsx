@@ -123,6 +123,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import LeaveManagementPage from '../pages/LeaveManagementPage.jsx';
 import LeaveAdminPage from '../pages/admin/LeaveAdminPage.jsx';
+import AsinDirectoryPage from '../pages/admin/AsinDirectoryPage.jsx';
 
 const drawerWidth = 230;
 
@@ -528,6 +529,22 @@ export default function AdminLayout({ user, onLogout }) {
                   <NavIcon icon={StorageIcon} label="ASIN Database" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="ASIN Storage" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* ASIN Directory */}
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/admin/asin-directory"
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/asin-directory'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={ListAltIcon} label="ASIN Directory" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="ASIN Directory" />}
               </ListItemButton>
             </ListItem>
 
@@ -1417,6 +1434,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/amazon-lookup" element={<AmazonLookupPage />} />
               <Route path="/product-umbrellas" element={<ManageProductUmbrellasPage />} />
               <Route path="/asin-storage" element={<ASINStoragePage />} />
+              <Route path="/asin-directory" element={<AsinDirectoryPage />} />
               <Route path="/column-creator" element={<ColumnCreatorPage />} />
             </>
           ) : null}
