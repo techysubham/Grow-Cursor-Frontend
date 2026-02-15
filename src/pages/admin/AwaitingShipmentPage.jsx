@@ -166,6 +166,14 @@ function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
     }
   }, [order.manualTrackingNumber, anchorEl, multipleItems, uniqueItemIds]);
 
+  const detectCarrier = (trackingNumber) => {
+    if (!trackingNumber) return null;
+    const cleanNumber = trackingNumber.trim().toUpperCase();
+    if (cleanNumber.startsWith('9')) return 'USPS';
+    if (cleanNumber.startsWith('1Z')) return 'UPS';
+    return null;
+  };
+
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
     setError('');
@@ -347,7 +355,12 @@ function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
               size="small"
               fullWidth
               value={value}
-              onChange={(e) => setValue(e.target.value)}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                setValue(newValue);
+                const detected = detectCarrier(newValue);
+                if (detected) setCarrier(detected);
+              }}
               autoFocus
               placeholder="e.g. 9400..."
             />
@@ -368,13 +381,18 @@ function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
                         size="small"
                         fullWidth
                         value={individualTracking[itemId]?.trackingNumber || ''}
-                        onChange={(e) => setIndividualTracking(prev => ({
-                          ...prev,
-                          [itemId]: {
-                            ...prev[itemId],
-                            trackingNumber: e.target.value
-                          }
-                        }))}
+                        onChange={(e) => {
+                          const newValue = e.target.value;
+                          const detected = detectCarrier(newValue);
+                          setIndividualTracking(prev => ({
+                            ...prev,
+                            [itemId]: {
+                              ...prev[itemId],
+                              trackingNumber: newValue,
+                              ...(detected ? { carrier: detected } : {})
+                            }
+                          }));
+                        }}
                         placeholder="e.g. 9400..."
                       />
                       <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -1223,9 +1241,9 @@ export default function AwaitingShipmentPage() {
               <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
                 {pendingRemarkUpdate && REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue]
                   ? replaceTemplateVariables(
-                      REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue],
-                      pendingRemarkUpdate.order
-                    )
+                    REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue],
+                    pendingRemarkUpdate.order
+                  )
                   : ''}
               </Typography>
             </Paper>
