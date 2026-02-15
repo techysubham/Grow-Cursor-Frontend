@@ -54,6 +54,7 @@ export default function ManageTemplatesPage() {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
   const [columnDialog, setColumnDialog] = useState(false);
+  const [editingColumnIndex, setEditingColumnIndex] = useState(null);
   const [columnFormData, setColumnFormData] = useState({
     name: '',
     displayName: '',
@@ -278,6 +279,7 @@ export default function ManageTemplatesPage() {
   };
 
   const handleAddColumn = () => {
+    setEditingColumnIndex(null);
     setColumnFormData({
       name: '',
       displayName: '',
@@ -289,28 +291,58 @@ export default function ManageTemplatesPage() {
     setColumnDialog(true);
   };
 
+  const handleEditColumn = (columnIndex) => {
+    const column = formData.customColumns[columnIndex];
+    setEditingColumnIndex(columnIndex);
+    setColumnFormData({
+      name: column.name,
+      displayName: column.displayName,
+      dataType: column.dataType,
+      defaultValue: column.defaultValue || '',
+      isRequired: column.isRequired || false,
+      placeholder: column.placeholder || ''
+    });
+    setColumnDialog(true);
+  };
+
   const handleSaveColumn = () => {
     if (!columnFormData.name || !columnFormData.displayName) {
       setError('Column name and display name are required');
       return;
     }
 
-    const maxOrder = formData.customColumns.length > 0 
-      ? Math.max(...formData.customColumns.map(col => col.order))
-      : 38;
+    if (editingColumnIndex !== null) {
+      // Edit existing column
+      const updatedColumns = [...formData.customColumns];
+      updatedColumns[editingColumnIndex] = {
+        ...updatedColumns[editingColumnIndex],
+        ...columnFormData
+      };
+      
+      setFormData({
+        ...formData,
+        customColumns: updatedColumns
+      });
+    } else {
+      // Add new column
+      const maxOrder = formData.customColumns.length > 0 
+        ? Math.max(...formData.customColumns.map(col => col.order))
+        : 38;
 
-    setFormData({
-      ...formData,
-      customColumns: [
-        ...formData.customColumns,
-        {
-          ...columnFormData,
-          order: maxOrder + 1
-        }
-      ]
-    });
+      setFormData({
+        ...formData,
+        customColumns: [
+          ...formData.customColumns,
+          {
+            ...columnFormData,
+            order: maxOrder + 1
+          }
+        ]
+      });
+    }
 
     setColumnDialog(false);
+    setEditingColumnIndex(null);
   };
 
   const handleRemoveColumn = (columnName) => {
@@ -551,7 +583,7 @@ export default function ManageTemplatesPage() {
                     </Typography>
                   ) : (
                     <Stack spacing={1}>
-                      {formData.customColumns.map((col) => (
+                      {formData.customColumns.map((col, index) => (
                         <Paper key={col.name} variant="outlined" sx={{ p: 1.5 }}>
                           <Stack direction="row" justifyContent="space-between" alignItems="center">
                             <Box>
@@ -560,9 +592,14 @@ export default function ManageTemplatesPage() {
                                 {col.displayName} • {col.dataType}
                               </Typography>
                             </Box>
-                            <IconButton size="small" color="error" onClick={() => handleRemoveColumn(col.name)}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
+                            <Stack direction="row" spacing={0.5}>
+                              <IconButton size="small" onClick={() => handleEditColumn(index)} title="Edit Column">
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" color="error" onClick={() => handleRemoveColumn(col.name)} title="Delete Column">
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Stack>
                           </Stack>
                         </Paper>
                       ))}
@@ -675,9 +712,9 @@ export default function ManageTemplatesPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Add Column Dialog */}
-      <Dialog open={columnDialog} onClose={() => setColumnDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Custom Column</DialogTitle>
+      {/* Add/Edit Column Dialog */}
+      <Dialog open={columnDialog} onClose={() => { setColumnDialog(false); setEditingColumnIndex(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>{editingColumnIndex !== null ? 'Edit Custom Column' : 'Add Custom Column'}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 1 }}>
             <Stack spacing={2}>
@@ -734,9 +771,9 @@ export default function ManageTemplatesPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setColumnDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setColumnDialog(false); setEditingColumnIndex(null); }}>Cancel</Button>
           <Button onClick={handleSaveColumn} variant="contained">
-            Add Column
+            {editingColumnIndex !== null ? 'Update Column' : 'Add Column'}
           </Button>
         </DialogActions>
       </Dialog>
