@@ -9,11 +9,14 @@ import {
   Delete as DeleteIcon, 
   Edit as EditIcon,
   Add as AddIcon,
-  Visibility as VisibilityIcon
+  Visibility as VisibilityIcon,
+  ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
 import FieldConfigList from '../../components/FieldConfigList.jsx';
+import CoreFieldDefaultsForm from '../../components/CoreFieldDefaultsForm.jsx';
+import PricingConfigSection from '../../components/PricingConfigSection.jsx';
 
 export default function ManageTemplatesPage() {
   const navigate = useNavigate();
@@ -29,6 +32,7 @@ export default function ManageTemplatesPage() {
       enabled: false,
       fieldConfigs: []
     },
+    coreFieldDefaults: {},
     pricingConfig: {
       enabled: false,
       spentRate: null,
@@ -48,7 +52,9 @@ export default function ManageTemplatesPage() {
 
   const [editDialog, setEditDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
+  const [highlightedId, setHighlightedId] = useState(null);
   const [columnDialog, setColumnDialog] = useState(false);
+  const [editingColumnIndex, setEditingColumnIndex] = useState(null);
   const [columnFormData, setColumnFormData] = useState({
     name: '',
     displayName: '',
@@ -96,6 +102,7 @@ export default function ManageTemplatesPage() {
           enabled: false,
           fieldConfigs: []
         },
+        coreFieldDefaults: {},
         pricingConfig: {
           enabled: false,
           spentRate: null,
@@ -128,6 +135,7 @@ export default function ManageTemplatesPage() {
         enabled: false,
         fieldConfigs: []
       },
+      coreFieldDefaults: template.coreFieldDefaults || {},
       pricingConfig: template.pricingConfig || {
         enabled: false,
         spentRate: null,
@@ -156,6 +164,7 @@ export default function ManageTemplatesPage() {
         enabled: false,
         fieldConfigs: []
       },
+      coreFieldDefaults: {},
       pricingConfig: {
         enabled: false,
         spentRate: null,
@@ -189,6 +198,7 @@ export default function ManageTemplatesPage() {
           enabled: false,
           fieldConfigs: []
         },
+        coreFieldDefaults: {},
         pricingConfig: {
           enabled: false,
           spentRate: null,
@@ -228,7 +238,48 @@ export default function ManageTemplatesPage() {
     }
   };
 
+  const handleDuplicate = async (templateId, templateName) => {
+    if (!window.confirm(`Create a copy of "${templateName}"?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+
+      const { data } = await api.post(`/listing-templates/${templateId}/duplicate`);
+      
+      setSuccess(`Template duplicated successfully as "${data.name}"!`);
+      await fetchTemplates();
+      
+      // Highlight the new template
+      setHighlightedId(data._id);
+      
+      // Auto-scroll to top where new template will appear
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+      
+      // Auto-open edit dialog for immediate customization
+      setTimeout(() => {
+        handleEdit(data);
+      }, 300);
+      
+      // Clear highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedId(null);
+      }, 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to duplicate template');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddColumn = () => {
+    setEditingColumnIndex(null);
     setColumnFormData({
       name: '',
       displayName: '',
@@ -240,28 +291,58 @@ export default function ManageTemplatesPage() {
     setColumnDialog(true);
   };
 
+  const handleEditColumn = (columnIndex) => {
+    const column = formData.customColumns[columnIndex];
+    setEditingColumnIndex(columnIndex);
+    setColumnFormData({
+      name: column.name,
+      displayName: column.displayName,
+      dataType: column.dataType,
+      defaultValue: column.defaultValue || '',
+      isRequired: column.isRequired || false,
+      placeholder: column.placeholder || ''
+    });
+    setColumnDialog(true);
+  };
+
   const handleSaveColumn = () => {
     if (!columnFormData.name || !columnFormData.displayName) {
       setError('Column name and display name are required');
       return;
     }
 
-    const maxOrder = formData.customColumns.length > 0 
-      ? Math.max(...formData.customColumns.map(col => col.order))
-      : 38;
+    if (editingColumnIndex !== null) {
+      // Edit existing column
+      const updatedColumns = [...formData.customColumns];
+      updatedColumns[editingColumnIndex] = {
+        ...updatedColumns[editingColumnIndex],
+        ...columnFormData
+      };
+      
+      setFormData({
+        ...formData,
+        customColumns: updatedColumns
+      });
+    } else {
+      // Add new column
+      const maxOrder = formData.customColumns.length > 0 
+        ? Math.max(...formData.customColumns.map(col => col.order))
+        : 38;
 
-    setFormData({
-      ...formData,
-      customColumns: [
-        ...formData.customColumns,
-        {
-          ...columnFormData,
-          order: maxOrder + 1
-        }
-      ]
-    });
+      setFormData({
+        ...formData,
+        customColumns: [
+          ...formData.customColumns,
+          {
+            ...columnFormData,
+            order: maxOrder + 1
+          }
+        ]
+      });
+    }
 
     setColumnDialog(false);
+    setEditingColumnIndex(null);
   };
 
   const handleRemoveColumn = (columnName) => {
@@ -296,6 +377,14 @@ export default function ManageTemplatesPage() {
   const handleViewListings = (templateId) => {
     // Navigate to seller selection page with returnTo parameter for direct template access
     navigate(`/admin/select-seller?returnTo=/admin/template-listings?templateId=${templateId}`);
+  };
+
+  const countCoreDefaults = () => {
+    return Object.keys(formData.coreFieldDefaults || {}).filter(
+      key => formData.coreFieldDefaults[key] !== '' && 
+             formData.coreFieldDefaults[key] !== null && 
+             formData.coreFieldDefaults[key] !== undefined
+    ).length;
   };
 
   return (
@@ -392,7 +481,14 @@ export default function ManageTemplatesPage() {
                 </TableRow>
               ) : (
                 templates.map((template) => (
-                  <TableRow key={template._id} hover>
+                  <TableRow 
+                    key={template._id} 
+                    hover
+                    sx={{
+                      bgcolor: highlightedId === template._id ? 'success.50' : 'transparent',
+                      transition: 'background-color 0.3s ease'
+                    }}
+                  >
                     <TableCell><strong>{template.name}</strong></TableCell>
                     <TableCell>
                       {template.customColumns?.length > 0 ? (
@@ -408,10 +504,13 @@ export default function ManageTemplatesPage() {
                       <IconButton size="small" onClick={() => handleViewListings(template._id)} title="View Listings">
                         <VisibilityIcon fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" onClick={() => handleEdit(template)}>
+                      <IconButton size="small" onClick={() => handleDuplicate(template._id, template.name)} title="Duplicate Template">
+                        <CopyIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => handleEdit(template)} title="Edit Template">
                         <EditIcon fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" color="error" onClick={() => handleDelete(template._id, template.name)}>
+                      <IconButton size="small" color="error" onClick={() => handleDelete(template._id, template.name)} title="Delete Template">
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </TableCell>
@@ -432,6 +531,26 @@ export default function ManageTemplatesPage() {
               <Tab label="Basic Info" />
               <Tab label="Custom Columns" />
               <Tab label="ASIN Auto-Fill" />
+              <Tab 
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    Core Defaults
+                    {countCoreDefaults() > 0 && (
+                      <Chip label={countCoreDefaults()} size="small" color="primary" sx={{ height: 18, fontSize: '0.7rem' }} />
+                    )}
+                  </Box>
+                } 
+              />
+              <Tab 
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    Pricing Calc
+                    {formData.pricingConfig?.enabled && (
+                      <Chip label="✓" size="small" color="success" sx={{ height: 18, fontSize: '0.7rem' }} />
+                    )}
+                  </Box>
+                } 
+              />
             </Tabs>
             
             <Box sx={{ minHeight: 300 }}>
@@ -464,7 +583,7 @@ export default function ManageTemplatesPage() {
                     </Typography>
                   ) : (
                     <Stack spacing={1}>
-                      {formData.customColumns.map((col) => (
+                      {formData.customColumns.map((col, index) => (
                         <Paper key={col.name} variant="outlined" sx={{ p: 1.5 }}>
                           <Stack direction="row" justifyContent="space-between" alignItems="center">
                             <Box>
@@ -473,9 +592,14 @@ export default function ManageTemplatesPage() {
                                 {col.displayName} • {col.dataType}
                               </Typography>
                             </Box>
-                            <IconButton size="small" color="error" onClick={() => handleRemoveColumn(col.name)}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
+                            <Stack direction="row" spacing={0.5}>
+                              <IconButton size="small" onClick={() => handleEditColumn(index)} title="Edit Column">
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" color="error" onClick={() => handleRemoveColumn(col.name)} title="Delete Column">
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Stack>
                           </Stack>
                         </Paper>
                       ))}
@@ -535,6 +659,48 @@ export default function ManageTemplatesPage() {
                   )}
                 </Stack>
               )}
+              
+              {/* Tab 3: Core Field Defaults */}
+              {currentTab === 3 && (
+                <Box>
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    <Typography variant="body2">
+                      <strong>How it works:</strong> Set default values for core eBay fields at the template level. 
+                      These defaults will apply to all sellers using this template unless they set seller-specific overrides.
+                      Auto-fill (AI/ASIN/Calculator) can still override these defaults.
+                    </Typography>
+                  </Alert>
+                  
+                  <CoreFieldDefaultsForm
+                    formData={formData.coreFieldDefaults || {}}
+                    onChange={(newDefaults) => setFormData({
+                      ...formData,
+                      coreFieldDefaults: newDefaults
+                    })}
+                  />
+                </Box>
+              )}
+              
+              {/* Tab 4: Pricing Calculator */}
+              {currentTab === 4 && (
+                <Box>
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    <Typography variant="body2">
+                      <strong>How it works:</strong> Configure the pricing calculator at the template level.
+                      When enabled, the calculator will automatically compute the Start Price based on Amazon ASIN data,
+                      exchange rates, fees, and desired profit margins. Sellers can override these settings if needed.
+                    </Typography>
+                  </Alert>
+                  
+                  <PricingConfigSection
+                    pricingConfig={formData.pricingConfig || {}}
+                    onChange={(newPricingConfig) => setFormData({
+                      ...formData,
+                      pricingConfig: newPricingConfig
+                    })}
+                  />
+                </Box>
+              )}
             </Box>
           </Box>
         </DialogContent>
@@ -546,9 +712,9 @@ export default function ManageTemplatesPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Add Column Dialog */}
-      <Dialog open={columnDialog} onClose={() => setColumnDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Custom Column</DialogTitle>
+      {/* Add/Edit Column Dialog */}
+      <Dialog open={columnDialog} onClose={() => { setColumnDialog(false); setEditingColumnIndex(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>{editingColumnIndex !== null ? 'Edit Custom Column' : 'Add Custom Column'}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 1 }}>
             <Stack spacing={2}>
@@ -605,9 +771,9 @@ export default function ManageTemplatesPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setColumnDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setColumnDialog(false); setEditingColumnIndex(null); }}>Cancel</Button>
           <Button onClick={handleSaveColumn} variant="contained">
-            Add Column
+            {editingColumnIndex !== null ? 'Update Column' : 'Add Column'}
           </Button>
         </DialogActions>
       </Dialog>
