@@ -107,3 +107,60 @@ export function getMyFileUrl(fileType) {
   const timestamp = new Date().getTime(); // Cache busting
   return `${baseUrl}/employee-profiles/me/file/${fileType}?token=${token}&t=${timestamp}`;
 }
+
+// Attendance APIs
+export async function startTimer() {
+  const { data } = await api.post('/attendance/start');
+  return data;
+}
+
+export async function pauseTimer() {
+  const { data } = await api.post('/attendance/pause');
+  return data;
+}
+
+export async function resumeTimer() {
+  const { data } = await api.post('/attendance/resume');
+  return data;
+}
+
+export async function stopTimer() {
+  const { data } = await api.post('/attendance/stop');
+  return data;
+}
+
+export async function getAttendanceStatus() {
+  const { data } = await api.get('/attendance/status');
+  return data;
+}
+
+export async function getAttendanceReport(params = {}) {
+  const { data } = await api.get('/attendance/report', { params });
+  return data;
+}
+
+export async function getAdminAttendanceReport(params = {}) {
+  const { data } = await api.get('/attendance/admin/report', { params });
+  return data;
+}
+
+// User APIs
+export async function toggleUserStrictTimer(userId, isStrictTimer) {
+  const { data } = await api.put(`/users/${userId}/strict-timer`, { isStrictTimer });
+  return data;
+}
+
+export async function forceStopAttendance(attendanceId) {
+  const { data } = await api.post(`/attendance/admin/force-stop/${attendanceId}`);
+  return data;
+}
+
+export async function updateAttendanceHours(attendanceId, totalWorkTime) {
+  const { data } = await api.put(`/attendance/admin/edit-hours/${attendanceId}`, { totalWorkTime });
+  return data;
+}
+
+export async function deleteAttendanceRecord(attendanceId) {
+  const { data } = await api.delete(`/attendance/admin/${attendanceId}`);
+  return data;
+}

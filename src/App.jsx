@@ -18,6 +18,9 @@ import TransactionPage from './pages/admin/TransactionPage.jsx';
 import IdeasPage from './pages/IdeasPage.jsx';
 
 import { setAuthToken } from './lib/api'
+import { AttendanceProvider } from './context/AttendanceContext';
+import AttendanceModal from './components/Attendance/AttendanceModal';
+import AttendanceTimer from './components/Attendance/AttendanceTimer';
 
 function useAuth() {
   const [token, setToken] = useState(() => sessionStorage.getItem('auth_token'));
@@ -66,64 +69,75 @@ export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage onLogin={login} />} />
+      {token && user ? (
+        <AttendanceProvider user={user}>
+          <AttendanceModal />
+          <AttendanceTimer />
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage onLogin={login} />} />
 
-        {/* PUBLIC ROUTE - No authentication required */}
-        <Route path="/ideas" element={<IdeasPage />} />
+            {/* PUBLIC ROUTE - No authentication required */}
+            <Route path="/ideas" element={<IdeasPage />} />
 
-        <Route
-          path="/about-me"
-          element={token && user ? <AboutMePage /> : <Navigate to="/login" replace />}
-        />
+            <Route
+              path="/about-me"
+              element={<AboutMePage />}
+            />
 
-        <Route
-          path="/admin/*"
-          element={
-            token && user && (
-              user.role === 'productadmin' ||
-              user.role === 'listingadmin' ||
-              user.role === 'superadmin' ||
-              user.role === 'compatibilityadmin' ||
-              user.role === 'compatibilityeditor' ||
-              user.role === 'fulfillmentadmin' ||
-              user.role === 'hradmin' ||
-              user.role === 'hr' ||
-              user.role === 'operationhead' ||
-              user.role === 'hoc' ||
-              user.role === 'compliancemanager' ||
-              // Lister roles - access to template listing workflow only
-              user.role === 'lister' ||
-              user.role === 'advancelister' ||
-              user.role === 'trainee'
-            ) ? (
-              <AdminLayout user={user} onLogout={logout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/lister"
-          element={token && user && (user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee') ? <ListerDashboard user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/lister/range-analyzer"
-          element={token && user && (user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee') ? <RangeAnalyzerPage /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/seller-ebay"
-          element={
-            token && user && (user.role === 'seller' || user.role === 'superadmin') ? (
-              <SellerEbayPage user={user} onLogout={logout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+            <Route
+              path="/admin/*"
+              element={
+                user.role === 'productadmin' ||
+                  user.role === 'listingadmin' ||
+                  user.role === 'superadmin' ||
+                  user.role === 'compatibilityadmin' ||
+                  user.role === 'compatibilityeditor' ||
+                  user.role === 'fulfillmentadmin' ||
+                  user.role === 'hradmin' ||
+                  user.role === 'hr' ||
+                  user.role === 'operationhead' ||
+                  user.role === 'hoc' ||
+                  user.role === 'compliancemanager' ||
+                  // Lister roles - access to template listing workflow only
+                  user.role === 'lister' ||
+                  user.role === 'advancelister' ||
+                  user.role === 'trainee' ? (
+                  <AdminLayout user={user} onLogout={logout} />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            <Route
+              path="/lister"
+              element={user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee' ? <ListerDashboard user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/lister/range-analyzer"
+              element={user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee' ? <RangeAnalyzerPage /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/seller-ebay"
+              element={
+                user.role === 'seller' || user.role === 'superadmin' ? (
+                  <SellerEbayPage user={user} onLogout={logout} />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AttendanceProvider>
+      ) : (
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage onLogin={login} />} />
+          <Route path="/ideas" element={<IdeasPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      )}
     </ThemeProvider>
   );
 }

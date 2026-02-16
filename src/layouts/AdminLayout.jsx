@@ -123,6 +123,8 @@ import HomeIcon from '@mui/icons-material/Home';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import LeaveManagementPage from '../pages/LeaveManagementPage.jsx';
 import LeaveAdminPage from '../pages/admin/LeaveAdminPage.jsx';
+import AttendanceAdminPage from '../pages/admin/AttendanceAdminPage.jsx';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import AsinDirectoryPage from '../pages/admin/AsinDirectoryPage.jsx';
 
 const drawerWidth = 230;
@@ -398,9 +400,25 @@ export default function AdminLayout({ user, onLogout }) {
                 sx={selectedMenuItemStyle}
               >
                 <ListItemIcon>
-                  <NavIcon icon={AdminPanelSettingsIcon} label="Admin Message View" sidebarOpen={sidebarOpen} />
+                  <NavIcon icon={AdminPanelSettingsIcon} label="Admin Panel - View All Messages" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="View All Messages" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* Attendance Tracking - superadmin only */}
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/admin/attendance"
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/attendance'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={AccessTimeIcon} label="Attendance Tracking" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Attendance Tracking" />}
               </ListItemButton>
             </ListItem>
           </>
@@ -1554,7 +1572,10 @@ export default function AdminLayout({ user, onLogout }) {
 
           {/* Internal Messages Admin - accessible to superadmin only */}
           {isSuper && (
-            <Route path="/internal-messages-admin" element={<InternalMessagesAdminPage />} />
+            <>
+              <Route path="/internal-messages-admin" element={<InternalMessagesAdminPage />} />
+              <Route path="/attendance" element={<AttendanceAdminPage />} />
+            </>
           )}
 
           {/* UPDATED DEFAULT REDIRECT */}
