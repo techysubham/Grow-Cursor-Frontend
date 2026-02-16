@@ -15,7 +15,9 @@ import {
   Alert,
   Stack,
   Skeleton,
-  CircularProgress
+  CircularProgress,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -26,7 +28,9 @@ import {
   Error as ErrorIcon,
   CheckCircle as CheckIcon,
   HourglassEmpty as LoadingIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Code as CodeIcon,
+  Visibility as VisibilityIcon
 } from '@mui/icons-material';
 
 export default function AsinReviewModal({ 
@@ -41,6 +45,7 @@ export default function AsinReviewModal({
   const [dismissedItems, setDismissedItems] = useState(new Set());
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [descriptionViewMode, setDescriptionViewMode] = useState('code'); // 'code' | 'preview'
 
   // Filter out dismissed items
   const activeItems = previewItems.filter(item => !dismissedItems.has(item.id));
@@ -468,26 +473,95 @@ export default function AsinReviewModal({
                 />
 
                 {/* Core Fields */}
-                {coreFieldColumns.map(col => (
-                  <TextField
-                    key={col.name}
-                    label={col.label || col.name}
-                    value={itemData[col.name] || ''}
-                    onChange={(e) => handleFieldChange(col.name, e.target.value, false)}
-                    multiline={col.name === 'description'}
-                    rows={col.name === 'description' ? 8 : 1}
-                    size="small"
-                    fullWidth
-                    required={col.name === 'title' || col.name === 'startPrice'}
-                    type={col.name === 'startPrice' || col.name === 'quantity' ? 'number' : 'text'}
-                    helperText={
-                      col.name === 'title' ? `${(itemData.title || '').length}/80` :
-                      col.name === 'description' ? 'HTML allowed' :
-                      col.name !== 'startPrice' && col.name !== 'quantity' ? `${(itemData[col.name] || '').length}/60` :
-                      ''
-                    }
-                  />
-                ))}
+                {coreFieldColumns.map(col => {
+                  // Special handling for description field with HTML preview
+                  if (col.name === 'description') {
+                    return (
+                      <Box key={col.name}>
+                        {/* Toggle Header */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight="500">
+                            {col.label || 'Description'}
+                          </Typography>
+                          <ToggleButtonGroup
+                            value={descriptionViewMode}
+                            exclusive
+                            onChange={(e, newMode) => newMode && setDescriptionViewMode(newMode)}
+                            size="small"
+                          >
+                            <ToggleButton value="code">
+                              <CodeIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                              Code
+                            </ToggleButton>
+                            <ToggleButton value="preview">
+                              <VisibilityIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                              Preview
+                            </ToggleButton>
+                          </ToggleButtonGroup>
+                        </Box>
+
+                        {/* Content Area */}
+                        {descriptionViewMode === 'code' ? (
+                          <TextField
+                            value={itemData.description || ''}
+                            onChange={(e) => handleFieldChange('description', e.target.value, false)}
+                            multiline
+                            rows={8}
+                            size="small"
+                            fullWidth
+                            placeholder="<html>...</html>"
+                            helperText={`HTML allowed • ${(itemData.description || '').length} characters`}
+                          />
+                        ) : (
+                          <Paper
+                            variant="outlined"
+                            sx={{
+                              p: 2,
+                              minHeight: 200,
+                              maxHeight: 400,
+                              overflow: 'auto',
+                              bgcolor: 'white',
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              '& img': { maxWidth: '100%', height: 'auto' },
+                              '& table': { width: '100%', borderCollapse: 'collapse' },
+                              '& td, & th': { border: '1px solid #ddd', padding: '8px' },
+                              '& p': { margin: '0 0 8px 0' },
+                              '& ul, & ol': { marginLeft: '20px' }
+                            }}
+                          >
+                            {itemData.description ? (
+                              <Box dangerouslySetInnerHTML={{ __html: itemData.description }} />
+                            ) : (
+                              <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                                No description generated
+                              </Typography>
+                            )}
+                          </Paper>
+                        )}
+                      </Box>
+                    );
+                  }
+
+                  // Regular fields
+                  return (
+                    <TextField
+                      key={col.name}
+                      label={col.label || col.name}
+                      value={itemData[col.name] || ''}
+                      onChange={(e) => handleFieldChange(col.name, e.target.value, false)}
+                      size="small"
+                      fullWidth
+                      required={col.name === 'title' || col.name === 'startPrice'}
+                      type={col.name === 'startPrice' || col.name === 'quantity' ? 'number' : 'text'}
+                      helperText={
+                        col.name === 'title' ? `${(itemData.title || '').length}/80` :
+                        col.name !== 'startPrice' && col.name !== 'quantity' ? `${(itemData[col.name] || '').length}/60` :
+                        ''
+                      }
+                    />
+                  );
+                })}
 
                 {/* Custom Fields */}
                 {customFieldColumns.length > 0 && (
