@@ -374,6 +374,28 @@ export default function AsinReviewModal({
                   </Typography>
                 </Box>
 
+                {currentItem.sourceData?.color && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Color
+                    </Typography>
+                    <Typography variant="body2">
+                      {currentItem.sourceData.color}
+                    </Typography>
+                  </Box>
+                )}
+
+                {currentItem.sourceData?.compatibility && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Compatibility
+                    </Typography>
+                    <Typography variant="body2">
+                      {currentItem.sourceData.compatibility}
+                    </Typography>
+                  </Box>
+                )}
+
                 <Box>
                   <Typography variant="caption" color="text.secondary">
                     Price
