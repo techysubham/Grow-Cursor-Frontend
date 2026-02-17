@@ -1,9 +1,9 @@
 import React from 'react';
-import { Grid, Card, CardContent, Box } from '@mui/material';
+import { Grid, Card, CardContent, Box, Button } from '@mui/material';
 import DepartmentIssues from '../components/DepartmentIssues';
 import Announcements from '../components/Announcements';
-import WorkHours from '../components/WorkHours';
 import LeaveRequests from '../components/LeaveRequests';
+import { Link } from 'react-router-dom';
 
 export default function WorkHRDashboard() {
   return (
@@ -12,27 +12,27 @@ export default function WorkHRDashboard() {
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
-              <DepartmentIssues />
-            </CardContent>
-          </Card>
-          <Card sx={{ mt: 3 }}>
-            <CardContent>
-              <Announcements />
+              <Announcements preview={true} showCreate={true} />
             </CardContent>
           </Card>
         </Grid>
+
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
-              <WorkHours />
+              <DepartmentIssues preview={true} showReport={true} showDateFilter={true} />
             </CardContent>
           </Card>
-          <Card sx={{ mt: 3 }}>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
             <CardContent>
               <LeaveRequests />
             </CardContent>
           </Card>
         </Grid>
+
       </Grid>
     </Box>
   );

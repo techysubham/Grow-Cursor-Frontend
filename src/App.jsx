@@ -124,57 +124,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
-        <Route
-          path="/about-me"
-          element={token && user ? <AboutMePage /> : <Navigate to="/login" replace />}
-        />
 
-        <Route
-          path="/admin/*"
-          element={
-            token && user && (
-              user.role === 'productadmin' ||
-              user.role === 'listingadmin' ||
-              user.role === 'superadmin' ||
-              user.role === 'compatibilityadmin' ||
-              user.role === 'compatibilityeditor' ||
-              user.role === 'fulfillmentadmin' ||
-              user.role === 'hradmin' ||
-              user.role === 'hr' ||
-              user.role === 'operationhead' ||
-              user.role === 'hoc' ||
-              user.role === 'compliancemanager' ||
-              // Lister roles - access to template listing workflow only
-              user.role === 'lister' ||
-              user.role === 'advancelister' ||
-              user.role === 'trainee'
-            ) ? (
-              <AdminLayout user={user} onLogout={logout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/lister"
-          element={token && user && (user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee') ? <ListerDashboard user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/lister/range-analyzer"
-          element={token && user && (user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee') ? <RangeAnalyzerPage /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/seller-ebay"
-          element={
-            token && user && (user.role === 'seller' || user.role === 'superadmin') ? (
-              <SellerEbayPage user={user} onLogout={logout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
     </ThemeProvider>
   );
 }

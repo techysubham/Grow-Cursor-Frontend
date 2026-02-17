@@ -1,6 +1,5 @@
 import WorkHRDashboard from '../pages/WorkHRDashboard.jsx';
-          {/* Work & HR Dashboard - accessible to all authenticated users */}
-          <Route path="/work-hr-dashboard" element={<WorkHRDashboard />} />
+
 import { useMemo, useState, useEffect, startTransition } from 'react';
 import { Link, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -127,6 +126,9 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import LeaveManagementPage from '../pages/LeaveManagementPage.jsx';
 import LeaveAdminPage from '../pages/admin/LeaveAdminPage.jsx';
 import AsinDirectoryPage from '../pages/admin/AsinDirectoryPage.jsx';
+import AnnouncementsPage from '../pages/AnnouncementsPage.jsx';
+import DepartmentIssuesPage from '../pages/DepartmentIssuesPage.jsx';
+
 
 const drawerWidth = 230;
 
@@ -271,6 +273,13 @@ export default function AdminLayout({ user, onLogout }) {
             {sidebarOpen && <ListItemText primary="Ideas & Issues" />}
           </ListItemButton>
         </ListItem>
+
+        {/* Hidden menu items for Dashboard "View All" links */}
+        <Box sx={{ display: 'none' }}>
+          <ListItemButton component={Link} to="/admin/announcements" />
+          <ListItemButton component={Link} to="/admin/department-issues" />
+        </Box>
+
 
         {/* About Me - visible to all users except superadmin */}
         {!isSuper && (
@@ -1304,21 +1313,7 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
-        {/* Leave Management - visible to ALL users for applying leaves */}
-        {(!isSuper) && (<ListItem disablePadding>
-          <ListItemButton
-            component={Link}
-            to="/admin/my-leaves"
-            onClick={() => setMobileOpen(false)}
-            selected={location.pathname === '/admin/my-leaves'}
-            sx={selectedMenuItemStyle}
-          >
-            <ListItemIcon>
-              <NavIcon icon={EventAvailableIcon} label="My Leave Requests" sidebarOpen={sidebarOpen} />
-            </ListItemIcon>
-            {sidebarOpen && <ListItemText primary="My Leaves" />}
-          </ListItemButton>
-        </ListItem>)}
+        {/* Leave Management - sidebar link removed intentionally (page remains accessible) */}
 
         {/* Leave Admin - visible to superadmin and hradmin only */}
         {(isSuper || isHRAdmin) && (
@@ -1444,6 +1439,9 @@ export default function AdminLayout({ user, onLogout }) {
           {/* Ideas & Issues - accessible to ALL roles */}
           <Route path="/ideas" element={<IdeasPage />} />
           <Route path="/work-hr-dashboard" element={<WorkHRDashboard />} />
+          <Route path="/announcements" element={<AnnouncementsPage />} />
+          <Route path="/department-issues" element={<DepartmentIssuesPage />} />
+
 
           {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
           {isProductAdmin || isSuper ? (

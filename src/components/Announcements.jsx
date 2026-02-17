@@ -42,7 +42,9 @@ const ADMIN_ROLES = [
   'compliancemanager'
 ];
 
-export default function Announcements() {
+import { Link } from 'react-router-dom';
+
+export default function Announcements({ preview = false, showCreate = false }) {
   const [announcementType, setAnnouncementType] = useState('company-wide');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -167,21 +169,21 @@ export default function Announcements() {
   };
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+    <Box sx={{ p: preview ? 1 : 3, maxWidth: 1200, mx: 'auto' }}>
       {/* Header Section with Gradient */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          mb: 4,
-          p: 3,
+          mb: preview ? 2 : 4,
+          p: preview ? 2 : 3,
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           borderRadius: 3,
           boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)'
         }}
       >
-        <CampaignIcon sx={{ fontSize: 40, mr: 2, color: 'white' }} />
-        <Typography variant="h4" fontWeight={700} color="white">
+        <CampaignIcon sx={{ fontSize: preview ? 28 : 40, mr: 2, color: 'white' }} />
+        <Typography variant={preview ? "h6" : "h4"} fontWeight={700} color="white">
           Announcements
         </Typography>
       </Box>
@@ -206,8 +208,8 @@ export default function Announcements() {
         </Alert>
       )}
 
-      {/* Announcement Form - Only for Admins */}
-      {isAdmin && (
+      {/* Announcement Form - Only for Admins. Show when not preview OR when showCreate is true */}
+      {isAdmin && (!preview || showCreate) && (
         <Paper
           elevation={0}
           sx={{
@@ -445,7 +447,7 @@ export default function Announcements() {
         </Paper>
       ) : (
         <Stack spacing={3}>
-          {announcements.map((announcement) => (
+          {(preview ? announcements.slice(0, 3) : announcements).map((announcement) => (
             <Card
               key={announcement._id}
               sx={{
@@ -590,7 +592,11 @@ export default function Announcements() {
                     whiteSpace: 'pre-wrap',
                     color: '#444',
                     lineHeight: 1.5,
-                    fontSize: '0.95rem' // smaller message
+                    fontSize: '0.95rem', // smaller message
+                    display: '-webkit-box',
+                    WebkitLineClamp: preview ? 3 : 'unset',
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
                   }}
                 >
                   {announcement.message}
@@ -635,7 +641,15 @@ export default function Announcements() {
               </CardContent>
             </Card>
           ))}
+          {preview && (
+            <Box textAlign="center" mt={2}>
+              <Button component={Link} to="/admin/announcements" variant="outlined">
+                View All Announcements
+              </Button>
+            </Box>
+          )}
         </Stack>
+
       )}
     </Box>
   );
