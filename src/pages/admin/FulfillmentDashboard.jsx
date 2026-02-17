@@ -1073,6 +1073,7 @@ function FulfillmentDashboard() {
   const [searchOrderId, setSearchOrderId] = useState(() => getInitialState('searchOrderId', ''));
   const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
   const [searchItemId, setSearchItemId] = useState(() => getInitialState('searchItemId', ''));
+  const [searchProductName, setSearchProductName] = useState(() => getInitialState('searchProductName', ''));
   //const [searchSoldDate, setSearchSoldDate] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [searchPaymentStatus, setSearchPaymentStatus] = useState(() => getInitialState('searchPaymentStatus', ''));
@@ -1412,6 +1413,7 @@ function FulfillmentDashboard() {
     searchOrderId,
     searchBuyerName,
     searchItemId,
+    searchProductName,
     searchMarketplace,
     searchPaymentStatus,
     excludeLowValue,
@@ -1455,6 +1457,7 @@ function FulfillmentDashboard() {
       prevFilters.current.searchOrderId !== searchOrderId ||
       prevFilters.current.searchBuyerName !== searchBuyerName ||
       prevFilters.current.searchItemId !== searchItemId ||
+      prevFilters.current.searchProductName !== searchProductName ||
       prevFilters.current.searchMarketplace !== searchMarketplace ||
       prevFilters.current.searchPaymentStatus !== searchPaymentStatus ||
       prevFilters.current.excludeLowValue !== excludeLowValue ||
@@ -1466,6 +1469,7 @@ function FulfillmentDashboard() {
       searchOrderId,
       searchBuyerName,
       searchItemId,
+      searchProductName,
       searchMarketplace,
       searchPaymentStatus,
       excludeLowValue,
@@ -1486,7 +1490,7 @@ function FulfillmentDashboard() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemId, searchMarketplace, searchPaymentStatus, excludeLowValue, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, dateFilter]);
 
   // Handle order earnings change (update local state)
   const handleOrderEarningsChange = (orderId, orderIdStr, value) => {
@@ -1568,6 +1572,7 @@ function FulfillmentDashboard() {
       };
 
       if (selectedSeller) params.sellerId = selectedSeller;
+      if (searchProductName.trim()) params.productName = searchProductName.trim();
       if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
@@ -3196,6 +3201,15 @@ function FulfillmentDashboard() {
                   sx={{ flex: 1 }}
                   fullWidth
                 />
+                <TextField
+                  size="small"
+                  label="Product Name"
+                  value={searchProductName}
+                  onChange={(e) => setSearchProductName(e.target.value)}
+                  placeholder="Search by product name..."
+                  sx={{ flex: 1 }}
+                  fullWidth
+                />
               </Stack>
 
               {/* Row 2: Date filters */}
@@ -3260,6 +3274,7 @@ function FulfillmentDashboard() {
                     setSearchOrderId('');
                     setSearchBuyerName('');
                     setSearchItemId('');
+                    setSearchProductName(''); // CLEAR NEW FILTER
                     setSearchPaymentStatus('');
                     setDateFilter({ mode: 'none', single: '', from: '', to: '' });
                   }}
