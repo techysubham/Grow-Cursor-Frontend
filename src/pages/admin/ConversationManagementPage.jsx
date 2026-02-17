@@ -113,6 +113,13 @@ function ResolutionDialog({ open, onClose, metaItem, onSave }) {
     handleTemplateClose();
   };
 
+  const handleMessageKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   // Helper to safely extract data from the metaItem object
   const sellerName = metaItem?.sellerName || 'Seller';
   const buyerName = metaItem?.buyerName || '-';
@@ -273,7 +280,16 @@ function ResolutionDialog({ open, onClose, metaItem, onSave }) {
              </Stack>
            </Box>
            <Box sx={{ p: 2, bgcolor: '#fff', borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1 }}>
-             <TextField fullWidth size="small" placeholder="Type message..." value={newMessage} onChange={e=>setNewMessage(e.target.value)} />
+            <TextField
+              fullWidth
+              size="small"
+              multiline
+              maxRows={4}
+              placeholder="Type message..."
+              value={newMessage}
+              onChange={e => setNewMessage(e.target.value)}
+              onKeyDown={handleMessageKeyDown}
+            />
              <Button variant="contained" onClick={handleSendMessage} disabled={sendingMsg}>
                 {sendingMsg ? <CircularProgress size={20}/> : <SendIcon/>}
              </Button>

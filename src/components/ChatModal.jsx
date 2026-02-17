@@ -148,7 +148,7 @@ export default function ChatModal({
     handleTemplateClose();
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -238,10 +238,12 @@ export default function ChatModal({
             <TextField
               fullWidth
               size="small"
+              multiline
+              maxRows={4}
               placeholder="Type message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
             />
             <Button
               variant="contained"

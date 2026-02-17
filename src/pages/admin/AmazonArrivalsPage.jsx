@@ -46,25 +46,33 @@ import {
   saveRemarkTemplates
 } from '../../constants/remarkTemplates';
 
-function NotesCell({ order, onSave, onNotify }) {
+function NotesCell({
+  order,
+  onSave,
+  onNotify,
+  fieldLabel = 'Notes',
+  valueKey = 'notes',
+  placeholder = 'Enter notes...',
+  emptyText = '+ Add Note'
+}) {
   const [isEditing, setIsEditing] = useState(false);
-  const [tempValue, setTempValue] = useState(order.notes || '');
+  const [tempValue, setTempValue] = useState(order[valueKey] || '');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!isEditing) {
-      setTempValue(order.notes || '');
+      setTempValue(order[valueKey] || '');
     }
-  }, [order.notes, isEditing]);
+  }, [order, valueKey, isEditing]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
       await onSave(order._id, tempValue);
       setIsEditing(false);
-      onNotify('success', '✅ Notes updated');
+      onNotify('success', `✅ ${fieldLabel} updated`);
     } catch {
-      onNotify('error', 'Failed to update notes');
+      onNotify('error', `Failed to update ${fieldLabel.toLowerCase()}`);
     } finally {
       setIsSaving(false);
     }
@@ -80,7 +88,7 @@ function NotesCell({ order, onSave, onNotify }) {
           size="small"
           value={tempValue}
           onChange={(e) => setTempValue(e.target.value)}
-          placeholder="Enter notes..."
+          placeholder={placeholder}
           autoFocus
         />
         <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
@@ -91,7 +99,7 @@ function NotesCell({ order, onSave, onNotify }) {
             size="small"
             variant="outlined"
             onClick={() => {
-              setTempValue(order.notes || '');
+              setTempValue(order[valueKey] || '');
               setIsEditing(false);
             }}
             disabled={isSaving}
@@ -111,8 +119,15 @@ function NotesCell({ order, onSave, onNotify }) {
       }}
       sx={{ cursor: 'pointer', minHeight: 24 }}
     >
-      <Typography variant="body2" sx={{ fontSize: '0.85rem', fontStyle: !order.notes ? 'italic' : 'normal', color: !order.notes ? 'text.secondary' : 'text.primary' }}>
-        {order.notes || '+ Add Note'}
+      <Typography
+        variant="body2"
+        sx={{
+          fontSize: '0.85rem',
+          fontStyle: !order[valueKey] ? 'italic' : 'normal',
+          color: !order[valueKey] ? 'text.secondary' : 'text.primary'
+        }}
+      >
+        {order[valueKey] || emptyText}
       </Typography>
     </Box>
   );
@@ -290,6 +305,11 @@ export default function AmazonArrivalsPage() {
   const updateSharedOrderNotes = async (orderId, value) => {
     await api.patch(`/ebay/orders/${orderId}/notes`, { notes: value });
     setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, notes: value } : o)));
+  };
+
+  const updateFulfillmentNotes = async (orderId, value) => {
+    await api.patch(`/ebay/orders/${orderId}/fulfillment-notes`, { fulfillmentNotes: value });
+    setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, fulfillmentNotes: value } : o)));
   };
 
   const replaceTemplateVariables = (template, order) => {
@@ -627,6 +647,7 @@ export default function AmazonArrivalsPage() {
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Account</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Order ID</TableCell>
+                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Tracking ID</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>
                   <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Messaging</TableCell>
@@ -751,6 +772,18 @@ export default function AmazonArrivalsPage() {
                         order={order}
                         onSave={updateSharedOrderNotes}
                         onNotify={showSnack}
+                        fieldLabel="Tracking ID"
+                        placeholder="Enter tracking ID..."
+                        emptyText="+ Add Tracking ID"
+                      />
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 260 }}>
+                      <NotesCell
+                        order={order}
+                        onSave={updateFulfillmentNotes}
+                        onNotify={showSnack}
+                        valueKey="fulfillmentNotes"
+                        fieldLabel="Notes"
                       />
                     </TableCell>
                     <TableCell>

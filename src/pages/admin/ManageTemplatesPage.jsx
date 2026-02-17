@@ -17,6 +17,7 @@ import api from '../../lib/api.js';
 import FieldConfigList from '../../components/FieldConfigList.jsx';
 import CoreFieldDefaultsForm from '../../components/CoreFieldDefaultsForm.jsx';
 import PricingConfigSection from '../../components/PricingConfigSection.jsx';
+import ActionFieldEditor from '../../components/ActionFieldEditor.jsx';
 
 export default function ManageTemplatesPage() {
   const navigate = useNavigate();
@@ -527,7 +528,13 @@ export default function ManageTemplatesPage() {
         <DialogTitle>Edit Template</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 1 }}>
-            <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)} sx={{ mb: 3 }}>
+            <Tabs 
+              value={currentTab} 
+              onChange={(e, v) => setCurrentTab(v)} 
+              sx={{ mb: 3 }}
+              variant="scrollable"
+              scrollButtons="auto"
+            >
               <Tab label="Basic Info" />
               <Tab label="Custom Columns" />
               <Tab label="ASIN Auto-Fill" />
@@ -551,6 +558,7 @@ export default function ManageTemplatesPage() {
                   </Box>
                 } 
               />
+              <Tab label="eBay Action Field" />
             </Tabs>
             
             <Box sx={{ minHeight: 300 }}>
@@ -699,6 +707,30 @@ export default function ManageTemplatesPage() {
                       pricingConfig: newPricingConfig
                     })}
                   />
+                </Box>
+              )}
+
+              {/* Tab 5: eBay Action Field */}
+              {currentTab === 5 && (
+                <Box sx={{ mt: 2 }}>
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    This field defines the eBay marketplace settings for CSV export.
+                    Changes here affect the base template and will be used by default for all sellers
+                    unless they create a seller-specific override.
+                  </Alert>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                    <ActionFieldEditor templateId={editingTemplate?._id} sellerId={null} />
+                  </Box>
+                  
+                  <Alert severity="warning" variant="outlined" sx={{ mt: 2 }}>
+                    <strong>Common Marketplace Examples:</strong>
+                    <br />• <strong>US:</strong> *Action(SiteID=US|Country=US|Currency=USD|Version=1193)
+                    <br />• <strong>UK:</strong> *Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)
+                    <br />• <strong>AU:</strong> *Action(SiteID=AU|Country=AU|Currency=AUD|Version=1193)
+                    <br />• <strong>CA:</strong> *Action(SiteID=CA|Country=CA|Currency=CAD|Version=1193)
+                    <br />• <strong>DE:</strong> *Action(SiteID=DE|Country=DE|Currency=EUR|Version=1193)
+                  </Alert>
                 </Box>
               )}
             </Box>
