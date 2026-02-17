@@ -53,11 +53,11 @@ const getVehicleString = (nameValueList) => {
   return mainString.trim();
 };
 
-// Helper: Date to IST
+// Helper: Date to PST
 const formatDate = (dateString) => {
   if (!dateString) return '-';
-  return new Intl.DateTimeFormat('en-IN', {
-    timeZone: 'Asia/Kolkata',
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: true
   }).format(new Date(dateString));

@@ -78,56 +78,14 @@ import ColumnSelector from '../../components/ColumnSelector';
 import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import api from '../../lib/api';
 import TemplateManagementModal from '../../components/TemplateManagementModal';
-
-// Remark dropdown options
-const REMARK_OPTIONS = [
-  { _id: '1', name: 'Delivered' },
-  { _id: '2', name: 'In-transit' },
-  { _id: '3', name: 'Processing' },
-  { _id: '4', name: 'Shipped' },
-  { _id: '5', name: 'Out for delivery' },
-  { _id: '6', name: 'Delayed' },
-  { _id: '7', name: 'Refund' },
-  { _id: '8', name: 'Not yet shipped' }
-];
-
 import { CHAT_TEMPLATES, personalizeTemplate } from '../../constants/chatTemplates';
-// Message templates for each remark status
-const REMARK_MESSAGE_TEMPLATES = {
-  'Delivered': `Hello {{buyer_first_name}},
-Thanks for your patience, we hope your package was delivered successfully and in satisfactory condition.
-If there are any issues with your order, please let us know so we can take care of it quickly.
-If you are satisfied, please leave us positive feedback with five stars.
-Thanks again and have a wonderful day.`,
-
-  'In-transit': `Hi {{buyer_first_name}}, We're pleased to let you know that your order is currently in transit and will be delivered shortly.
-Thank you for your trust and support.`,
-
-  'Processing': `Hi {{buyer_first_name}},
-
-We're pleased to inform you that your order has been processed.
-
-Also, we are actively monitoring your order to ensure it reaches you smoothly and tracking number will be updated on your eBay order page as soon as they become available.
-
-We truly appreciate your patience and understanding.`,
-
-  'Shipped': `Dear {{buyer_first_name}},
-Your package is on its way! The tracking number is {{tracking_number}} with {{shipping_carrier}}.
-It will arrive soon. Thank you for your patience!`,
-
-  'Out for delivery': `Hello {{buyer_first_name}}, your order is out for delivery and expected to arrive today.
-We're coordinating with our shipping partner to ensure smooth delivery.
-Thank you for your patience!`,
-
-  'Delayed': `Hi {{buyer_first_name}}, We sincerely apologize for the delay.
-Due to operational or weather issues, your delivery is delayed but will arrive soon.
-We appreciate your patience and understanding.`,
-
-  'Refund': `Dear {{buyer_first_name}},
-We've successfully processed your refund.
-The amount should reflect in your account shortly depending on your payment provider.
-If you need assistance, feel free to contact us.`
-};
+import RemarkTemplateManagerModal from '../../components/RemarkTemplateManagerModal';
+import {
+  findRemarkTemplateText,
+  loadRemarkTemplates,
+  remarkOptionsFromTemplates,
+  saveRemarkTemplates
+} from '../../constants/remarkTemplates';
 
 
 // --- IMAGE VIEWER DIALOG ---
@@ -1159,6 +1117,8 @@ function FulfillmentDashboard() {
   const [remarkConfirmOpen, setRemarkConfirmOpen] = useState(false);
   const [pendingRemarkUpdate, setPendingRemarkUpdate] = useState(null);
   const [sendingRemarkMessage, setSendingRemarkMessage] = useState(false);
+  const [remarkTemplates, setRemarkTemplates] = useState([]);
+  const [manageRemarkTemplatesOpen, setManageRemarkTemplatesOpen] = useState(false);
 
   // CSV Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -1239,6 +1199,18 @@ function FulfillmentDashboard() {
     getInitialState('visibleColumns', DEFAULT_VISIBLE_COLUMNS)
   );
 
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      const templates = await loadRemarkTemplates();
+      if (mounted) setRemarkTemplates(templates);
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
 
   // Helper function to replace template variables
   const replaceTemplateVariables = (template, order) => {
@@ -1259,10 +1231,24 @@ function FulfillmentDashboard() {
       .replace(/\{\{shipping_carrier\}\}/g, shippingCarrier);
   };
 
+  const handleSaveRemarkTemplates = async (nextTemplates) => {
+    try {
+      const savedTemplates = await saveRemarkTemplates(nextTemplates);
+      setRemarkTemplates(savedTemplates);
+      setSnackbarMsg('Remark templates saved');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (error) {
+      setSnackbarMsg(error?.response?.data?.error || 'Failed to save remark templates');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
   // Function to send auto-message based on remark
   const sendAutoMessageForRemark = async (order, remarkValue) => {
     // Get template for this remark
-    const template = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    const template = findRemarkTemplateText(remarkTemplates, remarkValue);
     if (!template) {
       console.log('No template found for remark:', remarkValue);
       return false;
@@ -1364,6 +1350,10 @@ function FulfillmentDashboard() {
 
   // Handle remark update - intercept to show confirmation
   const handleRemarkUpdate = (orderId, remarkValue) => {
+    if (remarkValue === '__manage_templates__') {
+      setManageRemarkTemplatesOpen(true);
+      return;
+    }
     // Find the order
     const order = orders.find(o => o._id === orderId);
     if (!order) {
@@ -1372,7 +1362,7 @@ function FulfillmentDashboard() {
     }
 
     // Check if there's a template for this remark
-    const hasTemplate = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    const hasTemplate = findRemarkTemplateText(remarkTemplates, remarkValue);
 
     if (hasTemplate) {
       // Show confirmation dialog
@@ -4145,8 +4135,9 @@ function FulfillmentDashboard() {
                           <TableCell>
                             <AutoSaveSelect
                               value={order.remark || ''}
-                              options={REMARK_OPTIONS}
+                              options={remarkOptionsFromTemplates(remarkTemplates)}
                               onSave={(val) => handleRemarkUpdate(order._id, val)}
+                              onManage={() => setManageRemarkTemplatesOpen(true)}
                             />
                           </TableCell>
                         )}
@@ -4271,9 +4262,9 @@ function FulfillmentDashboard() {
                     lineHeight: 1.6
                   }}
                 >
-                  {pendingRemarkUpdate && REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue]
+                  {pendingRemarkUpdate && findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue)
                     ? replaceTemplateVariables(
-                      REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue],
+                      findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue),
                       pendingRemarkUpdate.order
                     )
                     : ''}
@@ -4304,6 +4295,13 @@ function FulfillmentDashboard() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <RemarkTemplateManagerModal
+        open={manageRemarkTemplatesOpen}
+        onClose={() => setManageRemarkTemplatesOpen(false)}
+        templates={remarkTemplates}
+        onSaveTemplates={handleSaveRemarkTemplates}
+      />
 
 
       {/* CSV Export Column Selection Dialog */}
@@ -4586,7 +4584,7 @@ function AutoSaveDatePicker({ value, onSave, sx = {} }) {
   );
 }
 
-function AutoSaveSelect({ value, options, onSave }) {
+function AutoSaveSelect({ value, options, onSave, onManage }) {
   const [localValue, setLocalValue] = useState(value || '');
 
   useEffect(() => {
@@ -4595,6 +4593,10 @@ function AutoSaveSelect({ value, options, onSave }) {
 
   const handleChange = (e) => {
     const newVal = e.target.value;
+    if (newVal === '__manage_templates__') {
+      if (onManage) onManage();
+      return;
+    }
     setLocalValue(newVal);
     onSave(newVal); // Auto-save immediately on selection
   };
@@ -4622,6 +4624,11 @@ function AutoSaveSelect({ value, options, onSave }) {
           {opt.name}
         </MenuItem>
       ))}
+      {onManage ? (
+        <MenuItem value="__manage_templates__" sx={{ borderTop: '1px solid', borderColor: 'divider', mt: 0.5 }}>
+          Manage Templates
+        </MenuItem>
+      ) : null}
     </Select>
   );
 }

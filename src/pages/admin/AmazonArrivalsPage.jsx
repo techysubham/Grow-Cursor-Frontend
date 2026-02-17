@@ -39,45 +39,12 @@ import CloseIcon from '@mui/icons-material/Close';
 import InfoIcon from '@mui/icons-material/Info';
 import api from '../../lib/api';
 import ChatModal from '../../components/ChatModal';
-
-const REMARK_OPTIONS = [
-  'Delivered',
-  'In-transit',
-  'Processing',
-  'Shipped',
-  'Out for delivery',
-  'Delayed',
-  'Refund',
-  'Not yet shipped'
-];
-
-const REMARK_MESSAGE_TEMPLATES = {
-  'Delivered': `Hello {{buyer_first_name}},
-Thanks for your patience, we hope your package was delivered successfully and in satisfactory condition.
-If there are any issues with your order, please let us know so we can take care of it quickly.
-If you are satisfied, please leave us positive feedback with five stars.
-Thanks again and have a wonderful day.`,
-  'In-transit': `Hi {{buyer_first_name}}, We're pleased to let you know that your order is currently in transit and will be delivered shortly.
-Thank you for your trust and support.`,
-  'Processing': `Hi {{buyer_first_name}},
-We're pleased to inform you that your order has been processed.
-Also, we are actively monitoring your order to ensure it reaches you smoothly and tracking number will be updated on your eBay order page as soon as they become available.
-Thank you for choosing us.`,
-  'Shipped': `Hi {{buyer_first_name}},
-Your order has been shipped.
-We are still waiting for the tracking number from the warehouse and it will be updated shortly.`,
-  'Out for delivery': `Hi {{buyer_first_name}},
-Your package is currently out for delivery and should arrive shortly.`,
-  'Delayed': `Hi {{buyer_first_name}},
-We apologize for the delay in your shipment.
-Your package is still in transit and should arrive soon.`,
-  'Refund': `Hi {{buyer_first_name}},
-Your refund has been processed successfully.
-Please allow a few business days for it to reflect in your account.`,
-  'Not yet shipped': `Hi {{buyer_first_name}},
-Your order has not shipped yet, but our team is actively working on it.
-We'll keep you updated as soon as it ships.`
-};
+import RemarkTemplateManagerModal from '../../components/RemarkTemplateManagerModal';
+import {
+  findRemarkTemplateText,
+  loadRemarkTemplates,
+  saveRemarkTemplates
+} from '../../constants/remarkTemplates';
 
 function NotesCell({ order, onSave, onNotify }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -180,6 +147,8 @@ export default function AmazonArrivalsPage() {
   const [remarkConfirmOpen, setRemarkConfirmOpen] = useState(false);
   const [pendingRemarkUpdate, setPendingRemarkUpdate] = useState(null); // { orderId, remarkValue, order }
   const [sendingRemarkMessage, setSendingRemarkMessage] = useState(false);
+  const [remarkTemplates, setRemarkTemplates] = useState([]);
+  const [manageRemarkTemplatesOpen, setManageRemarkTemplatesOpen] = useState(false);
 
   // Debounced Values
   const [debouncedOrderId, setDebouncedOrderId] = useState('');
@@ -207,6 +176,18 @@ export default function AmazonArrivalsPage() {
     };
     loadSellers();
     loadAmazonAccounts();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      const templates = await loadRemarkTemplates();
+      if (mounted) setRemarkTemplates(templates);
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // 2. Debounce Order ID Search
@@ -284,6 +265,16 @@ export default function AmazonArrivalsPage() {
     setTimeout(() => setSnack(prev => ({ ...prev, open: false })), 2500);
   };
 
+  const handleSaveRemarkTemplates = async (nextTemplates) => {
+    try {
+      const savedTemplates = await saveRemarkTemplates(nextTemplates);
+      setRemarkTemplates(savedTemplates);
+      showSnack('success', 'Remark templates saved');
+    } catch (error) {
+      showSnack('error', error?.response?.data?.error || 'Failed to save remark templates');
+    }
+  };
+
   const toggleSort = () => {
     setArrivalSort(prev => prev === 'asc' ? 'desc' : 'asc');
   };
@@ -323,7 +314,7 @@ export default function AmazonArrivalsPage() {
   };
 
   const sendAutoMessageForRemark = async (order, remarkValue) => {
-    const template = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    const template = findRemarkTemplateText(remarkTemplates, remarkValue);
     if (!template) return false;
     const messageBody = replaceTemplateVariables(template, order);
 
@@ -368,6 +359,11 @@ export default function AmazonArrivalsPage() {
   };
 
   const handleRemarkUpdate = async (orderId, remarkValue) => {
+    if (remarkValue === '__manage_templates__') {
+      setManageRemarkTemplatesOpen(true);
+      return;
+    }
+
     // allow setting remark back to default/empty without confirmation
     if (!remarkValue) {
       const updated = await applyRemarkUpdateOnly(orderId, '');
@@ -376,7 +372,7 @@ export default function AmazonArrivalsPage() {
     }
 
     const order = orders.find(o => o._id === orderId);
-    const hasTemplate = REMARK_MESSAGE_TEMPLATES[remarkValue];
+    const hasTemplate = findRemarkTemplateText(remarkTemplates, remarkValue);
     if (order && hasTemplate) {
       setPendingRemarkUpdate({ orderId, remarkValue, order });
       setRemarkConfirmOpen(true);
@@ -765,9 +761,12 @@ export default function AmazonArrivalsPage() {
                           onChange={(e) => handleRemarkUpdate(order._id, e.target.value)}
                         >
                           <MenuItem value="">Select Remark</MenuItem>
-                          {REMARK_OPTIONS.map((opt) => (
-                            <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                          {remarkTemplates.map((template) => (
+                            <MenuItem key={template.id} value={template.name}>{template.name}</MenuItem>
                           ))}
+                          <MenuItem value="__manage_templates__" sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
+                            Manage Templates
+                          </MenuItem>
                         </Select>
                       </FormControl>
                     </TableCell>
@@ -834,6 +833,13 @@ export default function AmazonArrivalsPage() {
         />
       )}
 
+      <RemarkTemplateManagerModal
+        open={manageRemarkTemplatesOpen}
+        onClose={() => setManageRemarkTemplatesOpen(false)}
+        templates={remarkTemplates}
+        onSaveTemplates={handleSaveRemarkTemplates}
+      />
+
       <Dialog
         open={remarkConfirmOpen}
         onClose={() => {
@@ -861,9 +867,9 @@ export default function AmazonArrivalsPage() {
             </Typography>
             <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
               <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                {pendingRemarkUpdate && REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue]
+                {pendingRemarkUpdate && findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue)
                   ? replaceTemplateVariables(
-                      REMARK_MESSAGE_TEMPLATES[pendingRemarkUpdate.remarkValue],
+                      findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue),
                       pendingRemarkUpdate.order
                     )
                   : ''}

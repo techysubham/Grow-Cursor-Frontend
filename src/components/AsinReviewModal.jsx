@@ -15,7 +15,9 @@ import {
   Alert,
   Stack,
   Skeleton,
-  CircularProgress
+  CircularProgress,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -26,7 +28,9 @@ import {
   Error as ErrorIcon,
   CheckCircle as CheckIcon,
   HourglassEmpty as LoadingIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Code as CodeIcon,
+  Visibility as VisibilityIcon
 } from '@mui/icons-material';
 
 export default function AsinReviewModal({ 
@@ -41,6 +45,9 @@ export default function AsinReviewModal({
   const [dismissedItems, setDismissedItems] = useState(new Set());
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [descriptionViewMode, setDescriptionViewMode] = useState('code'); // 'code' | 'preview'
+  const [amazonWindowRef, setAmazonWindowRef] = useState(null);
+  const [showAmazonPreview, setShowAmazonPreview] = useState(false);
 
   // Filter out dismissed items
   const activeItems = previewItems.filter(item => !dismissedItems.has(item.id));
@@ -59,6 +66,36 @@ export default function AsinReviewModal({
       setEditedItems(initial);
     }
   }, [previewItems]);
+
+  // Sync Amazon preview window when navigating
+  useEffect(() => {
+    if (showAmazonPreview && amazonWindowRef && !amazonWindowRef.closed && currentItem?.asin) {
+      const asin = currentItem.asin;
+      const amazonUrl = `https://www.amazon.com/dp/${asin}`;
+      try {
+        amazonWindowRef.location.href = amazonUrl;
+      } catch (error) {
+        // Window might be closed or blocked
+        console.warn('Could not update Amazon preview window:', error);
+        setShowAmazonPreview(false);
+        setAmazonWindowRef(null);
+      }
+    }
+  }, [currentIndex, currentItem?.asin, showAmazonPreview, amazonWindowRef]);
+
+  // Check if Amazon preview window was closed manually
+  useEffect(() => {
+    if (!showAmazonPreview || !amazonWindowRef) return;
+    
+    const checkWindowClosed = setInterval(() => {
+      if (amazonWindowRef.closed) {
+        setShowAmazonPreview(false);
+        setAmazonWindowRef(null);
+      }
+    }, 500);
+    
+    return () => clearInterval(checkWindowClosed);
+  }, [showAmazonPreview, amazonWindowRef]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -140,7 +177,52 @@ export default function AsinReviewModal({
     }
   };
 
+  const openAmazonPreview = () => {
+    if (!currentItem?.asin) return;
+    
+    const asin = currentItem.asin;
+    const amazonUrl = `https://www.amazon.com/dp/${asin}`;
+    
+    // Calculate window position - right side of screen
+    const width = 900;
+    const height = window.screen.height - 100;
+    const left = window.screen.width - width - 20;
+    const top = 20;
+    
+    const windowRef = window.open(
+      amazonUrl,
+      'AmazonPreview',
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,location=yes`
+    );
+    
+    if (windowRef) {
+      setAmazonWindowRef(windowRef);
+      setShowAmazonPreview(true);
+    } else {
+      alert('Please allow popups to view Amazon preview side-by-side');
+    }
+  };
+
+  const closeAmazonPreview = () => {
+    if (amazonWindowRef && !amazonWindowRef.closed) {
+      amazonWindowRef.close();
+    }
+    setAmazonWindowRef(null);
+    setShowAmazonPreview(false);
+  };
+
+  const toggleAmazonPreview = () => {
+    if (showAmazonPreview) {
+      closeAmazonPreview();
+    } else {
+      openAmazonPreview();
+    }
+  };
+
   const handleClose = () => {
+    // Close Amazon preview window if open
+    closeAmazonPreview();
+    
     if (hasUnsavedChanges) {
       if (!window.confirm('You have unsaved changes. Are you sure you want to close?')) {
         return;
@@ -241,6 +323,15 @@ export default function AsinReviewModal({
           </Box>
           
           <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant={showAmazonPreview ? "contained" : "outlined"}
+              onClick={toggleAmazonPreview}
+              size="small"
+              sx={{ whiteSpace: 'nowrap' }}
+            >
+              {showAmazonPreview ? '✓ Amazon Preview' : 'View on Amazon'}
+            </Button>
+            
             <Button
               variant="outlined"
               color="error"
@@ -369,6 +460,28 @@ export default function AsinReviewModal({
                   </Typography>
                 </Box>
 
+                {currentItem.sourceData?.color && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Color
+                    </Typography>
+                    <Typography variant="body2">
+                      {currentItem.sourceData.color}
+                    </Typography>
+                  </Box>
+                )}
+
+                {currentItem.sourceData?.compatibility && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Compatibility
+                    </Typography>
+                    <Typography variant="body2">
+                      {currentItem.sourceData.compatibility}
+                    </Typography>
+                  </Box>
+                )}
+
                 <Box>
                   <Typography variant="caption" color="text.secondary">
                     Price
@@ -468,26 +581,95 @@ export default function AsinReviewModal({
                 />
 
                 {/* Core Fields */}
-                {coreFieldColumns.map(col => (
-                  <TextField
-                    key={col.name}
-                    label={col.label || col.name}
-                    value={itemData[col.name] || ''}
-                    onChange={(e) => handleFieldChange(col.name, e.target.value, false)}
-                    multiline={col.name === 'description'}
-                    rows={col.name === 'description' ? 8 : 1}
-                    size="small"
-                    fullWidth
-                    required={col.name === 'title' || col.name === 'startPrice'}
-                    type={col.name === 'startPrice' || col.name === 'quantity' ? 'number' : 'text'}
-                    helperText={
-                      col.name === 'title' ? `${(itemData.title || '').length}/80` :
-                      col.name === 'description' ? 'HTML allowed' :
-                      col.name !== 'startPrice' && col.name !== 'quantity' ? `${(itemData[col.name] || '').length}/60` :
-                      ''
-                    }
-                  />
-                ))}
+                {coreFieldColumns.map(col => {
+                  // Special handling for description field with HTML preview
+                  if (col.name === 'description') {
+                    return (
+                      <Box key={col.name}>
+                        {/* Toggle Header */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight="500">
+                            {col.label || 'Description'}
+                          </Typography>
+                          <ToggleButtonGroup
+                            value={descriptionViewMode}
+                            exclusive
+                            onChange={(e, newMode) => newMode && setDescriptionViewMode(newMode)}
+                            size="small"
+                          >
+                            <ToggleButton value="code">
+                              <CodeIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                              Code
+                            </ToggleButton>
+                            <ToggleButton value="preview">
+                              <VisibilityIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                              Preview
+                            </ToggleButton>
+                          </ToggleButtonGroup>
+                        </Box>
+
+                        {/* Content Area */}
+                        {descriptionViewMode === 'code' ? (
+                          <TextField
+                            value={itemData.description || ''}
+                            onChange={(e) => handleFieldChange('description', e.target.value, false)}
+                            multiline
+                            rows={8}
+                            size="small"
+                            fullWidth
+                            placeholder="<html>...</html>"
+                            helperText={`HTML allowed • ${(itemData.description || '').length} characters`}
+                          />
+                        ) : (
+                          <Paper
+                            variant="outlined"
+                            sx={{
+                              p: 2,
+                              minHeight: 200,
+                              maxHeight: 400,
+                              overflow: 'auto',
+                              bgcolor: 'white',
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              '& img': { maxWidth: '100%', height: 'auto' },
+                              '& table': { width: '100%', borderCollapse: 'collapse' },
+                              '& td, & th': { border: '1px solid #ddd', padding: '8px' },
+                              '& p': { margin: '0 0 8px 0' },
+                              '& ul, & ol': { marginLeft: '20px' }
+                            }}
+                          >
+                            {itemData.description ? (
+                              <Box dangerouslySetInnerHTML={{ __html: itemData.description }} />
+                            ) : (
+                              <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                                No description generated
+                              </Typography>
+                            )}
+                          </Paper>
+                        )}
+                      </Box>
+                    );
+                  }
+
+                  // Regular fields
+                  return (
+                    <TextField
+                      key={col.name}
+                      label={col.label || col.name}
+                      value={itemData[col.name] || ''}
+                      onChange={(e) => handleFieldChange(col.name, e.target.value, false)}
+                      size="small"
+                      fullWidth
+                      required={col.name === 'title' || col.name === 'startPrice'}
+                      type={col.name === 'startPrice' || col.name === 'quantity' ? 'number' : 'text'}
+                      helperText={
+                        col.name === 'title' ? `${(itemData.title || '').length}/80` :
+                        col.name !== 'startPrice' && col.name !== 'quantity' ? `${(itemData[col.name] || '').length}/60` :
+                        ''
+                      }
+                    />
+                  );
+                })}
 
                 {/* Custom Fields */}
                 {customFieldColumns.length > 0 && (
