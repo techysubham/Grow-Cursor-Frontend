@@ -10,7 +10,8 @@ import {
   Edit as EditIcon,
   Add as AddIcon,
   Visibility as VisibilityIcon,
-  ContentCopy as CopyIcon
+  ContentCopy as CopyIcon,
+  Publish as PublishIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
@@ -64,6 +65,13 @@ export default function ManageTemplatesPage() {
     isRequired: false,
     placeholder: ''
   });
+
+  // Bulk reset state
+  const [bulkResetDialog, setBulkResetDialog] = useState(false);
+  const [bulkResetTarget, setBulkResetTarget] = useState(null);
+  const [affectedSellersCount, setAffectedSellersCount] = useState(0);
+  const [confirmationInput, setConfirmationInput] = useState('');
+  const [bulkResetLoading, setBulkResetLoading] = useState(false);
 
   useEffect(() => {
     fetchTemplates();
@@ -276,6 +284,57 @@ export default function ManageTemplatesPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenBulkReset = async (template) => {
+    try {
+      setBulkResetLoading(true);
+      setError('');
+      
+      // Fetch the count of affected sellers
+      const { data } = await api.get(`/template-overrides/${template._id}/count`);
+      
+      setAffectedSellersCount(data.count);
+      setBulkResetTarget(template);
+      setConfirmationInput('');
+      setBulkResetDialog(true);
+    } catch (err) {
+      setError('Failed to fetch affected sellers count');
+      console.error(err);
+    } finally {
+      setBulkResetLoading(false);
+    }
+  };
+
+  const handleBulkReset = async () => {
+    if (!bulkResetTarget) return;
+
+    try {
+      setBulkResetLoading(true);
+      setError('');
+
+      const { data } = await api.delete(`/listing-templates/${bulkResetTarget._id}/bulk-reset-overrides`);
+      
+      setSuccess(data.message || `Successfully reset ${data.deletedCount} seller customizations!`);
+      setBulkResetDialog(false);
+      setBulkResetTarget(null);
+      setConfirmationInput('');
+      
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to reset overrides');
+      console.error(err);
+    } finally {
+      setBulkResetLoading(false);
+    }
+  };
+
+  const handleCloseBulkResetDialog = () => {
+    if (!bulkResetLoading) {
+      setBulkResetDialog(false);
+      setBulkResetTarget(null);
+      setConfirmationInput('');
+      setAffectedSellersCount(0);
     }
   };
 
@@ -507,6 +566,9 @@ export default function ManageTemplatesPage() {
                       </IconButton>
                       <IconButton size="small" onClick={() => handleDuplicate(template._id, template.name)} title="Duplicate Template">
                         <CopyIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" color="success" onClick={() => handleOpenBulkReset(template)} title="Apply Base Template to All Sellers">
+                        <PublishIcon fontSize="small" />
                       </IconButton>
                       <IconButton size="small" onClick={() => handleEdit(template)} title="Edit Template">
                         <EditIcon fontSize="small" />
@@ -806,6 +868,83 @@ export default function ManageTemplatesPage() {
           <Button onClick={() => { setColumnDialog(false); setEditingColumnIndex(null); }}>Cancel</Button>
           <Button onClick={handleSaveColumn} variant="contained">
             {editingColumnIndex !== null ? 'Update Column' : 'Add Column'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Reset Confirmation Dialog */}
+      <Dialog 
+        open={bulkResetDialog} 
+        onClose={handleCloseBulkResetDialog}
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'warning.main' }}>
+          <PublishIcon />
+          Apply Base Template to All Sellers
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 1 }}>
+            <Alert severity="warning" variant="outlined">
+              <strong>⚠️ Warning:</strong> This action is irreversible!
+            </Alert>
+
+            <Box>
+              <Typography variant="body1" gutterBottom>
+                This will:
+              </Typography>
+              <Box component="ul" sx={{ mt: 1, pl: 3 }}>
+                <li>Delete all seller-specific customizations for this template</li>
+                <li>Force all sellers to use the current base template settings</li>
+                <li>Apply immediately to <strong>{affectedSellersCount}</strong> seller{affectedSellersCount !== 1 ? 's' : ''} who have customized this template</li>
+              </Box>
+            </Box>
+
+            {affectedSellersCount === 0 && (
+              <Alert severity="info">
+                No sellers have customized this template yet. No changes will be made.
+              </Alert>
+            )}
+
+            {affectedSellersCount > 0 && (
+              <>
+                <Alert severity="warning">
+                  <strong>{affectedSellersCount}</strong> seller{affectedSellersCount !== 1 ? 's' : ''} will be affected.
+                  Their customizations will be permanently deleted.
+                </Alert>
+
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    To confirm, type the template name: <strong>{bulkResetTarget?.name}</strong>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={confirmationInput}
+                    onChange={(e) => setConfirmationInput(e.target.value)}
+                    placeholder="Enter template name exactly"
+                    autoFocus
+                    sx={{ mt: 1 }}
+                  />
+                </Box>
+              </>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseBulkResetDialog} disabled={bulkResetLoading}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleBulkReset} 
+            variant="contained"
+            color="warning"
+            disabled={
+              bulkResetLoading || 
+              affectedSellersCount === 0 ||
+              confirmationInput !== bulkResetTarget?.name
+            }
+          >
+            {bulkResetLoading ? 'Applying...' : `Apply to ${affectedSellersCount} Seller${affectedSellersCount !== 1 ? 's' : ''}`}
           </Button>
         </DialogActions>
       </Dialog>
