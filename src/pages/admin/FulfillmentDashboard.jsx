@@ -1121,6 +1121,14 @@ function FulfillmentDashboard() {
   const [remarkTemplates, setRemarkTemplates] = useState([]);
   const [manageRemarkTemplatesOpen, setManageRemarkTemplatesOpen] = useState(false);
 
+  const normalizeRemarkValue = useCallback((value) => {
+    if (value === null || value === undefined) return null;
+    const trimmed = String(value).trim();
+    if (!trimmed) return null;
+    if (trimmed.toLowerCase() === 'select') return null;
+    return trimmed;
+  }, []);
+
   // CSV Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   // selectedExportColumns is initialized after ALL_COLUMNS is defined
@@ -1281,16 +1289,17 @@ function FulfillmentDashboard() {
     if (!pendingRemarkUpdate) return;
 
     const { orderId, remarkValue, order } = pendingRemarkUpdate;
+    const normalizedRemarkValue = normalizeRemarkValue(remarkValue);
     setSendingRemarkMessage(true);
 
     try {
       // First update the remark field
-      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: remarkValue });
+      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemarkValue });
 
       // Update local state
       setOrders(prev => prev.map(o => {
         if (o._id === orderId) {
-          return { ...o, remark: remarkValue };
+          return { ...o, remark: normalizedRemarkValue };
         }
         return o;
       }));
@@ -1321,15 +1330,16 @@ function FulfillmentDashboard() {
     if (!pendingRemarkUpdate) return;
 
     const { orderId, remarkValue } = pendingRemarkUpdate;
+    const normalizedRemarkValue = normalizeRemarkValue(remarkValue);
 
     try {
       // Just update the remark without sending message
-      await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: remarkValue });
+      await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemarkValue });
 
       // Update local state
       setOrders(prev => prev.map(o => {
         if (o._id === orderId) {
-          return { ...o, remark: remarkValue };
+          return { ...o, remark: normalizedRemarkValue };
         }
         return o;
       }));
@@ -1377,8 +1387,9 @@ function FulfillmentDashboard() {
 
 
   const updateManualField = async (orderId, field, value) => {
+    const valueToSave = field === 'remark' ? normalizeRemarkValue(value) : value;
     try {
-      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { [field]: value });
+      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { [field]: valueToSave });
 
       // Update local state with the full order data (includes recalculated Amazon financials)
       setOrders(prev => prev.map(o => {
@@ -1388,7 +1399,7 @@ function FulfillmentDashboard() {
             return data.order; // Full order with recalculated amazonTotal, amazonTotalINR, marketplaceFee, igst, totalCC
           }
           // For other fields, just update that field
-          return { ...o, [field]: value };
+          return { ...o, [field]: valueToSave };
         }
         return o;
       }));

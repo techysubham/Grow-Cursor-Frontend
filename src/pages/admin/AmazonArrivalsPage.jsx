@@ -323,7 +323,9 @@ export default function AmazonArrivalsPage() {
 
   const applyRemarkUpdateOnly = async (orderId, remarkValue) => {
     try {
-      const normalizedRemark = remarkValue ? remarkValue : null;
+      const normalizedRemark = remarkValue && String(remarkValue).trim().toLowerCase() !== 'select'
+        ? String(remarkValue).trim()
+        : null;
       await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemark });
       setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, remark: normalizedRemark } : o)));
       return true;
