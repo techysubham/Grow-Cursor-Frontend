@@ -30,7 +30,8 @@ import {
   HourglassEmpty as LoadingIcon,
   Delete as DeleteIcon,
   Code as CodeIcon,
-  Visibility as VisibilityIcon
+  Visibility as VisibilityIcon,
+  Update as UpdateIcon
 } from '@mui/icons-material';
 
 export default function AsinReviewModal({ 
@@ -166,7 +167,20 @@ export default function AsinReviewModal({
       // Convert edited items to array format (exclude errors, loading, blocked, and dismissed items)
       const listingsToSave = activeItems
         .filter(item => !['error', 'loading', 'blocked'].includes(item.status))
-        .map(item => editedItems[item.id] || item.generatedListing);
+        .map(item => {
+          const listingData = editedItems[item.id] || item.generatedListing;
+          
+          // Mark duplicates for update
+          if (item.status === 'duplicate_updateable') {
+            return {
+              ...listingData,
+              _isDuplicateUpdate: true,
+              _existingListingId: item.generatedListing?._existingListingId || listingData._existingListingId
+            };
+          }
+          
+          return listingData;
+        });
       
       await onSave(listingsToSave);
       setHasUnsavedChanges(false);
@@ -240,6 +254,8 @@ export default function AsinReviewModal({
         return <CheckIcon color="success" />;
       case 'warning':
         return <WarningIcon color="warning" />;
+      case 'duplicate_updateable':
+        return <UpdateIcon color="warning" />;
       case 'blocked':
       case 'error':
         return <ErrorIcon color="error" />;
@@ -256,6 +272,7 @@ export default function AsinReviewModal({
       case 'success':
         return 'success';
       case 'warning':
+      case 'duplicate_updateable':
         return 'warning';
       case 'blocked':
       case 'error':
@@ -364,8 +381,29 @@ export default function AsinReviewModal({
           />
         </Box>
 
-        {/* Warnings/Errors */}
-        {(currentItem.warnings?.length > 0 || currentItem.errors?.length > 0) && (
+        {/* Duplicate Notification */}
+        {currentItem?.status === 'duplicate_updateable' && (
+          <Box sx={{ px: 2, pt: 2 }}>
+            <Alert severity="info" sx={{ mb: 1 }}>
+              <Stack spacing={0.5}>
+                <Typography variant="body2" fontWeight="bold">
+                  📝 Editing Existing Listing
+                </Typography>
+                <Typography variant="caption">
+                  You are editing an existing ASIN. Make any changes needed and click Save to update.
+                </Typography>
+                {currentItem.warnings?.map((warning, idx) => (
+                  <Typography key={idx} variant="caption" color="text.secondary">
+                    • {warning}
+                  </Typography>
+                ))}
+              </Stack>
+            </Alert>
+          </Box>
+        )}
+
+        {/* Warnings/Errors (exclude duplicate_updateable warnings since shown above) */}
+        {(currentItem.warnings?.length > 0 || currentItem.errors?.length > 0) && currentItem?.status !== 'duplicate_updateable' && (
           <Box sx={{ px: 2, pt: 2 }}>
             {currentItem.errors?.map((error, idx) => (
               <Alert key={idx} severity="error" sx={{ mb: 1 }}>
@@ -430,6 +468,47 @@ export default function AsinReviewModal({
                     <Skeleton variant="rectangular" height={120} />
                   </Grid>
                 </Grid>
+              </Stack>
+            ) : currentItem.status === 'duplicate_updateable' ? (
+              // Show metadata for existing listings
+              <Stack spacing={2}>
+                <Alert severity="info" variant="outlined">
+                  <Typography variant="body2" fontWeight="bold" gutterBottom>
+                    Existing Listing
+                  </Typography>
+                  <Typography variant="caption">
+                    This ASIN already exists in your listings. Edit the fields on the right to update it.
+                  </Typography>
+                </Alert>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    ASIN
+                  </Typography>
+                  <Typography variant="body2" fontWeight="bold">
+                    {currentItem.asin}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    SKU
+                  </Typography>
+                  <Typography variant="body2">
+                    {currentItem.sku}
+                  </Typography>
+                </Box>
+
+                {currentItem.warnings?.map((warning, idx) => (
+                  <Box key={idx}>
+                    <Typography variant="caption" color="text.secondary">
+                      {idx === 0 ? 'Status' : ''}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {warning}
+                    </Typography>
+                  </Box>
+                ))}
               </Stack>
             ) : currentItem.sourceData ? (
               <Stack spacing={2}>

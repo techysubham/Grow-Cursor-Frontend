@@ -769,11 +769,11 @@ export default function TemplateListingsPage() {
       setProcessingLog(prev => [
         ...prev,
         `💾 Saving ${listings.length} listings to database...`,
-        `✅ Save completed: ${data.created} created, ${data.reactivated || 0} reactivated, ${data.failed} failed, ${data.skipped} skipped`
+        `✅ Save completed: ${data.created} created, ${data.updated || 0} updated, ${data.reactivated || 0} reactivated, ${data.failed} failed, ${data.skipped} skipped`
       ]);
 
       setSuccess(
-        `Bulk save completed: ${data.created} created, ${data.reactivated || 0} reactivated, ${data.failed} failed, ${data.skipped} skipped`
+        `Bulk save completed: ${data.created} created, ${data.updated || 0} updated, ${data.reactivated || 0} reactivated, ${data.failed} failed, ${data.skipped} skipped`
       );
 
       // Refresh listings table
@@ -867,7 +867,7 @@ export default function TemplateListingsPage() {
       });
 
       setSuccess(
-        `Bulk create completed: ${data.created} created, ${data.reactivated || 0} reactivated, ${data.failed} failed, ${data.skipped} skipped`
+        `Bulk create completed: ${data.created} created, ${data.updated || 0} updated, ${data.reactivated || 0} reactivated, ${data.failed} failed, ${data.skipped} skipped`
       );
 
       // Refresh listings table
