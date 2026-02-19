@@ -79,6 +79,7 @@ import BuyerChatPage from '../pages/admin/BuyerChatPage.jsx';
 import RangeAnalyzerPage from '../pages/admin/RangeAnalyzerPage.jsx';
 import FeedUploadPage from '../pages/ebay/FeedUploadPage.jsx';
 import SellingPrivilegesPage from '../pages/admin/SellingPrivilegesPage.jsx';
+import EbayApiUsagePage from '../pages/admin/EbayApiUsagePage.jsx';
 
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -598,6 +599,22 @@ export default function AdminLayout({ user, onLogout }) {
                   <NavIcon icon={InsightsIcon} label="Selling Privileges" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Selling Privileges" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* eBay API Usage */}
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/admin/ebay-api-usage"
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/ebay-api-usage'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={BarChartIcon} label="eBay API Usage" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="eBay API Usage" />}
               </ListItemButton>
             </ListItem>
 
@@ -1479,6 +1496,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/listings-summary" element={<ListingsSummaryPage />} />
               <Route path="/feed-upload" element={<FeedUploadPage />} />
               <Route path="/selling-privileges" element={<SellingPrivilegesPage />} />
+              <Route path="/ebay-api-usage" element={<EbayApiUsagePage />} />
             </>
           ) : null}
           {isSuper && (
