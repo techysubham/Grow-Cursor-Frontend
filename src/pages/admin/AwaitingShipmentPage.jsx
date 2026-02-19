@@ -460,6 +460,7 @@ export default function AwaitingShipmentPage() {
   const [searchBuyerName, setSearchBuyerName] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState('');
   const [shipByDate, setShipByDate] = useState('');
+  const [dateSold, setDateSold] = useState('');
 
   const [visibleColumns, setVisibleColumns] = useState([
     'seller', 'orderId', 'marketplace', 'dateSold', 'shipBy', 'productName', 'buyerName', 'shippingAddress', 'trackingNumber', 'trackingId', 'notes'
@@ -527,7 +528,7 @@ export default function AwaitingShipmentPage() {
   useEffect(() => {
     fetchAwaitingOrders();
     // eslint-disable-next-line
-  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace, shipByDate]);
+  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace, shipByDate, dateSold]);
 
   // Handlers
   const handleSellerChange = (e) => {
@@ -543,6 +544,7 @@ export default function AwaitingShipmentPage() {
     setSelectedSeller('');
     setSearchMarketplace('');
     setShipByDate('');
+    setDateSold('');
     setPage(1);
   };
 
@@ -562,6 +564,7 @@ export default function AwaitingShipmentPage() {
       if (selectedSeller) params.sellerId = selectedSeller;
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (shipByDate) params.shipByDate = shipByDate;
+      if (dateSold) params.dateSold = dateSold;
 
       // SMART CHECK: If params haven't changed since last fetch, STOP.
       const paramsString = JSON.stringify(params);
@@ -1077,6 +1080,20 @@ export default function AwaitingShipmentPage() {
               value={shipByDate}
               onChange={(e) => {
                 setShipByDate(e.target.value);
+                setPage(1);
+              }}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 160 }}
+            />
+
+            {/* 6. DATE SOLD FILTER */}
+            <TextField
+              type="date"
+              size="small"
+              label="Date Sold"
+              value={dateSold}
+              onChange={(e) => {
+                setDateSold(e.target.value);
                 setPage(1);
               }}
               InputLabelProps={{ shrink: true }}
