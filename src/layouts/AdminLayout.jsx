@@ -587,23 +587,27 @@ export default function AdminLayout({ user, onLogout }) {
           </>
         ) : null}
 
+        {/* Feed Upload - accessible to listers, listingadmins, and superadmins */}
+        {(isListingAdmin || isSuper || isLister) && (
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/admin/feed-upload"
+              onClick={() => setMobileOpen(false)}
+              selected={location.pathname === '/admin/feed-upload'}
+              sx={selectedMenuItemStyle}
+            >
+              <ListItemIcon>
+                <NavIcon icon={CloudUploadIcon} label="Feed Upload" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
+              {sidebarOpen && <ListItemText primary="Feed Upload (CSV)" />}
+            </ListItemButton>
+          </ListItem>
+        )}
+
         {/* Listing Dropdown with Monitoring Subdropdown */}
         {(isListingAdmin || isSuper) && (
           <>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/feed-upload"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/feed-upload'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={CloudUploadIcon} label="Feed Upload" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Feed Upload (CSV)" />}
-              </ListItemButton>
-            </ListItem>
 
             {/* Selling Privileges */}
             <ListItem disablePadding>
@@ -1520,12 +1524,14 @@ export default function AdminLayout({ user, onLogout }) {
           {isSuper || isListingAdmin || isHRAdmin || isOperationHead ? (
             <Route path="/add-user" element={<AddListerPage />} />
           ) : null}
+          {isSuper || isListingAdmin || isLister ? (
+            <Route path="/feed-upload" element={<FeedUploadPage />} />
+          ) : null}
           {isSuper || isListingAdmin ? (
             <>
               <Route path="/platforms" element={<ManagePlatformsPage />} />
               <Route path="/stores" element={<ManageStoresPage />} />
               <Route path="/listings-summary" element={<ListingsSummaryPage />} />
-              <Route path="/feed-upload" element={<FeedUploadPage />} />
               <Route path="/selling-privileges" element={<SellingPrivilegesPage />} />
               <Route path="/ebay-api-usage" element={<EbayApiUsagePage />} />
             </>
