@@ -102,6 +102,7 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import SellerAnalyticsPage from '../pages/admin/SellerAnalyticsPage.jsx';
+import OrdersDepartmentDashboardPage from '../pages/admin/OrdersDepartmentDashboardPage.jsx';
 // WorksheetPage is now embedded in Issues and Resolutions (DisputesPage)
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ChatIcon from '@mui/icons-material/Chat';
@@ -964,6 +965,15 @@ export default function AdminLayout({ user, onLogout }) {
                 <List component="div" disablePadding sx={{ pl: 4 }}>
                   <ListItemButton
                     component={Link}
+                    to="/admin/orders-dashboard"
+                    onClick={() => setMobileOpen(false)}
+                    selected={location.pathname === '/admin/orders-dashboard'}
+                    sx={selectedMenuItemStyle}
+                  >
+                    <ListItemText primary="Orders Dashboard" />
+                  </ListItemButton>
+                  <ListItemButton
+                    component={Link}
                     to="/admin/order-analytics"
                     onClick={() => setMobileOpen(false)}
                     selected={location.pathname === '/admin/order-analytics'}
@@ -1110,6 +1120,9 @@ export default function AdminLayout({ user, onLogout }) {
               }}
               sx={{ pointerEvents: 'none', '& .MuiPaper-root': { pointerEvents: 'auto', minWidth: '220px', maxHeight: '80vh' } }}
             >
+              <MenuItem component={Link} to="/admin/orders-dashboard" onClick={() => setOrdersAnchorEl(null)}>
+                Orders Dashboard
+              </MenuItem>
               <MenuItem component={Link} to="/admin/order-analytics" onClick={() => setOrdersAnchorEl(null)}>
                 Order Analytics
               </MenuItem>
@@ -1581,6 +1594,7 @@ export default function AdminLayout({ user, onLogout }) {
           {/* UPDATED ROUTES FOR ORDERS DEPT */}
           {(isFulfillmentAdmin || isSuper || isHOC || isComplianceManager) && (
             <>
+              <Route path="/orders-dashboard" element={<OrdersDepartmentDashboardPage />} />
               <Route path="/order-analytics" element={<OrderAnalyticsPage />} />
               <Route path="/worksheet" element={<DisputesPage initialTab={4} />} />
               <Route path="/seller-analytics" element={<SellerAnalyticsPage />} />
