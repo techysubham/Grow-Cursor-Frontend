@@ -12,7 +12,8 @@ import {
     Alert,
     CircularProgress,
     Stack,
-    FormHelperText
+    FormHelperText,
+    Pagination
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -44,6 +45,10 @@ const FeedUploadPage = () => {
     const [tasks, setTasks] = useState([]);
     const [loadingTasks, setLoadingTasks] = useState(false);
     const [downloadingTaskId, setDownloadingTaskId] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalTasks, setTotalTasks] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     // Fetch Sellers on mount
     useEffect(() => {
@@ -62,24 +67,34 @@ const FeedUploadPage = () => {
         fetchSellers();
     }, []);
 
-    // Fetch Tasks when seller changes
+    // Fetch Tasks when seller changes — reset to first page
     useEffect(() => {
         if (selectedSeller) {
-            fetchTasks();
+            setCurrentPage(1);
+            fetchTasks(1);
         }
     }, [selectedSeller]);
 
-    const fetchTasks = async () => {
+    // Re-fetch when page or rowsPerPage changes
+    useEffect(() => {
+        if (selectedSeller) {
+            fetchTasks(currentPage);
+        }
+    }, [currentPage, rowsPerPage]);
+
+    const fetchTasks = async (pg = currentPage) => {
         setLoadingTasks(true);
         try {
             const res = await api.get('/ebay/feed/tasks', {
-                params: { sellerId: selectedSeller }
+                params: { sellerId: selectedSeller, limit: rowsPerPage, offset: (pg - 1) * rowsPerPage }
             });
             console.log('Fetched tasks:', res.data.tasks);
             setTasks(res.data.tasks || []);
+            const total = res.data.total || 0;
+            setTotalTasks(total);
+            setTotalPages(Math.ceil(total / rowsPerPage) || 1);
         } catch (err) {
             console.error('Failed to fetch tasks', err);
-            // Don't block UI with error, just log it
         } finally {
             setLoadingTasks(false);
         }
@@ -278,8 +293,29 @@ const FeedUploadPage = () => {
                     </Button>
                 </Stack>
 
-                <TableContainer component={Paper}>
-                    <Table>
+                <TableContainer
+                    component={Paper}
+                    sx={{
+                        maxHeight: 'calc(100vh - 450px)',
+                        overflow: 'auto',
+                        '&::-webkit-scrollbar': {
+                            width: '8px',
+                            height: '8px',
+                        },
+                        '&::-webkit-scrollbar-track': {
+                            backgroundColor: '#f1f1f1',
+                            borderRadius: '10px',
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                            backgroundColor: '#888',
+                            borderRadius: '10px',
+                            '&:hover': {
+                                backgroundColor: '#555',
+                            },
+                        },
+                    }}
+                >
+                    <Table stickyHeader>
                         <TableHead>
                             <TableRow>
                                 <TableCell>Date</TableCell>
@@ -356,6 +392,53 @@ const FeedUploadPage = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+
+                {/* Pagination */}
+                {totalTasks > 0 && (
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            py: 2,
+                            px: 1,
+                            borderTop: 1,
+                            borderColor: 'divider',
+                            bgcolor: 'background.paper'
+                        }}
+                    >
+                        <Pagination
+                            count={totalPages}
+                            page={currentPage}
+                            onChange={(e, page) => setCurrentPage(page)}
+                            color="primary"
+                            showFirstButton
+                            showLastButton
+                        />
+                        <Stack direction="row" alignItems="center" spacing={2}>
+                            <Typography variant="body2" color="text.secondary">
+                                Showing {(currentPage - 1) * rowsPerPage + 1} - {Math.min(currentPage * rowsPerPage, totalTasks)} of {totalTasks} uploads
+                            </Typography>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <Typography variant="body2" color="text.secondary">Rows per page:</Typography>
+                                <Select
+                                    size="small"
+                                    value={rowsPerPage}
+                                    onChange={(e) => {
+                                        setRowsPerPage(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    sx={{ minWidth: 70, height: 32 }}
+                                >
+                                    <MenuItem value={10}>10</MenuItem>
+                                    <MenuItem value={25}>25</MenuItem>
+                                    <MenuItem value={50}>50</MenuItem>
+                                </Select>
+                            </Stack>
+                        </Stack>
+                    </Box>
+                )}
             </Box>
         </Box>
     );
