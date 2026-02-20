@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import DownloadIcon from '@mui/icons-material/Download';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -42,6 +43,7 @@ const FeedUploadPage = () => {
 
     const [tasks, setTasks] = useState([]);
     const [loadingTasks, setLoadingTasks] = useState(false);
+    const [downloadingTaskId, setDownloadingTaskId] = useState(null);
 
     // Fetch Sellers on mount
     useEffect(() => {
@@ -80,6 +82,36 @@ const FeedUploadPage = () => {
             // Don't block UI with error, just log it
         } finally {
             setLoadingTasks(false);
+        }
+    };
+
+    const handleDownloadErrors = async (taskId) => {
+        setDownloadingTaskId(taskId);
+        try {
+            const response = await api.get(`/ebay/feed/result/${taskId}`, {
+                params: { sellerId: selectedSeller },
+                responseType: 'blob'
+            });
+
+            // Create a download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+
+            // Extract filename from Content-Disposition header or use default
+            const contentDisposition = response.headers['content-disposition'];
+            const fileNameMatch = contentDisposition?.match(/filename="?(.+?)"?$/);
+            link.download = fileNameMatch ? fileNameMatch[1] : `errors_${taskId}.csv`;
+
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Download failed', err);
+            setError(err.response?.data?.error || 'Failed to download error report');
+        } finally {
+            setDownloadingTaskId(null);
         }
     };
 
@@ -294,9 +326,28 @@ const FeedUploadPage = () => {
                                         </TableCell>
                                         <TableCell>
                                             {task.uploadSummary ? (
-                                                <Typography variant="body2" color="textSecondary">
-                                                    {task.uploadSummary.failureCount} failed, {task.uploadSummary.successCount} completed
-                                                </Typography>
+                                                <Stack direction="row" alignItems="center" spacing={1}>
+                                                    <Typography variant="body2" color="textSecondary">
+                                                        {task.uploadSummary.failureCount} failed, {task.uploadSummary.successCount} completed
+                                                    </Typography>
+                                                    {task.uploadSummary.failureCount > 0 && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color="warning"
+                                                            startIcon={
+                                                                downloadingTaskId === task.taskId
+                                                                    ? <CircularProgress size={14} color="inherit" />
+                                                                    : <DownloadIcon fontSize="small" />
+                                                            }
+                                                            onClick={() => handleDownloadErrors(task.taskId)}
+                                                            disabled={downloadingTaskId === task.taskId}
+                                                            sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                                                        >
+                                                            {downloadingTaskId === task.taskId ? 'Downloading...' : 'Download Errors'}
+                                                        </Button>
+                                                    )}
+                                                </Stack>
                                             ) : '-'}
                                         </TableCell>
                                     </TableRow>
