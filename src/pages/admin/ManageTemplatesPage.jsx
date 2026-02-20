@@ -72,6 +72,7 @@ export default function ManageTemplatesPage() {
   const [affectedSellersCount, setAffectedSellersCount] = useState(0);
   const [confirmationInput, setConfirmationInput] = useState('');
   const [bulkResetLoading, setBulkResetLoading] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState('');
 
   useEffect(() => {
     fetchTemplates();
@@ -518,9 +519,18 @@ export default function ManageTemplatesPage() {
       </Paper>
 
       <Paper>
-        <Typography variant="h6" sx={{ p: 2, bgcolor: 'grey.100', borderBottom: 1, borderColor: 'divider' }}>
-          Existing Templates ({templates.length})
-        </Typography>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 2, bgcolor: 'grey.100', borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="h6">
+            Existing Templates ({templates.filter(t => t.name.toLowerCase().includes(templateSearch.toLowerCase())).length}{templateSearch ? ` of ${templates.length}` : ''})
+          </Typography>
+          <TextField
+            size="small"
+            placeholder="Search by name…"
+            value={templateSearch}
+            onChange={(e) => setTemplateSearch(e.target.value)}
+            sx={{ width: 240 }}
+          />
+        </Stack>
         <TableContainer>
           <Table size="small">
             <TableHead sx={{ bgcolor: 'grey.50' }}>
@@ -539,8 +549,14 @@ export default function ManageTemplatesPage() {
                     No templates found. Create one above!
                   </TableCell>
                 </TableRow>
+              ) : templates.filter(t => t.name.toLowerCase().includes(templateSearch.toLowerCase())).length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                    No templates match "{templateSearch}"
+                  </TableCell>
+                </TableRow>
               ) : (
-                templates.map((template) => (
+                templates.filter(t => t.name.toLowerCase().includes(templateSearch.toLowerCase())).map((template) => (
                   <TableRow 
                     key={template._id} 
                     hover
@@ -660,6 +676,8 @@ export default function ManageTemplatesPage() {
                               <Typography variant="body2" fontWeight="bold">{col.name}</Typography>
                               <Typography variant="caption" color="text.secondary">
                                 {col.displayName} • {col.dataType}
+                                {col.isRequired && ' • Required'}
+                                {col.defaultValue && ` • Default: ${col.defaultValue}`}
                               </Typography>
                             </Box>
                             <Stack direction="row" spacing={0.5}>
@@ -792,6 +810,7 @@ export default function ManageTemplatesPage() {
                     <br />• <strong>AU:</strong> *Action(SiteID=AU|Country=AU|Currency=AUD|Version=1193)
                     <br />• <strong>CA:</strong> *Action(SiteID=CA|Country=CA|Currency=CAD|Version=1193)
                     <br />• <strong>DE:</strong> *Action(SiteID=DE|Country=DE|Currency=EUR|Version=1193)
+                    <br />• <strong>eBay Motors:</strong> *Action(SiteID=eBayMotors|Country=US|Currency=USD|Version=1193)
                   </Alert>
                 </Box>
               )}
