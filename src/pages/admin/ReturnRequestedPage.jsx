@@ -101,6 +101,7 @@ export default function ReturnRequestedPage({
   const [error, setError] = useState('');
   const [selectedReturn, setSelectedReturn] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [snadConfirm, setSnadConfirm] = useState({ open: false, ret: null, action: null });
 
   const ALL_COLUMNS = [
     { id: 'returnId', label: 'Return ID' },
@@ -117,6 +118,7 @@ export default function ReturnRequestedPage({
     { id: 'refundAmount', label: 'Refund Amount' },
     { id: 'worksheetStatus', label: 'Worksheet Status' },
     { id: 'logs', label: 'Logs' },
+    { id: 'snad', label: 'SNAD' },
     { id: 'chat', label: 'Chat' },
   ];
   const [visibleColumns, setVisibleColumns] = useState(ALL_COLUMNS.map(c => c.id));
@@ -397,6 +399,17 @@ export default function ReturnRequestedPage({
     } catch (err) {
       console.error('Failed to save return logs:', err);
       throw err;
+    }
+  };
+
+  const handleToggleSNAD = async (returnId, value) => {
+    try {
+      await api.patch(`/ebay/returns/${returnId}/mark-snad`, { markedAsSNAD: value });
+      setReturns(prev => prev.map(r => r.returnId === returnId ? { ...r, markedAsSNAD: value } : r));
+      setSnadConfirm({ open: false, ret: null, action: null });
+    } catch (err) {
+      console.error('Failed to update SNAD status:', err);
+      alert('Failed to update SNAD status: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -793,6 +806,7 @@ export default function ReturnRequestedPage({
                 {visibleColumns.includes('refundAmount') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>}
                 {visibleColumns.includes('worksheetStatus') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Worksheet Status</strong></TableCell>}
                 {visibleColumns.includes('logs') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Logs</strong></TableCell>}
+                {visibleColumns.includes('snad') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }} align="center"><strong>SNAD</strong></TableCell>}
                 {visibleColumns.includes('chat') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }} align="center"><strong>Chat</strong></TableCell>}
               </TableRow>
             </TableHead>
@@ -978,6 +992,27 @@ export default function ReturnRequestedPage({
                         onSave={handleSaveReturnLogs}
                       />
                     </TableCell>}
+                    {visibleColumns.includes('snad') && <TableCell align="center">
+                      {ret.markedAsSNAD ? (
+                        <Chip
+                          label="SNAD"
+                          color="warning"
+                          size="small"
+                          onDelete={() => setSnadConfirm({ open: true, ret, action: false })}
+                          sx={{ fontSize: '0.7rem' }}
+                        />
+                      ) : (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="warning"
+                          onClick={() => setSnadConfirm({ open: true, ret, action: true })}
+                          sx={{ fontSize: '0.7rem', py: 0.25, px: 1, minWidth: 'unset' }}
+                        >
+                          + SNAD
+                        </Button>
+                      )}
+                    </TableCell>}
                     {visibleColumns.includes('chat') && <TableCell align="center">
                       <Tooltip title="Chat with buyer">
                         <IconButton
@@ -1035,6 +1070,40 @@ export default function ReturnRequestedPage({
           orderId={selectedOrderId}
         />
       )}
+
+      {/* SNAD Confirmation Dialog */}
+      <Dialog open={snadConfirm.open} onClose={() => setSnadConfirm({ open: false, ret: null, action: null })} maxWidth="sm" fullWidth>
+        <DialogTitle>{snadConfirm.action ? 'Mark Return as SNAD?' : 'Remove SNAD Mark?'}</DialogTitle>
+        <DialogContent>
+          {snadConfirm.ret && (
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ mb: 2 }} color="text.secondary">
+                {snadConfirm.action
+                  ? 'This return will be included in the BBE (Buyer Bad Experience) SNAD calculation for this seller, counting toward the relevant 84-day window.'
+                  : 'This return will be removed from the BBE (Buyer Bad Experience) SNAD calculation.'}
+              </Typography>
+              <Stack spacing={1}>
+                <Typography variant="body2"><strong>Order ID:</strong> {snadConfirm.ret.orderId || '-'}</Typography>
+                <Typography variant="body2"><strong>Seller:</strong> {snadConfirm.ret.seller?.user?.username || '-'}</Typography>
+                <Typography variant="body2"><strong>Buyer:</strong> {snadConfirm.ret.buyerUsername || '-'}</Typography>
+                <Typography variant="body2"><strong>Return Reason:</strong> {snadConfirm.ret.returnReason?.replace(/_/g, ' ') || '-'}</Typography>
+                <Typography variant="body2"><strong>Refund Amount:</strong> {snadConfirm.ret.refundAmount?.value ? `${snadConfirm.ret.refundAmount.currency} ${snadConfirm.ret.refundAmount.value}` : '-'}</Typography>
+                <Typography variant="body2"><strong>Created:</strong> {formatDate(snadConfirm.ret.creationDate)}</Typography>
+              </Stack>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSnadConfirm({ open: false, ret: null, action: null })}>Cancel</Button>
+          <Button
+            variant="contained"
+            color={snadConfirm.action ? 'warning' : 'inherit'}
+            onClick={() => handleToggleSNAD(snadConfirm.ret?.returnId, snadConfirm.action)}
+          >
+            {snadConfirm.action ? 'Mark as SNAD' : 'Remove SNAD Mark'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Export CSV Dialog */}
       <Dialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)} maxWidth="sm" fullWidth>
