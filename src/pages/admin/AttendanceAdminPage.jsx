@@ -280,8 +280,17 @@ export default function AttendanceAdminPage() {
         return 'normal';
     };
 
-    // Format hours
+    // Format milliseconds to HH:MM string
     const formatHours = (milliseconds) => {
+        if (!milliseconds) return '00:00';
+        const totalMinutes = Math.floor(milliseconds / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    };
+
+    // Format milliseconds to decimal hours for the edit dialog input
+    const msToDecimalHours = (milliseconds) => {
         if (!milliseconds) return '0.00';
         return (milliseconds / (1000 * 60 * 60)).toFixed(2);
     };
@@ -458,7 +467,7 @@ export default function AttendanceAdminPage() {
                                                                 onClick={() => setEditDialog({
                                                                     open: true,
                                                                     record,
-                                                                    newHours: formatHours(record.totalWorkTime)
+                                                                    newHours: msToDecimalHours(record.totalWorkTime)
                                                                 })}
                                                             >
                                                                 <EditIcon />

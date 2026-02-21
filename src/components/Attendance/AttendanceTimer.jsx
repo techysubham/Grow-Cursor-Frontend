@@ -10,7 +10,7 @@ import MaximizeIcon from '@mui/icons-material/Maximize';
 import { useAttendance } from '../../context/AttendanceContext';
 
 export default function AttendanceTimer() {
-    const { status, attendance, totalHours, pause, resume, stop, start, isLoading, isStrictTimer } = useAttendance();
+    const { status, attendance, pause, resume, stop, start, isLoading, isStrictTimer } = useAttendance();
     const [elapsedTime, setElapsedTime] = useState(0);
     const [isMinimized, setIsMinimized] = useState(false);
 
@@ -42,6 +42,15 @@ export default function AttendanceTimer() {
 
         return () => clearInterval(interval);
     }, [status, attendance]);
+
+    // Format milliseconds to HH:MM
+    const msToHHMM = (ms) => {
+        if (!ms) return '00:00';
+        const totalMinutes = Math.floor(ms / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    };
 
     // Format time as HH:MM:SS
     const formatTime = (milliseconds) => {
@@ -129,7 +138,7 @@ export default function AttendanceTimer() {
             <Collapse in={true}>
                 <Box sx={{ px: 2, pb: 2 }}>
                     <Typography variant="h4" sx={{ textAlign: 'center', my: 1, fontFamily: 'monospace', fontWeight: 'bold' }}>
-                        {status === 'active' ? formatTime(elapsedTime) : totalHours + ' hrs'}
+                        {status === 'active' ? formatTime(elapsedTime) : msToHHMM(attendance?.totalWorkTime)}
                     </Typography>
 
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mb: 2 }}>
