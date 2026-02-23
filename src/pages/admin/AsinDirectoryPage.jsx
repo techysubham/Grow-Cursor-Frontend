@@ -19,7 +19,8 @@ import {
   Chip,
   TablePagination,
   Toolbar,
-  Tooltip
+  Tooltip,
+  CircularProgress
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -27,11 +28,16 @@ import {
   FileUpload as UploadIcon,
   FileDownload as DownloadIcon,
   Search as SearchIcon,
-  ContentCopy as CopyIcon
+  ContentCopy as CopyIcon,
+  BrokenImage as BrokenImageIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  AccountTree as AccountTreeIcon
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
 import AsinBulkAddDialog from '../../components/AsinBulkAddDialog.jsx';
 import AsinCsvImportDialog from '../../components/AsinCsvImportDialog.jsx';
+import AsinExportDialog from '../../components/AsinExportDialog.jsx';
+import AsinListManagerDialog from '../../components/AsinListManagerDialog.jsx';
 import { generateCsvContent, downloadCsv } from '../../utils/asinDirectoryUtils.js';
 
 export default function AsinDirectoryPage() {
@@ -50,6 +56,8 @@ export default function AsinDirectoryPage() {
 
   const [bulkAddDialog, setBulkAddDialog] = useState(false);
   const [csvImportDialog, setCsvImportDialog] = useState(false);
+  const [exportDialog, setExportDialog] = useState(false);
+  const [listManagerDialog, setListManagerDialog] = useState(false);
 
   useEffect(() => {
     fetchAsins();
@@ -227,11 +235,27 @@ export default function AsinDirectoryPage() {
             Import CSV
           </Button>
           <Button
+            startIcon={<AccountTreeIcon />}
+            variant="outlined"
+            onClick={() => setListManagerDialog(true)}
+          >
+            Manage Lists
+          </Button>
+          <Button
             startIcon={<DownloadIcon />}
             variant="outlined"
             onClick={handleExport}
           >
             Export
+          </Button>
+          <Button
+            startIcon={<DownloadIcon />}
+            variant="contained"
+            color="secondary"
+            onClick={() => setExportDialog(true)}
+            disabled={selected.length === 0}
+          >
+            Move to List
           </Button>
 
           <Box sx={{ flex: 1 }} />
@@ -265,60 +289,121 @@ export default function AsinDirectoryPage() {
                     onChange={handleSelectAll}
                   />
                 </TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: 64 }}>Image</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>ASIN</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Added Date</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: 90 }}>Price</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', width: 60 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                    Loading...
+                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                    <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                      <CircularProgress size={18} />
+                      <Typography variant="body2" color="text.secondary">Loading...</Typography>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ) : asins.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                     No ASINs yet. Add some to get started!
                   </TableCell>
                 </TableRow>
               ) : (
-                asins.map((asin) => (
-                  <TableRow key={asin._id} hover>
+                asins.map((item) => (
+                  <TableRow key={item._id} hover>
                     <TableCell padding="checkbox">
                       <Checkbox
-                        checked={selected.includes(asin._id)}
-                        onChange={() => handleSelectOne(asin._id)}
+                        checked={selected.includes(item._id)}
+                        onChange={() => handleSelectOne(item._id)}
                       />
                     </TableCell>
+
+                    {/* Image */}
+                    <TableCell sx={{ py: 0.5 }}>
+                      {item.images?.[0] ? (
+                        <Box
+                          component="img"
+                          src={item.images[0]}
+                          alt={item.asin}
+                          sx={{ width: 50, height: 50, objectFit: 'contain', borderRadius: 1, border: '1px solid', borderColor: 'divider', display: 'block' }}
+                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                        />
+                      ) : null}
+                      <Box
+                        sx={{
+                          width: 50, height: 50, borderRadius: 1,
+                          border: '1px solid', borderColor: 'divider',
+                          display: item.images?.[0] ? 'none' : 'flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          bgcolor: 'grey.100'
+                        }}
+                      >
+                        {item.scraped === false && item.scrapeError ? (
+                          <Tooltip title={`Scrape failed: ${item.scrapeError}`}>
+                            <ErrorOutlineIcon fontSize="small" sx={{ color: 'warning.main' }} />
+                          </Tooltip>
+                        ) : (
+                          <BrokenImageIcon fontSize="small" sx={{ color: 'grey.400' }} />
+                        )}
+                      </Box>
+                    </TableCell>
+
+                    {/* ASIN */}
                     <TableCell>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="body2" fontFamily="monospace">
-                          {asin.asin}
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Typography variant="body2" fontFamily="monospace" fontSize={13}>
+                          {item.asin}
                         </Typography>
                         <Tooltip title="Copy to clipboard">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleCopyAsin(asin.asin)}
-                          >
-                            <CopyIcon fontSize="small" />
+                          <IconButton size="small" onClick={() => handleCopyAsin(item.asin)}>
+                            <CopyIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         </Tooltip>
                       </Stack>
+                      {item.brand && (
+                        <Typography variant="caption" color="text.secondary">{item.brand}</Typography>
+                      )}
                     </TableCell>
+
+                    {/* Price */}
                     <TableCell>
-                      {new Date(asin.addedAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
+                      {item.price ? (
+                        <Typography variant="body2" fontWeight={500} color="success.main">
+                          ${parseFloat(item.price).toFixed(2)}
+                        </Typography>
+                      ) : (
+                        <Typography variant="body2" color="text.disabled">—</Typography>
+                      )}
                     </TableCell>
+
+                    {/* Title */}
+                    <TableCell sx={{ maxWidth: 420 }}>
+                      {item.title ? (
+                        <Tooltip title={item.title} placement="top-start">
+                          <Typography
+                            variant="body2"
+                            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 400, display: 'block' }}
+                          >
+                            {item.title}
+                          </Typography>
+                        </Tooltip>
+                      ) : (
+                        <Typography variant="body2" color="text.disabled" fontStyle="italic">
+                          {item.scraped === false ? 'Not scraped' : 'No title'}
+                        </Typography>
+                      )}
+                    </TableCell>
+
+                    {/* Delete */}
                     <TableCell align="right">
                       <IconButton
                         size="small"
                         color="error"
-                        onClick={() => handleDelete(asin._id, asin.asin)}
+                        onClick={() => handleDelete(item._id, item.asin)}
                       >
                         <DeleteIcon fontSize="small" />
                       </IconButton>
@@ -371,6 +456,23 @@ export default function AsinDirectoryPage() {
         open={csvImportDialog}
         onClose={() => setCsvImportDialog(false)}
         onImport={handleCsvImport}
+      />
+
+      <AsinExportDialog
+        open={exportDialog}
+        onClose={() => setExportDialog(false)}
+        selectedIds={selected}
+        onMoved={() => {
+          setSelected([]);
+          setSuccess('ASINs moved to list successfully');
+          fetchAsins();
+          setExportDialog(false);
+        }}
+      />
+
+      <AsinListManagerDialog
+        open={listManagerDialog}
+        onClose={() => setListManagerDialog(false)}
       />
     </Box>
   );
