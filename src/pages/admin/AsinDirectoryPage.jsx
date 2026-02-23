@@ -30,12 +30,14 @@ import {
   Search as SearchIcon,
   ContentCopy as CopyIcon,
   BrokenImage as BrokenImageIcon,
-  ErrorOutline as ErrorOutlineIcon
+  ErrorOutline as ErrorOutlineIcon,
+  AccountTree as AccountTreeIcon
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
 import AsinBulkAddDialog from '../../components/AsinBulkAddDialog.jsx';
 import AsinCsvImportDialog from '../../components/AsinCsvImportDialog.jsx';
 import AsinExportDialog from '../../components/AsinExportDialog.jsx';
+import AsinListManagerDialog from '../../components/AsinListManagerDialog.jsx';
 import { generateCsvContent, downloadCsv } from '../../utils/asinDirectoryUtils.js';
 
 export default function AsinDirectoryPage() {
@@ -55,6 +57,7 @@ export default function AsinDirectoryPage() {
   const [bulkAddDialog, setBulkAddDialog] = useState(false);
   const [csvImportDialog, setCsvImportDialog] = useState(false);
   const [exportDialog, setExportDialog] = useState(false);
+  const [listManagerDialog, setListManagerDialog] = useState(false);
 
   useEffect(() => {
     fetchAsins();
@@ -230,6 +233,13 @@ export default function AsinDirectoryPage() {
             onClick={() => setCsvImportDialog(true)}
           >
             Import CSV
+          </Button>
+          <Button
+            startIcon={<AccountTreeIcon />}
+            variant="outlined"
+            onClick={() => setListManagerDialog(true)}
+          >
+            Manage Lists
           </Button>
           <Button
             startIcon={<DownloadIcon />}
@@ -458,6 +468,11 @@ export default function AsinDirectoryPage() {
           fetchAsins();
           setExportDialog(false);
         }}
+      />
+
+      <AsinListManagerDialog
+        open={listManagerDialog}
+        onClose={() => setListManagerDialog(false)}
       />
     </Box>
   );
