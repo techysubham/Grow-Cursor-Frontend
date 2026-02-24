@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getAttendanceStatus, startTimer, pauseTimer, resumeTimer, stopTimer } from '../lib/api';
+import { getAttendanceStatus, startTimer, pauseTimer, resumeTimer, stopTimer, getAuthToken } from '../lib/api';
 
 const AttendanceContext = createContext();
 
@@ -33,17 +33,65 @@ export function AttendanceProvider({ children, user }) {
             setTotalHours(response.totalHours || '0.00');
         } catch (error) {
             console.error('Failed to fetch attendance status:', error);
-            setStatus('not_started');
+            // Don't reset status on network error, otherwise the user might 
+            // see the "Start Timer" popup during server redeploys.
+            // If the initial load fails, it will start as 'not_started' or keep 'loading'
+            if (status === 'loading') {
+                setStatus('not_started');
+            }
         }
-    }, [user]);
+    }, [user, status]);
 
     useEffect(() => {
-        fetchStatus();
+        fetchStatus(); // initial load
 
-        // Refresh status every 30 seconds to keep timer updated
-        const interval = setInterval(fetchStatus, 30000);
-        return () => clearInterval(interval);
+        // Poll every 60s (only needed to catch rare admin force-stops / cron events)
+        const interval = setInterval(() => {
+            // Skip polling if the tab is hidden — no need to sync when user isn't looking
+            if (document.visibilityState === 'visible') {
+                fetchStatus();
+            }
+        }, 60000);
+
+        // When user returns to this tab, immediately re-sync
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchStatus();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [fetchStatus]);
+
+    // Auto-pause timer when user closes tab, closes browser, or refreshes page
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            if (status === 'active') {
+                const token = getAuthToken();
+                const apiUrl = import.meta.env.VITE_API_URL;
+                if (token && apiUrl) {
+                    // fetch with keepalive:true is more reliable than sendBeacon —
+                    // it survives tab/browser close AND supports proper Authorization headers.
+                    // sendBeacon can't set headers so CORS often silently blocks it.
+                    fetch(`${apiUrl}/attendance/pause`, {
+                        method: 'POST',
+                        keepalive: true,
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }).catch(() => { }); // fire-and-forget; page is already unloading
+                }
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [status]);
 
     const start = async () => {
         setIsLoading(true);

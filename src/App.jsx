@@ -21,6 +21,7 @@ import { setAuthToken } from './lib/api'
 import { AttendanceProvider } from './context/AttendanceContext';
 import AttendanceModal from './components/Attendance/AttendanceModal';
 import AttendanceTimer from './components/Attendance/AttendanceTimer';
+import TimerPausedModal from './components/Attendance/TimerPausedModal';
 
 function useAuth() {
   const [token, setToken] = useState(() => sessionStorage.getItem('auth_token'));
@@ -72,6 +73,7 @@ export default function App() {
       {token && user ? (
         <AttendanceProvider user={user}>
           <AttendanceModal />
+          <TimerPausedModal />
           <AttendanceTimer />
           <Routes>
             <Route path="/" element={<LandingPage />} />
