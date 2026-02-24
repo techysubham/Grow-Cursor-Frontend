@@ -94,11 +94,14 @@ import EditListingsDashboard from '../pages/listings/EditListingsDashboard.jsx';
 import ConversationManagementPage from '../pages/admin/ConversationManagementPage.jsx';
 import ManageAmazonAccountsPage from '../pages/admin/ManageAmazonAccountsPage.jsx';
 import InternalMessagesPage from '../pages/admin/InternalMessagesPage.jsx';
+import AnnouncementsPage from '../pages/admin/AnnouncementsPage.jsx';
+import DepartmentIssuesPage from '../pages/admin/DepartmentIssuesPage.jsx';
 import InternalMessagesAdminPage from '../pages/admin/InternalMessagesAdminPage.jsx';
 import ManageCreditCardsPage from '../pages/admin/ManageCreditCardsPage.jsx';
 import ManageCreditCardNamesPage from '../pages/admin/ManageCreditCardNamesPage.jsx';
 import IdeasPage from '../pages/IdeasPage.jsx';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import BugReportIcon from '@mui/icons-material/BugReport';
 import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import SellerAnalyticsPage from '../pages/admin/SellerAnalyticsPage.jsx';
@@ -290,6 +293,38 @@ export default function AdminLayout({ user, onLogout }) {
               <NavIcon icon={ChatIcon} label="Team Chat & Messaging" sidebarOpen={sidebarOpen} />
             </ListItemIcon>
             {sidebarOpen && <ListItemText primary="Team Chat" />}
+          </ListItemButton>
+        </ListItem>
+
+        {/* Announcements - visible to admins and all users can view via the route */}
+        <ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            to="/admin/announcements"
+            onClick={() => setMobileOpen(false)}
+            selected={location.pathname === '/admin/announcements'}
+            sx={selectedMenuItemStyle}
+          >
+            <ListItemIcon>
+              <NavIcon icon={AutoAwesomeIcon} label="Announcements" sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
+            {sidebarOpen && <ListItemText primary="Announcements" />}
+          </ListItemButton>
+        </ListItem>
+
+        {/* Department Issues - visible to ALL authenticated users */}
+        <ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            to="/admin/department-issues"
+            onClick={() => setMobileOpen(false)}
+            selected={location.pathname === '/admin/department-issues'}
+            sx={selectedMenuItemStyle}
+          >
+            <ListItemIcon>
+              <NavIcon icon={BugReportIcon} label="Department Issues" sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
+            {sidebarOpen && <ListItemText primary="Department Issues" />}
           </ListItemButton>
         </ListItem>
 
@@ -1643,6 +1678,12 @@ export default function AdminLayout({ user, onLogout }) {
 
           {/* Internal Messages - accessible to ALL authenticated users */}
           <Route path="/internal-messages" element={<InternalMessagesPage />} />
+
+          {/* Announcements - accessible to authenticated users (creation restricted server-side) */}
+          <Route path="/announcements" element={<AnnouncementsPage />} />
+
+          {/* Department Issues - accessible to ALL authenticated users (server enforces visibility) */}
+          <Route path="/department-issues" element={<DepartmentIssuesPage />} />
 
           {/* Internal Messages Admin - accessible to superadmin only */}
           {isSuper && (

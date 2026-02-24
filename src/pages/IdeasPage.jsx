@@ -65,9 +65,9 @@ const NotesCell = memo(({ ideaId, initialNotes, onSave }) => {
   return (
     <TableCell sx={{ minWidth: 250, maxWidth: 300 }}>
       {!isEditing && localNotes ? (
-        <Tooltip 
+        <Tooltip
           title={localNotes}
-          arrow 
+          arrow
           placement="top"
           componentsProps={{
             tooltip: {
@@ -148,13 +148,13 @@ export default function IdeasPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  
+
   // Filters
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterType, setFilterType] = useState('');
   const [sortBy, setSortBy] = useState('updatedAt'); // Default to recently updated
-  
+
   // Form state
   const [formData, setFormData] = useState({
     title: '',
@@ -175,11 +175,12 @@ export default function IdeasPage() {
       const params = new URLSearchParams();
       params.append('page', page);
       params.append('limit', 50);
+      params.append('source', 'ideas');  // Only fetch Ideas & Issues board records
       if (filterStatus) params.append('status', filterStatus);
       if (filterPriority) params.append('priority', filterPriority);
       if (filterType) params.append('type', filterType);
       if (sortBy) params.append('sortBy', sortBy);
-      
+
       const response = await api.get(`/ideas?${params.toString()}`);
       setIdeas(response.data.ideas);
       setTotalPages(response.data.totalPages);
@@ -193,14 +194,14 @@ export default function IdeasPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.title || !formData.description || !formData.createdBy) {
       alert('Please fill in all required fields');
       return;
     }
 
     try {
-      await api.post('/ideas', formData);
+      await api.post('/ideas', { ...formData, source: 'ideas' });
       alert('Idea submitted successfully!');
       setFormData({
         title: '',
@@ -221,8 +222,8 @@ export default function IdeasPage() {
 
   const handleStatusChange = async (ideaId, newStatus) => {
     // Optimistic update: Update UI immediately
-    setIdeas(prevIdeas => 
-      prevIdeas.map(idea => 
+    setIdeas(prevIdeas =>
+      prevIdeas.map(idea =>
         idea._id === ideaId ? { ...idea, status: newStatus } : idea
       )
     );
@@ -240,8 +241,8 @@ export default function IdeasPage() {
 
   const handlePickedUpByChange = async (ideaId, newPickedUpBy) => {
     // Optimistic update: Update UI immediately
-    setIdeas(prevIdeas => 
-      prevIdeas.map(idea => 
+    setIdeas(prevIdeas =>
+      prevIdeas.map(idea =>
         idea._id === ideaId ? { ...idea, pickedUpBy: newPickedUpBy } : idea
       )
     );
@@ -259,8 +260,8 @@ export default function IdeasPage() {
 
   const handleNotesChange = useCallback(async (ideaId, notes) => {
     // Optimistic update: Update UI immediately
-    setIdeas(prevIdeas => 
-      prevIdeas.map(idea => 
+    setIdeas(prevIdeas =>
+      prevIdeas.map(idea =>
         idea._id === ideaId ? { ...idea, notes } : idea
       )
     );
@@ -280,7 +281,7 @@ export default function IdeasPage() {
     if (!window.confirm('Are you sure you want to delete this idea?')) {
       return;
     }
-    
+
     // Optimistic removal: Remove from UI immediately
     setIdeas(prevIdeas => prevIdeas.filter(idea => idea._id !== ideaId));
     setTotal(prevTotal => prevTotal - 1);
@@ -360,64 +361,64 @@ export default function IdeasPage() {
         <Typography variant="subtitle1" fontWeight="bold" sx={{ fontSize: { xs: '0.95rem', sm: '1rem' }, mb: { xs: 1.5, sm: 2 } }}>
           Search Filters
         </Typography>
-        
+
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.5, sm: 2 }}>
-            <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={filterStatus}
-                label="Status"
-                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-              >
-                <MenuItem value="">All Statuses</MenuItem>
-                <MenuItem value="open">Open</MenuItem>
-                <MenuItem value="in-progress">In Progress</MenuItem>
-                <MenuItem value="completed">Completed</MenuItem>
-              </Select>
-            </FormControl>
+          <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={filterStatus}
+              label="Status"
+              onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+            >
+              <MenuItem value="">All Statuses</MenuItem>
+              <MenuItem value="open">Open</MenuItem>
+              <MenuItem value="in-progress">In Progress</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+            </Select>
+          </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
-              <InputLabel>Priority</InputLabel>
-              <Select
-                value={filterPriority}
-                label="Priority"
-                onChange={(e) => { setFilterPriority(e.target.value); setPage(1); }}
-              >
-                <MenuItem value="">All Priorities</MenuItem>
-                <MenuItem value="low">Low</MenuItem>
-                <MenuItem value="medium">Medium</MenuItem>
-                <MenuItem value="high">High</MenuItem>
-              </Select>
-            </FormControl>
+          <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
+            <InputLabel>Priority</InputLabel>
+            <Select
+              value={filterPriority}
+              label="Priority"
+              onChange={(e) => { setFilterPriority(e.target.value); setPage(1); }}
+            >
+              <MenuItem value="">All Priorities</MenuItem>
+              <MenuItem value="low">Low</MenuItem>
+              <MenuItem value="medium">Medium</MenuItem>
+              <MenuItem value="high">High</MenuItem>
+            </Select>
+          </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
-              <InputLabel>Type</InputLabel>
-              <Select
-                value={filterType}
-                label="Type"
-                onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
-              >
-                <MenuItem value="">All Types</MenuItem>
-                <MenuItem value="idea">Idea</MenuItem>
-                <MenuItem value="issue">Issue</MenuItem>
-                <MenuItem value="feature">Feature Request</MenuItem>
-                <MenuItem value="bug">Bug</MenuItem>
-              </Select>
-            </FormControl>
+          <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
+            <InputLabel>Type</InputLabel>
+            <Select
+              value={filterType}
+              label="Type"
+              onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+            >
+              <MenuItem value="">All Types</MenuItem>
+              <MenuItem value="idea">Idea</MenuItem>
+              <MenuItem value="issue">Issue</MenuItem>
+              <MenuItem value="feature">Feature Request</MenuItem>
+              <MenuItem value="bug">Bug</MenuItem>
+            </Select>
+          </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
-              <InputLabel>Sort By</InputLabel>
-              <Select
-                value={sortBy}
-                label="Sort By"
-                onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
-              >
-                <MenuItem value="updatedAt">Recently Updated</MenuItem>
-                <MenuItem value="createdAt">Recently Created</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </Paper>
+          <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
+            <InputLabel>Sort By</InputLabel>
+            <Select
+              value={sortBy}
+              label="Sort By"
+              onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+            >
+              <MenuItem value="updatedAt">Recently Updated</MenuItem>
+              <MenuItem value="createdAt">Recently Created</MenuItem>
+            </Select>
+          </FormControl>
+        </Stack>
+      </Paper>
 
       {/* Ideas Table */}
       <TableContainer component={Paper} sx={{ overflowX: 'hidden' }}>
@@ -455,189 +456,189 @@ export default function IdeasPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-              {ideas.map((idea) => (
-                <TableRow key={idea._id} hover>
-                  {!isSmallMobile && (
-                    <TableCell sx={{ minWidth: 80 }}>
-                      <Typography variant="body2" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
-                        {formatDate(idea.createdAt)}
-                      </Typography>
-                    </TableCell>
-                  )}
-                  <TableCell sx={{ maxWidth: { xs: 150, sm: 250 }, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    <Typography 
-                      variant="subtitle2" 
-                      fontWeight="bold" 
-                      sx={{ 
-                        fontSize: { xs: '0.75rem', sm: '0.875rem' }, 
-                        overflow: 'hidden', 
-                        textOverflow: 'ellipsis', 
-                        whiteSpace: 'nowrap',
-                        cursor: isSmallMobile ? 'pointer' : 'default',
-                        '&:hover': isSmallMobile ? { textDecoration: 'underline', color: 'primary.main' } : {}
-                      }}
-                      onClick={() => isSmallMobile && setSelectedIdea(idea)}
-                    >
-                      {idea.title}
-                    </Typography>
+                {ideas.map((idea) => (
+                  <TableRow key={idea._id} hover>
                     {!isSmallMobile && (
-                      <Tooltip 
-                        title={idea.description} 
-                        arrow 
-                        placement="top"
-                        componentsProps={{
-                          tooltip: {
-                            sx: {
-                              bgcolor: 'rgba(0, 0, 0, 0.9)',
-                              fontSize: '0.875rem',
-                              maxWidth: 500,
-                              p: 1.5
-                            }
-                          }
+                      <TableCell sx={{ minWidth: 80 }}>
+                        <Typography variant="body2" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                          {formatDate(idea.createdAt)}
+                        </Typography>
+                      </TableCell>
+                    )}
+                    <TableCell sx={{ maxWidth: { xs: 150, sm: 250 }, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <Typography
+                        variant="subtitle2"
+                        fontWeight="bold"
+                        sx={{
+                          fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          cursor: isSmallMobile ? 'pointer' : 'default',
+                          '&:hover': isSmallMobile ? { textDecoration: 'underline', color: 'primary.main' } : {}
                         }}
+                        onClick={() => isSmallMobile && setSelectedIdea(idea)}
                       >
-                        <Typography 
-                          variant="body2" 
-                          color="text.secondary" 
-                          sx={{ 
-                            mt: 0.5,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            wordBreak: 'break-word',
-                            cursor: 'help',
-                            fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                        {idea.title}
+                      </Typography>
+                      {!isSmallMobile && (
+                        <Tooltip
+                          title={idea.description}
+                          arrow
+                          placement="top"
+                          componentsProps={{
+                            tooltip: {
+                              sx: {
+                                bgcolor: 'rgba(0, 0, 0, 0.9)',
+                                fontSize: '0.875rem',
+                                maxWidth: 500,
+                                p: 1.5
+                              }
+                            }
                           }}
                         >
-                          {idea.description}
-                        </Typography>
-                      </Tooltip>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              mt: 0.5,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              wordBreak: 'break-word',
+                              cursor: 'help',
+                              fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                            }}
+                          >
+                            {idea.description}
+                          </Typography>
+                        </Tooltip>
+                      )}
+                    </TableCell>
+                    {!isMobile && (
+                      <TableCell>
+                        <Chip
+                          label={idea.type.charAt(0).toUpperCase() + idea.type.slice(1)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                        />
+                      </TableCell>
                     )}
-                  </TableCell>
-                  {!isMobile && (
                     <TableCell>
                       <Chip
-                        label={idea.type.charAt(0).toUpperCase() + idea.type.slice(1)}
+                        label={idea.priority.charAt(0).toUpperCase() + idea.priority.slice(1)}
                         size="small"
-                        variant="outlined"
+                        color={getPriorityColor(idea.priority)}
                         sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                       />
                     </TableCell>
-                  )}
-                  <TableCell>
-                    <Chip
-                      label={idea.priority.charAt(0).toUpperCase() + idea.priority.slice(1)}
-                      size="small"
-                      color={getPriorityColor(idea.priority)}
-                      sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <FormControl size="small" fullWidth sx={{ minWidth: { xs: 75, sm: 100 } }}>
-                      <Select
-                        value={idea.status}
-                        onChange={(e) => handleStatusChange(idea._id, e.target.value)}
-                        sx={{
-                          bgcolor: idea.status === 'open' 
-                            ? '#fff3cd' 
-                            : idea.status === 'in-progress' 
-                            ? '#cfe2ff' 
-                            : '#d1e7dd',
-                          color: idea.status === 'open'
-                            ? '#856404'
-                            : idea.status === 'in-progress'
-                            ? '#084298'
-                            : '#0a3622',
-                          fontWeight: 'bold',
-                          fontSize: { xs: '0.6rem', sm: '0.75rem' },
-                          padding: { xs: '2px 4px', sm: '4px 8px' },
-                          '& .MuiSelect-select': {
-                            paddingRight: { xs: '20px !important', sm: '32px !important' },
-                            paddingTop: { xs: '4px', sm: '8px' },
-                            paddingBottom: { xs: '4px', sm: '8px' },
-                          },
-                          '& .MuiOutlinedInput-notchedOutline': { 
-                            border: 'none' 
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            border: '1px solid rgba(0,0,0,0.23)'
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            border: '2px solid #1976d2'
-                          }
-                        }}
-                      >
-                        <MenuItem value="open">{isSmallMobile ? 'Open' : 'Open'}</MenuItem>
-                        <MenuItem value="in-progress">{isSmallMobile ? 'In Prog.' : 'In Progress'}</MenuItem>
-                        <MenuItem value="completed">{isSmallMobile ? 'Done' : 'Completed'}</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </TableCell>
-                  {!isMobile && (
                     <TableCell>
-                      <FormControl size="small" fullWidth sx={{ minWidth: 120 }}>
+                      <FormControl size="small" fullWidth sx={{ minWidth: { xs: 75, sm: 100 } }}>
                         <Select
-                          value={idea.pickedUpBy || ''}
-                          onChange={(e) => handlePickedUpByChange(idea._id, e.target.value)}
-                          displayEmpty
+                          value={idea.status}
+                          onChange={(e) => handleStatusChange(idea._id, e.target.value)}
                           sx={{
-                            fontSize: '0.875rem',
+                            bgcolor: idea.status === 'open'
+                              ? '#fff3cd'
+                              : idea.status === 'in-progress'
+                                ? '#cfe2ff'
+                                : '#d1e7dd',
+                            color: idea.status === 'open'
+                              ? '#856404'
+                              : idea.status === 'in-progress'
+                                ? '#084298'
+                                : '#0a3622',
+                            fontWeight: 'bold',
+                            fontSize: { xs: '0.6rem', sm: '0.75rem' },
+                            padding: { xs: '2px 4px', sm: '4px 8px' },
+                            '& .MuiSelect-select': {
+                              paddingRight: { xs: '20px !important', sm: '32px !important' },
+                              paddingTop: { xs: '4px', sm: '8px' },
+                              paddingBottom: { xs: '4px', sm: '8px' },
+                            },
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              border: 'none'
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              border: '1px solid rgba(0,0,0,0.23)'
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              border: '2px solid #1976d2'
+                            }
                           }}
                         >
-                          <MenuItem value="">-</MenuItem>
-                          <MenuItem value="aaryan">aaryan</MenuItem>
-                          <MenuItem value="rajarshi">rajarshi</MenuItem>
-                          <MenuItem value="prassanna">prassanna</MenuItem>
+                          <MenuItem value="open">{isSmallMobile ? 'Open' : 'Open'}</MenuItem>
+                          <MenuItem value="in-progress">{isSmallMobile ? 'In Prog.' : 'In Progress'}</MenuItem>
+                          <MenuItem value="completed">{isSmallMobile ? 'Done' : 'Completed'}</MenuItem>
                         </Select>
                       </FormControl>
                     </TableCell>
-                  )}
-                  {!isMobile && (
-                    <NotesCell 
-                      ideaId={idea._id}
-                      initialNotes={idea.notes}
-                      onSave={handleNotesChange}
-                    />
-                  )}
-                  {!isSmallMobile && (
-                    <TableCell sx={{ minWidth: 120 }}>
-                      {idea.completeByDate ? (
-                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                          {new Date(idea.completeByDate).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                    {!isMobile && (
+                      <TableCell>
+                        <FormControl size="small" fullWidth sx={{ minWidth: 120 }}>
+                          <Select
+                            value={idea.pickedUpBy || ''}
+                            onChange={(e) => handlePickedUpByChange(idea._id, e.target.value)}
+                            displayEmpty
+                            sx={{
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            <MenuItem value="">-</MenuItem>
+                            <MenuItem value="aaryan">aaryan</MenuItem>
+                            <MenuItem value="rajarshi">rajarshi</MenuItem>
+                            <MenuItem value="prassanna">prassanna</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </TableCell>
+                    )}
+                    {!isMobile && (
+                      <NotesCell
+                        ideaId={idea._id}
+                        initialNotes={idea.notes}
+                        onSave={handleNotesChange}
+                      />
+                    )}
+                    {!isSmallMobile && (
+                      <TableCell sx={{ minWidth: 120 }}>
+                        {idea.completeByDate ? (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                            {new Date(idea.completeByDate).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.disabled" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
+                    )}
+                    {!isSmallMobile && (
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                          {idea.createdBy}
                         </Typography>
-                      ) : (
-                        <Typography variant="body2" color="text.disabled" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                          -
-                        </Typography>
-                      )}
-                    </TableCell>
-                  )}
-                  {!isSmallMobile && (
+                      </TableCell>
+                    )}
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                        {idea.createdBy}
-                      </Typography>
+                      <IconButton
+                        color="error"
+                        size="small"
+                        onClick={() => handleDelete(idea._id)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
                     </TableCell>
-                  )}
-                  <TableCell>
-                    <IconButton
-                      color="error"
-                      size="small"
-                      onClick={() => handleDelete(idea._id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </>
         )}
       </TableContainer>
@@ -658,10 +659,10 @@ export default function IdeasPage() {
       )}
 
       {/* Idea Detail Dialog for Mobile */}
-      <Dialog 
-        open={!!selectedIdea} 
-        onClose={() => setSelectedIdea(null)} 
-        maxWidth="sm" 
+      <Dialog
+        open={!!selectedIdea}
+        onClose={() => setSelectedIdea(null)}
+        maxWidth="sm"
         fullWidth
         fullScreen={isSmallMobile}
       >
@@ -683,7 +684,7 @@ export default function IdeasPage() {
               <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', gap: 1.5 }}>
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Type</Typography>
-                  <Chip 
+                  <Chip
                     label={selectedIdea?.type?.charAt(0).toUpperCase() + selectedIdea?.type?.slice(1)}
                     size="small"
                     variant="outlined"
@@ -692,7 +693,7 @@ export default function IdeasPage() {
                 </Box>
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Priority</Typography>
-                  <Chip 
+                  <Chip
                     label={selectedIdea?.priority?.charAt(0).toUpperCase() + selectedIdea?.priority?.slice(1)}
                     size="small"
                     color={getPriorityColor(selectedIdea?.priority)}
