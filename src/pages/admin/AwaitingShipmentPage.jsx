@@ -463,7 +463,7 @@ export default function AwaitingShipmentPage() {
   const [dateSold, setDateSold] = useState('');
 
   const [visibleColumns, setVisibleColumns] = useState([
-    'seller', 'orderId', 'marketplace', 'dateSold', 'shipBy', 'productName', 'buyerName', 'shippingAddress', 'trackingNumber', 'trackingId', 'notes'
+    'seller', 'orderId', 'marketplace', 'dateSold', 'shipBy', 'deliveryDate', 'productName', 'buyerName', 'shippingAddress', 'trackingNumber', 'trackingId', 'notes'
   ]); // Default specific to Awaiting Shipment needs, or use ALL_COLUMNS.map(c => c.id)
 
   const formatCurrency = (value) => {

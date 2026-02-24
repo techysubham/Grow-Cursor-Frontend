@@ -40,7 +40,7 @@ export default function MessageReceivedPage() {
   const [error, setError] = useState('');
   const [snackbarMsg, setSnackbarMsg] = useState('');
   const [resolvedFilter, setResolvedFilter] = useState('false'); // Show unresolved by default
-  
+
   // Dialog state
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -55,7 +55,7 @@ export default function MessageReceivedPage() {
     try {
       const params = {};
       if (resolvedFilter !== '') params.isResolved = resolvedFilter;
-      
+
       const res = await api.get('/ebay/stored-messages', { params });
       const messageData = res.data.messages || [];
       console.log(`Loaded ${messageData.length} messages from database`);
@@ -75,23 +75,23 @@ export default function MessageReceivedPage() {
     try {
       const res = await api.post('/ebay/fetch-messages');
       const { totalNewMessages, totalUpdatedMessages, results, errors } = res.data;
-      
+
       let msg = `✅ Fetch complete!\n`;
       msg += `New messages: ${totalNewMessages}\n`;
       msg += `Updated messages: ${totalUpdatedMessages}\n\n`;
-      
+
       if (results && results.length > 0) {
         results.forEach(r => {
           msg += `${r.sellerName}: ${r.newMessages} new, ${r.updatedMessages} updated\n`;
         });
       }
-      
+
       if (errors && errors.length > 0) {
         msg += `\n⚠️ Errors:\n${errors.join('\n')}`;
       }
-      
+
       setSnackbarMsg(msg);
-      
+
       // Reload messages from database
       await loadStoredMessages();
     } catch (e) {
@@ -107,7 +107,7 @@ export default function MessageReceivedPage() {
       await api.patch(`/ebay/messages/${messageId}/resolve`, {
         isResolved: !currentStatus
       });
-      
+
       // Reload messages
       await loadStoredMessages();
     } catch (e) {
@@ -163,9 +163,9 @@ export default function MessageReceivedPage() {
       )}
 
       {snackbarMsg && (
-        <Alert 
-          severity="info" 
-          sx={{ mb: 2, whiteSpace: 'pre-line' }} 
+        <Alert
+          severity="info"
+          sx={{ mb: 2, whiteSpace: 'pre-line' }}
           onClose={() => setSnackbarMsg('')}
         >
           {snackbarMsg}
@@ -234,8 +234,8 @@ export default function MessageReceivedPage() {
                 </TableRow>
               ) : (
                 messages.map((msg) => (
-                  <TableRow 
-                    key={msg._id} 
+                  <TableRow
+                    key={msg._id}
                     hover
                     sx={{ backgroundColor: !msg.isResolved ? '#fff3e0' : 'inherit' }}
                   >
@@ -273,12 +273,12 @@ export default function MessageReceivedPage() {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography 
-                        variant="body2" 
+                      <Typography
+                        variant="body2"
                         fontSize="0.7rem"
-                        sx={{ 
-                          maxWidth: 200, 
-                          overflow: 'hidden', 
+                        sx={{
+                          maxWidth: 200,
+                          overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap'
                         }}
@@ -287,8 +287,8 @@ export default function MessageReceivedPage() {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip 
-                        label={msg.isResolved ? 'Resolved' : 'Unresolved'} 
+                      <Chip
+                        label={msg.isResolved ? 'Resolved' : 'Unresolved'}
                         color={msg.isResolved ? 'success' : 'warning'}
                         size="small"
                         sx={{ fontSize: '0.7rem' }}
@@ -307,8 +307,8 @@ export default function MessageReceivedPage() {
                     <TableCell>
                       <Stack direction="row" spacing={0.5}>
                         <Tooltip title="View Full Message">
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             color="primary"
                             onClick={() => openMessageDialog(msg)}
                           >
@@ -316,8 +316,8 @@ export default function MessageReceivedPage() {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title={msg.isResolved ? 'Mark as Unresolved' : 'Mark as Resolved'}>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             color={msg.isResolved ? 'warning' : 'success'}
                             onClick={() => toggleResolvedStatus(msg._id, msg.isResolved)}
                           >
@@ -398,14 +398,14 @@ export default function MessageReceivedPage() {
                 <Box>
                   <Typography variant="subtitle2" color="text.secondary">Status:</Typography>
                   <Stack direction="row" spacing={1} mt={0.5}>
-                    <Chip 
-                      label={selectedMessage.isResolved ? 'Resolved' : 'Unresolved'} 
+                    <Chip
+                      label={selectedMessage.isResolved ? 'Resolved' : 'Unresolved'}
                       color={selectedMessage.isResolved ? 'success' : 'warning'}
                       size="small"
                     />
                     {selectedMessage.inquiryStatus && (
-                      <Chip 
-                        label={selectedMessage.inquiryStatus} 
+                      <Chip
+                        label={selectedMessage.inquiryStatus}
                         variant="outlined"
                         size="small"
                       />
@@ -430,8 +430,8 @@ export default function MessageReceivedPage() {
             </DialogContent>
             <DialogActions>
               <Button onClick={closeMessageDialog}>Close</Button>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 color={selectedMessage.isResolved ? 'warning' : 'success'}
                 onClick={() => {
                   toggleResolvedStatus(selectedMessage._id, selectedMessage.isResolved);
