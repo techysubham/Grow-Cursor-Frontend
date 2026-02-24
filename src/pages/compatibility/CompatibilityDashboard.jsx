@@ -4,7 +4,7 @@ import {
   Button, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, IconButton, TextField, Grid, Chip, Divider, FormControl,
   InputLabel, Select, MenuItem, Snackbar, Alert, Pagination, OutlinedInput, Checkbox, ListItemText,
-  Autocomplete, InputAdornment, Tooltip
+  Autocomplete, InputAdornment, Tooltip, Switch, FormControlLabel
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -103,6 +103,11 @@ export default function CompatibilityDashboard() {
   const [endYear, setEndYear] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [pageInputValue, setPageInputValue] = useState('');
+  const [filterNoFitment, setFilterNoFitment] = useState(false);
+
+  const displayedListings = filterNoFitment
+    ? listings.filter(item => !item.compatibility || item.compatibility.length === 0)
+    : listings;
 
   useEffect(() => {
     const initDashboard = async () => {
@@ -491,7 +496,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
         <Box display="flex" alignItems="center" gap={2}>
           <Box>
             <Typography variant="h5">Compatibility Dashboard</Typography>
-            <Typography variant="caption" color="textSecondary">Showing {listings.length} of {totalItems} Active Listings</Typography>
+            <Typography variant="caption" color="textSecondary">Showing {displayedListings.length}{filterNoFitment ? ` (filtered)` : ` of ${totalItems}`} Active Listings</Typography>
           </Box>
 
           {/* API USAGE BADGE */}
@@ -575,6 +580,23 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
             </Button>
           </Box>
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={filterNoFitment}
+                onChange={(e) => setFilterNoFitment(e.target.checked)}
+                size="small"
+                color="warning"
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                No Fitment Only
+              </Typography>
+            }
+            sx={{ mr: 0 }}
+          />
+
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Select Seller</InputLabel>
             <Select value={currentSellerId} label="Select Seller" onChange={(e) => setCurrentSellerId(e.target.value)}>
@@ -603,7 +625,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 </TableRow>
               </TableHead>
               <TableBody>
-                {listings.map((item, index) => {
+                {displayedListings.map((item, index) => {
                   const fitmentSummary = groupFitmentData(item.compatibility);
                   return (
                     <TableRow key={item.itemId}>
