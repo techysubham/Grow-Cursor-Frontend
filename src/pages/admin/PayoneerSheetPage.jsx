@@ -133,6 +133,31 @@ function MobilePayoneerCard({ record, isEditing, renderCell, onEdit, onDelete, o
                             </Stack>
                         </Paper>
                     )}
+
+                    {/* Period & Profit */}
+                    <Stack direction="row" spacing={2}>
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold' }}>
+                                PERIOD
+                            </Typography>
+                            {isEditing ? (
+                                <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                                    <TextField type="date" size="small" label="From" InputLabelProps={{ shrink: true }} value={editFormData?.periodStart || ''} onChange={(e) => handleEditChange('periodStart', e.target.value)} fullWidth />
+                                    <TextField type="date" size="small" label="To" InputLabelProps={{ shrink: true }} value={editFormData?.periodEnd || ''} onChange={(e) => handleEditChange('periodEnd', e.target.value)} fullWidth />
+                                </Stack>
+                            ) : (
+                                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                    {record.periodStart ? new Date(record.periodStart).toLocaleDateString() : '-'} → {record.periodEnd ? new Date(record.periodEnd).toLocaleDateString() : '-'}
+                                </Typography>
+                            )}
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold' }}>
+                                PROFIT ($)
+                            </Typography>
+                            <Box sx={{ mt: 0.5 }}>{renderCell(record, 'profit', 'number')}</Box>
+                        </Box>
+                    </Stack>
                 </Stack>
             </Stack>
         </Paper>
@@ -167,13 +192,15 @@ const PayoneerSheetPage = () => {
         totalRecords: 0
     });
 
-    // Form State for "Add New"
     const [formData, setFormData] = useState({
         bankAccount: '', // ObjectId of BankAccount
         paymentDate: new Date().toISOString().split('T')[0],
         amount: '',
         exchangeRate: '',
-        store: ''
+        store: '',
+        periodStart: '',
+        periodEnd: '',
+        profit: ''
     });
 
     // Calculated Preview for "Add New"
@@ -284,7 +311,10 @@ const PayoneerSheetPage = () => {
                 paymentDate: new Date().toISOString().split('T')[0],
                 amount: '',
                 exchangeRate: '',
-                store: ''
+                store: '',
+                periodStart: '',
+                periodEnd: '',
+                profit: ''
             });
         } catch (error) {
             alert('Failed to create: ' + (error.response?.data?.error || error.message));
@@ -312,7 +342,10 @@ const PayoneerSheetPage = () => {
             paymentDate: record.paymentDate ? record.paymentDate.split('T')[0] : '',
             amount: record.amount,
             exchangeRate: record.exchangeRate,
-            store: record.store?._id // Store ID
+            store: record.store?._id,
+            periodStart: record.periodStart ? record.periodStart.split('T')[0] : '',
+            periodEnd: record.periodEnd ? record.periodEnd.split('T')[0] : '',
+            profit: record.profit ?? ''
         });
     };
 
@@ -348,6 +381,8 @@ const PayoneerSheetPage = () => {
             if (field === 'amount' || field === 'bankDeposit') return value?.toFixed(2);
             if (field === 'actualExchangeRate') return value?.toFixed(4);
             if (field === 'paymentDate') return new Date(value).toLocaleDateString();
+            if (field === 'periodStart' || field === 'periodEnd') return value ? new Date(value).toLocaleDateString() : '-';
+            if (field === 'profit') return value != null ? value.toFixed(2) : '-';
             return value;
         }
 
@@ -560,6 +595,8 @@ const PayoneerSheetPage = () => {
                                 <TableCell>Exch. Rate</TableCell>
                                 <TableCell>Actual Rate (+2%)</TableCell>
                                 <TableCell>Bank Deposit (INR)</TableCell>
+                                <TableCell>Period</TableCell>
+                                <TableCell>Profit ($)</TableCell>
                                 <TableCell align="right">Actions</TableCell>
                             </TableRow>
                         </TableHead>
@@ -581,6 +618,41 @@ const PayoneerSheetPage = () => {
                                         <TableCell sx={{ bgcolor: isEditing ? '#f8f9fa' : 'inherit', color: 'text.secondary', fontWeight: 'bold' }}>
                                             {isEditing ? 'Auto-calc' : record.bankDeposit?.toFixed(2)}
                                         </TableCell>
+
+                                        {/* Period range */}
+                                        <TableCell>
+                                            {isEditing ? (
+                                                <Stack spacing={0.5}>
+                                                    <TextField
+                                                        type="date"
+                                                        size="small"
+                                                        label="From"
+                                                        InputLabelProps={{ shrink: true }}
+                                                        value={editFormData.periodStart || ''}
+                                                        onChange={(e) => handleEditChange('periodStart', e.target.value)}
+                                                        sx={{ width: 150 }}
+                                                    />
+                                                    <TextField
+                                                        type="date"
+                                                        size="small"
+                                                        label="To"
+                                                        InputLabelProps={{ shrink: true }}
+                                                        value={editFormData.periodEnd || ''}
+                                                        onChange={(e) => handleEditChange('periodEnd', e.target.value)}
+                                                        sx={{ width: 150 }}
+                                                    />
+                                                </Stack>
+                                            ) : (
+                                                <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                                                    {record.periodStart ? new Date(record.periodStart).toLocaleDateString() : '-'}
+                                                    {' → '}
+                                                    {record.periodEnd ? new Date(record.periodEnd).toLocaleDateString() : '-'}
+                                                </Typography>
+                                            )}
+                                        </TableCell>
+
+                                        {/* Profit */}
+                                        <TableCell>{renderCell(record, 'profit', 'number')}</TableCell>
 
                                         <TableCell align="right">
                                             {isEditing ? (
@@ -616,7 +688,7 @@ const PayoneerSheetPage = () => {
                             })}
                             {records.length === 0 && !loading && (
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center">
+                                    <TableCell colSpan={10} align="center">
                                         No records found.
                                     </TableCell>
                                 </TableRow>
@@ -712,6 +784,37 @@ const PayoneerSheetPage = () => {
                                 <Typography variant="body2">Bank Deposit: <b>{preview.bankDeposit?.toFixed(2)}</b></Typography>
                             </Box>
                         </Paper>
+
+                        {/* Period Range */}
+                        <Typography variant="subtitle2" sx={{ mb: -1 }}>Period (optional)</Typography>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
+                            <TextField
+                                label="From"
+                                type="date"
+                                fullWidth
+                                InputLabelProps={{ shrink: true }}
+                                value={formData.periodStart}
+                                onChange={(e) => setFormData({ ...formData, periodStart: e.target.value })}
+                            />
+                            <TextField
+                                label="To"
+                                type="date"
+                                fullWidth
+                                InputLabelProps={{ shrink: true }}
+                                value={formData.periodEnd}
+                                onChange={(e) => setFormData({ ...formData, periodEnd: e.target.value })}
+                            />
+                        </Stack>
+
+                        {/* Profit */}
+                        <TextField
+                            label="Profit ($)"
+                            type="number"
+                            fullWidth
+                            placeholder="Enter profit amount (optional)"
+                            value={formData.profit}
+                            onChange={(e) => setFormData({ ...formData, profit: e.target.value })}
+                        />
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: { xs: 1, sm: 2 }, gap: 1, flexDirection: { xs: 'column-reverse', sm: 'row' } }}>
