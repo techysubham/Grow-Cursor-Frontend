@@ -1155,6 +1155,9 @@ function FulfillmentDashboard() {
   const [creditCards, setCreditCards] = useState([]);
   const [selectedRowId, setSelectedRowId] = useState(null);
 
+  // Issues index: maps orderId -> [{type, status}] for INR/Return/Dispute chips
+  const [issuesIndex, setIssuesIndex] = useState({});
+
   // Column visibility state - persisted in sessionStorage
   const DEFAULT_VISIBLE_COLUMNS = [
     'seller', 'orderId', 'dateSold', 'shipBy', 'deliveryDate', 'productName',
@@ -1162,7 +1165,7 @@ function FulfillmentDashboard() {
     'shipping', 'salesTax', 'discount', 'transactionFees',
     'adFeeGeneral', 'cancelStatus', 'refunds', 'orderEarnings', 'trackingNumber',
     'amazonAccount', 'arriving', 'beforeTax', 'estimatedTax',
-    'azOrderId', 'amazonRefund', 'cardName', 'notes', 'messagingStatus', 'remark'
+    'azOrderId', 'amazonRefund', 'cardName', 'notes', 'messagingStatus', 'remark', 'issueFlags'
   ];
 
   const ALL_COLUMNS = [
@@ -1198,15 +1201,19 @@ function FulfillmentDashboard() {
     { id: 'cardName', label: 'Card Name' },
     { id: 'notes', label: 'Notes' },
     { id: 'messagingStatus', label: 'Messaging' },
-    { id: 'remark', label: 'Remark' }
+    { id: 'remark', label: 'Remark' },
+    { id: 'issueFlags', label: 'Issues' }
   ];
 
   // CSV Export column selection - initialized after ALL_COLUMNS is defined
   const [selectedExportColumns, setSelectedExportColumns] = useState(ALL_COLUMNS.map(c => c.id));
 
-  const [visibleColumns, setVisibleColumns] = useState(() =>
-    getInitialState('visibleColumns', DEFAULT_VISIBLE_COLUMNS)
-  );
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const stored = getInitialState('visibleColumns', DEFAULT_VISIBLE_COLUMNS);
+    // Merge any newly added default columns that aren't in the cached list yet
+    const missing = DEFAULT_VISIBLE_COLUMNS.filter(col => !stored.includes(col));
+    return missing.length > 0 ? [...stored, ...missing] : stored;
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -1293,13 +1300,13 @@ function FulfillmentDashboard() {
     setSendingRemarkMessage(true);
 
     try {
-      // First update the remark field
-      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemarkValue });
+      // First update the remark field and mark that message was sent
+      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemarkValue, remarkMessageSent: true });
 
       // Update local state
       setOrders(prev => prev.map(o => {
         if (o._id === orderId) {
-          return { ...o, remark: normalizedRemarkValue };
+          return { ...o, remark: normalizedRemarkValue, remarkMessageSent: true };
         }
         return o;
       }));
@@ -1334,12 +1341,12 @@ function FulfillmentDashboard() {
 
     try {
       // Just update the remark without sending message
-      await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemarkValue });
+      await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemarkValue, remarkMessageSent: false });
 
       // Update local state
       setOrders(prev => prev.map(o => {
         if (o._id === orderId) {
-          return { ...o, remark: normalizedRemarkValue };
+          return { ...o, remark: normalizedRemarkValue, remarkMessageSent: false };
         }
         return o;
       }));
@@ -1380,16 +1387,16 @@ function FulfillmentDashboard() {
       setPendingRemarkUpdate({ orderId, remarkValue, order });
       setRemarkConfirmOpen(true);
     } else {
-      // No template, just update normally
-      updateManualField(orderId, 'remark', remarkValue);
+      // No template, update remark and reset remarkMessageSent flag
+      updateManualField(orderId, 'remark', remarkValue, { remarkMessageSent: false });
     }
   };
 
 
-  const updateManualField = async (orderId, field, value) => {
+  const updateManualField = async (orderId, field, value, extraFields = {}) => {
     const valueToSave = field === 'remark' ? normalizeRemarkValue(value) : value;
     try {
-      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { [field]: valueToSave });
+      const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { [field]: valueToSave, ...extraFields });
 
       // Update local state with the full order data (includes recalculated Amazon financials)
       setOrders(prev => prev.map(o => {
@@ -1398,8 +1405,8 @@ function FulfillmentDashboard() {
           if (field === 'beforeTax' || field === 'estimatedTax') {
             return data.order; // Full order with recalculated amazonTotal, amazonTotalINR, marketplaceFee, igst, totalCC
           }
-          // For other fields, just update that field
-          return { ...o, [field]: valueToSave };
+          // For other fields, just update that field (including any extraFields)
+          return { ...o, [field]: valueToSave, ...extraFields };
         }
         return o;
       }));
@@ -1431,12 +1438,14 @@ function FulfillmentDashboard() {
     dateFilter
   });
 
-  // Fetch amazon accounts once
+  // Fetch amazon accounts and issues index once on mount
   useEffect(() => {
     if (!hasFetchedInitialData.current) {
       api.get('/amazon-accounts').then(({ data }) => setAmazonAccounts(data || [])).catch(console.error);
       api.get('/credit-cards').then(({ data }) => setCreditCards(data || [])).catch(console.error);
     }
+    // Issues index is always fetched fresh (independent of hasFetchedInitialData)
+    api.get('/ebay/issues-by-order').then(({ data }) => setIssuesIndex(data?.index || {})).catch(console.error);
   }, []);
 
   // Initial load - fetch sellers and orders once
@@ -3407,6 +3416,7 @@ function FulfillmentDashboard() {
                     {visibleColumns.includes('notes') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>}
                     {visibleColumns.includes('messagingStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Messaging</TableCell>}
                     {visibleColumns.includes('remark') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>}
+                    {visibleColumns.includes('issueFlags') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Issues</TableCell>}
                     <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}></TableCell>
                   </TableRow>
                 </TableHead>
@@ -4144,7 +4154,7 @@ function FulfillmentDashboard() {
                         )}
                         {visibleColumns.includes('messagingStatus') && (
                           <TableCell align="center">
-                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                            <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
                               <Tooltip title="Message Buyer">
                                 <IconButton
                                   color="primary"
@@ -4154,6 +4164,11 @@ function FulfillmentDashboard() {
                                   <ChatIcon />
                                 </IconButton>
                               </Tooltip>
+                              {order.remarkMessageSent ? (
+                                <Tooltip title="Message was sent with last remark update">
+                                  <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                                </Tooltip>
+                              ) : null}
                             </Stack>
                           </TableCell>
                         )}
@@ -4167,6 +4182,32 @@ function FulfillmentDashboard() {
                             />
                           </TableCell>
                         )}
+                        {visibleColumns.includes('issueFlags') && (() => {
+                          const issues = issuesIndex[order.orderId] || issuesIndex[order.legacyOrderId] || [];
+                          if (issues.length === 0) return <TableCell><Typography variant="body2" color="text.disabled">-</Typography></TableCell>;
+                          // Deduplicate by type
+                          const seen = new Set();
+                          const unique = issues.filter(i => { if (seen.has(i.type)) return false; seen.add(i.type); return true; });
+                          return (
+                            <TableCell>
+                              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                                {unique.map((issue, idx) => {
+                                  const colorMap = { INR: 'warning', SNAD: 'error', Return: 'info', Dispute: 'secondary' };
+                                  return (
+                                    <Chip
+                                      key={idx}
+                                      label={issue.type}
+                                      size="small"
+                                      color={colorMap[issue.type] || 'default'}
+                                      variant="outlined"
+                                      sx={{ fontWeight: 'bold', fontSize: '0.7rem', height: 20 }}
+                                    />
+                                  );
+                                })}
+                              </Stack>
+                            </TableCell>
+                          );
+                        })()}
 
 
                       </TableRow>

@@ -327,7 +327,12 @@ export default function AmazonArrivalsPage() {
         ? String(remarkValue).trim()
         : null;
       await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemark });
-      setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, remark: normalizedRemark } : o)));
+      if (normalizedRemark === 'Delivered') {
+        // Remove the delivered order from the arrivals list
+        setOrders(prev => prev.filter(o => o._id !== orderId));
+      } else {
+        setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, remark: normalizedRemark } : o)));
+      }
       return true;
     } catch (err) {
       showSnack('error', err?.response?.data?.error || 'Failed to update remark');
@@ -466,9 +471,9 @@ export default function AmazonArrivalsPage() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       arrivalDate.setHours(0, 0, 0, 0);
-      
+
       const diffDays = Math.ceil((arrivalDate - today) / (1000 * 60 * 60 * 24));
-      
+
       if (diffDays < 0) return 'error'; // Overdue
       if (diffDays <= 3) return 'warning'; // Arriving soon
       return 'success'; // Future
@@ -478,10 +483,10 @@ export default function AmazonArrivalsPage() {
   };
 
   return (
-    <Box sx={{ 
-      height: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column', 
+    <Box sx={{
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
       p: 3,
       overflow: 'hidden'
     }}>
@@ -743,9 +748,9 @@ export default function AmazonArrivalsPage() {
                     </TableCell>
                     <TableCell sx={{ maxWidth: 300 }}>
                       <Tooltip title={order.productName || order.lineItems?.[0]?.title || '-'}>
-                        <Typography variant="body2" sx={{ 
-                          overflow: 'hidden', 
-                          textOverflow: 'ellipsis', 
+                        <Typography variant="body2" sx={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
                           maxWidth: 300
                         }}>
@@ -904,9 +909,9 @@ export default function AmazonArrivalsPage() {
               <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
                 {pendingRemarkUpdate && findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue)
                   ? replaceTemplateVariables(
-                      findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue),
-                      pendingRemarkUpdate.order
-                    )
+                    findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue),
+                    pendingRemarkUpdate.order
+                  )
                   : ''}
               </Typography>
             </Paper>

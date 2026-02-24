@@ -24,6 +24,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SettingsIcon from '@mui/icons-material/Settings';
 import api from '../../lib/api';
 import TemplateManagementModal from '../../components/TemplateManagementModal';
+import OrderDetailsModal from '../../components/OrderDetailsModal';
 
 // Session storage key for persisting state
 const CHAT_STORAGE_KEY = 'buyer_chat_page_state';
@@ -65,7 +66,17 @@ export default function BuyerChatPage() {
 
   const [metaCategory, setMetaCategory] = useState('');
   const [metaCaseStatus, setMetaCaseStatus] = useState('');
+  const [metaPickedUpBy, setMetaPickedUpBy] = useState('');
   const [savingMeta, setSavingMeta] = useState(false);
+
+  // Chat agents for "Picked Up By" dropdown
+  const [chatAgents, setChatAgents] = useState([]);
+
+  // Order details modal
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
+
+  // Thread thumbnail image
+  const [threadThumbnail, setThreadThumbnail] = useState(null);
 
   // Snackbar state for sync results
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -148,6 +159,28 @@ export default function BuyerChatPage() {
     } else {
       setMetaCategory('');
       setMetaCaseStatus('');
+      setMetaPickedUpBy('');
+    }
+  }, [selectedThread]);
+
+  // Fetch thumbnail image when thread changes
+  useEffect(() => {
+    setThreadThumbnail(null);
+    if (
+      selectedThread &&
+      selectedThread.itemId &&
+      selectedThread.itemId !== 'DIRECT_MESSAGE' &&
+      selectedThread.sellerId
+    ) {
+      api
+        .get(`/ebay/item-images/${selectedThread.itemId}`, {
+          params: { sellerId: selectedThread.sellerId, thumbnail: true }
+        })
+        .then((res) => {
+          const url = res.data?.thumbnail || res.data?.images?.[0] || null;
+          setThreadThumbnail(url);
+        })
+        .catch(() => setThreadThumbnail(null));
     }
   }, [selectedThread]);
 
@@ -164,10 +197,12 @@ export default function BuyerChatPage() {
       // If data exists, fill state. If not, reset to empty/default.
       if (data && data._id) {
         setMetaCategory(data.category);
-        setMetaCaseStatus(data.caseStatus);
+        setMetaCaseStatus(data.status || data.caseStatus || '');
+        setMetaPickedUpBy(data.pickedUpBy || '');
       } else {
         setMetaCategory('');
         setMetaCaseStatus('');
+        setMetaPickedUpBy('');
       }
     } catch (e) {
       // Don't log 401 errors - they're handled by the interceptor
@@ -177,12 +212,13 @@ export default function BuyerChatPage() {
       // Reset to empty on error
       setMetaCategory('');
       setMetaCaseStatus('');
+      setMetaPickedUpBy('');
     }
   }
 
   async function handleSaveMeta() {
     if (!metaCategory || !metaCaseStatus) {
-      alert("Please select both 'About' and 'Case' fields.");
+      alert("Please select both 'About' and 'Status' fields.");
       return;
     }
 
@@ -194,7 +230,9 @@ export default function BuyerChatPage() {
         orderId: selectedThread.orderId,
         itemId: selectedThread.itemId,
         category: metaCategory,
-        caseStatus: metaCaseStatus
+        caseStatus: metaCaseStatus,  // keep backward-compat field
+        status: metaCaseStatus,      // synced status field
+        pickedUpBy: metaPickedUpBy || null
       });
       // Optional: Show a small success toast or icon change
     } catch (e) {
@@ -206,6 +244,15 @@ export default function BuyerChatPage() {
 
 
 
+
+  async function fetchAgents() {
+    try {
+      const { data } = await api.get('/ebay/chat-agents');
+      setChatAgents(data || []);
+    } catch (e) {
+      console.error('Failed to load chat agents', e);
+    }
+  }
 
   async function loadChatTemplates() {
     setTemplatesLoading(true);
@@ -242,6 +289,7 @@ export default function BuyerChatPage() {
       fetchSellers();
       loadThreads(true);
       loadChatTemplates();
+      fetchAgents();
 
       // If we have a restored selectedThread, load its messages
       if (selectedThread && !selectedThread.isNew) {
@@ -418,7 +466,7 @@ export default function BuyerChatPage() {
   async function handleThreadSelect(thread) {
     setSelectedThread(thread);
     setSearchError('');
-    
+
     // Close sidebar on mobile and tablet when thread is selected
     if (isMobile || isTablet) {
       setSidebarOpen(false);
@@ -645,8 +693,8 @@ export default function BuyerChatPage() {
   }
 
   return (
-    <Box sx={{ 
-      display: 'flex', 
+    <Box sx={{
+      display: 'flex',
       flexDirection: { xs: 'column', md: 'row' },
       height: { xs: '100vh', md: '85vh' },
       gap: { xs: 0, md: 2 },
@@ -670,7 +718,7 @@ export default function BuyerChatPage() {
       )}
 
       {/* LEFT: SIDEBAR */}
-      <Paper sx={{ 
+      <Paper sx={{
         width: { xs: '100%', sm: sidebarOpen ? '100%' : 0, md: 340 },
         display: { xs: sidebarOpen ? 'flex' : 'none', sm: sidebarOpen ? 'flex' : 'none', md: 'flex' },
         flexDirection: 'column',
@@ -682,17 +730,17 @@ export default function BuyerChatPage() {
         overflow: 'hidden',
         boxShadow: { xs: 3, sm: 3, md: 1 }
       }}>
-        <Box sx={{ 
-          p: { xs: 1.5, md: 2 }, 
-          bgcolor: '#f5f5f5', 
-          borderBottom: 1, 
-          borderColor: 'divider' 
+        <Box sx={{
+          p: { xs: 1.5, md: 2 },
+          bgcolor: '#f5f5f5',
+          borderBottom: 1,
+          borderColor: 'divider'
         }}>
           {/* Mobile & Tablet: Close button */}
           {(isMobile || isTablet) && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
               <Typography variant="h6" sx={{ fontSize: '1rem' }}>Conversations</Typography>
-              <IconButton 
+              <IconButton
                 onClick={() => setSidebarOpen(false)}
                 size="small"
               >
@@ -702,15 +750,15 @@ export default function BuyerChatPage() {
           )}
 
           {/* Filters - Vertically stacked, full width */}
-          <Stack 
-            direction="column" 
+          <Stack
+            direction="column"
             spacing={1.5}
             sx={{ mb: 2 }}
           >
-            <FormControl 
+            <FormControl
               fullWidth
-              size="small" 
-              sx={{ 
+              size="small"
+              sx={{
                 bgcolor: 'white'
               }}
             >
@@ -731,10 +779,10 @@ export default function BuyerChatPage() {
               </Select>
             </FormControl>
 
-            <FormControl 
+            <FormControl
               fullWidth
-              size="small" 
-              sx={{ 
+              size="small"
+              sx={{
                 bgcolor: 'white'
               }}
             >
@@ -750,10 +798,10 @@ export default function BuyerChatPage() {
               </Select>
             </FormControl>
 
-            <FormControl 
+            <FormControl
               fullWidth
-              size="small" 
-              sx={{ 
+              size="small"
+              sx={{
                 bgcolor: 'white'
               }}
             >
@@ -770,10 +818,10 @@ export default function BuyerChatPage() {
               </Select>
             </FormControl>
 
-            <FormControl 
+            <FormControl
               fullWidth
-              size="small" 
-              sx={{ 
+              size="small"
+              sx={{
                 bgcolor: 'white'
               }}
             >
@@ -789,9 +837,9 @@ export default function BuyerChatPage() {
             </FormControl>
           </Stack>
 
-          <Stack 
-            direction={{ xs: 'column', sm: 'row' }} 
-            justifyContent="space-between" 
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            justifyContent="space-between"
             alignItems={{ xs: 'stretch', sm: 'center' }}
             spacing={1}
             mb={2}
@@ -954,9 +1002,9 @@ export default function BuyerChatPage() {
       )}
 
       {/* RIGHT: CHAT AREA */}
-      <Paper sx={{ 
-        flex: 1, 
-        display: 'flex', 
+      <Paper sx={{
+        flex: 1,
+        display: 'flex',
         flexDirection: 'column',
         width: { xs: '100%', md: 'auto' },
         height: { xs: '100vh', md: '100%' },
@@ -966,12 +1014,12 @@ export default function BuyerChatPage() {
         {
           selectedThread ? (
             <>
-              <Box sx={{ 
-                p: { xs: 1.5, md: 2 }, 
-                borderBottom: 1, 
-                borderColor: 'divider', 
-                bgcolor: '#fff', 
-                position: 'relative' 
+              <Box sx={{
+                p: { xs: 1.5, md: 2 },
+                borderBottom: 1,
+                borderColor: 'divider',
+                bgcolor: '#fff',
+                position: 'relative'
               }}>
                 {/* Mobile & Tablet: Back button */}
                 {(isMobile || isTablet) && (
@@ -992,33 +1040,31 @@ export default function BuyerChatPage() {
                   spacing={1}
                   alignItems={{ xs: 'stretch', sm: 'center' }}
                   flexWrap="wrap"
-                  sx={{ 
-                    position: { xs: 'static', md: 'absolute' },
-                    top: { md: 12 },
-                    left: { md: 12 },
-                    mb: { xs: 2, md: 0 },
-                    maxWidth: { md: 'calc(100% - 24px)' },
-                    justifyContent: { sm: 'flex-start', md: 'flex-start' },
+                  sx={{
+                    position: 'static',
+                    mb: 2,
+                    maxWidth: '100%',
+                    justifyContent: 'flex-start',
                     gap: 1,
                     zIndex: 10
                   }}
                 >
 
                   {/* Meta dropdowns - Stack on mobile */}
-                  <Stack 
-                    direction={{ xs: 'column', sm: 'row' }} 
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
                     spacing={1}
                     flexWrap="wrap"
-                    sx={{ 
+                    sx={{
                       width: { xs: '100%', sm: 'auto' },
                       maxWidth: { md: '100%' },
                       gap: 1
                     }}
                   >
-                    <FormControl 
-                      size="small" 
+                    <FormControl
+                      size="small"
                       fullWidth={isMobile}
-                      sx={{ 
+                      sx={{
                         minWidth: { xs: '100%', sm: 120, md: 140 },
                         maxWidth: { md: 180 },
                         '& .MuiInputBase-root': { height: { xs: 40, sm: 32 } }
@@ -1033,31 +1079,59 @@ export default function BuyerChatPage() {
                       >
                         <MenuItem value="INR">INR</MenuItem>
                         <MenuItem value="Cancellation">Cancellation</MenuItem>
-                        <MenuItem value="Return">Return</MenuItem>
+                        <ListSubheader sx={{ fontSize: '0.75rem', lineHeight: '2.2rem', color: 'text.secondary', fontWeight: 'bold' }}>Return</ListSubheader>
+                        <MenuItem value="Return - Refund" sx={{ pl: 3 }}>↳ Refund</MenuItem>
+                        <MenuItem value="Return - Replace" sx={{ pl: 3 }}>↳ Replace</MenuItem>
                         <MenuItem value="Out of Stock">Out of Stock</MenuItem>
                         <MenuItem value="Issue with Product">Issue with Product</MenuItem>
                         <MenuItem value="Inquiry">Inquiry</MenuItem>
                       </Select>
                     </FormControl>
 
-                    <FormControl 
-                      size="small" 
+                    <FormControl
+                      size="small"
                       fullWidth={isMobile}
-                      sx={{ 
+                      sx={{
                         minWidth: { xs: '100%', sm: 120, md: 140 },
                         maxWidth: { md: 180 },
                         '& .MuiInputBase-root': { height: { xs: 40, sm: 32 } }
                       }}
                     >
-                      <InputLabel sx={{ fontSize: '0.8rem' }}>Case</InputLabel>
+                      <InputLabel sx={{ fontSize: '0.8rem' }}>Status</InputLabel>
                       <Select
                         value={metaCaseStatus}
-                        label="Case"
+                        label="Status"
                         onChange={(e) => setMetaCaseStatus(e.target.value)}
                         sx={{ fontSize: '0.8rem' }}
                       >
-                        <MenuItem value="Case Opened">Case Opened</MenuItem>
-                        <MenuItem value="Case Not Opened">Case Not Opened</MenuItem>
+                        <MenuItem value="Open">Open</MenuItem>
+                        <MenuItem value="In Progress">In Progress</MenuItem>
+                        <MenuItem value="Resolved">Resolved</MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    <FormControl
+                      size="small"
+                      fullWidth={isMobile}
+                      sx={{
+                        minWidth: { xs: '100%', sm: 130, md: 150 },
+                        maxWidth: { md: 200 },
+                        '& .MuiInputBase-root': { height: { xs: 40, sm: 32 } }
+                      }}
+                    >
+                      <InputLabel shrink sx={{ fontSize: '0.8rem' }}>Picked Up By</InputLabel>
+                      <Select
+                        value={metaPickedUpBy}
+                        label="Picked Up By"
+                        onChange={(e) => setMetaPickedUpBy(e.target.value)}
+                        sx={{ fontSize: '0.8rem' }}
+                        displayEmpty
+                        renderValue={(selected) => (selected ? selected : '— Unassigned —')}
+                      >
+                        <MenuItem value=""><em>— Unassigned —</em></MenuItem>
+                        {chatAgents.map(agent => (
+                          <MenuItem key={agent._id} value={agent.name}>{agent.name}</MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
 
@@ -1067,10 +1141,10 @@ export default function BuyerChatPage() {
                       onClick={handleSaveMeta}
                       disabled={savingMeta}
                       fullWidth={isMobile}
-                      sx={{ 
-                        minWidth: { xs: '100%', sm: 40 }, 
-                        height: { xs: 40, sm: 32 }, 
-                        px: { xs: 2, sm: 1 } 
+                      sx={{
+                        minWidth: { xs: '100%', sm: 40 },
+                        height: { xs: 40, sm: 32 },
+                        px: { xs: 2, sm: 1 }
                       }}
                     >
                       {savingMeta ? <CircularProgress size={16} color="inherit" /> : <SaveIcon fontSize="small" />}
@@ -1078,8 +1152,8 @@ export default function BuyerChatPage() {
                   </Stack>
 
                   {/* Seller chip and actions */}
-                  <Stack 
-                    direction={{ xs: 'column', sm: 'row' }} 
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
                     spacing={1}
                     alignItems={{ xs: 'stretch', sm: 'center' }}
                     sx={{ width: { xs: '100%', sm: 'auto' } }}
@@ -1098,11 +1172,11 @@ export default function BuyerChatPage() {
                       }}
                     />
                     {selectedThread.isNew && (
-                      <Chip 
-                        label="New" 
-                        size="small" 
-                        color="success" 
-                        sx={{ height: { xs: 36, sm: 24 } }} 
+                      <Chip
+                        label="New"
+                        size="small"
+                        color="success"
+                        sx={{ height: { xs: 36, sm: 24 } }}
                       />
                     )}
 
@@ -1114,8 +1188,8 @@ export default function BuyerChatPage() {
                         onClick={handleTemplateClick}
                         disabled={sending}
                         fullWidth={isMobile}
-                        sx={{ 
-                          height: { xs: 40, sm: 30 }, 
+                        sx={{
+                          height: { xs: 40, sm: 30 },
                           fontSize: '0.75rem',
                           minWidth: { xs: '100%', sm: 100 },
                           bgcolor: 'white'
@@ -1134,9 +1208,9 @@ export default function BuyerChatPage() {
                         disabled={markingUnread}
                         startIcon={markingUnread ? <CircularProgress size={16} color="inherit" /> : <MarkAsUnreadIcon fontSize="small" />}
                         fullWidth={isMobile}
-                        sx={{ 
-                          height: { xs: 40, sm: 30 }, 
-                          fontSize: '0.75rem' 
+                        sx={{
+                          height: { xs: 40, sm: 30 },
+                          fontSize: '0.75rem'
                         }}
                       >
                         {markingUnread ? 'Marking...' : 'Mark Unread'}
@@ -1176,9 +1250,9 @@ export default function BuyerChatPage() {
                   }}
                 >
                   {/* Manage Templates Button */}
-                  <MenuItem 
+                  <MenuItem
                     onClick={() => { handleTemplateClose(); setManageTemplatesOpen(true); }}
-                    sx={{ 
+                    sx={{
                       borderBottom: '2px solid #e0e0e0',
                       bgcolor: '#f9f9ff',
                       py: 1.5
@@ -1201,10 +1275,10 @@ export default function BuyerChatPage() {
                   ) : (
                     chatTemplates.map((group, index) => (
                       <Box key={index}>
-                        <ListSubheader 
-                          sx={{ 
-                            bgcolor: '#f5f5f5', 
-                            fontWeight: 'bold', 
+                        <ListSubheader
+                          sx={{
+                            bgcolor: '#f5f5f5',
+                            fontWeight: 'bold',
                             lineHeight: '32px',
                             color: 'primary.main',
                             fontSize: '0.75rem'
@@ -1213,13 +1287,13 @@ export default function BuyerChatPage() {
                           {group.category}
                         </ListSubheader>
                         {group.items.map((item, idx) => (
-                          <MenuItem 
-                            key={item._id || idx} 
+                          <MenuItem
+                            key={item._id || idx}
                             onClick={() => handleSelectTemplate(item.text)}
-                            sx={{ 
-                              fontSize: '0.85rem', 
-                              whiteSpace: 'normal', 
-                              py: 1, 
+                            sx={{
+                              fontSize: '0.85rem',
+                              whiteSpace: 'normal',
+                              py: 1,
                               borderBottom: '1px solid #f0f0f0',
                               display: 'block'
                             }}
@@ -1227,15 +1301,15 @@ export default function BuyerChatPage() {
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
                               {item.label}
                             </Typography>
-                            <Typography 
-                              variant="caption" 
-                              color="text.secondary" 
-                              sx={{ 
-                                display: '-webkit-box', 
-                                WebkitLineClamp: 2, 
-                                WebkitBoxOrient: 'vertical', 
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
                                 overflow: 'hidden',
-                                fontSize: '0.75rem' 
+                                fontSize: '0.75rem'
                               }}
                             >
                               {item.text}
@@ -1257,17 +1331,17 @@ export default function BuyerChatPage() {
                 />
 
                 {/* MAIN CONTENT - Responsive padding */}
-                <Stack spacing={1.5} sx={{ 
-                  pl: { xs: 0, md: 0 }, 
+                <Stack spacing={1.5} sx={{
+                  pl: { xs: 0, md: 0 },
                   pr: { xs: 0, md: 0 },
-                  mt: { xs: 1, md: 6 }, // Add top margin to prevent overlap with absolutely positioned buttons
+                  mt: { xs: 1, md: 1 },
                   mb: { md: 0 }
                 }}>
 
                   {/* 1. BUYER IDENTITY - Stack on mobile */}
-                  <Stack 
-                    direction={{ xs: 'column', sm: 'row' }} 
-                    alignItems={{ xs: 'flex-start', sm: 'center' }} 
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
                     spacing={{ xs: 1, sm: 3 }}
                   >
                     <Box>
@@ -1320,6 +1394,24 @@ export default function BuyerChatPage() {
                     ) : (
                       /* REGULAR ITEM LINK */
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5 }}>
+                        {/* Product thumbnail */}
+                        {threadThumbnail && (
+                          <Box
+                            component="img"
+                            src={threadThumbnail}
+                            alt="Product"
+                            sx={{
+                              width: 44,
+                              height: 44,
+                              objectFit: 'cover',
+                              borderRadius: 1,
+                              border: '1px solid',
+                              borderColor: 'grey.300',
+                              flexShrink: 0,
+                              mr: 0.5
+                            }}
+                          />
+                        )}
                         <Link
                           href={`https://www.ebay.com/itm/${selectedThread.itemId}`}
                           target="_blank"
@@ -1339,8 +1431,8 @@ export default function BuyerChatPage() {
                           </Typography>
                           <OpenInNewIcon sx={{ fontSize: 16, color: 'primary.main', mt: 0.3 }} />
                         </Link>
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           onClick={() => handleCopy(selectedThread.itemTitle || `Item ID: ${selectedThread.itemId}`)}
                           aria-label="copy product title"
                           sx={{ p: 0.5, mt: -0.2 }}
@@ -1355,14 +1447,17 @@ export default function BuyerChatPage() {
                         label={`Order #: ${selectedThread.orderId}`}
                         size="small"
                         variant="outlined"
+                        onClick={() => setSelectedOrderId(selectedThread.orderId)}
                         sx={{
                           borderRadius: 1,
                           height: 30,
                           fontSize: '0.75rem',
                           fontWeight: 'bold',
-                          color: 'text.secondary',
-                          borderColor: 'divider',
-                          bgcolor: '#fafafa'
+                          color: 'primary.main',
+                          borderColor: 'primary.main',
+                          bgcolor: '#f0f7ff',
+                          cursor: 'pointer',
+                          '&:hover': { bgcolor: '#dbeafe' }
                         }}
                       />
                     )}
@@ -1387,11 +1482,11 @@ export default function BuyerChatPage() {
                 </Stack>
               </Box>
 
-              <Box sx={{ 
-                flex: 1, 
-                p: { xs: 1.5, md: 2 }, 
-                overflowY: 'auto', 
-                bgcolor: '#f0f2f5' 
+              <Box sx={{
+                flex: 1,
+                p: { xs: 1.5, md: 2 },
+                overflowY: 'auto',
+                bgcolor: '#f0f2f5'
               }}>
                 {loadingMessages ? (
                   <Box display="flex" justifyContent="center" mt={4}><CircularProgress /></Box>
@@ -1419,10 +1514,10 @@ export default function BuyerChatPage() {
                             position: 'relative'
                           }}
                         >
-                          <Typography 
-                            variant="body1" 
-                            sx={{ 
-                              whiteSpace: 'pre-wrap', 
+                          <Typography
+                            variant="body1"
+                            sx={{
+                              whiteSpace: 'pre-wrap',
                               wordBreak: 'break-word',
                               fontSize: { xs: '0.875rem', md: '1rem' }
                             }}
@@ -1454,12 +1549,12 @@ export default function BuyerChatPage() {
                             </Box>
                           )}
                         </Paper>
-                        <Typography 
-                          variant="caption" 
-                          color="text.secondary" 
-                          sx={{ 
-                            display: 'block', 
-                            mt: 0.5, 
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{
+                            display: 'block',
+                            mt: 0.5,
                             textAlign: msg.sender === 'SELLER' ? 'right' : 'left',
                             fontSize: { xs: '0.7rem', md: '0.75rem' }
                           }}
@@ -1474,14 +1569,14 @@ export default function BuyerChatPage() {
                 )}
               </Box>
 
-              <Box sx={{ 
-                p: { xs: 1.5, md: 2 }, 
-                borderTop: 1, 
-                borderColor: 'divider', 
-                bgcolor: '#fff', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: 1 
+              <Box sx={{
+                p: { xs: 1.5, md: 2 },
+                borderTop: 1,
+                borderColor: 'divider',
+                bgcolor: '#fff',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1
               }}>
                 {selectedThread.itemId === 'DIRECT_MESSAGE' ? (
                   <Alert severity="warning" sx={{ width: '100%' }}>
@@ -1541,9 +1636,9 @@ export default function BuyerChatPage() {
 
                       <Button
                         variant="contained"
-                        sx={{ 
-                          px: { xs: 2, md: 3 }, 
-                          alignSelf: 'flex-end', 
+                        sx={{
+                          px: { xs: 2, md: 3 },
+                          alignSelf: 'flex-end',
                           mb: 0.5,
                           minWidth: { xs: 'auto', md: 'auto' }
                         }}
@@ -1610,6 +1705,15 @@ export default function BuyerChatPage() {
         message="Copied to clipboard!"
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
+
+      {/* Order Details Modal */}
+      {selectedOrderId && (
+        <OrderDetailsModal
+          open={Boolean(selectedOrderId)}
+          onClose={() => setSelectedOrderId(null)}
+          orderId={selectedOrderId}
+        />
+      )}
     </Box >
   );
 }

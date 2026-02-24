@@ -37,6 +37,29 @@ const STATUS_COLUMNS = [
   { key: 'attended', label: 'Attended' },
   { key: 'resolved', label: 'Resolved' }
 ];
+const HEADER_ROW_ONE_HEIGHT = 36;
+
+const PT_TIMEZONE = 'America/Los_Angeles';
+
+function getCurrentPtDateString() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: PT_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+
+function parseYmdAsStableDate(dateString) {
+  if (!dateString) return null;
+  const ymd = String(dateString).slice(0, 10);
+  const [yearText, monthText, dayText] = ymd.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+}
 
 export default function WorksheetPage({
   dateFilter: dateFilterProp,
@@ -58,7 +81,7 @@ export default function WorksheetPage({
 
   const [internalDateFilter, setInternalDateFilter] = useState({
     mode: 'single',
-    single: new Date().toISOString().split('T')[0],
+    single: getCurrentPtDateString(),
     from: '',
     to: ''
   });
@@ -147,20 +170,24 @@ export default function WorksheetPage({
   }, [tableData]);
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString + 'T00:00:00'); // Parse as local date
+    const date = parseYmdAsStableDate(dateString);
+    if (!date) return '-';
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
-      weekday: 'short'
+      weekday: 'short',
+      timeZone: PT_TIMEZONE
     }).format(date);
   };
 
   const formatPstDate = (dateString) => {
     if (!dateString) return null;
-    const date = new Date(dateString + 'T00:00:00');
+    const date = parseYmdAsStableDate(dateString);
+    if (!date) return null;
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: PT_TIMEZONE
     }).format(date);
   };
 
@@ -223,7 +250,7 @@ export default function WorksheetPage({
             Worksheet
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Daily overview of cancellations, returns, INR & disputes, and inquiries. Dates shown in local time with PST reference.
+            Daily overview of cancellations, returns, INR & disputes, and inquiries. Dates and filters are based on Pacific Time.
           </Typography>
         </Box>
         <Chip
@@ -422,9 +449,12 @@ export default function WorksheetPage({
                       bgcolor: 'primary.main',
                       color: 'white',
                       minWidth: 120,
+                      height: HEADER_ROW_ONE_HEIGHT,
+                      py: 0.5,
                       position: 'sticky',
+                      top: 0,
                       left: 0,
-                      zIndex: 3
+                      zIndex: 5
                     }}
                   >
                     Date
@@ -438,7 +468,12 @@ export default function WorksheetPage({
                         fontWeight: 'bold',
                         bgcolor: 'primary.main',
                         color: 'white',
-                        borderLeft: '8px solid white'
+                        height: HEADER_ROW_ONE_HEIGHT,
+                        py: 0.5,
+                        borderLeft: '8px solid white',
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 4
                       }}
                     >
                       {category.label}
@@ -452,8 +487,9 @@ export default function WorksheetPage({
                       bgcolor: 'primary.dark',
                       color: 'white',
                       position: 'sticky',
+                      top: HEADER_ROW_ONE_HEIGHT,
                       left: 0,
-                      zIndex: 3
+                      zIndex: 5
                     }}
                   />}
                   {CATEGORIES.map((category) => (
@@ -467,7 +503,10 @@ export default function WorksheetPage({
                             bgcolor: 'primary.dark',
                             color: 'white',
                             fontSize: '0.75rem',
-                            borderLeft: '8px solid white'
+                            borderLeft: '8px solid white',
+                            position: 'sticky',
+                            top: HEADER_ROW_ONE_HEIGHT,
+                            zIndex: 3
                           }}
                         >
                           Total
@@ -482,7 +521,10 @@ export default function WorksheetPage({
                               bgcolor: 'primary.dark',
                               color: 'white',
                               fontSize: '0.75rem',
-                              borderLeft: index === 0 ? '8px solid white' : 'none'
+                              borderLeft: index === 0 ? '8px solid white' : 'none',
+                              position: 'sticky',
+                              top: HEADER_ROW_ONE_HEIGHT,
+                              zIndex: 3
                             }}
                           >
                             {status.label}
