@@ -46,7 +46,7 @@ export default function AsinReviewModal({
   const [dismissedItems, setDismissedItems] = useState(new Set());
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [descriptionViewMode, setDescriptionViewMode] = useState('code'); // 'code' | 'preview'
+  const [descriptionViewMode, setDescriptionViewMode] = useState('preview'); // 'code' | 'preview'
   const [amazonWindowRef, setAmazonWindowRef] = useState(null);
   const [showAmazonPreview, setShowAmazonPreview] = useState(false);
 
