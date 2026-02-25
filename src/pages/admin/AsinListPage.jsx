@@ -32,7 +32,9 @@ import {
   BrokenImage as BrokenImageIcon,
   AddCircle as AddCircleIcon
 } from '@mui/icons-material';
-import api from '../../lib/api.js';
+import api, { getAuthToken } from '../../lib/api.js';
+import AsinReviewModal from '../../components/AsinReviewModal.jsx';
+import AsinListCreateDialog from '../../components/AsinListCreateDialog.jsx';
 
 export default function AsinListPage() {
   // ── Taxonomy dropdowns ──────────────────────────────────────────────────────
@@ -71,6 +73,13 @@ export default function AsinListPage() {
   // ── Feedback ────────────────────────────────────────────────────────────────
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // ── Create Listing flow ──────────────────────────────────────────────────────
+  const [createDialog, setCreateDialog] = useState(false);
+  const [reviewModal, setReviewModal] = useState(false);
+  const [previewItems, setPreviewItems] = useState([]);
+  const [activeTemplate, setActiveTemplate] = useState(null);
+  const [activeSellerId, setActiveSellerId] = useState('');
 
   // ── Taxonomy fetch ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -209,6 +218,79 @@ export default function AsinListPage() {
     setSearchActive(keyword);
   };
 
+  // ── Create Listing handlers ──────────────────────────────────────────────────
+  const handleCreateConfirmed = ({ sellerId, templateId, template }) => {
+    setActiveSellerId(sellerId);
+    setActiveTemplate(template);
+    setCreateDialog(false);
+
+    // Build loading placeholders so the modal opens immediately
+    const selectedAsins = asins.filter(a => selected.includes(a._id));
+    const placeholders = selectedAsins.map(a => ({
+      id: `preview-${a.asin}`,
+      asin: a.asin,
+      sku: '',
+      status: 'loading',
+      generatedListing: null,
+      warnings: [],
+      errors: []
+    }));
+    setPreviewItems(placeholders);
+    setReviewModal(true);
+
+    // Connect SSE stream
+    const asinParam = selectedAsins.map(a => a.asin).join(',');
+    const authToken = getAuthToken();
+    const sseUrl =
+      `/template-listings/bulk-preview-from-directory-stream` +
+      `?templateId=${templateId}&sellerId=${sellerId}` +
+      `&asins=${encodeURIComponent(asinParam)}&token=${encodeURIComponent(authToken)}`;
+
+    const eventSource = new EventSource(api.defaults.baseURL + sseUrl);
+    window._directoryEventSource = eventSource;
+
+    eventSource.onmessage = (event) => {
+      if (event.data === '[DONE]') {
+        eventSource.close();
+        window._directoryEventSource = null;
+        return;
+      }
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'item') {
+          setPreviewItems(prev =>
+            prev.map(p => p.id === payload.item.id ? payload.item : p)
+          );
+        }
+      } catch { /* ignore parse errors */ }
+    };
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      window._directoryEventSource = null;
+    };
+  };
+
+  const handleSaveFromReview = async (listings) => {
+    try {
+      const { data } = await api.post('/template-listings/bulk-save', {
+        templateId: activeTemplate._id,
+        sellerId: activeSellerId,
+        listings,
+        options: { skipDuplicates: true }
+      });
+      setSuccess(
+        `Bulk save completed: ${data.created} created, ${data.updated || 0} updated, ` +
+        `${data.reactivated || 0} reactivated, ${data.failed} failed, ${data.skipped} skipped`
+      );
+      setReviewModal(false);
+      setPreviewItems([]);
+      setSelected([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save listings');
+    }
+  };
+
   // ── Image helper ─────────────────────────────────────────────────────────────
   const [imgErrors, setImgErrors] = useState({});
   const handleImgError = (id) => setImgErrors(prev => ({ ...prev, [id]: true }));
@@ -303,10 +385,11 @@ export default function AsinListPage() {
             <Button
               variant="contained"
               startIcon={<AddCircleIcon />}
-              disabled={selected.length === 0}
+              disabled={selected.length === 0 || !productId}
+              onClick={() => setCreateDialog(true)}
               sx={{ whiteSpace: 'nowrap' }}
             >
-              Create Listing
+              Create Listing ({selected.length})
             </Button>
           </Stack>
 
@@ -565,6 +648,35 @@ export default function AsinListPage() {
           />
         )}
       </Paper>
+
+      {/* ── Dialogs ──────────────────────────────────────────────────────────── */}
+      <AsinListCreateDialog
+        open={createDialog}
+        onClose={() => setCreateDialog(false)}
+        asinCount={selected.length}
+        onConfirm={handleCreateConfirmed}
+      />
+
+      <AsinReviewModal
+        open={reviewModal}
+        onClose={() => {
+          if (window._directoryEventSource) {
+            window._directoryEventSource.close();
+            window._directoryEventSource = null;
+          }
+          setReviewModal(false);
+          setPreviewItems([]);
+        }}
+        previewItems={previewItems}
+        onSave={handleSaveFromReview}
+        templateColumns={[
+          ...(activeTemplate?.customColumns?.map(c => ({ ...c, type: 'custom' })) || []),
+          { name: 'title', label: 'Title', type: 'core' },
+          { name: 'description', label: 'Description', type: 'core' },
+          { name: 'startPrice', label: 'Start Price', type: 'core' },
+          { name: 'quantity', label: 'Quantity', type: 'core' }
+        ]}
+      />
     </Box>
   );
 }
