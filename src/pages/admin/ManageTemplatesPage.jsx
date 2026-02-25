@@ -3,7 +3,7 @@ import {
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, 
   DialogContent, DialogActions, Alert, Chip, FormControl, InputLabel, Select, MenuItem,
-  Tabs, Tab, Switch, FormControlLabel
+  Tabs, Tab, Switch, FormControlLabel, Divider
 } from '@mui/material';
 import { 
   Delete as DeleteIcon, 
@@ -18,7 +18,6 @@ import api from '../../lib/api.js';
 import FieldConfigList from '../../components/FieldConfigList.jsx';
 import CoreFieldDefaultsForm from '../../components/CoreFieldDefaultsForm.jsx';
 import PricingConfigSection from '../../components/PricingConfigSection.jsx';
-import ActionFieldEditor from '../../components/ActionFieldEditor.jsx';
 
 export default function ManageTemplatesPage() {
   const navigate = useNavigate();
@@ -35,6 +34,7 @@ export default function ManageTemplatesPage() {
       fieldConfigs: []
     },
     coreFieldDefaults: {},
+    customActionField: '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)',
     pricingConfig: {
       enabled: false,
       spentRate: null,
@@ -146,6 +146,7 @@ export default function ManageTemplatesPage() {
         fieldConfigs: []
       },
       coreFieldDefaults: template.coreFieldDefaults || {},
+      customActionField: template.customActionField || '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)',
       pricingConfig: template.pricingConfig || {
         enabled: false,
         spentRate: null,
@@ -175,6 +176,7 @@ export default function ManageTemplatesPage() {
         fieldConfigs: []
       },
       coreFieldDefaults: {},
+      customActionField: '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)',
       pricingConfig: {
         enabled: false,
         spentRate: null,
@@ -209,6 +211,7 @@ export default function ManageTemplatesPage() {
           fieldConfigs: []
         },
         coreFieldDefaults: {},
+        customActionField: '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)',
         pricingConfig: {
           enabled: false,
           spentRate: null,
@@ -636,7 +639,6 @@ export default function ManageTemplatesPage() {
                   </Box>
                 } 
               />
-              <Tab label="eBay Action Field" />
             </Tabs>
             
             <Box sx={{ minHeight: 300 }}>
@@ -751,6 +753,27 @@ export default function ManageTemplatesPage() {
               {/* Tab 3: Core Field Defaults */}
               {currentTab === 3 && (
                 <Box>
+                  {/* eBay Action Field dropdown */}
+                  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                    eBay Action Field
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <FormControl fullWidth size="small" sx={{ mb: 4 }}>
+                    <InputLabel>eBay Platform</InputLabel>
+                    <Select
+                      value={formData.customActionField || '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)'}
+                      label="eBay Platform"
+                      onChange={(e) => setFormData({ ...formData, customActionField: e.target.value })}
+                    >
+                      <MenuItem value="*Action(SiteID=US|Country=US|Currency=USD|Version=1193)">
+                        eBay US &nbsp;—&nbsp; *Action(SiteID=US|Country=US|Currency=USD|Version=1193)
+                      </MenuItem>
+                      <MenuItem value="*Action(SiteID=eBayMotors|Country=US|Currency=USD|Version=1193)">
+                        eBay Motors &nbsp;—&nbsp; *Action(SiteID=eBayMotors|Country=US|Currency=USD|Version=1193)
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+
                   <Alert severity="info" sx={{ mb: 3 }}>
                     <Typography variant="body2">
                       <strong>How it works:</strong> Set default values for core eBay fields at the template level. 
@@ -790,30 +813,7 @@ export default function ManageTemplatesPage() {
                 </Box>
               )}
 
-              {/* Tab 5: eBay Action Field */}
-              {currentTab === 5 && (
-                <Box sx={{ mt: 2 }}>
-                  <Alert severity="info" sx={{ mb: 2 }}>
-                    This field defines the eBay marketplace settings for CSV export.
-                    Changes here affect the base template and will be used by default for all sellers
-                    unless they create a seller-specific override.
-                  </Alert>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                    <ActionFieldEditor templateId={editingTemplate?._id} sellerId={null} />
-                  </Box>
-                  
-                  <Alert severity="warning" variant="outlined" sx={{ mt: 2 }}>
-                    <strong>Common Marketplace Examples:</strong>
-                    <br />• <strong>US:</strong> *Action(SiteID=US|Country=US|Currency=USD|Version=1193)
-                    <br />• <strong>UK:</strong> *Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)
-                    <br />• <strong>AU:</strong> *Action(SiteID=AU|Country=AU|Currency=AUD|Version=1193)
-                    <br />• <strong>CA:</strong> *Action(SiteID=CA|Country=CA|Currency=CAD|Version=1193)
-                    <br />• <strong>DE:</strong> *Action(SiteID=DE|Country=DE|Currency=EUR|Version=1193)
-                    <br />• <strong>eBay Motors:</strong> *Action(SiteID=eBayMotors|Country=US|Currency=USD|Version=1193)
-                  </Alert>
-                </Box>
-              )}
+
             </Box>
           </Box>
         </DialogContent>
