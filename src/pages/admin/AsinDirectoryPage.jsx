@@ -31,13 +31,15 @@ import {
   ContentCopy as CopyIcon,
   BrokenImage as BrokenImageIcon,
   ErrorOutline as ErrorOutlineIcon,
-  AccountTree as AccountTreeIcon
+  AccountTree as AccountTreeIcon,
+  Visibility as ViewIcon
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
 import AsinBulkAddDialog from '../../components/AsinBulkAddDialog.jsx';
 import AsinCsvImportDialog from '../../components/AsinCsvImportDialog.jsx';
 import AsinExportDialog from '../../components/AsinExportDialog.jsx';
 import AsinListManagerDialog from '../../components/AsinListManagerDialog.jsx';
+import AsinDetailDialog from '../../components/AsinDetailDialog.jsx';
 import { generateCsvContent, downloadCsv } from '../../utils/asinDirectoryUtils.js';
 
 export default function AsinDirectoryPage() {
@@ -58,6 +60,7 @@ export default function AsinDirectoryPage() {
   const [csvImportDialog, setCsvImportDialog] = useState(false);
   const [exportDialog, setExportDialog] = useState(false);
   const [listManagerDialog, setListManagerDialog] = useState(false);
+  const [viewAsin, setViewAsin] = useState(null);
 
   useEffect(() => {
     fetchAsins();
@@ -293,7 +296,7 @@ export default function AsinDirectoryPage() {
                 <TableCell sx={{ fontWeight: 'bold' }}>ASIN</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: 90 }}>Price</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold', width: 60 }}>Actions</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', width: 90 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -400,6 +403,14 @@ export default function AsinDirectoryPage() {
 
                     {/* Delete */}
                     <TableCell align="right">
+                      <Tooltip title="View details">
+                        <IconButton
+                          size="small"
+                          onClick={() => setViewAsin(item)}
+                        >
+                          <ViewIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       <IconButton
                         size="small"
                         color="error"
@@ -473,6 +484,12 @@ export default function AsinDirectoryPage() {
       <AsinListManagerDialog
         open={listManagerDialog}
         onClose={() => setListManagerDialog(false)}
+      />
+
+      <AsinDetailDialog
+        open={!!viewAsin}
+        onClose={() => setViewAsin(null)}
+        asin={viewAsin}
       />
     </Box>
   );
