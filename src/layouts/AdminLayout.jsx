@@ -130,6 +130,10 @@ import AttendanceAdminPage from '../pages/admin/AttendanceAdminPage.jsx';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import AsinDirectoryPage from '../pages/admin/AsinDirectoryPage.jsx';
 import AsinListPage from '../pages/admin/AsinListPage.jsx';
+import UserSellerAssignmentPage from '../pages/admin/UserSellerAssignmentPage.jsx';
+import UserPerformancePage from '../pages/admin/UserPerformancePage.jsx';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 const drawerWidth = 230;
 
@@ -1371,6 +1375,40 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
+        {/* User-Seller Assignments - superadmin, hradmin, hr */}
+        {(isSuper || isHRAdmin || user?.role === 'hr') && (
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/admin/user-seller-assignments"
+              onClick={() => setMobileOpen(false)}
+              selected={location.pathname === '/admin/user-seller-assignments'}
+              sx={selectedMenuItemStyle}
+            >
+              <ListItemIcon>
+                <NavIcon icon={AssignmentIcon} label="User-Seller Assignments" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
+              {sidebarOpen && <ListItemText primary="User-Seller Assignments" />}
+            </ListItemButton>
+          </ListItem>
+        )}
+
+        {/* User Performance - visible to ALL users */}
+        <ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            to="/admin/user-performance"
+            onClick={() => setMobileOpen(false)}
+            selected={location.pathname === '/admin/user-performance'}
+            sx={selectedMenuItemStyle}
+          >
+            <ListItemIcon>
+              <NavIcon icon={TrendingUpIcon} label={isSuper || isHRAdmin || user?.role === 'hr' ? "User Performance Log" : "My Performance"} sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
+            {sidebarOpen && <ListItemText primary={isSuper || isHRAdmin || user?.role === 'hr' ? "User Performance Log" : "My Performance"} />}
+          </ListItemButton>
+        </ListItem>
+
         {/* Leave Management - visible to ALL users for applying leaves */}
         {(!isSuper) && (<ListItem disablePadding>
           <ListItemButton
@@ -1650,6 +1688,12 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/internal-messages-admin" element={<InternalMessagesAdminPage />} />
               <Route path="/attendance" element={<AttendanceAdminPage />} />
             </>
+          )}
+
+          {/* User Performance and Assignments */}
+          <Route path="/user-performance" element={<UserPerformancePage />} />
+          {(isSuper || isHRAdmin || user?.role === 'hr') && (
+            <Route path="/user-seller-assignments" element={<UserSellerAssignmentPage />} />
           )}
 
           {/* UPDATED DEFAULT REDIRECT */}
