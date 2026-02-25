@@ -197,16 +197,22 @@ export default function AsinReviewModal({
     const asin = currentItem.asin;
     const amazonUrl = `https://www.amazon.com/dp/${asin}`;
     
-    // Calculate window position - right side of screen
-    const width = 900;
-    const height = window.screen.height - 100;
-    const left = window.screen.width - width - 20;
-    const top = 20;
+    const halfWidth = Math.floor(window.screen.width / 2);
+    const screenHeight = window.screen.height;
+
+    // Move the main browser window to the right half
+    try {
+      window.moveTo(halfWidth, 0);
+      window.resizeTo(halfWidth, screenHeight);
+    } catch (e) {
+      // Silently ignore — not permitted for regular browser tabs
+    }
     
+    // Open Amazon popup on the left half
     const windowRef = window.open(
       amazonUrl,
       'AmazonPreview',
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,location=yes`
+      `width=${halfWidth},height=${screenHeight},left=0,top=0,resizable=yes,scrollbars=yes,location=yes`
     );
     
     if (windowRef) {
@@ -223,6 +229,14 @@ export default function AsinReviewModal({
     }
     setAmazonWindowRef(null);
     setShowAmazonPreview(false);
+
+    // Restore main window to full screen
+    try {
+      window.moveTo(0, 0);
+      window.resizeTo(window.screen.width, window.screen.height);
+    } catch (e) {
+      // Silently ignore
+    }
   };
 
   const toggleAmazonPreview = () => {
@@ -295,31 +309,47 @@ export default function AsinReviewModal({
       open={open} 
       onClose={handleClose}
       maxWidth={false}
-      fullScreen
+      fullScreen={!showAmazonPreview}
       PaperProps={{
-        sx: { 
-          bgcolor: '#f5f5f5',
-          height: '100vh'
-        }
+        sx: showAmazonPreview
+          ? {
+              position: 'fixed',
+              right: 0,
+              top: 0,
+              width: '50vw',
+              height: '100vh',
+              maxHeight: '100vh',
+              m: 0,
+              borderRadius: 0,
+              bgcolor: '#f5f5f5'
+            }
+          : {
+              bgcolor: '#f5f5f5',
+              height: '100vh'
+            }
       }}
     >
       <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <Box sx={{ 
           bgcolor: 'white', 
-          p: 2, 
+          p: showAmazonPreview ? 1 : 2, 
           borderBottom: 1, 
           borderColor: 'divider',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          flexWrap: showAmazonPreview ? 'wrap' : 'nowrap',
+          gap: showAmazonPreview ? 0.5 : 0
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h6">
-              Review Generated Listings
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: showAmazonPreview ? 0.5 : 2, flexWrap: 'wrap' }}>
+            {!showAmazonPreview && (
+              <Typography variant="h6">
+                Review Generated Listings
+              </Typography>
+            )}
             <Chip 
-              label={`${currentIndex + 1} of ${activeItems.length}`}
+              label={`${currentIndex + 1} / ${activeItems.length}`}
               color="primary"
               size="small"
             />
@@ -339,41 +369,71 @@ export default function AsinReviewModal({
             />
           </Box>
           
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
             <Button
               variant={showAmazonPreview ? "contained" : "outlined"}
               onClick={toggleAmazonPreview}
               size="small"
-              sx={{ whiteSpace: 'nowrap' }}
+              sx={{ whiteSpace: 'nowrap', fontSize: showAmazonPreview ? '0.7rem' : undefined }}
             >
-              {showAmazonPreview ? '✓ Amazon Preview' : 'View on Amazon'}
+              {showAmazonPreview ? '✓ Split' : 'Split View Amazon'}
             </Button>
+
+            {showAmazonPreview && (
+              <Button
+                variant="outlined"
+                size="small"
+                sx={{ whiteSpace: 'nowrap', fontSize: '0.7rem' }}
+                onClick={() => {
+                  if (amazonWindowRef && !amazonWindowRef.closed) {
+                    amazonWindowRef.focus();
+                  }
+                }}
+              >
+                ↗ Amazon
+              </Button>
+            )}
             
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={handleDismiss}
-              disabled={!currentItem || activeItems.length === 0}
-            >
-              Dismiss
-            </Button>
+            {showAmazonPreview ? (
+              <IconButton
+                color="error"
+                size="small"
+                onClick={handleDismiss}
+                disabled={!currentItem || activeItems.length === 0}
+                title="Dismiss"
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            ) : (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={handleDismiss}
+                disabled={!currentItem || activeItems.length === 0}
+                size="small"
+              >
+                Dismiss
+              </Button>
+            )}
             <Button
               variant="contained"
-              startIcon={<SaveIcon />}
+              startIcon={showAmazonPreview ? null : <SaveIcon />}
               onClick={handleSaveAll}
+              size="small"
               disabled={saving || activeItems.every(i => ['error', 'loading', 'blocked'].includes(i.status))}
+              sx={{ fontSize: showAmazonPreview ? '0.7rem' : undefined, whiteSpace: 'nowrap' }}
             >
               {saving ? 'Saving...' : `Save All (${activeItems.filter(i => !['error', 'loading', 'blocked'].includes(i.status)).length})`}
             </Button>
-            <IconButton onClick={handleClose}>
-              <CloseIcon />
+            <IconButton onClick={handleClose} size="small">
+              <CloseIcon fontSize={showAmazonPreview ? 'small' : 'medium'} />
             </IconButton>
           </Box>
         </Box>
 
         {/* Progress Bar */}
-        <Box sx={{ bgcolor: 'white', px: 2, pb: 1 }}>
+        <Box sx={{ bgcolor: 'white', px: showAmazonPreview ? 1 : 2, pb: 1 }}>
           <LinearProgress 
             variant="determinate" 
             value={activeItems.length > 0 ? ((currentIndex + 1) / activeItems.length) * 100 : 0}
@@ -383,7 +443,7 @@ export default function AsinReviewModal({
 
         {/* Duplicate Notification */}
         {currentItem?.status === 'duplicate_updateable' && (
-          <Box sx={{ px: 2, pt: 2 }}>
+          <Box sx={{ px: showAmazonPreview ? 1 : 2, pt: showAmazonPreview ? 1 : 2 }}>
             <Alert severity="info" sx={{ mb: 1 }}>
               <Stack spacing={0.5}>
                 <Typography variant="body2" fontWeight="bold">
@@ -404,7 +464,7 @@ export default function AsinReviewModal({
 
         {/* Warnings/Errors (exclude duplicate_updateable warnings since shown above) */}
         {(currentItem.warnings?.length > 0 || currentItem.errors?.length > 0) && currentItem?.status !== 'duplicate_updateable' && (
-          <Box sx={{ px: 2, pt: 2 }}>
+          <Box sx={{ px: showAmazonPreview ? 1 : 2, pt: showAmazonPreview ? 1 : 2 }}>
             {currentItem.errors?.map((error, idx) => (
               <Alert key={idx} severity="error" sx={{ mb: 1 }}>
                 {error}
@@ -422,16 +482,17 @@ export default function AsinReviewModal({
         <Box sx={{ 
           flex: 1, 
           display: 'flex', 
-          gap: 2, 
-          p: 2, 
+          gap: showAmazonPreview ? 0 : 2, 
+          p: showAmazonPreview ? 0.5 : 2, 
           overflow: 'hidden'
         }}>
-          {/* Right Panel - Amazon Source Data */}
+          {/* Left Panel - Amazon Source Data (hidden in split view mode) */}
           <Paper sx={{ 
             width: '40%', 
             p: 2, 
             overflow: 'auto',
-            bgcolor: '#fafafa'
+            bgcolor: '#fafafa',
+            display: showAmazonPreview ? 'none' : undefined
           }}>
             <Typography variant="h6" gutterBottom>
               Amazon Product Data
@@ -620,10 +681,10 @@ export default function AsinReviewModal({
             )}
           </Paper>
 
-          {/* Left Panel - Generated Listing (Editable) */}
+          {/* Right Panel - Generated Listing (Editable) */}
           <Paper sx={{ 
-            width: '60%', 
-            p: 2, 
+            width: showAmazonPreview ? '100%' : '60%', 
+            p: showAmazonPreview ? 1.5 : 2, 
             overflow: 'auto'
           }}>
             <Typography variant="h6" gutterBottom>
@@ -811,7 +872,7 @@ export default function AsinReviewModal({
         {/* Footer - Navigation */}
         <Box sx={{ 
           bgcolor: 'white', 
-          p: 2, 
+          p: showAmazonPreview ? 1 : 2, 
           borderTop: 1, 
           borderColor: 'divider',
           display: 'flex',
@@ -822,18 +883,20 @@ export default function AsinReviewModal({
             startIcon={<PrevIcon />}
             onClick={handlePrevious}
             disabled={currentIndex === 0}
+            size={showAmazonPreview ? 'small' : 'medium'}
           >
-            Previous
+            {showAmazonPreview ? 'Prev' : 'Previous'}
           </Button>
           
-          <Typography variant="body2" color="text.secondary">
-            Use arrow keys to navigate
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: showAmazonPreview ? '0.7rem' : undefined }}>
+            {showAmazonPreview ? '← →' : 'Use arrow keys to navigate'}
           </Typography>
           
           <Button
             endIcon={<NextIcon />}
             onClick={handleNext}
             disabled={currentIndex === activeItems.length - 1}
+            size={showAmazonPreview ? 'small' : 'medium'}
           >
             Next
           </Button>
