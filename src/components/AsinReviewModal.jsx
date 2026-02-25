@@ -17,8 +17,13 @@ import {
   Skeleton,
   CircularProgress,
   ToggleButtonGroup,
-  ToggleButton
+  ToggleButton,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from '@mui/material';
+import { DESCRIPTION_FOOTER_TEMPLATES, FOOTER_SENTINEL_START, FOOTER_SENTINEL_END } from '../constants/descriptionFooterTemplates';
 import {
   Close as CloseIcon,
   NavigateBefore as PrevIcon,
@@ -49,6 +54,7 @@ export default function AsinReviewModal({
   const [descriptionViewMode, setDescriptionViewMode] = useState('preview'); // 'code' | 'preview'
   const [amazonWindowRef, setAmazonWindowRef] = useState(null);
   const [showAmazonPreview, setShowAmazonPreview] = useState(false);
+  const [appliedDescTemplates, setAppliedDescTemplates] = useState({}); // { [itemId]: templateKey | '' }
 
   // Filter out dismissed items
   const activeItems = previewItems.filter(item => !dismissedItems.has(item.id));
@@ -158,6 +164,29 @@ export default function AsinReviewModal({
       [currentItem.id]: updatedItem
     }));
     
+    setHasUnsavedChanges(true);
+  };
+
+  const applyDescTemplate = (itemId, templateKey) => {
+    const currentDesc = (editedItems[itemId] || currentItem?.generatedListing || {}).description || '';
+    // Strip any existing footer using sentinel comments
+    const baseDesc = currentDesc.includes(FOOTER_SENTINEL_START)
+      ? currentDesc.slice(0, currentDesc.indexOf(FOOTER_SENTINEL_START)).trimEnd()
+      : currentDesc;
+
+    let newDesc;
+    if (!templateKey) {
+      newDesc = baseDesc;
+    } else {
+      const template = DESCRIPTION_FOOTER_TEMPLATES.find(t => t.key === templateKey);
+      newDesc = baseDesc + '\n' + FOOTER_SENTINEL_START + '\n' + template.html + '\n' + FOOTER_SENTINEL_END;
+    }
+
+    setEditedItems(prev => ({
+      ...prev,
+      [itemId]: { ...(prev[itemId] || currentItem?.generatedListing || {}), description: newDesc }
+    }));
+    setAppliedDescTemplates(prev => ({ ...prev, [itemId]: templateKey }));
     setHasUnsavedChanges(true);
   };
 
@@ -747,6 +776,21 @@ export default function AsinReviewModal({
                             </ToggleButton>
                           </ToggleButtonGroup>
                         </Box>
+
+                        {/* Footer Template Dropdown */}
+                        <FormControl size="small" sx={{ mb: 1.5, width: 280 }}>
+                          <InputLabel>Append Footer Template</InputLabel>
+                          <Select
+                            value={appliedDescTemplates[currentItem?.id] || ''}
+                            label="Append Footer Template"
+                            onChange={(e) => applyDescTemplate(currentItem.id, e.target.value)}
+                          >
+                            <MenuItem value=""><em>— No Footer —</em></MenuItem>
+                            {DESCRIPTION_FOOTER_TEMPLATES.map(t => (
+                              <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
 
                         {/* Content Area */}
                         {descriptionViewMode === 'code' ? (
