@@ -41,6 +41,12 @@ const UserSellerAssignmentPage = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const [dailyTarget, setDailyTarget] = useState(0);
+
+    const [openEditDialog, setOpenEditDialog] = useState(false);
+    const [editAssignmentId, setEditAssignmentId] = useState('');
+    const [editDailyTarget, setEditDailyTarget] = useState(0);
+
     useEffect(() => {
         fetchAssignments();
         fetchUsersAndSellers();
@@ -79,14 +85,38 @@ const UserSellerAssignmentPage = () => {
         try {
             await api.post('/user-sellers/assignments', {
                 userId: selectedUser,
-                sellerId: selectedSeller
+                sellerId: selectedSeller,
+                dailyTarget: Number(dailyTarget)
             });
             setOpenDialog(false);
             setSelectedUser('');
             setSelectedSeller('');
+            setDailyTarget(0);
             fetchAssignments();
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to create assignment');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEditTargetSubmit = async () => {
+        if (editDailyTarget === '' || isNaN(editDailyTarget)) {
+            setError('Please enter a valid daily target');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        try {
+            await api.patch(`/user-sellers/assignments/${editAssignmentId}/target`, {
+                dailyTarget: Number(editDailyTarget)
+            });
+            setOpenEditDialog(false);
+            setEditAssignmentId('');
+            setEditDailyTarget(0);
+            fetchAssignments();
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to update target');
         } finally {
             setLoading(false);
         }
@@ -126,7 +156,10 @@ const UserSellerAssignmentPage = () => {
                         variant="contained"
                         color="primary"
                         startIcon={<AddIcon />}
-                        onClick={() => setOpenDialog(true)}
+                        onClick={() => {
+                            setOpenDialog(true);
+                            setError('');
+                        }}
                     >
                         New Assignment
                     </Button>
@@ -142,13 +175,14 @@ const UserSellerAssignmentPage = () => {
                             <TableCell>User</TableCell>
                             <TableCell>Department</TableCell>
                             <TableCell>Seller / Store</TableCell>
+                            <TableCell align="center">Daily Target</TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {assignments.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={4} align="center">No assignments found</TableCell>
+                                <TableCell colSpan={5} align="center">No assignments found</TableCell>
                             </TableRow>
                         ) : (
                             assignments.map((assignment) => (
@@ -157,6 +191,21 @@ const UserSellerAssignmentPage = () => {
                                     <TableCell>{assignment.user?.department || '-'}</TableCell>
                                     <TableCell>
                                         {assignment.seller?.user?.username || assignment.seller?.storeName || assignment.seller?._id}
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        {assignment.dailyTarget || 0}
+                                        <Button
+                                            size="small"
+                                            sx={{ ml: 1, minWidth: 'auto', p: '2px 8px' }}
+                                            onClick={() => {
+                                                setEditAssignmentId(assignment._id);
+                                                setEditDailyTarget(assignment.dailyTarget || 0);
+                                                setError('');
+                                                setOpenEditDialog(true);
+                                            }}
+                                        >
+                                            Edit
+                                        </Button>
                                     </TableCell>
                                     <TableCell align="right">
                                         <IconButton color="error" onClick={() => handleDelete(assignment._id)}>
@@ -189,7 +238,7 @@ const UserSellerAssignmentPage = () => {
                             ))}
                         </Select>
                     </FormControl>
-                    <FormControl fullWidth sx={{ mt: 3 }}>
+                    <FormControl fullWidth sx={{ mt: 3, mb: 2 }}>
                         <InputLabel>Select Seller</InputLabel>
                         <Select
                             value={selectedSeller}
@@ -203,11 +252,57 @@ const UserSellerAssignmentPage = () => {
                             ))}
                         </Select>
                     </FormControl>
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                        <label style={{ fontSize: '0.8rem', color: 'rgba(0, 0, 0, 0.6)', marginBottom: '8px' }}>Daily Target</label>
+                        <input
+                            type="number"
+                            value={dailyTarget}
+                            onChange={(e) => setDailyTarget(e.target.value)}
+                            style={{
+                                padding: '16.5px 14px',
+                                border: '1px solid rgba(0, 0, 0, 0.23)',
+                                borderRadius: '4px',
+                                fontSize: '1rem',
+                                color: 'rgba(0, 0, 0, 0.87)'
+                            }}
+                            min="0"
+                        />
+                    </FormControl>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
                     <Button onClick={handleAssign} variant="contained" disabled={loading}>
                         Assign
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Edit Target Dialog */}
+            <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Edit Daily Target</DialogTitle>
+                <DialogContent>
+                    {error && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{error}</Alert>}
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                        <label style={{ fontSize: '0.8rem', color: 'rgba(0, 0, 0, 0.6)', marginBottom: '8px' }}>Daily Target</label>
+                        <input
+                            type="number"
+                            value={editDailyTarget}
+                            onChange={(e) => setEditDailyTarget(e.target.value)}
+                            style={{
+                                padding: '16.5px 14px',
+                                border: '1px solid rgba(0, 0, 0, 0.23)',
+                                borderRadius: '4px',
+                                fontSize: '1rem',
+                                color: 'rgba(0, 0, 0, 0.87)'
+                            }}
+                            min="0"
+                        />
+                    </FormControl>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenEditDialog(false)}>Cancel</Button>
+                    <Button onClick={handleEditTargetSubmit} variant="contained" disabled={loading}>
+                        Save Target
                     </Button>
                 </DialogActions>
             </Dialog>
