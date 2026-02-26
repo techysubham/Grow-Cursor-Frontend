@@ -24,7 +24,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Divider
+  Divider,
+  Chip
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -586,11 +587,14 @@ export default function AsinListPage() {
                           </Typography>
                         </TableCell>
 
-                        {/* Count — row number placeholder */}
+                        {/* Count — total times this ASIN has been listed */}
                         <TableCell align="center">
-                          <Typography variant="body2">
-                            {page * rowsPerPage + idx + 1}
-                          </Typography>
+                          <Chip
+                            label={asin.listingCount || 0}
+                            size="small"
+                            color={asin.listingCount > 0 ? 'primary' : 'default'}
+                            variant={asin.listingCount > 0 ? 'filled' : 'outlined'}
+                          />
                         </TableCell>
 
                         {/* Orders — placeholder */}
