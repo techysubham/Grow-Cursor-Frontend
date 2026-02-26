@@ -80,6 +80,7 @@ import RangeAnalyzerPage from '../pages/admin/RangeAnalyzerPage.jsx';
 import FeedUploadPage from '../pages/ebay/FeedUploadPage.jsx';
 import SellingPrivilegesPage from '../pages/admin/SellingPrivilegesPage.jsx';
 import EbayApiUsagePage from '../pages/admin/EbayApiUsagePage.jsx';
+import SalaryPage from '../pages/admin/SalaryPage.jsx';
 
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -1375,6 +1376,24 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
+        {/* Salary Page - superadmin only */}
+        {isSuper && (
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/admin/salary"
+              onClick={() => setMobileOpen(false)}
+              selected={location.pathname === '/admin/salary'}
+              sx={selectedMenuItemStyle}
+            >
+              <ListItemIcon>
+                <NavIcon icon={AttachMoneyIcon} label="Salary Page" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
+              {sidebarOpen && <ListItemText primary="Salary Page" />}
+            </ListItemButton>
+          </ListItem>
+        )}
+
         {/* User-Seller Assignments - superadmin, hradmin, hr */}
         {(isSuper || isHRAdmin || user?.role === 'hr') && (
           <ListItem disablePadding>
@@ -1602,6 +1621,7 @@ export default function AdminLayout({ user, onLogout }) {
                 <Route path="/extra-expenses" element={<ExtraExpensePage />} />
                 <Route path="/manage-templates" element={<ManageTemplatesPage />} />
                 <Route path="/listings-database" element={<TemplateDatabasePage />} />
+                <Route path="/salary" element={<SalaryPage />} />
               </>
             </>
           )}
