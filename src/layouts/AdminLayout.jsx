@@ -365,6 +365,15 @@ export default function AdminLayout({ user, onLogout }) {
                   >
                     <ListItemText primary="Credit Card Names" />
                   </ListItemButton>
+                  <ListItemButton
+                    component={Link}
+                    to="/admin/salary"
+                    onClick={() => setMobileOpen(false)}
+                    selected={location.pathname === '/admin/salary'}
+                    sx={selectedMenuItemStyle}
+                  >
+                    <ListItemText primary="Salary Page" />
+                  </ListItemButton>
                 </List>
               </Collapse>
             )}
@@ -396,6 +405,9 @@ export default function AdminLayout({ user, onLogout }) {
               </MenuItem>
               <MenuItem component={Link} to="/admin/credit-card-names" onClick={() => setFinanceAnchorEl(null)}>
                 Credit Card Names
+              </MenuItem>
+              <MenuItem component={Link} to="/admin/salary" onClick={() => setFinanceAnchorEl(null)}>
+                Salary Page
               </MenuItem>
             </Menu>
 
@@ -1376,23 +1388,6 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
-        {/* Salary Page - superadmin only */}
-        {isSuper && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/salary"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/salary'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon>
-                <NavIcon icon={AttachMoneyIcon} label="Salary Page" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Salary Page" />}
-            </ListItemButton>
-          </ListItem>
-        )}
 
         {/* User-Seller Assignments - superadmin, hradmin, hr */}
         {(isSuper || isHRAdmin || user?.role === 'hr') && (
