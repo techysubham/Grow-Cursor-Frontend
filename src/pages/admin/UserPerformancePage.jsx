@@ -129,6 +129,7 @@ const UserPerformancePage = () => {
                             <TableCell>Date</TableCell>
                             <TableCell>User</TableCell>
                             <TableCell>Seller</TableCell>
+                            <TableCell align="center">Target Quantity</TableCell>
                             <TableCell align="center">Completed Quantity</TableCell>
                             <TableCell>Remarks</TableCell>
                         </TableRow>
@@ -136,7 +137,7 @@ const UserPerformancePage = () => {
                     <TableBody>
                         {records.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} align="center">No performance records found</TableCell>
+                                <TableCell colSpan={6} align="center">No performance records found</TableCell>
                             </TableRow>
                         ) : (
                             records.map((r) => (
@@ -144,6 +145,7 @@ const UserPerformancePage = () => {
                                     <TableCell>{r.dateString}</TableCell>
                                     <TableCell>{r.user?.username}</TableCell>
                                     <TableCell>{r.seller?.user?.username || r.seller?.storeName || r.seller?._id}</TableCell>
+                                    <TableCell align="center">{r.targetQuantity || 0}</TableCell>
                                     <TableCell align="center">{r.quantity}</TableCell>
                                     <TableCell>
                                         {canManageRemarks ? (
