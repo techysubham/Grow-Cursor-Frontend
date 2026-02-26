@@ -15,6 +15,7 @@ import MessageReceivedPage from './pages/admin/MessageReceivedPage.jsx';
 import PayoneerSheetPage from './pages/admin/PayoneerSheetPage.jsx';
 import BankAccountsPage from './pages/admin/BankAccountsPage.jsx';
 import TransactionPage from './pages/admin/TransactionPage.jsx';
+import SalaryPage from './pages/admin/SalaryPage.jsx';
 import IdeasPage from './pages/IdeasPage.jsx';
 
 import { setAuthToken } from './lib/api'
