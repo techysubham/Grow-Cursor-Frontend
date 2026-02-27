@@ -4,8 +4,10 @@ import {
   Button, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, IconButton, TextField, Grid, Chip, Divider, FormControl,
   InputLabel, Select, MenuItem, Snackbar, Alert, Pagination, OutlinedInput, Checkbox, ListItemText,
-  Autocomplete, InputAdornment, Tooltip, Switch, FormControlLabel
+  Autocomplete, InputAdornment, Tooltip, Switch, FormControlLabel, Collapse
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
@@ -90,15 +92,19 @@ export default function CompatibilityDashboard() {
   const [makeOptions, setMakeOptions] = useState([]);
   const [modelOptions, setModelOptions] = useState([]);
   const [yearOptions, setYearOptions] = useState([]); // Dynamic Years
+  const [trimsByYear, setTrimsByYear] = useState({}); // { "2023": ["Trim1", "Trim2"], ... }
 
   const [loadingMakes, setLoadingMakes] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [loadingYears, setLoadingYears] = useState(false);
+  const [loadingTrims, setLoadingTrims] = useState(false);
 
   // Selection
   const [selectedMake, setSelectedMake] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedYears, setSelectedYears] = useState([]);
+  const [selectedTrimsByYear, setSelectedTrimsByYear] = useState({}); // { "2023": ["Trim1"], ... }
+  const [expandedYears, setExpandedYears] = useState({});
   const [startYear, setStartYear] = useState('');
   const [endYear, setEndYear] = useState('');
   const [newNotes, setNewNotes] = useState('');
@@ -145,6 +151,9 @@ export default function CompatibilityDashboard() {
         setSelectedMake(null);
         setSelectedModel(null);
         setSelectedYears([]);
+        setSelectedTrimsByYear({});
+        setTrimsByYear({});
+        setExpandedYears({});
         setStartYear('');
         setEndYear('');
         setNewNotes('');
@@ -156,6 +165,9 @@ export default function CompatibilityDashboard() {
         setSelectedMake(null);
         setSelectedModel(null);
         setSelectedYears([]);
+        setSelectedTrimsByYear({});
+        setTrimsByYear({});
+        setExpandedYears({});
         setStartYear('');
         setEndYear('');
         setNewNotes('');
@@ -234,6 +246,9 @@ export default function CompatibilityDashboard() {
     setSelectedModel(null);
     setYearOptions([]);
     setSelectedYears([]);
+    setTrimsByYear({});
+    setSelectedTrimsByYear({});
+    setExpandedYears({});
     try {
       const { data } = await api.post('/ebay/compatibility/values', {
         sellerId: currentSellerId,
@@ -268,7 +283,54 @@ export default function CompatibilityDashboard() {
     finally { setLoadingYears(false); }
   };
 
+  const fetchTrims = async (makeVal, modelVal, years) => {
+    if (!makeVal || !modelVal || !years || years.length === 0) {
+      setTrimsByYear({});
+      setSelectedTrimsByYear({});
+      return;
+    }
+    setLoadingTrims(true);
+    setTrimsByYear({});
+    setSelectedTrimsByYear({});
+    try {
+      // Fetch trims for each selected year in parallel (eBay returns different trims per year)
+      const promises = years.map(year =>
+        api.post('/ebay/compatibility/values', {
+          sellerId: currentSellerId,
+          propertyName: 'Trim',
+          constraints: [
+            { name: 'Make', value: makeVal },
+            { name: 'Model', value: modelVal },
+            { name: 'Year', value: year }
+          ]
+        }).then(res => ({ year, trims: (res.data.values || []).sort() })).catch(() => ({ year, trims: [] }))
+      );
+      const results = await Promise.all(promises);
+      // Store trims grouped by year
+      const byYear = {};
+      results.forEach(({ year, trims }) => {
+        if (trims.length > 0) byYear[year] = trims;
+      });
+      setTrimsByYear(byYear);
+      // Auto-expand all years
+      const expanded = {};
+      Object.keys(byYear).forEach(y => { expanded[y] = true; });
+      setExpandedYears(expanded);
+    } catch (e) { console.error(e); }
+    finally { setLoadingTrims(false); }
+  };
+
   // --- HANDLERS ---
+
+  // Auto-fetch trims when selected years change
+  useEffect(() => {
+    if (selectedMake && selectedModel && selectedYears.length > 0) {
+      fetchTrims(selectedMake, selectedModel, selectedYears);
+    } else {
+      setTrimsByYear({});
+      setSelectedTrimsByYear({});
+    }
+  }, [selectedYears, selectedMake, selectedModel]);
 
   const handleEditClick = (item, index) => {
     setSelectedItem(item);
@@ -278,6 +340,9 @@ export default function CompatibilityDashboard() {
     setSelectedMake(null);
     setSelectedModel(null);
     setSelectedYears([]);
+    setSelectedTrimsByYear({});
+    setTrimsByYear({});
+    setExpandedYears({});
     setStartYear('');
     setEndYear('');
     setNewNotes('');
@@ -286,16 +351,24 @@ export default function CompatibilityDashboard() {
 
   const handleAddVehicle = () => {
     if (!selectedMake || !selectedModel || selectedYears.length === 0) return;
-    const newEntries = selectedYears.map(year => ({
-      notes: newNotes,
-      nameValueList: [
-        { name: 'Year', value: year },
-        { name: 'Make', value: selectedMake },
-        { name: 'Model', value: selectedModel }
-      ]
-    }));
+    const newEntries = [];
+    // Check if any trims are selected across any year
+    const hasAnyTrimsSelected = Object.values(selectedTrimsByYear).some(arr => arr && arr.length > 0);
+    for (const year of selectedYears) {
+      const yearTrims = (hasAnyTrimsSelected && selectedTrimsByYear[year]?.length > 0) ? selectedTrimsByYear[year] : [null];
+      for (const trim of yearTrims) {
+        const nameValueList = [
+          { name: 'Year', value: year },
+          { name: 'Make', value: selectedMake },
+          { name: 'Model', value: selectedModel }
+        ];
+        if (trim) nameValueList.push({ name: 'Trim', value: trim });
+        newEntries.push({ notes: newNotes, nameValueList });
+      }
+    }
     setEditCompatList([...newEntries, ...editCompatList]);
     setSelectedYears([]);
+    setSelectedTrimsByYear({});
     setStartYear('');
     setEndYear('');
     setNewNotes('');
@@ -433,6 +506,9 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
         setSelectedMake(null);
         setSelectedModel(null);
         setSelectedYears([]);
+        setSelectedTrimsByYear({});
+        setTrimsByYear({});
+        setExpandedYears({});
         setStartYear('');
         setEndYear('');
         setNewNotes('');
@@ -460,6 +536,9 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       setSelectedMake(null);
       setSelectedModel(null);
       setSelectedYears([]);
+      setSelectedTrimsByYear({});
+      setTrimsByYear({});
+      setExpandedYears({});
       setStartYear('');
       setEndYear('');
       setNewNotes('');
@@ -479,6 +558,9 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       setSelectedMake(null);
       setSelectedModel(null);
       setSelectedYears([]);
+      setSelectedTrimsByYear({});
+      setTrimsByYear({});
+      setExpandedYears({});
       setStartYear('');
       setEndYear('');
       setNewNotes('');
@@ -773,7 +855,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 <Autocomplete
                   options={modelOptions}
                   value={selectedModel}
-                  onChange={(e, val) => { setSelectedModel(val); if (val) fetchYears(selectedMake, val); }}
+                  onChange={(e, val) => { setSelectedModel(val); if (val) { fetchYears(selectedMake, val); } else { setTrimsByYear({}); setSelectedTrimsByYear({}); setExpandedYears({}); } }}
                   loading={loadingModels}
                   disabled={!selectedMake}
                   renderInput={(params) => <TextField {...params} label="Model" size="small" />}
@@ -865,6 +947,133 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                   )}
                 </Box>
               </Grid>
+              {/* TRIM PER-YEAR SECTIONS */}
+              {selectedModel && Object.keys(trimsByYear).length > 0 && (() => {
+                const totalTrims = Object.values(trimsByYear).reduce((sum, arr) => sum + arr.length, 0);
+                const totalSelected = Object.values(selectedTrimsByYear).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+                const allSelected = totalSelected === totalTrims && totalTrims > 0;
+                return (
+                  <Grid item xs={12}>
+                    <Box sx={{ border: '1px solid #e0e0e0', borderRadius: 1, bgcolor: '#fafafa' }}>
+                      {/* Header */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderBottom: '1px solid #e0e0e0' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Checkbox
+                            size="small"
+                            checked={allSelected}
+                            indeterminate={totalSelected > 0 && !allSelected}
+                            onChange={() => {
+                              if (allSelected) {
+                                setSelectedTrimsByYear({});
+                              } else {
+                                const all = {};
+                                Object.entries(trimsByYear).forEach(([y, trims]) => { all[y] = [...trims]; });
+                                setSelectedTrimsByYear(all);
+                              }
+                            }}
+                          />
+                          <Typography variant="body2" fontWeight="bold">
+                            Select all {totalTrims} vehicle trims
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" color="textSecondary">
+                          {totalSelected} selected
+                        </Typography>
+                      </Box>
+                      {/* Year rows */}
+                      <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+                        {selectedYears
+                          .sort((a, b) => Number(b) - Number(a))
+                          .filter(year => trimsByYear[year] && trimsByYear[year].length > 0)
+                          .map(year => {
+                            const yearTrims = trimsByYear[year] || [];
+                            const yearSelected = selectedTrimsByYear[year] || [];
+                            const isExpanded = expandedYears[year] || false;
+                            const allYearSelected = yearSelected.length === yearTrims.length && yearTrims.length > 0;
+                            return (
+                              <Box key={year}>
+                                {/* Year header row */}
+                                <Box
+                                  sx={{
+                                    display: 'flex', alignItems: 'center', px: 1.5, py: 1,
+                                    borderBottom: '1px solid #f0f0f0', cursor: 'pointer',
+                                    '&:hover': { bgcolor: '#f5f5f5' },
+                                    bgcolor: isExpanded ? '#f0f0f0' : 'transparent'
+                                  }}
+                                  onClick={() => setExpandedYears(prev => ({ ...prev, [year]: !prev[year] }))}
+                                >
+                                  <IconButton size="small" sx={{ mr: 0.5 }}>
+                                    {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                                  </IconButton>
+                                  <Checkbox
+                                    size="small"
+                                    checked={allYearSelected}
+                                    indeterminate={yearSelected.length > 0 && !allYearSelected}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => {
+                                      setSelectedTrimsByYear(prev => ({
+                                        ...prev,
+                                        [year]: allYearSelected ? [] : [...yearTrims]
+                                      }));
+                                    }}
+                                    sx={{ mr: 1 }}
+                                  />
+                                  <Typography variant="body2" fontWeight="bold" sx={{ flex: 1 }}>
+                                    {selectedMake} {selectedModel} {year}
+                                  </Typography>
+                                  <Typography variant="caption" color="textSecondary">
+                                    {yearTrims.length} available
+                                  </Typography>
+                                </Box>
+                                {/* Expanded trim list */}
+                                <Collapse in={isExpanded}>
+                                  <Box sx={{ pl: 6 }}>
+                                    {yearTrims.map(trim => (
+                                      <Box
+                                        key={`${year}-${trim}`}
+                                        sx={{
+                                          display: 'flex', alignItems: 'center', py: 0.5, px: 1,
+                                          borderBottom: '1px solid #f8f8f8',
+                                          '&:hover': { bgcolor: '#fafafa' }
+                                        }}
+                                      >
+                                        <Checkbox
+                                          size="small"
+                                          checked={yearSelected.includes(trim)}
+                                          onChange={() => {
+                                            setSelectedTrimsByYear(prev => {
+                                              const current = prev[year] || [];
+                                              const updated = current.includes(trim)
+                                                ? current.filter(t => t !== trim)
+                                                : [...current, trim];
+                                              return { ...prev, [year]: updated };
+                                            });
+                                          }}
+                                          sx={{ mr: 1, p: 0.25 }}
+                                        />
+                                        <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                                          {trim}
+                                        </Typography>
+                                      </Box>
+                                    ))}
+                                  </Box>
+                                </Collapse>
+                              </Box>
+                            );
+                          })}
+                      </Box>
+                    </Box>
+                  </Grid>
+                );
+              })()}
+              {loadingTrims && selectedModel && (
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CircularProgress size={16} />
+                    <Typography variant="caption" color="textSecondary">Loading trims...</Typography>
+                  </Box>
+                </Grid>
+              )}
               <Grid item xs={2}><TextField label="Notes" size="small" value={newNotes} onChange={e => setNewNotes(e.target.value)} fullWidth /></Grid>
               <Grid item xs={1}><Button variant="contained" onClick={handleAddVehicle} sx={{ height: 40 }}><AddIcon /></Button></Grid>
             </Grid>
