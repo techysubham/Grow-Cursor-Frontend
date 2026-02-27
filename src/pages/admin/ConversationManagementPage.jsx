@@ -372,7 +372,7 @@ function ResolutionDialog({ open, onClose, metaItem, onSave, chatAgents = [] }) 
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <Typography variant="caption" color="text.secondary">Conversation About</Typography>
-                <Chip label={metaItem?.category} color="primary" variant="outlined" sx={{ mt: 0.5, fontWeight: 'bold' }} />
+                <Chip label={formatCategory(metaItem?.category)} color="primary" variant="outlined" sx={{ mt: 0.5, fontWeight: 'bold' }} />
               </Grid>
               <Grid item xs={6}>
                 <Typography variant="caption" color="text.secondary">Case Status</Typography>
@@ -457,6 +457,12 @@ function ResolutionDialog({ open, onClose, metaItem, onSave, chatAgents = [] }) 
     </Dialog>
   );
 }
+
+const CATEGORY_DISPLAY_MAP = {
+  'Return - Refund': 'Refund',
+  'Return - Replace': 'Replace',
+};
+const formatCategory = (cat) => CATEGORY_DISPLAY_MAP[cat] || cat;
 
 export default function ConversationManagementPage() {
   const [items, setItems] = useState([]);
@@ -641,7 +647,7 @@ export default function ConversationManagementPage() {
 
       // 2. Dropdown Filters
       const matchesSeller = filterSeller === 'All' || item.sellerName === filterSeller;
-      const matchesAbout = filterAbout === 'All' || item.category === filterAbout;
+      const matchesAbout = filterAbout === 'All' || formatCategory(item.category) === filterAbout;
       const matchesCase = filterCase === 'All' || item.caseStatus === filterCase;
 
       return matchesText && matchesSeller && matchesAbout && matchesCase;
@@ -729,6 +735,8 @@ export default function ConversationManagementPage() {
                 <MenuItem value="INR">INR</MenuItem>
                 <MenuItem value="Cancellation">Cancellation</MenuItem>
                 <MenuItem value="Return">Return</MenuItem>
+                <MenuItem value="Refund">Refund</MenuItem>
+                <MenuItem value="Replace">Replace</MenuItem>
                 <MenuItem value="Out of Stock">Out of Stock</MenuItem>
                 <MenuItem value="Issue with Product">Issue with Product</MenuItem>
                 <MenuItem value="Inquiry">Inquiry</MenuItem>
@@ -817,7 +825,7 @@ export default function ConversationManagementPage() {
                       />
                     </TableCell>}
                     {visibleColumns.includes('about') && <TableCell>
-                      <Chip label={item.category} color="primary" size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 'bold' }} />
+                      <Chip label={formatCategory(item.category)} color="primary" size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 'bold' }} />
                     </TableCell>}
                     {visibleColumns.includes('case') && <TableCell>
                       <Chip
