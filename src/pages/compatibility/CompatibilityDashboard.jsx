@@ -293,8 +293,8 @@ export default function CompatibilityDashboard() {
     setTrimsByYear({});
     setSelectedTrimsByYear({});
     try {
-      // Fetch trims for each selected year in parallel (eBay returns different trims per year)
-      const promises = years.map(year =>
+      // Step 1: Fetch trim names for each year in parallel
+      const trimPromises = years.map(year =>
         api.post('/ebay/compatibility/values', {
           sellerId: currentSellerId,
           propertyName: 'Trim',
@@ -305,11 +305,41 @@ export default function CompatibilityDashboard() {
           ]
         }).then(res => ({ year, trims: (res.data.values || []).sort() })).catch(() => ({ year, trims: [] }))
       );
-      const results = await Promise.all(promises);
-      // Store trims grouped by year
+      const trimResults = await Promise.all(trimPromises);
+
+      // Step 2: For each (year, trim), fetch Engine values in parallel
+      const enginePromises = [];
+      trimResults.forEach(({ year, trims }) => {
+        trims.forEach(trim => {
+          enginePromises.push(
+            api.post('/ebay/compatibility/values', {
+              sellerId: currentSellerId,
+              propertyName: 'Engine',
+              constraints: [
+                { name: 'Make', value: makeVal },
+                { name: 'Model', value: modelVal },
+                { name: 'Year', value: year },
+                { name: 'Trim', value: trim }
+              ]
+            }).then(res => ({ year, trim, engines: res.data.values || [] })).catch(() => ({ year, trim, engines: [] }))
+          );
+        });
+      });
+      const engineResults = await Promise.all(enginePromises);
+
+      // Step 3: Build trimsByYear as { year: [{ trim, engine }, ...] }
       const byYear = {};
-      results.forEach(({ year, trims }) => {
-        if (trims.length > 0) byYear[year] = trims;
+      engineResults.forEach(({ year, trim, engines }) => {
+        if (!byYear[year]) byYear[year] = [];
+        if (engines.length > 0) {
+          engines.forEach(engine => byYear[year].push({ trim, engine }));
+        } else {
+          byYear[year].push({ trim, engine: '' });
+        }
+      });
+      // Sort each year's entries by trim then engine
+      Object.keys(byYear).forEach(y => {
+        byYear[y].sort((a, b) => a.trim.localeCompare(b.trim) || a.engine.localeCompare(b.engine));
       });
       setTrimsByYear(byYear);
       // Auto-expand all years
@@ -349,20 +379,26 @@ export default function CompatibilityDashboard() {
     fetchMakes();
   };
 
+  // Helper to create a unique key for a trim+engine entry
+  const trimKey = (entry) => `${entry.trim}|||${entry.engine}`;
+
   const handleAddVehicle = () => {
     if (!selectedMake || !selectedModel || selectedYears.length === 0) return;
     const newEntries = [];
     // Check if any trims are selected across any year
     const hasAnyTrimsSelected = Object.values(selectedTrimsByYear).some(arr => arr && arr.length > 0);
     for (const year of selectedYears) {
-      const yearTrims = (hasAnyTrimsSelected && selectedTrimsByYear[year]?.length > 0) ? selectedTrimsByYear[year] : [null];
-      for (const trim of yearTrims) {
+      const yearEntries = (hasAnyTrimsSelected && selectedTrimsByYear[year]?.length > 0) ? selectedTrimsByYear[year] : [null];
+      for (const entry of yearEntries) {
         const nameValueList = [
           { name: 'Year', value: year },
           { name: 'Make', value: selectedMake },
           { name: 'Model', value: selectedModel }
         ];
-        if (trim) nameValueList.push({ name: 'Trim', value: trim });
+        if (entry) {
+          nameValueList.push({ name: 'Trim', value: entry.trim });
+          if (entry.engine) nameValueList.push({ name: 'Engine', value: entry.engine });
+        }
         newEntries.push({ notes: newNotes, nameValueList });
       }
     }
@@ -947,7 +983,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                   )}
                 </Box>
               </Grid>
-              {/* TRIM PER-YEAR SECTIONS */}
+              {/* TRIM + ENGINE PER-YEAR SECTIONS */}
               {selectedModel && Object.keys(trimsByYear).length > 0 && (() => {
                 const totalTrims = Object.values(trimsByYear).reduce((sum, arr) => sum + arr.length, 0);
                 const totalSelected = Object.values(selectedTrimsByYear).reduce((sum, arr) => sum + (arr?.length || 0), 0);
@@ -967,7 +1003,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                                 setSelectedTrimsByYear({});
                               } else {
                                 const all = {};
-                                Object.entries(trimsByYear).forEach(([y, trims]) => { all[y] = [...trims]; });
+                                Object.entries(trimsByYear).forEach(([y, entries]) => { all[y] = [...entries]; });
                                 setSelectedTrimsByYear(all);
                               }
                             }}
@@ -981,15 +1017,16 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                         </Typography>
                       </Box>
                       {/* Year rows */}
-                      <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+                      <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
                         {selectedYears
                           .sort((a, b) => Number(b) - Number(a))
                           .filter(year => trimsByYear[year] && trimsByYear[year].length > 0)
                           .map(year => {
-                            const yearTrims = trimsByYear[year] || [];
+                            const yearEntries = trimsByYear[year] || [];
                             const yearSelected = selectedTrimsByYear[year] || [];
+                            const yearSelectedKeys = new Set(yearSelected.map(trimKey));
                             const isExpanded = expandedYears[year] || false;
-                            const allYearSelected = yearSelected.length === yearTrims.length && yearTrims.length > 0;
+                            const allYearSelected = yearSelected.length === yearEntries.length && yearEntries.length > 0;
                             return (
                               <Box key={year}>
                                 {/* Year header row */}
@@ -1013,7 +1050,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                                     onChange={() => {
                                       setSelectedTrimsByYear(prev => ({
                                         ...prev,
-                                        [year]: allYearSelected ? [] : [...yearTrims]
+                                        [year]: allYearSelected ? [] : [...yearEntries]
                                       }));
                                     }}
                                     sx={{ mr: 1 }}
@@ -1022,40 +1059,54 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                                     {selectedMake} {selectedModel} {year}
                                   </Typography>
                                   <Typography variant="caption" color="textSecondary">
-                                    {yearTrims.length} available
+                                    {yearEntries.length} available
                                   </Typography>
                                 </Box>
-                                {/* Expanded trim list */}
+                                {/* Expanded trim+engine table */}
                                 <Collapse in={isExpanded}>
-                                  <Box sx={{ pl: 6 }}>
-                                    {yearTrims.map(trim => (
-                                      <Box
-                                        key={`${year}-${trim}`}
-                                        sx={{
-                                          display: 'flex', alignItems: 'center', py: 0.5, px: 1,
-                                          borderBottom: '1px solid #f8f8f8',
-                                          '&:hover': { bgcolor: '#fafafa' }
-                                        }}
-                                      >
-                                        <Checkbox
-                                          size="small"
-                                          checked={yearSelected.includes(trim)}
-                                          onChange={() => {
-                                            setSelectedTrimsByYear(prev => {
-                                              const current = prev[year] || [];
-                                              const updated = current.includes(trim)
-                                                ? current.filter(t => t !== trim)
-                                                : [...current, trim];
-                                              return { ...prev, [year]: updated };
-                                            });
+                                  <Box sx={{ pl: 5 }}>
+                                    {/* Table header */}
+                                    <Box sx={{ display: 'flex', borderBottom: '2px solid #e0e0e0', py: 0.5, px: 1 }}>
+                                      <Box sx={{ width: 40 }} />
+                                      <Typography variant="caption" fontWeight="bold" sx={{ flex: 1, color: '#555' }}>Trim</Typography>
+                                      <Typography variant="caption" fontWeight="bold" sx={{ flex: 1, color: '#555' }}>Engine</Typography>
+                                    </Box>
+                                    {yearEntries.map((entry, idx) => {
+                                      const key = trimKey(entry);
+                                      const isChecked = yearSelectedKeys.has(key);
+                                      return (
+                                        <Box
+                                          key={`${year}-${key}-${idx}`}
+                                          sx={{
+                                            display: 'flex', alignItems: 'center', py: 0.5, px: 1,
+                                            borderBottom: '1px solid #f5f5f5',
+                                            '&:hover': { bgcolor: '#f5f5f5' }
                                           }}
-                                          sx={{ mr: 1, p: 0.25 }}
-                                        />
-                                        <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                                          {trim}
-                                        </Typography>
-                                      </Box>
-                                    ))}
+                                        >
+                                          <Checkbox
+                                            size="small"
+                                            checked={isChecked}
+                                            onChange={() => {
+                                              setSelectedTrimsByYear(prev => {
+                                                const current = prev[year] || [];
+                                                const currentKeys = new Set(current.map(trimKey));
+                                                const updated = currentKeys.has(key)
+                                                  ? current.filter(e => trimKey(e) !== key)
+                                                  : [...current, entry];
+                                                return { ...prev, [year]: updated };
+                                              });
+                                            }}
+                                            sx={{ mr: 1, p: 0.25 }}
+                                          />
+                                          <Typography variant="body2" sx={{ flex: 1, fontSize: '0.85rem' }}>
+                                            {entry.trim}
+                                          </Typography>
+                                          <Typography variant="body2" sx={{ flex: 1, fontSize: '0.8rem', color: '#666' }}>
+                                            {entry.engine || '—'}
+                                          </Typography>
+                                        </Box>
+                                      );
+                                    })}
                                   </Box>
                                 </Collapse>
                               </Box>
