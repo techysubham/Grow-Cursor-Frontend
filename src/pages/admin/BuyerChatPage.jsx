@@ -217,8 +217,8 @@ export default function BuyerChatPage() {
   }
 
   async function handleSaveMeta() {
-    if (!metaCategory || !metaCaseStatus) {
-      alert("Please select both 'About' and 'Status' fields.");
+    if (!metaCaseStatus) {
+      alert("Please select a 'Status' field.");
       return;
     }
 
@@ -907,6 +907,8 @@ export default function BuyerChatPage() {
                       </Badge>
                     </ListItemAvatar>
                     <ListItemText
+                      primaryTypographyProps={{ component: 'div' }}
+                      secondaryTypographyProps={{ component: 'div' }}
                       primary={
                         <Stack direction="row" justifyContent="space-between">
                           <Typography variant="subtitle2" noWrap sx={{ maxWidth: 140, fontWeight: 'bold' }}>
@@ -1078,9 +1080,9 @@ export default function BuyerChatPage() {
                         notched
                         onChange={(e) => setMetaCategory(e.target.value)}
                         sx={{ fontSize: '0.8rem' }}
-                        renderValue={(selected) => selected ? selected : <em style={{ color: '#999', fontSize: '0.8rem' }}>— Select —</em>}
+                        renderValue={(selected) => selected ? selected : <em style={{ color: '#999', fontSize: '0.8rem' }}>— Not a Case —</em>}
                       >
-                        <MenuItem value=""><em>Default</em></MenuItem>
+                        <MenuItem value=""><em>— Not a Case —</em></MenuItem>
                         <MenuItem value="INR">INR</MenuItem>
                         <MenuItem value="Cancellation">Cancellation</MenuItem>
                         <MenuItem value="Return">Return</MenuItem>
