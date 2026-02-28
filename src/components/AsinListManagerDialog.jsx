@@ -18,19 +18,60 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
-  ListItemSecondaryAction
+  Checkbox,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip
 } from '@mui/material';
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
   Check as CheckIcon,
   Close as CloseIcon,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Edit as EditIcon,
+  ContentCopy as DuplicateIcon,
+  CallMade as CopyToIcon
 } from '@mui/icons-material';
 import api from '../lib/api.js';
 
 // ── Single panel component ─────────────────────────────────────────────────
-function TaxonomyPanel({ title, items, selectedId, onSelect, onAdd, onDelete, loading, disabled, emptyText, addPlaceholder, saving }) {
+function TaxonomyPanel({
+  title,
+  items,
+  selectedId,
+  onSelect,
+  onAdd,
+  onDelete,
+  loading,
+  disabled,
+  emptyText,
+  addPlaceholder,
+  saving,
+  // Selectable / copy props
+  selectable = false,
+  selectedIds,
+  onToggleSelect,
+  onToggleAll,
+  // Edit props
+  onEdit,
+  onDuplicate,
+  editingId,
+  editingName,
+  onEditNameChange,
+  onEditConfirm,
+  onEditCancel,
+  savingEdit,
+  // Duplicate-inline props
+  duplicatingSourceId,
+  duplicateNewName,
+  onDuplicateNameChange,
+  onDuplicateConfirm,
+  onDuplicateCancel,
+  savingDuplicate,
+}) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
 
@@ -45,6 +86,9 @@ function TaxonomyPanel({ title, items, selectedId, onSelect, onAdd, onDelete, lo
     if (e.key === 'Enter') handleAdd();
     if (e.key === 'Escape') { setAdding(false); setNewName(''); }
   };
+
+  const allSelected = items.length > 0 && selectedIds && selectedIds.size === items.length;
+  const someSelected = selectedIds && selectedIds.size > 0 && selectedIds.size < items.length;
 
   return (
     <Box
@@ -61,7 +105,19 @@ function TaxonomyPanel({ title, items, selectedId, onSelect, onAdd, onDelete, lo
       {/* Panel header */}
       <Box sx={{ px: 2, py: 1.5, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="subtitle2" fontWeight={700}>{title}</Typography>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            {selectable && !disabled && (
+              <Checkbox
+                size="small"
+                indeterminate={someSelected}
+                checked={allSelected}
+                onChange={onToggleAll}
+                disabled={items.length === 0}
+                sx={{ p: 0.25 }}
+              />
+            )}
+            <Typography variant="subtitle2" fontWeight={700}>{title}</Typography>
+          </Stack>
           {!disabled && (
             <Tooltip title={`Add ${title.slice(0, -1)}`}>
               <span>
@@ -119,37 +175,119 @@ function TaxonomyPanel({ title, items, selectedId, onSelect, onAdd, onDelete, lo
         ) : (
           <List dense disablePadding>
             {items.map(item => (
-              <ListItem
-                key={item._id}
-                disablePadding
-                secondaryAction={
-                  <Tooltip title="Delete">
-                    <IconButton
-                      edge="end"
+              <Box key={item._id}>
+                {/* ── Normal / edit row ── */}
+                <ListItem disablePadding>
+                  {selectable && (
+                    <Checkbox
                       size="small"
-                      color="error"
-                      onClick={(e) => { e.stopPropagation(); onDelete(item); }}
-                      sx={{ mr: 0.5 }}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                }
-              >
-                <ListItemButton
-                  selected={selectedId === item._id}
-                  onClick={() => onSelect(item._id)}
-                  sx={{ pr: 6 }}
-                >
-                  <ListItemText
-                    primary={item.name}
-                    primaryTypographyProps={{ variant: 'body2', noWrap: true }}
-                  />
-                  {onSelect && selectedId === item._id && (
-                    <ChevronRightIcon fontSize="small" sx={{ color: 'primary.main', flexShrink: 0 }} />
+                      checked={selectedIds ? selectedIds.has(item._id) : false}
+                      onChange={() => onToggleSelect(item._id)}
+                      sx={{ ml: 0.5, flexShrink: 0 }}
+                    />
                   )}
-                </ListItemButton>
-              </ListItem>
+
+                  {editingId === item._id ? (
+                    /* ── Inline edit field ── */
+                    <Box sx={{ flex: 1, px: 1, py: 0.5 }}>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <TextField
+                          autoFocus
+                          size="small"
+                          fullWidth
+                          value={editingName}
+                          onChange={e => onEditNameChange(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') onEditConfirm();
+                            if (e.key === 'Escape') onEditCancel();
+                          }}
+                          disabled={savingEdit}
+                        />
+                        <IconButton size="small" color="success" onClick={onEditConfirm} disabled={!editingName.trim() || savingEdit}>
+                          {savingEdit ? <CircularProgress size={16} /> : <CheckIcon fontSize="small" />}
+                        </IconButton>
+                        <IconButton size="small" onClick={onEditCancel} disabled={savingEdit}>
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    </Box>
+                  ) : (
+                    /* ── Normal row ── */
+                    <>
+                      <ListItemButton
+                        selected={selectedId === item._id}
+                        onClick={() => onSelect && onSelect(item._id)}
+                        sx={{ pr: 1, flex: 1 }}
+                      >
+                        <ListItemText
+                          primary={item.name}
+                          primaryTypographyProps={{ variant: 'body2', noWrap: true }}
+                        />
+                        {onSelect && selectedId === item._id && (
+                          <ChevronRightIcon fontSize="small" sx={{ color: 'primary.main', flexShrink: 0 }} />
+                        )}
+                      </ListItemButton>
+
+                      {/* Action icons */}
+                      <Stack direction="row" alignItems="center" sx={{ pr: 0.5, flexShrink: 0 }}>
+                        {onEdit && (
+                          <Tooltip title="Rename">
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
+                              <EditIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {onDuplicate && (
+                          <Tooltip title="Duplicate">
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDuplicate(item); }}>
+                              <DuplicateIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="Delete">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => { e.stopPropagation(); onDelete(item); }}
+                          >
+                            <DeleteIcon sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </>
+                  )}
+                </ListItem>
+
+                {/* ── Inline duplicate row (appears below source) ── */}
+                {duplicatingSourceId === item._id && (
+                  <ListItem disablePadding sx={{ bgcolor: 'action.hover' }}>
+                    {selectable && <Box sx={{ width: 34, flexShrink: 0 }} />}
+                    <Box sx={{ flex: 1, px: 1, py: 0.5 }}>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <TextField
+                          autoFocus
+                          size="small"
+                          fullWidth
+                          placeholder="New product name"
+                          value={duplicateNewName}
+                          onChange={e => onDuplicateNameChange(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') onDuplicateConfirm();
+                            if (e.key === 'Escape') onDuplicateCancel();
+                          }}
+                          disabled={savingDuplicate}
+                        />
+                        <IconButton size="small" color="success" onClick={onDuplicateConfirm} disabled={!duplicateNewName.trim() || savingDuplicate}>
+                          {savingDuplicate ? <CircularProgress size={16} /> : <CheckIcon fontSize="small" />}
+                        </IconButton>
+                        <IconButton size="small" onClick={onDuplicateCancel} disabled={savingDuplicate}>
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    </Box>
+                  </ListItem>
+                )}
+              </Box>
             ))}
           </List>
         )}
@@ -181,6 +319,145 @@ export default function AsinListManagerDialog({ open, onClose }) {
 
   const [error, setError] = useState('');
 
+  // ── Product selection (for copy) ─────────────────────────────────────────
+  const [selectedProductIds, setSelectedProductIds] = useState(new Set());
+
+  const handleToggleProductSelect = (id) => {
+    setSelectedProductIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleAllProducts = () => {
+    if (selectedProductIds.size === products.length) {
+      setSelectedProductIds(new Set());
+    } else {
+      setSelectedProductIds(new Set(products.map(p => p._id)));
+    }
+  };
+
+  // ── Copy-to-range state ──────────────────────────────────────────────────
+  const [copyDialog, setCopyDialog] = useState(false);
+  const [allRanges, setAllRanges] = useState([]);
+  const [loadingAllRanges, setLoadingAllRanges] = useState(false);
+  const [targetRangeId, setTargetRangeId] = useState('');
+  const [copying, setCopying] = useState(false);
+  const [copySuccess, setCopySuccess] = useState('');
+
+  const openCopyDialog = async () => {
+    setTargetRangeId('');
+    setCopyDialog(true);
+    if (allRanges.length === 0) {
+      try {
+        setLoadingAllRanges(true);
+        const { data } = await api.get('/asin-list-ranges', { params: { all: 'true' } });
+        setAllRanges(data);
+      } catch {
+        setError('Failed to load ranges');
+      } finally {
+        setLoadingAllRanges(false);
+      }
+    }
+  };
+
+  const handleCopyToRange = async () => {
+    if (!targetRangeId || selectedProductIds.size === 0) return;
+    try {
+      setCopying(true);
+      const { data } = await api.post('/asin-list-products/copy-to-range', {
+        productIds: [...selectedProductIds],
+        targetRangeId
+      });
+      const targetRange = allRanges.find(r => r._id === targetRangeId);
+      const msg = `Copied ${data.copied} product(s) to "${targetRange?.name}"` +
+        (data.skipped > 0 ? `. ${data.skipped} already existed and were skipped.` : '.');
+      setCopySuccess(msg);
+      setCopyDialog(false);
+      setSelectedProductIds(new Set());
+      setTargetRangeId('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to copy products');
+    } finally {
+      setCopying(false);
+    }
+  };
+
+  // ── Product edit (rename) state ──────────────────────────────────────────
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [editingProductName, setEditingProductName] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleEditProduct = (item) => {
+    setEditingProductId(item._id);
+    setEditingProductName(item.name);
+    setDuplicatingSourceId(null);
+    setDuplicateNewName('');
+  };
+
+  const handleEditConfirm = async () => {
+    if (!editingProductName.trim()) return;
+    try {
+      setSavingEdit(true);
+      const { data } = await api.put(`/asin-list-products/${editingProductId}`, { name: editingProductName.trim() });
+      setProducts(prev => prev.map(p => p._id === editingProductId ? data : p));
+      setEditingProductId(null);
+      setEditingProductName('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to rename product');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditingProductId(null);
+    setEditingProductName('');
+  };
+
+  // ── Product duplicate state ──────────────────────────────────────────────
+  const [duplicatingSourceId, setDuplicatingSourceId] = useState(null);
+  const [duplicateNewName, setDuplicateNewName] = useState('');
+  const [savingDuplicate, setSavingDuplicate] = useState(false);
+
+  const handleDuplicateProduct = (item) => {
+    setDuplicatingSourceId(item._id);
+    setDuplicateNewName(`${item.name} (copy)`);
+    setEditingProductId(null);
+    setEditingProductName('');
+  };
+
+  const handleDuplicateConfirm = async () => {
+    if (!duplicateNewName.trim()) return;
+    const selectedRange = ranges.find(r => r._id === selectedRangeId);
+    try {
+      setSavingDuplicate(true);
+      const { data } = await api.post('/asin-list-products', {
+        name: duplicateNewName.trim(),
+        rangeId: selectedRangeId,
+        categoryId: selectedRange?.categoryId || selectedCategoryId
+      });
+      setProducts(prev => {
+        const idx = prev.findIndex(p => p._id === duplicatingSourceId);
+        const next = [...prev];
+        next.splice(idx + 1, 0, data);
+        return next;
+      });
+      setDuplicatingSourceId(null);
+      setDuplicateNewName('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to duplicate product');
+    } finally {
+      setSavingDuplicate(false);
+    }
+  };
+
+  const handleDuplicateCancel = () => {
+    setDuplicatingSourceId(null);
+    setDuplicateNewName('');
+  };
+
   // ── Fetch on open ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
@@ -189,19 +466,29 @@ export default function AsinListManagerDialog({ open, onClose }) {
     setRanges([]);
     setProducts([]);
     setError('');
+    setCopySuccess('');
     setConfirmDelete(null);
+    setSelectedProductIds(new Set());
+    setEditingProductId(null);
+    setDuplicatingSourceId(null);
     fetchCategories();
   }, [open]);
 
   useEffect(() => {
     setSelectedRangeId('');
     setProducts([]);
+    setSelectedProductIds(new Set());
+    setEditingProductId(null);
+    setDuplicatingSourceId(null);
     if (selectedCategoryId) fetchRanges(selectedCategoryId);
     else setRanges([]);
   }, [selectedCategoryId]);
 
   useEffect(() => {
     setProducts([]);
+    setSelectedProductIds(new Set());
+    setEditingProductId(null);
+    setDuplicatingSourceId(null);
     if (selectedRangeId) fetchProducts(selectedRangeId);
   }, [selectedRangeId]);
 
@@ -303,6 +590,11 @@ export default function AsinListManagerDialog({ open, onClose }) {
       } else if (type === 'product') {
         await api.delete(`/asin-list-products/${item._id}`);
         setProducts(prev => prev.filter(p => p._id !== item._id));
+        setSelectedProductIds(prev => {
+          const next = new Set(prev);
+          next.delete(item._id);
+          return next;
+        });
       }
       setConfirmDelete(null);
     } catch {
@@ -321,6 +613,16 @@ export default function AsinListManagerDialog({ open, onClose }) {
     return `Delete product "${item.name}"? Any ASINs assigned to it will be unassigned.`;
   };
 
+  // ── Grouped ranges for copy picker ────────────────────────────────────────
+  const groupedRanges = allRanges
+    .filter(r => r._id !== selectedRangeId)
+    .reduce((acc, r) => {
+      const cat = r.categoryName || 'Uncategorized';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(r);
+      return acc;
+    }, {});
+
   return (
     <>
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -335,6 +637,11 @@ export default function AsinListManagerDialog({ open, onClose }) {
         {error && (
           <Box sx={{ px: 3, pt: 2 }}>
             <Alert severity="error" onClose={() => setError('')}>{error}</Alert>
+          </Box>
+        )}
+        {copySuccess && (
+          <Box sx={{ px: 3, pt: 2 }}>
+            <Alert severity="success" onClose={() => setCopySuccess('')}>{copySuccess}</Alert>
           </Box>
         )}
 
@@ -378,8 +685,55 @@ export default function AsinListManagerDialog({ open, onClose }) {
               emptyText="Select a range"
               addPlaceholder="Product name"
               saving={savingProduct}
+              selectable={!!selectedRangeId}
+              selectedIds={selectedProductIds}
+              onToggleSelect={handleToggleProductSelect}
+              onToggleAll={handleToggleAllProducts}
+              onEdit={handleEditProduct}
+              onDuplicate={handleDuplicateProduct}
+              editingId={editingProductId}
+              editingName={editingProductName}
+              onEditNameChange={setEditingProductName}
+              onEditConfirm={handleEditConfirm}
+              onEditCancel={handleEditCancel}
+              savingEdit={savingEdit}
+              duplicatingSourceId={duplicatingSourceId}
+              duplicateNewName={duplicateNewName}
+              onDuplicateNameChange={setDuplicateNewName}
+              onDuplicateConfirm={handleDuplicateConfirm}
+              onDuplicateCancel={handleDuplicateCancel}
+              savingDuplicate={savingDuplicate}
             />
           </Box>
+
+          {/* ── Copy-to-range toolbar ── */}
+          {selectedProductIds.size > 0 && (
+            <Box sx={{ px: 2, py: 1, bgcolor: 'primary.50', borderTop: '1px solid', borderColor: 'divider' }}>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Chip
+                  label={`${selectedProductIds.size} product${selectedProductIds.size > 1 ? 's' : ''} selected`}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                />
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={<CopyToIcon fontSize="small" />}
+                  onClick={openCopyDialog}
+                >
+                  Copy to Range
+                </Button>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => setSelectedProductIds(new Set())}
+                >
+                  Clear
+                </Button>
+              </Stack>
+            </Box>
+          )}
         </DialogContent>
 
         <Divider />
@@ -388,7 +742,52 @@ export default function AsinListManagerDialog({ open, onClose }) {
         </DialogActions>
       </Dialog>
 
-      {/* Confirm delete dialog */}
+      {/* ── Copy-to-range sub-dialog ── */}
+      <Dialog open={copyDialog} onClose={() => setCopyDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          Copy {selectedProductIds.size} product{selectedProductIds.size > 1 ? 's' : ''} to another range
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          {loadingAllRanges ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : (
+            <FormControl fullWidth size="small" sx={{ mt: 1 }}>
+              <InputLabel>Target Range</InputLabel>
+              <Select
+                value={targetRangeId}
+                label="Target Range"
+                onChange={e => setTargetRangeId(e.target.value)}
+              >
+                {Object.entries(groupedRanges).sort(([a], [b]) => a.localeCompare(b)).flatMap(([catName, catRanges]) => [
+                  <MenuItem key={`header-${catName}`} disabled sx={{ opacity: '1 !important', fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary', pointerEvents: 'none' }}>
+                    {catName}
+                  </MenuItem>,
+                  ...catRanges.map(r => (
+                    <MenuItem key={r._id} value={r._id} sx={{ pl: 3 }}>
+                      {r.name}
+                    </MenuItem>
+                  ))
+                ])}
+              </Select>
+            </FormControl>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCopyDialog(false)} disabled={copying}>Cancel</Button>
+          <Button
+            onClick={handleCopyToRange}
+            variant="contained"
+            disabled={!targetRangeId || copying}
+            startIcon={copying ? <CircularProgress size={14} /> : <CopyToIcon />}
+          >
+            Copy
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Confirm delete dialog ── */}
       <Dialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
