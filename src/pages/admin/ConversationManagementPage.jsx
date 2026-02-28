@@ -461,8 +461,9 @@ function ResolutionDialog({ open, onClose, metaItem, onSave, chatAgents = [] }) 
 const CATEGORY_DISPLAY_MAP = {
   'Return - Refund': 'Refund',
   'Return - Replace': 'Replace',
+  '': 'Not a Case Yet',
 };
-const formatCategory = (cat) => CATEGORY_DISPLAY_MAP[cat] || cat;
+const formatCategory = (cat) => CATEGORY_DISPLAY_MAP[cat ?? ''] ?? cat ?? 'Not a Case Yet';
 
 export default function ConversationManagementPage() {
   const [items, setItems] = useState([]);
@@ -563,7 +564,7 @@ export default function ConversationManagementPage() {
   async function fetchItems() {
     setLoading(true);
     try {
-      const { data } = await api.get('/ebay/conversation-management/list', { params: { status: 'Open,In Progress' } });
+      const { data } = await api.get('/ebay/conversation-management/list', { params: { status: 'Case Not Opened,Open,In Progress' } });
       setItems(data || []);
     } catch (e) {
       console.error(e);
