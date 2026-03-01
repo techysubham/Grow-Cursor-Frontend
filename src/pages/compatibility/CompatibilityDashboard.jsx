@@ -615,7 +615,13 @@ export default function CompatibilityDashboard() {
       showSnackbar('All bulk items processed!', 'success');
     } else {
       setBulkQueueIdx(nextIdx);
-      // Fields will auto-apply via the useEffect above
+    }
+  };
+
+  // Go back to previous item in queue
+  const handleBulkQueuePrevious = () => {
+    if (bulkQueueIdx > 0) {
+      setBulkQueueIdx(bulkQueueIdx - 1);
     }
   };
 
@@ -1043,7 +1049,10 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
         <>
           {/* Bulk select toolbar */}
           {selectedIds.size > 0 && (
-            <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 2, p: 1.5, bgcolor: '#f0f4ff', borderRadius: 1, border: '1px solid #c7d7fd' }}>
+            <Box sx={{
+              mb: 1, display: 'flex', alignItems: 'center', gap: 2,
+              p: 1.5, bgcolor: '#f0f4ff', borderRadius: 1, border: '1px solid #c7d7fd'
+            }}>
               <Typography variant="body2" fontWeight={600}>
                 {selectedIds.size} item{selectedIds.size > 1 ? 's' : ''} selected
               </Typography>
@@ -1054,7 +1063,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 onClick={handleBulkAiSuggest}
                 sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' }, fontWeight: 600 }}
               >
-                AI Suggest Selected ({selectedIds.size})
+                ✨ AI Suggest Selected ({selectedIds.size})
               </Button>
               <Button
                 size="small"
@@ -1065,8 +1074,8 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
               </Button>
             </Box>
           )}
-          <TableContainer component={Paper}>
-            <Table>
+          <TableContainer component={Paper} sx={{ maxHeight: 'calc(100vh - 260px)', overflow: 'auto' }}>
+            <Table stickyHeader>
               <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                 <TableRow>
                   <TableCell padding="checkbox">
@@ -1578,20 +1587,34 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
           {bulkMode ? (
             <>
               <Button
+                onClick={handleBulkQueuePrevious}
+                variant="outlined"
+                disabled={bulkQueueIdx === 0}
+              >
+                ← Previous
+              </Button>
+              <Button
                 onClick={() => handleBulkQueueNext(true)}
                 variant="outlined"
                 color="secondary"
               >
-                Skip ({bulkQueueIdx + 1}/{bulkQueue.length})
+                Skip → ({bulkQueueIdx + 1}/{bulkQueue.length})
               </Button>
-              <Button onClick={() => handleSaveCompatibility(true)} variant="outlined" color="primary">Save</Button>
+              <Button
+                onClick={() => handleSaveCompatibility(true)}
+                variant="outlined"
+                color="primary"
+                title="Save this item and stay on it"
+              >
+                Save (Stay)
+              </Button>
               <Button
                 onClick={async () => { await handleSaveCompatibility(false); handleBulkQueueNext(false); }}
                 variant="contained"
                 color="primary"
                 disabled={bulkQueue[bulkQueueIdx]?.status === 'loading'}
               >
-                Save & Next in Queue ({bulkQueueIdx + 1}/{bulkQueue.length})
+                Save & Next → ({bulkQueueIdx + 1}/{bulkQueue.length})
               </Button>
             </>
           ) : (
