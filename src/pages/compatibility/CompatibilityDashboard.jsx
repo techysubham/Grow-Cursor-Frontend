@@ -113,6 +113,14 @@ export default function CompatibilityDashboard() {
   const [filterNoFitment, setFilterNoFitment] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
 
+  // BULK AI SUGGEST STATE
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  // bulkQueue entries: { item, status: 'loading'|'ready'|'no-match'|'error',
+  //   aiData, modelOptions, yearOptions, trimsByYear, selectedYears, modelExists, yearsExist, error }
+  const [bulkQueue, setBulkQueue] = useState([]);
+  const [bulkQueueIdx, setBulkQueueIdx] = useState(0);
+  const [bulkMode, setBulkMode] = useState(false);
+
   const displayedListings = filterNoFitment
     ? listings.filter(item => !item.compatibility || item.compatibility.length === 0)
     : listings;
@@ -198,13 +206,15 @@ export default function CompatibilityDashboard() {
         params: {
           sellerId: currentSellerId,
           page,
-          limit: 50,
+          limit: 100,
           search: searchToSend
         }
       });
       setListings(data.listings);
       setTotalPages(data.pagination.pages);
       setTotalItems(data.pagination.total);
+      // Clear selections when new page loads
+      setSelectedIds(new Set());
     } catch (e) { showSnackbar('Failed to load listings', 'error'); }
     finally { setLoading(false); }
   };
@@ -425,6 +435,196 @@ export default function CompatibilityDashboard() {
     }
   };
 
+  // --- BULK AI SUGGEST ---
+
+  const handleBulkAiSuggest = async () => {
+    const selectedItems = displayedListings.filter(item => selectedIds.has(item.itemId));
+    if (selectedItems.length === 0) return;
+
+    // Build initial queue (all loading)
+    const initial = selectedItems.map(item => ({
+      item, status: 'loading', aiData: null,
+      modelOptions: [], yearOptions: [], trimsByYear: {}, selectedYears: [],
+      modelExists: true, yearsExist: true, error: null
+    }));
+    setBulkQueue(initial);
+    setBulkQueueIdx(0);
+    setBulkMode(true);
+
+    // Open Edit modal immediately on first item (shows loading state)
+    const firstItem = selectedItems[0];
+    const firstIdx = listings.findIndex(l => l.itemId === firstItem.itemId);
+    setSelectedItem(firstItem);
+    setCurrentListingIndex(firstIdx >= 0 ? firstIdx : 0);
+    setEditCompatList(JSON.parse(JSON.stringify(firstItem.compatibility || [])));
+    setOpenModal(true);
+    setSelectedMake(null); setSelectedModel(null);
+    setSelectedYears([]); setSelectedTrimsByYear({});
+    setTrimsByYear({}); setYearOptions([]); setModelOptions([]);
+    setExpandedYears({}); setStartYear(''); setEndYear(''); setNewNotes('');
+    fetchMakes();
+
+    // Fire AI + full data fetch for EVERY selected item in parallel
+    selectedItems.forEach((item, idx) => {
+      api.post('/ai/suggest-fitment', {
+        title: item.title || '',
+        description: item.descriptionPreview || ''
+      }).then(async ({ data }) => {
+        if (!data.make) {
+          setBulkQueue(prev => {
+            const u = [...prev];
+            u[idx] = { ...u[idx], status: 'no-match', error: 'AI could not extract fitment info' };
+            return u;
+          });
+          return;
+        }
+
+        // Fetch models, years and trims all in background
+        let modelOpts = [], yearOpts = [], resolvedYears = [], trimsByYearResult = {};
+        let modelExists = true, yearsExist = true;
+        try {
+          // 1. Models
+          const modelsRes = await api.post('/ebay/compatibility/values', {
+            sellerId: currentSellerId,
+            propertyName: 'Model',
+            constraints: [{ name: 'Make', value: data.make }]
+          });
+          modelOpts = modelsRes.data.values || [];
+          modelExists = modelOpts.includes(data.model);
+
+          // 2. Years
+          const yearsRes = await api.post('/ebay/compatibility/values', {
+            sellerId: currentSellerId,
+            propertyName: 'Year',
+            constraints: [{ name: 'Make', value: data.make }, { name: 'Model', value: data.model }]
+          });
+          yearOpts = (yearsRes.data.values || []).map(y => String(y)).sort((a, b) => Number(b) - Number(a));
+          if (data.startYear && data.endYear) {
+            const min = Math.min(Number(data.startYear), Number(data.endYear));
+            const max = Math.max(Number(data.startYear), Number(data.endYear));
+            resolvedYears = yearOpts.filter(y => Number(y) >= min && Number(y) <= max);
+          }
+          yearsExist = resolvedYears.length > 0;
+
+          // 3. Trims for all resolved years (parallel)
+          if (resolvedYears.length > 0) {
+            const trimPromises = resolvedYears.map(year =>
+              api.post('/ebay/compatibility/values', {
+                sellerId: currentSellerId, propertyName: 'Trim',
+                constraints: [{ name: 'Make', value: data.make }, { name: 'Model', value: data.model }, { name: 'Year', value: year }]
+              }).then(r => ({ year, trims: (r.data.values || []).sort() })).catch(() => ({ year, trims: [] }))
+            );
+            const trimResults = await Promise.all(trimPromises);
+
+            // 4. Engines for each trim (parallel)
+            const enginePromises = [];
+            trimResults.forEach(({ year, trims }) => {
+              trims.forEach(trim => {
+                enginePromises.push(
+                  api.post('/ebay/compatibility/values', {
+                    sellerId: currentSellerId, propertyName: 'Engine',
+                    constraints: [
+                      { name: 'Make', value: data.make }, { name: 'Model', value: data.model },
+                      { name: 'Year', value: year }, { name: 'Trim', value: trim }
+                    ]
+                  }).then(r => ({ year, trim, engines: r.data.values || [] })).catch(() => ({ year, trim, engines: [] }))
+                );
+              });
+            });
+            const engineResults = await Promise.all(enginePromises);
+
+            const byYear = {};
+            engineResults.forEach(({ year, trim, engines }) => {
+              if (!byYear[year]) byYear[year] = [];
+              if (engines.length > 0) engines.forEach(engine => byYear[year].push({ trim, engine }));
+              else byYear[year].push({ trim, engine: '' });
+            });
+            Object.keys(byYear).forEach(y => {
+              byYear[y].sort((a, b) => a.trim.localeCompare(b.trim) || a.engine.localeCompare(b.engine));
+            });
+            trimsByYearResult = byYear;
+          }
+        } catch (fetchErr) {
+          console.error('[Bulk AI] Compat data fetch error:', fetchErr);
+        }
+
+        setBulkQueue(prev => {
+          const u = [...prev];
+          u[idx] = {
+            ...u[idx], status: 'ready', aiData: data,
+            modelOptions: modelOpts, yearOptions: yearOpts,
+            trimsByYear: trimsByYearResult, selectedYears: resolvedYears,
+            modelExists, yearsExist, error: null
+          };
+          return u;
+        });
+      }).catch(err => {
+        setBulkQueue(prev => {
+          const u = [...prev];
+          u[idx] = { ...u[idx], status: 'error', error: err.response?.data?.error || err.message || 'AI failed' };
+          return u;
+        });
+      });
+    });
+  };
+
+  // Apply current bulk queue item data to modal state whenever it's ready
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!bulkMode || !openModal) return;
+    const entry = bulkQueue[bulkQueueIdx];
+    if (!entry) return;
+
+    // Always update the modal's item
+    setSelectedItem(entry.item);
+    setEditCompatList(JSON.parse(JSON.stringify(entry.item.compatibility || [])));
+    const newIdx = listings.findIndex(l => l.itemId === entry.item.itemId);
+    setCurrentListingIndex(newIdx >= 0 ? newIdx : 0);
+
+    if (entry.status === 'ready' && entry.aiData) {
+      setSelectedMake(entry.aiData.make);
+      setSelectedModel(entry.aiData.model);
+      setStartYear(entry.aiData.startYear || '');
+      setEndYear(entry.aiData.endYear || '');
+      setModelOptions(entry.modelOptions || []);
+      setYearOptions(entry.yearOptions || []);
+      setSelectedYears(entry.selectedYears || []);
+      setTrimsByYear(entry.trimsByYear || {});
+      setSelectedTrimsByYear({});
+      const expanded = {};
+      Object.keys(entry.trimsByYear || {}).forEach(y => { expanded[y] = true; });
+      setExpandedYears(expanded);
+      setNewNotes('');
+    } else if (entry.status !== 'loading') {
+      // no-match or error — reset fields so user can fill manually
+      setSelectedMake(null); setSelectedModel(null);
+      setSelectedYears([]); setSelectedTrimsByYear({});
+      setTrimsByYear({}); setYearOptions([]); setModelOptions([]);
+      setExpandedYears({}); setStartYear(''); setEndYear(''); setNewNotes('');
+    }
+  }, [bulkQueueIdx, bulkQueue, bulkMode, openModal]);
+
+  // Advance to next item in queue (or close modal)
+  const handleBulkQueueNext = (skip = false) => {
+    const nextIdx = bulkQueueIdx + 1;
+    if (nextIdx >= bulkQueue.length) {
+      // Finished queue
+      setBulkMode(false);
+      setBulkQueue([]);
+      setOpenModal(false);
+      showSnackbar('All bulk items processed!', 'success');
+    } else {
+      setBulkQueueIdx(nextIdx);
+      // Fields will auto-apply via the useEffect above
+    }
+  };
+
+  // Open Edit modal pre-filled from a bulk result (kept for compatibility)
+  const handleInspectItem = (result) => {
+    const idx = listings.findIndex(l => l.itemId === result.item.itemId);
+    handleEditClick(result.item, idx >= 0 ? idx : 0, result.aiData);
+  };
+
   // --- HANDLERS ---
 
   // Auto-fetch trims when selected years change
@@ -437,21 +637,57 @@ export default function CompatibilityDashboard() {
     }
   }, [selectedYears, selectedMake, selectedModel]);
 
-  const handleEditClick = (item, index) => {
+  const handleEditClick = (item, index, prefillAiData = null) => {
     setSelectedItem(item);
     setCurrentListingIndex(index);
     setEditCompatList(JSON.parse(JSON.stringify(item.compatibility || [])));
     setOpenModal(true);
-    setSelectedMake(null);
-    setSelectedModel(null);
-    setSelectedYears([]);
-    setSelectedTrimsByYear({});
     setTrimsByYear({});
     setExpandedYears({});
-    setStartYear('');
-    setEndYear('');
     setNewNotes('');
     fetchMakes();
+    // Reset bulk mode when opening manually
+    setBulkMode(false);
+    setBulkQueue([]);
+    setBulkQueueIdx(0);
+
+    if (prefillAiData && prefillAiData.make) {
+      setSelectedMake(prefillAiData.make);
+      setSelectedModel(prefillAiData.model || null);
+      setStartYear(prefillAiData.startYear || '');
+      setEndYear(prefillAiData.endYear || '');
+      api.post('/ebay/compatibility/values', {
+        sellerId: currentSellerId,
+        propertyName: 'Model',
+        constraints: [{ name: 'Make', value: prefillAiData.make }]
+      }).then(r => setModelOptions(r.data.values || [])).catch(() => { });
+      if (prefillAiData.model) {
+        setLoadingYears(true);
+        api.post('/ebay/compatibility/values', {
+          sellerId: currentSellerId,
+          propertyName: 'Year',
+          constraints: [
+            { name: 'Make', value: prefillAiData.make },
+            { name: 'Model', value: prefillAiData.model }
+          ]
+        }).then(r => {
+          const yearList = (r.data.values || []).map(y => String(y)).sort((a, b) => Number(b) - Number(a));
+          setYearOptions(yearList);
+          if (prefillAiData.startYear && prefillAiData.endYear) {
+            const min = Math.min(Number(prefillAiData.startYear), Number(prefillAiData.endYear));
+            const max = Math.max(Number(prefillAiData.startYear), Number(prefillAiData.endYear));
+            setSelectedYears(yearList.filter(y => Number(y) >= min && Number(y) <= max));
+          }
+        }).catch(() => { }).finally(() => setLoadingYears(false));
+      } else {
+        setSelectedYears([]); setYearOptions([]);
+      }
+    } else {
+      setSelectedMake(null); setSelectedModel(null);
+      setSelectedYears([]); setSelectedTrimsByYear({});
+      setYearOptions([]); setModelOptions([]);
+      setStartYear(''); setEndYear('');
+    }
   };
 
   // Helper to create a unique key for a trim+engine entry
@@ -805,10 +1041,49 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       {/* TABLE */}
       {loading ? <Box display="flex" justifyContent="center" mt={5}><CircularProgress /></Box> : (
         <>
+          {/* Bulk select toolbar */}
+          {selectedIds.size > 0 && (
+            <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 2, p: 1.5, bgcolor: '#f0f4ff', borderRadius: 1, border: '1px solid #c7d7fd' }}>
+              <Typography variant="body2" fontWeight={600}>
+                {selectedIds.size} item{selectedIds.size > 1 ? 's' : ''} selected
+              </Typography>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                onClick={handleBulkAiSuggest}
+                sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' }, fontWeight: 600 }}
+              >
+                AI Suggest Selected ({selectedIds.size})
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear Selection
+              </Button>
+            </Box>
+          )}
           <TableContainer component={Paper}>
             <Table>
               <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                 <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      size="small"
+                      checked={displayedListings.length > 0 && displayedListings.every(l => selectedIds.has(l.itemId))}
+                      indeterminate={selectedIds.size > 0 && !displayedListings.every(l => selectedIds.has(l.itemId))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(new Set(displayedListings.map(l => l.itemId)));
+                        } else {
+                          setSelectedIds(new Set());
+                        }
+                      }}
+                      title="Select all on this page"
+                    />
+                  </TableCell>
                   <TableCell width="80">Image</TableCell>
                   <TableCell width="25%">Title & SKU</TableCell>
                   <TableCell>Price</TableCell>
@@ -820,8 +1095,23 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
               <TableBody>
                 {displayedListings.map((item, index) => {
                   const fitmentSummary = groupFitmentData(item.compatibility);
+                  const isSelected = selectedIds.has(item.itemId);
                   return (
-                    <TableRow key={item.itemId}>
+                    <TableRow key={item.itemId} selected={isSelected} hover>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          size="small"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            setSelectedIds(prev => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(item.itemId);
+                              else next.delete(item.itemId);
+                              return next;
+                            });
+                          }}
+                        />
+                      </TableCell>
                       <TableCell>{item.mainImageUrl && <img src={item.mainImageUrl} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }} />}</TableCell>
                       <TableCell>
                         <Typography variant="subtitle2" sx={{ lineHeight: 1.2, mb: 0.5 }}>{item.title}</Typography>
@@ -854,7 +1144,10 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
               </TableBody>
             </Table>
           </TableContainer>
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+            <Typography variant="body2" color="textSecondary">
+              Showing {displayedListings.length}{filterNoFitment ? ' (filtered)' : ` of ${totalItems}`} listings
+            </Typography>
             <Pagination count={totalPages} page={page} onChange={(e, v) => setPage(v)} color="primary" showFirstButton showLastButton />
           </Box>
         </>
@@ -873,6 +1166,41 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       >
         <DialogTitle sx={{ borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2 }}>
           <Box>
+            {bulkMode && (
+              <Box sx={{ mb: 1 }}>
+                {/* Queue progress bar */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <AutoAwesomeIcon sx={{ fontSize: 14, color: '#7c3aed' }} />
+                  <Typography variant="caption" fontWeight={700} sx={{ color: '#7c3aed' }}>
+                    Bulk AI Queue — Item {bulkQueueIdx + 1} of {bulkQueue.length}
+                  </Typography>
+                  {bulkQueue[bulkQueueIdx]?.status === 'loading' && (
+                    <><CircularProgress size={11} sx={{ color: '#7c3aed', ml: 0.5 }} />
+                      <Typography variant="caption" color="textSecondary">AI analyzing...</Typography></>
+                  )}
+                  {bulkQueue[bulkQueueIdx]?.status === 'no-match' && (
+                    <Chip label="⚠️ No fitment found — fill manually" color="warning" size="small" />
+                  )}
+                  {bulkQueue[bulkQueueIdx]?.status === 'error' && (
+                    <Chip label={`❌ ${bulkQueue[bulkQueueIdx]?.error}`} color="error" size="small" />
+                  )}
+                </Box>
+                {/* Validation warnings */}
+                {bulkQueue[bulkQueueIdx]?.status === 'ready' && (
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {!bulkQueue[bulkQueueIdx]?.modelExists && (
+                      <Chip label={`⚠️ Model "${bulkQueue[bulkQueueIdx]?.aiData?.model}" not in eBay DB`} color="warning" size="small" />
+                    )}
+                    {!bulkQueue[bulkQueueIdx]?.yearsExist && (
+                      <Chip label={`⚠️ Years ${bulkQueue[bulkQueueIdx]?.aiData?.startYear}–${bulkQueue[bulkQueueIdx]?.aiData?.endYear} not in eBay DB`} color="warning" size="small" />
+                    )}
+                    {bulkQueue[bulkQueueIdx]?.modelExists && bulkQueue[bulkQueueIdx]?.yearsExist && (
+                      <Chip label="✅ Make / Model / Years verified in eBay DB" color="success" size="small" />
+                    )}
+                  </Box>
+                )}
+              </Box>
+            )}
             <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5, fontSize: '1.3rem' }}>
               {selectedItem?.title}
             </Typography>
@@ -892,7 +1220,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
           </Box>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             <Typography variant="caption" sx={{ mr: 1 }}>
-              {(page - 1) * 50 + currentListingIndex + 1} / {totalItems}
+              {(page - 1) * 100 + currentListingIndex + 1} / {totalItems}
             </Typography>
             <IconButton
               size="small"
@@ -1246,16 +1574,39 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenModal(false)}>Cancel</Button>
-          <Button onClick={() => handleSaveCompatibility(true)} variant="outlined" color="primary">Save</Button>
-          <Button
-            onClick={handleSaveAndNext}
-            variant="contained"
-            color="primary"
-            disabled={currentListingIndex >= listings.length - 1 && page >= totalPages}
-          >
-            Save and Go to Next
-          </Button>
+          <Button onClick={() => { setBulkMode(false); setBulkQueue([]); setOpenModal(false); }}>Cancel</Button>
+          {bulkMode ? (
+            <>
+              <Button
+                onClick={() => handleBulkQueueNext(true)}
+                variant="outlined"
+                color="secondary"
+              >
+                Skip ({bulkQueueIdx + 1}/{bulkQueue.length})
+              </Button>
+              <Button onClick={() => handleSaveCompatibility(true)} variant="outlined" color="primary">Save</Button>
+              <Button
+                onClick={async () => { await handleSaveCompatibility(false); handleBulkQueueNext(false); }}
+                variant="contained"
+                color="primary"
+                disabled={bulkQueue[bulkQueueIdx]?.status === 'loading'}
+              >
+                Save & Next in Queue ({bulkQueueIdx + 1}/{bulkQueue.length})
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button onClick={() => handleSaveCompatibility(true)} variant="outlined" color="primary">Save</Button>
+              <Button
+                onClick={handleSaveAndNext}
+                variant="contained"
+                color="primary"
+                disabled={currentListingIndex >= listings.length - 1 && page >= totalPages}
+              >
+                Save and Go to Next
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 
