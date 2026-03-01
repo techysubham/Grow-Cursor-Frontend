@@ -458,6 +458,78 @@ export default function AsinListManagerDialog({ open, onClose }) {
     setDuplicateNewName('');
   };
 
+  // ── Range edit (rename) state ────────────────────────────────────────────
+  const [editingRangeId, setEditingRangeId] = useState(null);
+  const [editingRangeName, setEditingRangeName] = useState('');
+  const [savingRangeEdit, setSavingRangeEdit] = useState(false);
+
+  const handleEditRange = (item) => {
+    setEditingRangeId(item._id);
+    setEditingRangeName(item.name);
+    setDuplicatingRangeSourceId(null);
+    setDuplicateRangeNewName('');
+  };
+
+  const handleEditRangeConfirm = async () => {
+    if (!editingRangeName.trim()) return;
+    try {
+      setSavingRangeEdit(true);
+      const { data } = await api.put(`/asin-list-ranges/${editingRangeId}`, { name: editingRangeName.trim() });
+      setRanges(prev => prev.map(r => r._id === editingRangeId ? data : r));
+      setEditingRangeId(null);
+      setEditingRangeName('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to rename range');
+    } finally {
+      setSavingRangeEdit(false);
+    }
+  };
+
+  const handleEditRangeCancel = () => {
+    setEditingRangeId(null);
+    setEditingRangeName('');
+  };
+
+  // ── Range duplicate (shallow) state ─────────────────────────────────────
+  const [duplicatingRangeSourceId, setDuplicatingRangeSourceId] = useState(null);
+  const [duplicateRangeNewName, setDuplicateRangeNewName] = useState('');
+  const [savingRangeDuplicate, setSavingRangeDuplicate] = useState(false);
+
+  const handleDuplicateRange = (item) => {
+    setDuplicatingRangeSourceId(item._id);
+    setDuplicateRangeNewName(`${item.name} (copy)`);
+    setEditingRangeId(null);
+    setEditingRangeName('');
+  };
+
+  const handleDuplicateRangeConfirm = async () => {
+    if (!duplicateRangeNewName.trim()) return;
+    try {
+      setSavingRangeDuplicate(true);
+      const { data } = await api.post('/asin-list-ranges/duplicate', {
+        sourceRangeId: duplicatingRangeSourceId,
+        name: duplicateRangeNewName.trim()
+      });
+      setRanges(prev => {
+        const idx = prev.findIndex(r => r._id === duplicatingRangeSourceId);
+        const next = [...prev];
+        next.splice(idx + 1, 0, data);
+        return next;
+      });
+      setDuplicatingRangeSourceId(null);
+      setDuplicateRangeNewName('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to duplicate range');
+    } finally {
+      setSavingRangeDuplicate(false);
+    }
+  };
+
+  const handleDuplicateRangeCancel = () => {
+    setDuplicatingRangeSourceId(null);
+    setDuplicateRangeNewName('');
+  };
+
   // ── Fetch on open ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
@@ -471,6 +543,8 @@ export default function AsinListManagerDialog({ open, onClose }) {
     setSelectedProductIds(new Set());
     setEditingProductId(null);
     setDuplicatingSourceId(null);
+    setEditingRangeId(null);
+    setDuplicatingRangeSourceId(null);
     fetchCategories();
   }, [open]);
 
@@ -480,6 +554,8 @@ export default function AsinListManagerDialog({ open, onClose }) {
     setSelectedProductIds(new Set());
     setEditingProductId(null);
     setDuplicatingSourceId(null);
+    setEditingRangeId(null);
+    setDuplicatingRangeSourceId(null);
     if (selectedCategoryId) fetchRanges(selectedCategoryId);
     else setRanges([]);
   }, [selectedCategoryId]);
@@ -672,6 +748,20 @@ export default function AsinListManagerDialog({ open, onClose }) {
               emptyText="Select a category"
               addPlaceholder="Range name"
               saving={savingRange}
+              onEdit={handleEditRange}
+              onDuplicate={handleDuplicateRange}
+              editingId={editingRangeId}
+              editingName={editingRangeName}
+              onEditNameChange={setEditingRangeName}
+              onEditConfirm={handleEditRangeConfirm}
+              onEditCancel={handleEditRangeCancel}
+              savingEdit={savingRangeEdit}
+              duplicatingSourceId={duplicatingRangeSourceId}
+              duplicateNewName={duplicateRangeNewName}
+              onDuplicateNameChange={setDuplicateRangeNewName}
+              onDuplicateConfirm={handleDuplicateRangeConfirm}
+              onDuplicateCancel={handleDuplicateRangeCancel}
+              savingDuplicate={savingRangeDuplicate}
             />
             <TaxonomyPanel
               title="Products"
