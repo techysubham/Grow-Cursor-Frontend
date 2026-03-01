@@ -113,6 +113,7 @@ import ManageProductUmbrellasPage from '../pages/admin/ManageProductUmbrellasPag
 import UmbrellaIcon from '@mui/icons-material/Umbrella';
 import ASINStoragePage from '../pages/admin/ASINStoragePage.jsx';
 import StorageIcon from '@mui/icons-material/Storage';
+import ImportExportIcon from '@mui/icons-material/ImportExport';
 import ColumnCreatorPage from '../pages/admin/ColumnCreatorPage.jsx';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import ManageTemplatesPage from '../pages/admin/ManageTemplatesPage.jsx';
@@ -183,6 +184,7 @@ export default function AdminLayout({ user, onLogout }) {
   const [ordersAnchorEl, setOrdersAnchorEl] = useState(null);
   const [manageAnchorEl, setManageAnchorEl] = useState(null);
   const [financeAnchorEl, setFinanceAnchorEl] = useState(null);
+  const [asinImporterAnchorEl, setAsinImporterAnchorEl] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -195,6 +197,7 @@ export default function AdminLayout({ user, onLogout }) {
     setOrdersAnchorEl(null);
     setManageAnchorEl(null);
     setFinanceAnchorEl(null);
+    setAsinImporterAnchorEl(null);
     setMobileOpen(false);
   };
 
@@ -486,37 +489,30 @@ export default function AdminLayout({ user, onLogout }) {
               </ListItemButton>
             </ListItem>
 
-            {/* ASIN Directory */}
+            {/* ASIN Importer */}
             <ListItem disablePadding>
               <ListItemButton
-                component={Link}
-                to="/admin/asin-directory"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/asin-directory'}
-                sx={selectedMenuItemStyle}
+                onClick={(e) => setAsinImporterAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
               >
                 <ListItemIcon>
-                  <NavIcon icon={ListAltIcon} label="ASIN Directory" sidebarOpen={sidebarOpen} />
+                  <NavIcon icon={ImportExportIcon} label="ASIN Importer" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="ASIN Directory" />}
+                {sidebarOpen && <ListItemText primary="ASIN Importer" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
               </ListItemButton>
             </ListItem>
 
-            {/* ASIN Lists */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/asin-lists"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/asin-lists'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={CategoryIcon} label="ASIN Lists" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="ASIN Lists" />}
-              </ListItemButton>
-            </ListItem>
+            <Menu
+              anchorEl={asinImporterAnchorEl}
+              open={Boolean(asinImporterAnchorEl)}
+              onClose={() => setAsinImporterAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+            >
+              <MenuItem component={Link} to="/admin/asin-directory" onClick={closeAllMenus}>ASIN Directory</MenuItem>
+              <MenuItem component={Link} to="/admin/asin-lists" onClick={closeAllMenus}>ASIN Lists</MenuItem>
+            </Menu>
 
             {/* Column Creator */}
             <ListItem disablePadding>
