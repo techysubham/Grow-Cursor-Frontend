@@ -384,22 +384,6 @@ export default function AdminLayout({ user, onLogout }) {
               </ListItemButton>
             </ListItem>
 
-            {/* Amazon Lookup */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/amazon-lookup"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/amazon-lookup'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={SearchIcon} label="Search Amazon Products" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Amazon Lookup" />}
-              </ListItemButton>
-            </ListItem>
-
           </>
         ) : null}
 
@@ -437,38 +421,6 @@ export default function AdminLayout({ user, onLogout }) {
         {isSuper ? (
           <>
 
-            {/* Product Umbrellas */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/product-umbrellas"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/product-umbrellas'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={UmbrellaIcon} label="Product Categories" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Product Umbrellas" />}
-              </ListItemButton>
-            </ListItem>
-
-            {/* ASIN Storage */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/asin-storage"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/asin-storage'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={StorageIcon} label="ASIN Database" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="ASIN Storage" />}
-              </ListItemButton>
-            </ListItem>
-
             {/* ASIN Importer */}
             <ListItem disablePadding>
               <ListItemButton
@@ -494,21 +446,6 @@ export default function AdminLayout({ user, onLogout }) {
               <MenuItem component={Link} to="/admin/asin-lists" onClick={closeAllMenus}>ASIN Lists</MenuItem>
             </Menu>
 
-            {/* Column Creator */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/column-creator"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/column-creator'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={ViewColumnIcon} label="Create Custom Columns" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Column Creator" />}
-              </ListItemButton>
-            </ListItem>
           </>
         ) : null}
 
