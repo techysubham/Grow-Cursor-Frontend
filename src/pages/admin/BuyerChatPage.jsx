@@ -423,6 +423,7 @@ export default function BuyerChatPage() {
   async function loadThreads(reset = false) {
     if (loadingThreads) return;
     setLoadingThreads(true);
+    if (reset) setThreads([]); // Clear immediately so stale results don't show during load
 
     try {
       const currentPage = reset ? 1 : page;

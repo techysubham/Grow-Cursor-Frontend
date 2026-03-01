@@ -15,6 +15,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import api from '../../lib/api';
@@ -110,6 +111,7 @@ export default function CompatibilityDashboard() {
   const [newNotes, setNewNotes] = useState('');
   const [pageInputValue, setPageInputValue] = useState('');
   const [filterNoFitment, setFilterNoFitment] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const displayedListings = filterNoFitment
     ? listings.filter(item => !item.compatibility || item.compatibility.length === 0)
@@ -348,6 +350,79 @@ export default function CompatibilityDashboard() {
       setExpandedYears(expanded);
     } catch (e) { console.error(e); }
     finally { setLoadingTrims(false); }
+  };
+
+  // --- AI SUGGEST FITMENT ---
+  const handleAiSuggest = async () => {
+    if (!selectedItem) return;
+    setAiLoading(true);
+    try {
+      const { data } = await api.post('/ai/suggest-fitment', {
+        title: selectedItem.title || '',
+        description: selectedItem.descriptionPreview || ''
+      });
+      if (!data.make) {
+        showSnackbar('AI could not extract fitment info from this listing', 'warning');
+        return;
+      }
+      // Step 1: Set make and fetch models
+      setSelectedMake(data.make);
+      setLoadingModels(true);
+      setModelOptions([]);
+      setSelectedModel(null);
+      setYearOptions([]);
+      setSelectedYears([]);
+      setTrimsByYear({});
+      setSelectedTrimsByYear({});
+      setExpandedYears({});
+      try {
+        const modelsRes = await api.post('/ebay/compatibility/values', {
+          sellerId: currentSellerId,
+          propertyName: 'Model',
+          constraints: [{ name: 'Make', value: data.make }]
+        });
+        setModelOptions(modelsRes.data.values || []);
+      } finally {
+        setLoadingModels(false);
+      }
+      // Step 2: Set model and fetch years
+      setSelectedModel(data.model);
+      setLoadingYears(true);
+      setYearOptions([]);
+      setSelectedYears([]);
+      try {
+        const yearsRes = await api.post('/ebay/compatibility/values', {
+          sellerId: currentSellerId,
+          propertyName: 'Year',
+          constraints: [
+            { name: 'Make', value: data.make },
+            { name: 'Model', value: data.model }
+          ]
+        });
+        const yearList = (yearsRes.data.values || [])
+          .map(y => String(y))
+          .sort((a, b) => Number(b) - Number(a));
+        setYearOptions(yearList);
+        // Step 3: Apply year range
+        if (data.startYear && data.endYear) {
+          setStartYear(data.startYear);
+          setEndYear(data.endYear);
+          const startNum = Number(data.startYear);
+          const endNum = Number(data.endYear);
+          const min = Math.min(startNum, endNum);
+          const max = Math.max(startNum, endNum);
+          const range = yearList.filter(y => Number(y) >= min && Number(y) <= max);
+          setSelectedYears(range);
+        }
+      } finally {
+        setLoadingYears(false);
+      }
+      showSnackbar(`AI suggested: ${data.make} ${data.model} (${data.startYear}–${data.endYear})`, 'success');
+    } catch (e) {
+      showSnackbar('AI suggestion failed: ' + (e.response?.data?.error || e.message), 'error');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // --- HANDLERS ---
@@ -875,9 +950,32 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
               Compatible Vehicles ({editCompatList.length})
             </Typography>
 
+            {/* AI SUGGEST BUTTON */}
+            <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={aiLoading ? <CircularProgress size={14} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                onClick={handleAiSuggest}
+                disabled={aiLoading}
+                sx={{
+                  borderColor: '#7c3aed',
+                  color: '#7c3aed',
+                  '&:hover': { borderColor: '#6d28d9', bgcolor: '#f5f3ff' },
+                  fontWeight: 600,
+                  fontSize: '0.78rem'
+                }}
+              >
+                {aiLoading ? 'Analyzing...' : '✨ AI Suggest'}
+              </Button>
+              <Typography variant="caption" color="textSecondary">
+                Auto-fills Make, Model &amp; Year range from listing title/description
+              </Typography>
+            </Box>
+
             <Grid container spacing={2} alignItems="flex-start" sx={{ mb: 2 }}>
               {/* MAKE */}
-              <Grid item xs={2}>
+              <Grid item xs={3}>
                 <Autocomplete
                   options={makeOptions}
                   value={selectedMake}
@@ -887,7 +985,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 />
               </Grid>
               {/* MODEL */}
-              <Grid item xs={2}>
+              <Grid item xs={3}>
                 <Autocomplete
                   options={modelOptions}
                   value={selectedModel}
@@ -898,7 +996,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 />
               </Grid>
               {/* YEAR RANGE SELECTOR */}
-              <Grid item xs={5}>
+              <Grid item xs={6}>
                 <Box>
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                     <Autocomplete
