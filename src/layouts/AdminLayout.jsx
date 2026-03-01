@@ -1,10 +1,9 @@
-import { useMemo, useState, useEffect, startTransition } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
   CssBaseline,
-  Collapse,
   Divider,
   Drawer,
   IconButton,
@@ -28,8 +27,8 @@ import StoreIcon from '@mui/icons-material/Store';
 import AppsIcon from '@mui/icons-material/Apps';
 import CategoryIcon from '@mui/icons-material/Category';
 import ListAltIcon from '@mui/icons-material/ListAlt';
-import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ProductResearchPage from '../pages/admin/ProductResearchPage.jsx';
 import AddListerPage from '../pages/admin/AddListerPage.jsx';
@@ -138,6 +137,22 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 const drawerWidth = 230;
 
+// Shared flyout menu positioning — all flyouts open to the right of their anchor
+const flyoutMenuPositionProps = {
+  anchorOrigin: { vertical: 'top', horizontal: 'right' },
+  transformOrigin: { vertical: 'top', horizontal: 'left' },
+};
+
+// Custom styling for selected sidebar items
+const selectedMenuItemStyle = {
+  '&.Mui-selected': {
+    backgroundColor: 'rgba(25, 118, 210, 0.25)',
+    '&:hover': {
+      backgroundColor: 'rgba(25, 118, 210, 0.35)',
+    }
+  }
+};
+
 // Helper component for sidebar icons with tooltips when collapsed
 const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
   sidebarOpen ? (
@@ -160,14 +175,8 @@ const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
 export default function AdminLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [listingMenuOpen, setListingMenuOpen] = useState(false);
-  const [monitoringMenuOpen, setMonitoringMenuOpen] = useState(false);
-  const [compatMenuOpen, setCompatMenuOpen] = useState(false);
-  const [ordersMenuOpen, setOrdersMenuOpen] = useState(false);
-  const [manageMenuOpen, setManageMenuOpen] = useState(false);
-  const [financeMenuOpen, setFinanceMenuOpen] = useState(false);
 
-  // Flyout menu anchor states for collapsed sidebar
+  // Flyout menu anchor states
   const [listingAnchorEl, setListingAnchorEl] = useState(null);
   const [monitoringAnchorEl, setMonitoringAnchorEl] = useState(null);
   const [compatAnchorEl, setCompatAnchorEl] = useState(null);
@@ -178,19 +187,16 @@ export default function AdminLayout({ user, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Close all dropdowns when sidebar collapses
-  useEffect(() => {
-    if (!sidebarOpen) {
-      startTransition(() => {
-        setListingMenuOpen(false);
-        setMonitoringMenuOpen(false);
-        setCompatMenuOpen(false);
-        setOrdersMenuOpen(false);
-        setManageMenuOpen(false);
-        setFinanceMenuOpen(false);
-      });
-    }
-  }, [sidebarOpen]);
+  // Close all flyout menus + mobile drawer in one call
+  const closeAllMenus = () => {
+    setListingAnchorEl(null);
+    setMonitoringAnchorEl(null);
+    setCompatAnchorEl(null);
+    setOrdersAnchorEl(null);
+    setManageAnchorEl(null);
+    setFinanceAnchorEl(null);
+    setMobileOpen(false);
+  };
 
   // --- ROLE DEFINITIONS ---
   const isSuper = user?.role === 'superadmin';
@@ -212,16 +218,6 @@ export default function AdminLayout({ user, onLogout }) {
   const isAdvanceLister = user?.role === 'advancelister';
   const isTrainee = user?.role === 'trainee';
   const isAnyLister = isLister || isAdvanceLister || isTrainee;
-
-  // Custom styling for selected menu items
-  const selectedMenuItemStyle = {
-    '&.Mui-selected': {
-      backgroundColor: 'rgba(25, 118, 210, 0.25)',
-      '&:hover': {
-        backgroundColor: 'rgba(25, 118, 210, 0.35)',
-      }
-    }
-  };
 
   const drawer = (
     <div>
@@ -303,112 +299,31 @@ export default function AdminLayout({ user, onLogout }) {
           <>
             <ListItem disablePadding>
               <ListItemButton
-                onClick={() => sidebarOpen && setFinanceMenuOpen((open) => !open)}
-                onMouseEnter={(e) => !sidebarOpen && setFinanceAnchorEl(e.currentTarget)}
-                onMouseLeave={() => !sidebarOpen && setFinanceAnchorEl(null)}
+                onClick={(e) => setFinanceAnchorEl(e.currentTarget)}
                 sx={{ justifyContent: 'space-between' }}
               >
                 <ListItemIcon>
                   <NavIcon icon={AttachMoneyIcon} label="Finance" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Finance" />}
-                {sidebarOpen && (financeMenuOpen ? <ExpandLess /> : <ExpandMore />)}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
               </ListItemButton>
             </ListItem>
 
-            {/* Expanded sidebar: Collapse component */}
-            {sidebarOpen && (
-              <Collapse in={financeMenuOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ pl: 4 }}>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/payoneer"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/payoneer'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Payoneer Sheet" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/bank-accounts"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/bank-accounts'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Bank Accounts" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/transactions"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/transactions'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Transactions" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/extra-expenses"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/extra-expenses'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Extra Expenses" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/credit-card-names"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/credit-card-names'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Credit Card Names" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/salary"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/salary'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Salary Page" />
-                  </ListItemButton>
-                </List>
-              </Collapse>
-            )}
-
-            {/* Collapsed sidebar: Flyout menu */}
+            {/* Sideways flyout menu */}
             <Menu
               anchorEl={financeAnchorEl}
-              open={Boolean(financeAnchorEl) && !sidebarOpen}
+              open={Boolean(financeAnchorEl)}
               onClose={() => setFinanceAnchorEl(null)}
-              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-              MenuListProps={{
-                onMouseEnter: () => financeAnchorEl && setFinanceAnchorEl(financeAnchorEl),
-                onMouseLeave: () => setFinanceAnchorEl(null),
-              }}
-              sx={{ pointerEvents: 'none', '& .MuiPaper-root': { pointerEvents: 'auto', minWidth: '220px' } }}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
             >
-              <MenuItem component={Link} to="/admin/payoneer" onClick={() => setFinanceAnchorEl(null)}>
-                Payoneer Sheet
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/bank-accounts" onClick={() => setFinanceAnchorEl(null)}>
-                Bank Accounts
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/transactions" onClick={() => setFinanceAnchorEl(null)}>
-                Transactions
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/extra-expenses" onClick={() => setFinanceAnchorEl(null)}>
-                Extra Expenses
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/credit-card-names" onClick={() => setFinanceAnchorEl(null)}>
-                Credit Card Names
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/salary" onClick={() => setFinanceAnchorEl(null)}>
-                Salary Page
-              </MenuItem>
+              <MenuItem component={Link} to="/admin/payoneer" onClick={closeAllMenus}>Payoneer Sheet</MenuItem>
+              <MenuItem component={Link} to="/admin/bank-accounts" onClick={closeAllMenus}>Bank Accounts</MenuItem>
+              <MenuItem component={Link} to="/admin/transactions" onClick={closeAllMenus}>Transactions</MenuItem>
+              <MenuItem component={Link} to="/admin/extra-expenses" onClick={closeAllMenus}>Extra Expenses</MenuItem>
+              <MenuItem component={Link} to="/admin/credit-card-names" onClick={closeAllMenus}>Credit Card Names</MenuItem>
+              <MenuItem component={Link} to="/admin/salary" onClick={closeAllMenus}>Salary Page</MenuItem>
             </Menu>
 
             {/* View All Messages - standalone */}
@@ -677,155 +592,27 @@ export default function AdminLayout({ user, onLogout }) {
 
             <ListItem disablePadding>
               <ListItemButton
-                onClick={() => sidebarOpen && setListingMenuOpen((open) => !open)}
-                onMouseEnter={(e) => !sidebarOpen && setListingAnchorEl(e.currentTarget)}
-                onMouseLeave={() => !sidebarOpen && setListingAnchorEl(null)}
+                onClick={(e) => setListingAnchorEl(e.currentTarget)}
                 sx={{ justifyContent: 'space-between' }}
               >
                 <ListItemIcon>
                   <NavIcon icon={ListAltIcon} label="Listing Management" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Listing" />}
-                {sidebarOpen && (listingMenuOpen ? <ExpandLess /> : <ExpandMore />)}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
               </ListItemButton>
             </ListItem>
 
-            {/* Expanded sidebar: Collapse component */}
-            {sidebarOpen && (
-              <Collapse in={listingMenuOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ pl: 4 }}>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/listing"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/listing'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Product Table" />
-                  </ListItemButton>
-                  {/* Monitoring Subdropdown */}
-                  <ListItemButton onClick={() => setMonitoringMenuOpen((open) => !open)} sx={{ justifyContent: 'space-between' }}>
-                    <ListItemText primary="Monitoring" />
-                    {monitoringMenuOpen ? <ExpandLess /> : <ExpandMore />}
-                  </ListItemButton>
-                  <Collapse in={monitoringMenuOpen} timeout="auto" unmountOnExit>
-                    <List component="div" disablePadding sx={{ pl: 4 }}>
-                      <ListItemButton
-                        component={Link}
-                        to="/admin/task-list"
-                        onClick={() => setMobileOpen(false)}
-                        selected={location.pathname === '/admin/task-list'}
-                        sx={selectedMenuItemStyle}
-                      >
-                        <ListItemText primary="Task List" />
-                      </ListItemButton>
-                      <ListItemButton
-                        component={Link}
-                        to="/admin/assignments"
-                        onClick={() => setMobileOpen(false)}
-                        selected={location.pathname === '/admin/assignments'}
-                        sx={selectedMenuItemStyle}
-                      >
-                        <ListItemText primary="Assignments" />
-                      </ListItemButton>
-                      <ListItemButton
-                        component={Link}
-                        to="/admin/listings-summary"
-                        onClick={() => setMobileOpen(false)}
-                        selected={location.pathname === '/admin/listings-summary'}
-                        sx={selectedMenuItemStyle}
-                      >
-                        <ListItemText primary="Listings Summary" />
-                      </ListItemButton>
-                      <ListItemButton
-                        component={Link}
-                        to="/admin/listings-summary"
-                        onClick={() => setMobileOpen(false)}
-                        selected={location.pathname === '/admin/listings-summary'}
-                        sx={selectedMenuItemStyle}
-                      >
-                        <ListItemText primary="Listings Summary" />
-                      </ListItemButton>
-
-                      <ListItemButton
-                        component={Link}
-                        to="/admin/listing-sheet"
-                        onClick={() => setMobileOpen(false)}
-                        selected={location.pathname === '/admin/listing-sheet'}
-                        sx={selectedMenuItemStyle}
-                      >
-                        <ListItemText primary="Listing Sheet" />
-                      </ListItemButton>
-                      <ListItemButton
-                        component={Link}
-                        to="/admin/store-wise-tasks"
-                        onClick={() => setMobileOpen(false)}
-                        selected={location.pathname === '/admin/store-wise-tasks'}
-                        sx={selectedMenuItemStyle}
-                      >
-                        <ListItemText primary="Store-Wise Tasks" />
-                      </ListItemButton>
-                      <ListItemButton
-                        component={Link}
-                        to="/admin/store-daily-tasks"
-                        onClick={() => setMobileOpen(false)}
-                        selected={location.pathname === '/admin/store-daily-tasks'}
-                        sx={selectedMenuItemStyle}
-                      >
-                        <ListItemText primary="Store Daily Tasks" />
-                      </ListItemButton>
-                      <ListItemButton
-                        component={Link}
-                        to="/admin/lister-info"
-                        onClick={() => setMobileOpen(false)}
-                        selected={location.pathname === '/admin/lister-info'}
-                        sx={selectedMenuItemStyle}
-                      >
-                        <ListItemText primary="Lister Info" />
-                      </ListItemButton>
-                      <ListItemButton
-                        component={Link}
-                        to="/admin/range-analyzer"
-                        onClick={() => setMobileOpen(false)}
-                        selected={location.pathname === '/admin/range-analyzer'}
-                        sx={selectedMenuItemStyle}
-                      >
-                        <ListItemText primary="Range Analyzer" />
-                      </ListItemButton>
-                    </List>
-                  </Collapse>
-
-                </List>
-              </Collapse>
-            )}
-
-            {/* Collapsed sidebar: Flyout menu */}
+            {/* Sideways flyout menu */}
             <Menu
               anchorEl={listingAnchorEl}
-              open={Boolean(listingAnchorEl) && !sidebarOpen}
-              onClose={() => {
-                setListingAnchorEl(null);
-                setMonitoringAnchorEl(null);
-              }}
-              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-              MenuListProps={{
-                onMouseEnter: () => listingAnchorEl && setListingAnchorEl(listingAnchorEl),
-                onMouseLeave: () => {
-                  // Only close Listing menu if Monitoring is also not open
-                  if (!monitoringAnchorEl) {
-                    setListingAnchorEl(null);
-                  }
-                },
-              }}
-              sx={{ pointerEvents: 'none', '& .MuiPaper-root': { pointerEvents: 'auto', minWidth: '220px' } }}
+              open={Boolean(listingAnchorEl)}
+              onClose={() => { setListingAnchorEl(null); setMonitoringAnchorEl(null); }}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
             >
-              <MenuItem component={Link} to="/admin/listing" onClick={() => { setListingAnchorEl(null); setMonitoringAnchorEl(null); }}>
-                Product Table
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/feed-upload" onClick={() => { setListingAnchorEl(null); setMonitoringAnchorEl(null); }}>
-                Feed Upload (CSV)
-              </MenuItem>
+              <MenuItem component={Link} to="/admin/listing" onClick={closeAllMenus}>Product Table</MenuItem>
+              <MenuItem component={Link} to="/admin/feed-upload" onClick={closeAllMenus}>Feed Upload (CSV)</MenuItem>
               <MenuItem
                 onMouseEnter={(e) => setMonitoringAnchorEl(e.currentTarget)}
                 onMouseLeave={() => setMonitoringAnchorEl(null)}
@@ -838,43 +625,23 @@ export default function AdminLayout({ user, onLogout }) {
             {/* Nested Monitoring flyout menu */}
             <Menu
               anchorEl={monitoringAnchorEl}
-              open={Boolean(monitoringAnchorEl) && !sidebarOpen}
+              open={Boolean(monitoringAnchorEl)}
               onClose={() => setMonitoringAnchorEl(null)}
-              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              {...flyoutMenuPositionProps}
               MenuListProps={{
                 onMouseEnter: () => monitoringAnchorEl && setMonitoringAnchorEl(monitoringAnchorEl),
                 onMouseLeave: () => setMonitoringAnchorEl(null),
               }}
               sx={{ pointerEvents: 'none', '& .MuiPaper-root': { pointerEvents: 'auto', minWidth: '220px', maxHeight: '80vh' } }}
             >
-              <MenuItem component={Link} to="/admin/task-list" onClick={() => { setMonitoringAnchorEl(null); setListingAnchorEl(null); }}>
-                Task List
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/assignments" onClick={() => { setMonitoringAnchorEl(null); setListingAnchorEl(null); }}>
-                Assignments
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/listings-summary" onClick={() => { setMonitoringAnchorEl(null); setListingAnchorEl(null); }}>
-                Listings Summary
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/listings-summary" onClick={() => { setMonitoringAnchorEl(null); setListingAnchorEl(null); }}>
-                Listings Summary
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/listing-sheet" onClick={() => { setMonitoringAnchorEl(null); setListingAnchorEl(null); }}>
-                Listing Sheet
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/store-wise-tasks" onClick={() => { setMonitoringAnchorEl(null); setListingAnchorEl(null); }}>
-                Store-Wise Tasks
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/store-daily-tasks" onClick={() => { setMonitoringAnchorEl(null); setListingAnchorEl(null); }}>
-                Store Daily Tasks
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/lister-info" onClick={() => { setMonitoringAnchorEl(null); setListingAnchorEl(null); }}>
-                Lister Info
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/range-analyzer" onClick={() => { setMonitoringAnchorEl(null); setListingAnchorEl(null); }}>
-                Range Analyzer
-              </MenuItem>
+              <MenuItem component={Link} to="/admin/task-list" onClick={closeAllMenus}>Task List</MenuItem>
+              <MenuItem component={Link} to="/admin/assignments" onClick={closeAllMenus}>Assignments</MenuItem>
+              <MenuItem component={Link} to="/admin/listings-summary" onClick={closeAllMenus}>Listings Summary</MenuItem>
+              <MenuItem component={Link} to="/admin/listing-sheet" onClick={closeAllMenus}>Listing Sheet</MenuItem>
+              <MenuItem component={Link} to="/admin/store-wise-tasks" onClick={closeAllMenus}>Store-Wise Tasks</MenuItem>
+              <MenuItem component={Link} to="/admin/store-daily-tasks" onClick={closeAllMenus}>Store Daily Tasks</MenuItem>
+              <MenuItem component={Link} to="/admin/lister-info" onClick={closeAllMenus}>Lister Info</MenuItem>
+              <MenuItem component={Link} to="/admin/range-analyzer" onClick={closeAllMenus}>Range Analyzer</MenuItem>
             </Menu>
           </>
         )}
@@ -884,64 +651,27 @@ export default function AdminLayout({ user, onLogout }) {
           <>
             <ListItem disablePadding>
               <ListItemButton
-                onClick={() => sidebarOpen && setCompatMenuOpen((open) => !open)}
-                onMouseEnter={(e) => !sidebarOpen && setCompatAnchorEl(e.currentTarget)}
-                onMouseLeave={() => !sidebarOpen && setCompatAnchorEl(null)}
+                onClick={(e) => setCompatAnchorEl(e.currentTarget)}
                 sx={{ justifyContent: 'space-between' }}
               >
                 <ListItemIcon>
                   <NavIcon icon={TaskIcon} label="Compatibility Management" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Compatibility" />}
-                {sidebarOpen && (compatMenuOpen ? <ExpandLess /> : <ExpandMore />)}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
               </ListItemButton>
             </ListItem>
 
-            {/* Expanded sidebar: Collapse component */}
-            {sidebarOpen && (
-              <Collapse in={compatMenuOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ pl: 4 }}>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/compatibility-tasks"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/compatibility-tasks'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Compatibility Tasks" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/compatibility-progress"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/compatibility-progress'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Progress Tracking" />
-                  </ListItemButton>
-                </List>
-              </Collapse>
-            )}
-
-            {/* Collapsed sidebar: Flyout menu */}
+            {/* Sideways flyout menu */}
             <Menu
               anchorEl={compatAnchorEl}
-              open={Boolean(compatAnchorEl) && !sidebarOpen}
+              open={Boolean(compatAnchorEl)}
               onClose={() => setCompatAnchorEl(null)}
-              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-              MenuListProps={{
-                onMouseEnter: () => compatAnchorEl && setCompatAnchorEl(compatAnchorEl),
-                onMouseLeave: () => setCompatAnchorEl(null),
-              }}
-              sx={{ pointerEvents: 'none', '& .MuiPaper-root': { pointerEvents: 'auto', minWidth: '220px' } }}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
             >
-              <MenuItem component={Link} to="/admin/compatibility-tasks" onClick={() => setCompatAnchorEl(null)}>
-                Compatibility Tasks
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/compatibility-progress" onClick={() => setCompatAnchorEl(null)}>
-                Progress Tracking
-              </MenuItem>
+              <MenuItem component={Link} to="/admin/compatibility-tasks" onClick={closeAllMenus}>Compatibility Tasks</MenuItem>
+              <MenuItem component={Link} to="/admin/compatibility-progress" onClick={closeAllMenus}>Progress Tracking</MenuItem>
             </Menu>
           </>
         )}
@@ -984,222 +714,40 @@ export default function AdminLayout({ user, onLogout }) {
           <>
             <ListItem disablePadding>
               <ListItemButton
-                onClick={() => sidebarOpen && setOrdersMenuOpen((open) => !open)}
-                onMouseEnter={(e) => !sidebarOpen && setOrdersAnchorEl(e.currentTarget)}
-                onMouseLeave={() => !sidebarOpen && setOrdersAnchorEl(null)}
+                onClick={(e) => setOrdersAnchorEl(e.currentTarget)}
                 sx={{ justifyContent: 'space-between' }}
               >
                 <ListItemIcon>
                   <NavIcon icon={LocalShippingIcon} label="Orders & Fulfillment" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Orders Dept" />}
-                {sidebarOpen && (ordersMenuOpen ? <ExpandLess /> : <ExpandMore />)}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
               </ListItemButton>
             </ListItem>
 
-            {/* Expanded sidebar: Collapse component */}
-            {sidebarOpen && (
-              <Collapse in={ordersMenuOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ pl: 4 }}>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/orders-dashboard"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/orders-dashboard'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Orders Dashboard" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/order-analytics"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/order-analytics'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Order Analytics" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/seller-analytics"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/seller-analytics'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Seller Analytics" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/fulfillment"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/fulfillment'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="All Orders" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/all-orders-sheet"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/all-orders-sheet'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="All Orders Sheet (USD)" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/awaiting-shipment"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/awaiting-shipment'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Awaiting Shipment" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/awaiting-sheet"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/awaiting-sheet'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Awaiting Sheet" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/amazon-arrivals"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/amazon-arrivals'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Amazon Arrivals" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/fulfillment-notes"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/fulfillment-notes'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Fulfillment Notes" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/disputes"
-                    onClick={() => setMobileOpen(false)}
-                    selected={
-                      location.pathname === '/admin/disputes' ||
-                      location.pathname === '/admin/worksheet' ||
-                      location.pathname === '/admin/cancelled-status' ||
-                      location.pathname === '/admin/return-requested'
-                    }
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Issues and Resolutions" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/account-health"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/account-health'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Account Health Report" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/message-received"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/message-received'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Buyer Messages" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/conversation-management"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/conversation-management'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Conversation Mgmt" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/amazon-accounts"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/amazon-accounts'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Manage Amazon Accts" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/credit-cards"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/credit-cards'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Manage Credit Cards" />
-                  </ListItemButton>
-                </List>
-              </Collapse>
-            )}
-
-            {/* Collapsed sidebar: Flyout menu */}
+            {/* Sideways flyout menu */}
             <Menu
               anchorEl={ordersAnchorEl}
-              open={Boolean(ordersAnchorEl) && !sidebarOpen}
+              open={Boolean(ordersAnchorEl)}
               onClose={() => setOrdersAnchorEl(null)}
-              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-              MenuListProps={{
-                onMouseEnter: () => ordersAnchorEl && setOrdersAnchorEl(ordersAnchorEl),
-                onMouseLeave: () => setOrdersAnchorEl(null),
-              }}
-              sx={{ pointerEvents: 'none', '& .MuiPaper-root': { pointerEvents: 'auto', minWidth: '220px', maxHeight: '80vh' } }}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px', maxHeight: '80vh' } }}
             >
-              <MenuItem component={Link} to="/admin/orders-dashboard" onClick={() => setOrdersAnchorEl(null)}>
-                Orders Dashboard
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/order-analytics" onClick={() => setOrdersAnchorEl(null)}>
-                Order Analytics
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/seller-analytics" onClick={() => setOrdersAnchorEl(null)}>
-                Seller Analytics
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/fulfillment" onClick={() => setOrdersAnchorEl(null)}>
-                All Orders
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/all-orders-sheet" onClick={() => setOrdersAnchorEl(null)}>
-                All Orders Sheet (USD)
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/awaiting-shipment" onClick={() => setOrdersAnchorEl(null)}>
-                Awaiting Shipment
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/awaiting-sheet" onClick={() => setOrdersAnchorEl(null)}>
-                Awaiting Sheet
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/fulfillment-notes" onClick={() => setOrdersAnchorEl(null)}>
-                Fulfillment Notes
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/disputes" onClick={() => setOrdersAnchorEl(null)}>
-                Issues and Resolutions
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/account-health" onClick={() => setOrdersAnchorEl(null)}>
-                Account Health Report
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/message-received" onClick={() => setOrdersAnchorEl(null)}>
-                Buyer Messages
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/conversation-management" onClick={() => setOrdersAnchorEl(null)}>
-                Conversation Mgmt
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/amazon-accounts" onClick={() => setOrdersAnchorEl(null)}>
-                Manage Amazon Accts
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/credit-cards" onClick={() => setOrdersAnchorEl(null)}>
-                Manage Credit Cards
-              </MenuItem>
+              <MenuItem component={Link} to="/admin/orders-dashboard" onClick={closeAllMenus}>Orders Dashboard</MenuItem>
+              <MenuItem component={Link} to="/admin/order-analytics" onClick={closeAllMenus}>Order Analytics</MenuItem>
+              <MenuItem component={Link} to="/admin/seller-analytics" onClick={closeAllMenus}>Seller Analytics</MenuItem>
+              <MenuItem component={Link} to="/admin/fulfillment" onClick={closeAllMenus}>All Orders</MenuItem>
+              <MenuItem component={Link} to="/admin/all-orders-sheet" onClick={closeAllMenus}>All Orders Sheet (USD)</MenuItem>
+              <MenuItem component={Link} to="/admin/awaiting-shipment" onClick={closeAllMenus}>Awaiting Shipment</MenuItem>
+              <MenuItem component={Link} to="/admin/awaiting-sheet" onClick={closeAllMenus}>Awaiting Sheet</MenuItem>
+              <MenuItem component={Link} to="/admin/amazon-arrivals" onClick={closeAllMenus}>Amazon Arrivals</MenuItem>
+              <MenuItem component={Link} to="/admin/fulfillment-notes" onClick={closeAllMenus}>Fulfillment Notes</MenuItem>
+              <MenuItem component={Link} to="/admin/disputes" onClick={closeAllMenus}>Issues and Resolutions</MenuItem>
+              <MenuItem component={Link} to="/admin/account-health" onClick={closeAllMenus}>Account Health Report</MenuItem>
+              <MenuItem component={Link} to="/admin/message-received" onClick={closeAllMenus}>Buyer Messages</MenuItem>
+              <MenuItem component={Link} to="/admin/conversation-management" onClick={closeAllMenus}>Conversation Mgmt</MenuItem>
+              <MenuItem component={Link} to="/admin/amazon-accounts" onClick={closeAllMenus}>Manage Amazon Accts</MenuItem>
+              <MenuItem component={Link} to="/admin/credit-cards" onClick={closeAllMenus}>Manage Credit Cards</MenuItem>
             </Menu>
           </>
         )}
@@ -1209,74 +757,26 @@ export default function AdminLayout({ user, onLogout }) {
           <>
             <ListItem disablePadding>
               <ListItemButton
-                onClick={() => sidebarOpen && setManageMenuOpen((open) => !open)}
-                onMouseEnter={(e) => !sidebarOpen && setManageAnchorEl(e.currentTarget)}
-                onMouseLeave={() => !sidebarOpen && setManageAnchorEl(null)}
+                onClick={(e) => setManageAnchorEl(e.currentTarget)}
                 sx={{ justifyContent: 'space-between' }}
               >
                 <ListItemIcon><CategoryIcon /></ListItemIcon>
                 {sidebarOpen && <ListItemText primary="Manage Components" />}
-                {sidebarOpen && (manageMenuOpen ? <ExpandLess /> : <ExpandMore />)}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
               </ListItemButton>
             </ListItem>
 
-            {/* Expanded sidebar: Collapse component */}
-            {sidebarOpen && (
-              <Collapse in={manageMenuOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ pl: 4 }}>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/categories"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/categories'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Manage Categories" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/platforms"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/platforms'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Manage Platforms" />
-                  </ListItemButton>
-                  <ListItemButton
-                    component={Link}
-                    to="/admin/stores"
-                    onClick={() => setMobileOpen(false)}
-                    selected={location.pathname === '/admin/stores'}
-                    sx={selectedMenuItemStyle}
-                  >
-                    <ListItemText primary="Manage Stores" />
-                  </ListItemButton>
-                </List>
-              </Collapse>
-            )}
-
-            {/* Collapsed sidebar: Flyout menu */}
+            {/* Sideways flyout menu */}
             <Menu
               anchorEl={manageAnchorEl}
-              open={Boolean(manageAnchorEl) && !sidebarOpen}
+              open={Boolean(manageAnchorEl)}
               onClose={() => setManageAnchorEl(null)}
-              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-              MenuListProps={{
-                onMouseEnter: () => manageAnchorEl && setManageAnchorEl(manageAnchorEl),
-                onMouseLeave: () => setManageAnchorEl(null),
-              }}
-              sx={{ pointerEvents: 'none', '& .MuiPaper-root': { pointerEvents: 'auto', minWidth: '220px' } }}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
             >
-              <MenuItem component={Link} to="/admin/categories" onClick={() => setManageAnchorEl(null)}>
-                Manage Categories
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/platforms" onClick={() => setManageAnchorEl(null)}>
-                Manage Platforms
-              </MenuItem>
-              <MenuItem component={Link} to="/admin/stores" onClick={() => setManageAnchorEl(null)}>
-                Manage Stores
-              </MenuItem>
+              <MenuItem component={Link} to="/admin/categories" onClick={closeAllMenus}>Manage Categories</MenuItem>
+              <MenuItem component={Link} to="/admin/platforms" onClick={closeAllMenus}>Manage Platforms</MenuItem>
+              <MenuItem component={Link} to="/admin/stores" onClick={closeAllMenus}>Manage Stores</MenuItem>
             </Menu>
           </>
         )}
