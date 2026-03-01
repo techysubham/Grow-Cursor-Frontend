@@ -114,6 +114,7 @@ import UmbrellaIcon from '@mui/icons-material/Umbrella';
 import ASINStoragePage from '../pages/admin/ASINStoragePage.jsx';
 import StorageIcon from '@mui/icons-material/Storage';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
+import LayersIcon from '@mui/icons-material/Layers';
 import ColumnCreatorPage from '../pages/admin/ColumnCreatorPage.jsx';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import ManageTemplatesPage from '../pages/admin/ManageTemplatesPage.jsx';
@@ -185,6 +186,7 @@ export default function AdminLayout({ user, onLogout }) {
   const [manageAnchorEl, setManageAnchorEl] = useState(null);
   const [financeAnchorEl, setFinanceAnchorEl] = useState(null);
   const [asinImporterAnchorEl, setAsinImporterAnchorEl] = useState(null);
+  const [templateListingAnchorEl, setTemplateListingAnchorEl] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -198,6 +200,7 @@ export default function AdminLayout({ user, onLogout }) {
     setManageAnchorEl(null);
     setFinanceAnchorEl(null);
     setAsinImporterAnchorEl(null);
+    setTemplateListingAnchorEl(null);
     setMobileOpen(false);
   };
 
@@ -397,60 +400,37 @@ export default function AdminLayout({ user, onLogout }) {
               </ListItemButton>
             </ListItem>
 
-            {/* Listing Templates - Create/Edit Templates (Superadmin only) */}
-            {isSuper && (
-              <ListItem disablePadding>
-                <ListItemButton
-                  component={Link}
-                  to="/admin/manage-templates"
-                  onClick={() => setMobileOpen(false)}
-                  selected={location.pathname === '/admin/manage-templates'}
-                  sx={selectedMenuItemStyle}
-                >
-                  <ListItemIcon>
-                    <NavIcon icon={DescriptionIcon} label="Manage Templates" sidebarOpen={sidebarOpen} />
-                  </ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="Manage Templates" />}
-                </ListItemButton>
-              </ListItem>
-            )}
-
-            {/* Template Listings Database (Superadmin only) */}
-            {isSuper && (
-              <ListItem disablePadding>
-                <ListItemButton
-                  component={Link}
-                  to="/admin/listings-database"
-                  onClick={() => setMobileOpen(false)}
-                  selected={location.pathname === '/admin/listings-database'}
-                  sx={selectedMenuItemStyle}
-                >
-                  <ListItemIcon>
-                    <NavIcon icon={StorageIcon} label="Listings Database" sidebarOpen={sidebarOpen} />
-                  </ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="Listings Database" />}
-                </ListItemButton>
-              </ListItem>
-            )}
           </>
         ) : null}
 
-        {/* Template Listings - Seller-based listing workflow (Superadmin + Listers) */}
+        {/* Template Listing flyout (Superadmin + Listers) */}
         {(isSuper || isAnyLister) && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/select-seller"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname.startsWith('/admin/select-seller') || location.pathname.startsWith('/admin/seller-templates') || location.pathname.startsWith('/admin/template-listings')}
-              sx={selectedMenuItemStyle}
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={(e) => setTemplateListingAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={LayersIcon} label="Template Listing" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Template Listing" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+              </ListItemButton>
+            </ListItem>
+
+            <Menu
+              anchorEl={templateListingAnchorEl}
+              open={Boolean(templateListingAnchorEl)}
+              onClose={() => setTemplateListingAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
             >
-              <ListItemIcon>
-                <NavIcon icon={AddCircleIcon} label="Add Template Listings" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Add Template Listings" />}
-            </ListItemButton>
-          </ListItem>
+              {isSuper && <MenuItem component={Link} to="/admin/manage-templates" onClick={closeAllMenus}>Manage Templates</MenuItem>}
+              {isSuper && <MenuItem component={Link} to="/admin/listings-database" onClick={closeAllMenus}>Listings Database</MenuItem>}
+              <MenuItem component={Link} to="/admin/select-seller" onClick={closeAllMenus}>Add Template Listings</MenuItem>
+            </Menu>
+          </>
         )}
 
         {/* Continue with Product Features (Superadmin only) */}
