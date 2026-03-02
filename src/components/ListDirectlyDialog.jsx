@@ -146,8 +146,30 @@ export default function ListDirectlyDialog({ open, onClose, selectedListings, te
 
       const csvFile = new File([response.data], filename, { type: 'text/csv' });
 
+      // Save to CSV Storage (non-blocking — upload still proceeds on failure)
+      let csvStorageId = null;
+      try {
+        const storageForm = new FormData();
+        storageForm.append('csvFile', csvFile, csvFile.name);
+        storageForm.append('sellerId', selectedSeller);
+        if (templateId) storageForm.append('templateId', templateId);
+        storageForm.append('listingCount', String(selectedListings.size));
+        if (selectedCategoryId) storageForm.append('categoryId', selectedCategoryId);
+        storageForm.append('categoryName', categories.find(c => c._id === selectedCategoryId)?.name || '');
+        if (selectedRangeId) storageForm.append('rangeId', selectedRangeId);
+        storageForm.append('rangeName', ranges.find(r => r._id === selectedRangeId)?.name || '');
+        if (selectedProductId) storageForm.append('productId', selectedProductId);
+        storageForm.append('productName', products.find(p => p._id === selectedProductId)?.name || '');
+        const saveRes = await api.post('/csv-storage', storageForm, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        csvStorageId = saveRes.data._id;
+      } catch (saveErr) {
+        console.error('Failed to save CSV to storage:', saveErr.message);
+      }
+
       onClose();
-      navigate('/admin/feed-upload', { state: { sellerId: selectedSeller, csvFile } });
+      navigate('/admin/feed-upload', { state: { sellerId: selectedSeller, csvFile, csvStorageId } });
     } catch (err) {
       const msg = err.response?.data
         ? (err.response.data instanceof Blob

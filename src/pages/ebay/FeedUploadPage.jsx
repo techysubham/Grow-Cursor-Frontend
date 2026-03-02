@@ -173,6 +173,15 @@ const FeedUploadPage = () => {
                 },
             });
 
+            // If this upload came from CSV Storage (List Directly flow), link the records
+            const taskId = response.data?.taskId;
+            if (location.state?.csvStorageId && taskId) {
+                try {
+                    await api.patch(`/csv-storage/${location.state.csvStorageId}/link-upload`, { taskId });
+                } catch (linkErr) {
+                    console.error('Failed to link CSV storage record:', linkErr.message);
+                }
+            }
             setResult(response.data);
             fetchTasks(); // Refresh list
         } catch (err) {
