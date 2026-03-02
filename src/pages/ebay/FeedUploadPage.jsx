@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
     Box,
     Paper,
@@ -33,6 +34,7 @@ const FEED_TYPES = [
 ];
 
 const FeedUploadPage = () => {
+    const location = useLocation();
     const [selectedFile, setSelectedFile] = useState(null);
     const [feedType, setFeedType] = useState('FX_LISTING');
     const [schemaVersion, setSchemaVersion] = useState('1.0');
@@ -50,13 +52,23 @@ const FeedUploadPage = () => {
     const [totalTasks, setTotalTasks] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
+    // Pre-populate from navigation state (List Directly flow)
+    useEffect(() => {
+        if (location.state?.csvFile) {
+            setSelectedFile(location.state.csvFile);
+        }
+    }, []);
+
     // Fetch Sellers on mount
     useEffect(() => {
         const fetchSellers = async () => {
             try {
                 const res = await api.get('/sellers/all');
                 setSellers(res.data);
-                if (res.data.length > 0) {
+                // If navigated from List Directly, use the passed seller; otherwise default to first
+                if (location.state?.sellerId) {
+                    setSelectedSeller(location.state.sellerId);
+                } else if (res.data.length > 0) {
                     setSelectedSeller(res.data[0]._id);
                 }
             } catch (err) {
@@ -161,6 +173,15 @@ const FeedUploadPage = () => {
                 },
             });
 
+            // If this upload came from CSV Storage (List Directly flow), link the records
+            const taskId = response.data?.taskId;
+            if (location.state?.csvStorageId && taskId) {
+                try {
+                    await api.patch(`/csv-storage/${location.state.csvStorageId}/link-upload`, { taskId });
+                } catch (linkErr) {
+                    console.error('Failed to link CSV storage record:', linkErr.message);
+                }
+            }
             setResult(response.data);
             fetchTasks(); // Refresh list
         } catch (err) {

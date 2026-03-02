@@ -123,6 +123,7 @@ import TemplateListingAnalyticsPage from '../pages/admin/TemplateListingAnalytic
 import SelectSellerPage from '../pages/admin/SelectSellerPage.jsx';
 import SellerTemplatesPage from '../pages/admin/SellerTemplatesPage.jsx';
 import TemplateDatabasePage from '../pages/admin/TemplateDatabasePage.jsx';
+import CsvStoragePage from '../pages/admin/CsvStoragePage.jsx';
 import DescriptionIcon from '@mui/icons-material/Description';
 import HomeIcon from '@mui/icons-material/Home';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
@@ -463,6 +464,24 @@ export default function AdminLayout({ user, onLogout }) {
                 <NavIcon icon={CloudUploadIcon} label="Feed Upload" sidebarOpen={sidebarOpen} />
               </ListItemIcon>
               {sidebarOpen && <ListItemText primary="Feed Upload (CSV)" />}
+            </ListItemButton>
+          </ListItem>
+        )}
+
+        {/* CSV Storage - accessible to listers, listingadmins, and superadmins */}
+        {(isListingAdmin || isSuper || isLister) && (
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/admin/csv-storage"
+              onClick={() => setMobileOpen(false)}
+              selected={location.pathname === '/admin/csv-storage'}
+              sx={selectedMenuItemStyle}
+            >
+              <ListItemIcon>
+                <NavIcon icon={StorageIcon} label="CSV Storage" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
+              {sidebarOpen && <ListItemText primary="CSV Storage" />}
             </ListItemButton>
           </ListItem>
         )}
@@ -1009,6 +1028,9 @@ export default function AdminLayout({ user, onLogout }) {
           ) : null}
           {isSuper || isListingAdmin || isLister ? (
             <Route path="/feed-upload" element={<FeedUploadPage />} />
+          ) : null}
+          {isSuper || isListingAdmin || isLister ? (
+            <Route path="/csv-storage" element={<CsvStoragePage />} />
           ) : null}
           {isSuper || isListingAdmin ? (
             <>
