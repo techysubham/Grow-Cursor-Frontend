@@ -30,6 +30,7 @@ import TemplateListingStatsCard from '../../components/TemplateListingStatsCard.
 import ActionFieldEditor from '../../components/ActionFieldEditor.jsx';
 import TemplateCustomizationDialog from '../../components/TemplateCustomizationDialog.jsx';
 import AsinReviewModal from '../../components/AsinReviewModal.jsx';
+import ListDirectlyDialog from '../../components/ListDirectlyDialog.jsx';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
 
@@ -96,6 +97,9 @@ export default function TemplateListingsPage() {
   // ASIN Review Modal state
   const [reviewModal, setReviewModal] = useState(false);
   const [previewItems, setPreviewItems] = useState([]);
+
+  // List Directly dialog state
+  const [listDirectlyDialog, setListDirectlyDialog] = useState(false);
 
   // Row selection state
   const [selectedListings, setSelectedListings] = useState(new Set());
@@ -1145,8 +1149,19 @@ export default function TemplateListingsPage() {
               <Button variant="outlined" size="small" onClick={() => {}}>
                 Save As
               </Button>
-              <Button variant="contained" size="small" color="primary" onClick={() => {}}>
-                List Directly
+              <Button
+                variant="contained"
+                size="small"
+                color="primary"
+                onClick={() => {
+                  if (selectedListings.size === 0) {
+                    setError('Please select at least one listing to proceed.');
+                    return;
+                  }
+                  setListDirectlyDialog(true);
+                }}
+              >
+                List Directly ({selectedListings.size})
               </Button>
             </>
           )}
@@ -2232,6 +2247,14 @@ export default function TemplateListingsPage() {
       />
       
       {/* ASIN Review Modal */}
+      <ListDirectlyDialog
+        open={listDirectlyDialog}
+        onClose={() => setListDirectlyDialog(false)}
+        selectedListings={selectedListings}
+        templateId={templateId}
+        sellerId={sellerId}
+      />
+
       <AsinReviewModal
         open={reviewModal}
         onClose={() => {
