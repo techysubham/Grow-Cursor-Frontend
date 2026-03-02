@@ -4030,9 +4030,9 @@ function FulfillmentDashboard() {
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <AutoSaveTextField
-                                type="number"
+                                type="text"
                                 value={order.beforeTax}
-                                onSave={(val) => updateManualField(order._id, 'beforeTax', val)}
+                                onSave={(val) => updateManualField(order._id, 'beforeTax', val === '' ? null : parseFloat(val))}
                               />
                               <IconButton
                                 size="small"
@@ -4051,9 +4051,9 @@ function FulfillmentDashboard() {
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <AutoSaveTextField
-                                type="number"
+                                type="text"
                                 value={order.estimatedTax}
-                                onSave={(val) => updateManualField(order._id, 'estimatedTax', val)}
+                                onSave={(val) => updateManualField(order._id, 'estimatedTax', val === '' ? null : parseFloat(val))}
                               />
                               <IconButton
                                 size="small"
@@ -4094,8 +4094,8 @@ function FulfillmentDashboard() {
                             <Stack direction="row" spacing={1} alignItems="center">
                               <AutoSaveTextField
                                 value={order.amazonRefund}
-                                type="number"
-                                onSave={(val) => updateManualField(order._id, 'amazonRefund', val)}
+                                type="text"
+                                onSave={(val) => updateManualField(order._id, 'amazonRefund', val === '' ? null : parseFloat(val))}
                                 sx={{ minWidth: 100 }}
                               />
                               <IconButton
