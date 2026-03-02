@@ -851,6 +851,13 @@ export default function AsinReviewModal({
                         col.name !== 'startPrice' && col.name !== 'quantity' ? `${(itemData[col.name] || '').length}/60` :
                         ''
                       }
+                      {...(col.name === 'startPrice' && {
+                        sx: {
+                          '& input::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                          '& input::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                          '& input[type=number]': { MozAppearance: 'textfield' },
+                        },
+                      })}
                     />
                   );
                 })}
