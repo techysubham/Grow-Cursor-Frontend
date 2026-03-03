@@ -128,11 +128,49 @@ export default function CompatibilityDashboard() {
   const normModel = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const fuzzyMatchModel = (aiModel, options) => {
     if (!aiModel || !options?.length) return null;
-    // 1. Exact match
     if (options.includes(aiModel)) return aiModel;
-    // 2. Normalized match (handles F150 ↔ F-150, Silverado1500 ↔ Silverado 1500, etc.)
     const normAi = normModel(aiModel);
     return options.find(opt => normModel(opt) === normAi) || null;
+  };
+
+  // Common shorthand → eBay canonical Make names
+  const MAKE_ALIASES = {
+    'chevy': 'Chevrolet',
+    'chev': 'Chevrolet',
+    'vw': 'Volkswagen',
+    'volkswagon': 'Volkswagen', // common misspelling
+    'merc': 'Mercury',
+    'benz': 'Mercedes-Benz',
+    'mercedes': 'Mercedes-Benz',
+    'alfa': 'Alfa Romeo',
+    'land rover': 'Land Rover',
+    'landrover': 'Land Rover',
+    'range rover': 'Land Rover',
+  };
+  // Returns the canonical Make name — resolves aliases first, then falls back to raw AI value
+  const resolveMake = (aiMake) => {
+    if (!aiMake) return aiMake;
+    const lower = aiMake.trim().toLowerCase();
+    return MAKE_ALIASES[lower] || aiMake;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Normalize AI make and model values to match database conventions
+  // ---------------------------------------------------------------------------
+  const resolveModel = (aiMake, aiModel) => {
+    if (!aiModel) return aiModel;
+
+    // Model normalization: silverado → silverado 1500
+    if (aiModel.toLowerCase().includes('silverado') && !aiModel.toLowerCase().includes('1500')) {
+      return 'Silverado 1500';
+    }
+
+    // Special case: BMW 3 Series → 330i
+    if (aiMake && aiMake.toLowerCase() === 'bmw' && aiModel.toLowerCase().includes('3 series')) {
+      return '330i';
+    }
+
+    return aiModel;
   };
 
   const displayedListings = filterNoFitment
@@ -390,8 +428,10 @@ export default function CompatibilityDashboard() {
         showSnackbar('AI could not extract fitment info from this listing', 'warning');
         return;
       }
-      // Step 1: Set make and fetch models
-      setSelectedMake(data.make);
+      // Step 1: Resolve Make alias (Chevy→Chevrolet etc.) then fetch models
+      const resolvedMake = resolveMake(data.make);
+      const resolvedModelInput = resolveModel(resolvedMake, data.model); // Apply model normalization
+      setSelectedMake(resolvedMake);
       setModelOptions([]);
       setSelectedModel(null);
       setYearOptions([]);
@@ -403,16 +443,16 @@ export default function CompatibilityDashboard() {
       const modelsRes = await api.post('/ebay/compatibility/values', {
         sellerId: currentSellerId,
         propertyName: 'Model',
-        constraints: [{ name: 'Make', value: data.make }]
+        constraints: [{ name: 'Make', value: resolvedMake }]
       });
       const modelOpts = modelsRes.data.values || [];
       setModelOptions(modelOpts);
       setLoadingModels(false);
 
       // Fuzzy-match the AI model against eBay's list (handles F150 ↔ F-150 etc.)
-      const resolvedModel = fuzzyMatchModel(data.model, modelOpts);
+      const resolvedModel = fuzzyMatchModel(resolvedModelInput, modelOpts);
       if (!resolvedModel) {
-        showSnackbar(`AI suggested model "${data.model}" not found in eBay DB for ${data.make}. Please select manually.`, 'warning');
+        showSnackbar(`AI suggested model "${data.model}" not found in eBay DB for ${resolvedMake}. Please select manually.`, 'warning');
         return;
       }
 
@@ -426,7 +466,7 @@ export default function CompatibilityDashboard() {
           sellerId: currentSellerId,
           propertyName: 'Year',
           constraints: [
-            { name: 'Make', value: data.make },
+            { name: 'Make', value: resolvedMake },
             { name: 'Model', value: resolvedModel }
           ]
         });
@@ -512,25 +552,26 @@ export default function CompatibilityDashboard() {
         // Fetch models, years and trims all in background
         let modelOpts = [], yearOpts = [], resolvedYears = [], trimsByYearResult = {};
         let modelExists = true, yearsExist = true;
-        let canonicalModel = data.model; // hoisted — updated inside try if fuzzy match succeeds
+        const resolvedMake = resolveMake(data.make); // Chevy→Chevrolet etc.
+        const resolvedModelInput = resolveModel(resolvedMake, data.model); // Apply model normalization
+        let canonicalModel = resolvedModelInput; // hoisted — updated inside try if fuzzy match succeeds
         try {
-          // 1. Models
+          // 1. Models — use resolved make (alias-corrected)
           const modelsRes = await api.post('/ebay/compatibility/values', {
             sellerId: currentSellerId,
             propertyName: 'Model',
-            constraints: [{ name: 'Make', value: data.make }]
+            constraints: [{ name: 'Make', value: resolvedMake }]
           });
           modelOpts = modelsRes.data.values || [];
-          // Fuzzy-match the AI model against eBay's list (handles F150 ↔ F-150 etc.)
-          const resolvedModel = fuzzyMatchModel(data.model, modelOpts);
+          const resolvedModel = fuzzyMatchModel(resolvedModelInput, modelOpts);
           modelExists = !!resolvedModel;
-          canonicalModel = resolvedModel || data.model; // fallback: use raw AI value
+          canonicalModel = resolvedModel || resolvedModelInput;
 
-          // 2. Years — use canonical eBay model name
+          // 2. Years — use resolved make + canonical model
           const yearsRes = await api.post('/ebay/compatibility/values', {
             sellerId: currentSellerId,
             propertyName: 'Year',
-            constraints: [{ name: 'Make', value: data.make }, { name: 'Model', value: canonicalModel }]
+            constraints: [{ name: 'Make', value: resolvedMake }, { name: 'Model', value: canonicalModel }]
           });
           yearOpts = (yearsRes.data.values || []).map(y => String(y)).sort((a, b) => Number(b) - Number(a));
           if (data.startYear && data.endYear) {
@@ -545,7 +586,7 @@ export default function CompatibilityDashboard() {
             const trimPromises = resolvedYears.map(year =>
               api.post('/ebay/compatibility/values', {
                 sellerId: currentSellerId, propertyName: 'Trim',
-                constraints: [{ name: 'Make', value: data.make }, { name: 'Model', value: canonicalModel }, { name: 'Year', value: year }]
+                constraints: [{ name: 'Make', value: resolvedMake }, { name: 'Model', value: canonicalModel }, { name: 'Year', value: year }]
               }).then(r => ({ year, trims: (r.data.values || []).sort() })).catch(() => ({ year, trims: [] }))
             );
             const trimResults = await Promise.all(trimPromises);
@@ -558,7 +599,7 @@ export default function CompatibilityDashboard() {
                   api.post('/ebay/compatibility/values', {
                     sellerId: currentSellerId, propertyName: 'Engine',
                     constraints: [
-                      { name: 'Make', value: data.make }, { name: 'Model', value: canonicalModel },
+                      { name: 'Make', value: resolvedMake }, { name: 'Model', value: canonicalModel },
                       { name: 'Year', value: year }, { name: 'Trim', value: trim }
                     ]
                   }).then(r => ({ year, trim, engines: r.data.values || [] })).catch(() => ({ year, trim, engines: [] }))
@@ -586,7 +627,7 @@ export default function CompatibilityDashboard() {
           const u = [...prev];
           u[idx] = {
             ...u[idx], status: 'ready',
-            aiData: { ...data, model: canonicalModel }, // store canonical model name
+            aiData: { ...data, make: resolvedMake, model: canonicalModel }, // store canonical make+model
             modelOptions: modelOpts, yearOptions: yearOpts,
             trimsByYear: trimsByYearResult, selectedYears: resolvedYears,
             modelExists, yearsExist, error: null
