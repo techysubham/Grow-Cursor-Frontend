@@ -121,6 +121,20 @@ export default function CompatibilityDashboard() {
   const [bulkQueueIdx, setBulkQueueIdx] = useState(0);
   const [bulkMode, setBulkMode] = useState(false);
 
+  // ---------------------------------------------------------------------------
+  // Normalize a model string for fuzzy comparison:
+  // strips dashes, spaces, dots and lowercases → "F-150" and "F150" both become "f150"
+  // ---------------------------------------------------------------------------
+  const normModel = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const fuzzyMatchModel = (aiModel, options) => {
+    if (!aiModel || !options?.length) return null;
+    // 1. Exact match
+    if (options.includes(aiModel)) return aiModel;
+    // 2. Normalized match (handles F150 ↔ F-150, Silverado1500 ↔ Silverado 1500, etc.)
+    const normAi = normModel(aiModel);
+    return options.find(opt => normModel(opt) === normAi) || null;
+  };
+
   const displayedListings = filterNoFitment
     ? listings.filter(item => !item.compatibility || item.compatibility.length === 0)
     : listings;
@@ -366,6 +380,7 @@ export default function CompatibilityDashboard() {
   const handleAiSuggest = async () => {
     if (!selectedItem) return;
     setAiLoading(true);
+    setLoadingModels(true);
     try {
       const { data } = await api.post('/ai/suggest-fitment', {
         title: selectedItem.title || '',
@@ -377,7 +392,6 @@ export default function CompatibilityDashboard() {
       }
       // Step 1: Set make and fetch models
       setSelectedMake(data.make);
-      setLoadingModels(true);
       setModelOptions([]);
       setSelectedModel(null);
       setYearOptions([]);
@@ -385,18 +399,25 @@ export default function CompatibilityDashboard() {
       setTrimsByYear({});
       setSelectedTrimsByYear({});
       setExpandedYears({});
-      try {
-        const modelsRes = await api.post('/ebay/compatibility/values', {
-          sellerId: currentSellerId,
-          propertyName: 'Model',
-          constraints: [{ name: 'Make', value: data.make }]
-        });
-        setModelOptions(modelsRes.data.values || []);
-      } finally {
-        setLoadingModels(false);
+
+      const modelsRes = await api.post('/ebay/compatibility/values', {
+        sellerId: currentSellerId,
+        propertyName: 'Model',
+        constraints: [{ name: 'Make', value: data.make }]
+      });
+      const modelOpts = modelsRes.data.values || [];
+      setModelOptions(modelOpts);
+      setLoadingModels(false);
+
+      // Fuzzy-match the AI model against eBay's list (handles F150 ↔ F-150 etc.)
+      const resolvedModel = fuzzyMatchModel(data.model, modelOpts);
+      if (!resolvedModel) {
+        showSnackbar(`AI suggested model "${data.model}" not found in eBay DB for ${data.make}. Please select manually.`, 'warning');
+        return;
       }
-      // Step 2: Set model and fetch years
-      setSelectedModel(data.model);
+
+      // Step 2: Set resolved (canonical) model and fetch years
+      setSelectedModel(resolvedModel);
       setLoadingYears(true);
       setYearOptions([]);
       setSelectedYears([]);
@@ -406,7 +427,7 @@ export default function CompatibilityDashboard() {
           propertyName: 'Year',
           constraints: [
             { name: 'Make', value: data.make },
-            { name: 'Model', value: data.model }
+            { name: 'Model', value: resolvedModel }
           ]
         });
         const yearList = (yearsRes.data.values || [])
@@ -422,30 +443,27 @@ export default function CompatibilityDashboard() {
           const range = yearList.filter(y => Number(y) >= min && Number(y) <= max);
           setSelectedYears(range);
           if (range.length > 0) {
-            // Use min/max of what's actually available in eBay, not what AI said
             const rangeNums = range.map(Number);
             setStartYear(String(Math.min(...rangeNums)));
             setEndYear(String(Math.max(...rangeNums)));
           } else {
-            // No years in eBay matched — keep raw AI values as a hint, warn user
             setStartYear(data.startYear);
             setEndYear(data.endYear);
-            showSnackbar(`AI suggested ${data.make} ${data.model} (${data.startYear}–${data.endYear}) but those years aren't in eBay's DB for this model. Please select years manually.`, 'warning');
+            showSnackbar(`AI suggested ${data.make} ${resolvedModel} (${data.startYear}–${data.endYear}) but those years aren't in eBay's DB for this model. Please select years manually.`, 'warning');
             return;
           }
         }
       } finally {
         setLoadingYears(false);
       }
-      // Use validated range in the snackbar so user sees what was actually applied
-      showSnackbar(`AI suggested: ${data.make} ${data.model} — years verified in eBay DB`, 'success');
+      showSnackbar(`AI suggested: ${data.make} ${resolvedModel === data.model ? resolvedModel : `${resolvedModel} (matched from "${data.model}")`} — years verified in eBay DB`, 'success');
     } catch (e) {
       showSnackbar('AI suggestion failed: ' + (e.response?.data?.error || e.message), 'error');
     } finally {
+      setLoadingModels(false);
       setAiLoading(false);
     }
   };
-
   // --- BULK AI SUGGEST ---
 
   const handleBulkAiSuggest = async () => {
@@ -494,6 +512,7 @@ export default function CompatibilityDashboard() {
         // Fetch models, years and trims all in background
         let modelOpts = [], yearOpts = [], resolvedYears = [], trimsByYearResult = {};
         let modelExists = true, yearsExist = true;
+        let canonicalModel = data.model; // hoisted — updated inside try if fuzzy match succeeds
         try {
           // 1. Models
           const modelsRes = await api.post('/ebay/compatibility/values', {
@@ -502,13 +521,16 @@ export default function CompatibilityDashboard() {
             constraints: [{ name: 'Make', value: data.make }]
           });
           modelOpts = modelsRes.data.values || [];
-          modelExists = modelOpts.includes(data.model);
+          // Fuzzy-match the AI model against eBay's list (handles F150 ↔ F-150 etc.)
+          const resolvedModel = fuzzyMatchModel(data.model, modelOpts);
+          modelExists = !!resolvedModel;
+          canonicalModel = resolvedModel || data.model; // fallback: use raw AI value
 
-          // 2. Years
+          // 2. Years — use canonical eBay model name
           const yearsRes = await api.post('/ebay/compatibility/values', {
             sellerId: currentSellerId,
             propertyName: 'Year',
-            constraints: [{ name: 'Make', value: data.make }, { name: 'Model', value: data.model }]
+            constraints: [{ name: 'Make', value: data.make }, { name: 'Model', value: canonicalModel }]
           });
           yearOpts = (yearsRes.data.values || []).map(y => String(y)).sort((a, b) => Number(b) - Number(a));
           if (data.startYear && data.endYear) {
@@ -518,12 +540,12 @@ export default function CompatibilityDashboard() {
           }
           yearsExist = resolvedYears.length > 0;
 
-          // 3. Trims for all resolved years (parallel)
+          // 3. Trims for all resolved years (parallel) — use canonical model name
           if (resolvedYears.length > 0) {
             const trimPromises = resolvedYears.map(year =>
               api.post('/ebay/compatibility/values', {
                 sellerId: currentSellerId, propertyName: 'Trim',
-                constraints: [{ name: 'Make', value: data.make }, { name: 'Model', value: data.model }, { name: 'Year', value: year }]
+                constraints: [{ name: 'Make', value: data.make }, { name: 'Model', value: canonicalModel }, { name: 'Year', value: year }]
               }).then(r => ({ year, trims: (r.data.values || []).sort() })).catch(() => ({ year, trims: [] }))
             );
             const trimResults = await Promise.all(trimPromises);
@@ -536,7 +558,7 @@ export default function CompatibilityDashboard() {
                   api.post('/ebay/compatibility/values', {
                     sellerId: currentSellerId, propertyName: 'Engine',
                     constraints: [
-                      { name: 'Make', value: data.make }, { name: 'Model', value: data.model },
+                      { name: 'Make', value: data.make }, { name: 'Model', value: canonicalModel },
                       { name: 'Year', value: year }, { name: 'Trim', value: trim }
                     ]
                   }).then(r => ({ year, trim, engines: r.data.values || [] })).catch(() => ({ year, trim, engines: [] }))
@@ -563,7 +585,8 @@ export default function CompatibilityDashboard() {
         setBulkQueue(prev => {
           const u = [...prev];
           u[idx] = {
-            ...u[idx], status: 'ready', aiData: data,
+            ...u[idx], status: 'ready',
+            aiData: { ...data, model: canonicalModel }, // store canonical model name
             modelOptions: modelOpts, yearOptions: yearOpts,
             trimsByYear: trimsByYearResult, selectedYears: resolvedYears,
             modelExists, yearsExist, error: null
