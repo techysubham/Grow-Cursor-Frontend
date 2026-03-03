@@ -1401,7 +1401,23 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 <Autocomplete
                   options={makeOptions}
                   value={selectedMake}
-                  onChange={(e, val) => { setSelectedMake(val); if (val) fetchModels(val); }}
+                  onChange={(e, val) => { 
+                    setSelectedMake(val); 
+                    if (val) {
+                      fetchModels(val);
+                    } else {
+                      // Reset all dependent fields when make is cleared
+                      setModelOptions([]);
+                      setSelectedModel(null);
+                      setYearOptions([]);
+                      setSelectedYears([]);
+                      setTrimsByYear({});
+                      setSelectedTrimsByYear({});
+                      setExpandedYears({});
+                      setStartYear('');
+                      setEndYear('');
+                    }
+                  }}
                   loading={loadingMakes}
                   renderInput={(params) => <TextField {...params} label="Make" size="small" />}
                 />
@@ -1411,7 +1427,21 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 <Autocomplete
                   options={modelOptions}
                   value={selectedModel}
-                  onChange={(e, val) => { setSelectedModel(val); if (val) { fetchYears(selectedMake, val); } else { setTrimsByYear({}); setSelectedTrimsByYear({}); setExpandedYears({}); } }}
+                  onChange={(e, val) => { 
+                    setSelectedModel(val); 
+                    if (val) { 
+                      fetchYears(selectedMake, val); 
+                    } else { 
+                      // Reset all dependent fields when model is cleared
+                      setYearOptions([]);
+                      setSelectedYears([]);
+                      setTrimsByYear({}); 
+                      setSelectedTrimsByYear({}); 
+                      setExpandedYears({});
+                      setStartYear('');
+                      setEndYear('');
+                    } 
+                  }}
                   loading={loadingModels}
                   disabled={!selectedMake}
                   renderInput={(params) => <TextField {...params} label="Model" size="small" />}
