@@ -1729,9 +1729,8 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
               <Button
                 onClick={async () => {
                   await handleSaveCompatibility(false);
-                  // Track save-and-next action — hadData = current queue entry had AI data
-                  const entry = bulkQueue[bulkQueueIdx];
-                  api.post('/ai/track-save-next', { hadData: !!(entry?.aiData?.make) }).catch(() => {});
+                  // Track save-and-next — hadData = user had entries in the compatibility list
+                  api.post('/ai/track-save-next', { hadData: editCompatList.length > 0 }).catch(() => {});
                   handleBulkQueueNext(false);
                 }}
                 variant="contained"

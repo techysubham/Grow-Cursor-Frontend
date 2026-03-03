@@ -164,7 +164,7 @@ export default function AiFitmentUsagePage() {
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
                 <SaveIcon sx={{ color: '#16a34a', fontSize: 28, mb: 0.5 }} />
                 <Typography variant="h4" fontWeight={700} color="#16a34a">{totals.saveNextWithData.toLocaleString()}</Typography>
-                <Typography variant="body2" color="text.secondary">Save & Next (with AI Data)</Typography>
+                <Typography variant="body2" color="text.secondary">Save & Next (with Compat Data)</Typography>
               </CardContent>
             </Card>
             <Card sx={{ flex: 1, minWidth: 200, bgcolor: '#fffbeb', border: '1px solid #fde68a' }}>
@@ -196,7 +196,7 @@ export default function AiFitmentUsagePage() {
                     </Tooltip>
                   </TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700 }}>
-                    <Tooltip title="Save & Next clicks where the AI response had fitment data">
+                    <Tooltip title="Save & Next clicks where user had vehicle entries in the compatibility list">
                       <span>Save & Next (with Data)</span>
                     </Tooltip>
                   </TableCell>
