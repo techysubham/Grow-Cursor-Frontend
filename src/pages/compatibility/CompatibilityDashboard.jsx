@@ -413,21 +413,32 @@ export default function CompatibilityDashboard() {
           .map(y => String(y))
           .sort((a, b) => Number(b) - Number(a));
         setYearOptions(yearList);
-        // Step 3: Apply year range
+        // Step 3: Apply year range — use eBay-validated subset, NOT raw AI years
         if (data.startYear && data.endYear) {
-          setStartYear(data.startYear);
-          setEndYear(data.endYear);
           const startNum = Number(data.startYear);
           const endNum = Number(data.endYear);
           const min = Math.min(startNum, endNum);
           const max = Math.max(startNum, endNum);
           const range = yearList.filter(y => Number(y) >= min && Number(y) <= max);
           setSelectedYears(range);
+          if (range.length > 0) {
+            // Use min/max of what's actually available in eBay, not what AI said
+            const rangeNums = range.map(Number);
+            setStartYear(String(Math.min(...rangeNums)));
+            setEndYear(String(Math.max(...rangeNums)));
+          } else {
+            // No years in eBay matched — keep raw AI values as a hint, warn user
+            setStartYear(data.startYear);
+            setEndYear(data.endYear);
+            showSnackbar(`AI suggested ${data.make} ${data.model} (${data.startYear}–${data.endYear}) but those years aren't in eBay's DB for this model. Please select years manually.`, 'warning');
+            return;
+          }
         }
       } finally {
         setLoadingYears(false);
       }
-      showSnackbar(`AI suggested: ${data.make} ${data.model} (${data.startYear}–${data.endYear})`, 'success');
+      // Use validated range in the snackbar so user sees what was actually applied
+      showSnackbar(`AI suggested: ${data.make} ${data.model} — years verified in eBay DB`, 'success');
     } catch (e) {
       showSnackbar('AI suggestion failed: ' + (e.response?.data?.error || e.message), 'error');
     } finally {
@@ -584,11 +595,20 @@ export default function CompatibilityDashboard() {
     if (entry.status === 'ready' && entry.aiData) {
       setSelectedMake(entry.aiData.make);
       setSelectedModel(entry.aiData.model);
-      setStartYear(entry.aiData.startYear || '');
-      setEndYear(entry.aiData.endYear || '');
+      // Use eBay-validated year range (min/max of resolvedYears), NOT raw AI output.
+      // e.g. AI says 2019-2025 but eBay only has [2025] → show 2025-2025, not 2019-2025.
+      const resolvedYears = entry.selectedYears || [];
+      if (resolvedYears.length > 0) {
+        const nums = resolvedYears.map(Number);
+        setStartYear(String(Math.min(...nums)));
+        setEndYear(String(Math.max(...nums)));
+      } else {
+        setStartYear(entry.aiData.startYear || '');
+        setEndYear(entry.aiData.endYear || '');
+      }
       setModelOptions(entry.modelOptions || []);
       setYearOptions(entry.yearOptions || []);
-      setSelectedYears(entry.selectedYears || []);
+      setSelectedYears(resolvedYears);
       setTrimsByYear(entry.trimsByYear || {});
       setSelectedTrimsByYear({});
       const expanded = {};
