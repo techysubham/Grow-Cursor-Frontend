@@ -461,6 +461,7 @@ export default function CompatibilityDashboard() {
     setBulkQueue(initial);
     setBulkQueueIdx(0);
     setBulkMode(true);
+    setSelectedIds(new Set()); // deselect all checkboxes once queue is running
 
     // Open Edit modal immediately on first item (shows loading state)
     const firstItem = selectedItems[0];
