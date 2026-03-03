@@ -80,6 +80,7 @@ import api from '../../lib/api';
 import TemplateManagementModal from '../../components/TemplateManagementModal';
 import { CHAT_TEMPLATES, personalizeTemplate } from '../../constants/chatTemplates';
 import RemarkTemplateManagerModal from '../../components/RemarkTemplateManagerModal';
+import ResolutionOptionsModal from '../../components/ResolutionOptionsModal';
 import {
   findRemarkTemplateText,
   loadRemarkTemplates,
@@ -1153,6 +1154,8 @@ function FulfillmentDashboard() {
 
   const [amazonAccounts, setAmazonAccounts] = useState([]);
   const [creditCards, setCreditCards] = useState([]);
+  const [resolutionOptions, setResolutionOptions] = useState([]);
+  const [manageResolutionOptionsOpen, setManageResolutionOptionsOpen] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState(null);
 
   // Issues index: maps orderId -> [{type, status}] for INR/Return/Dispute chips
@@ -1165,7 +1168,7 @@ function FulfillmentDashboard() {
     'shipping', 'salesTax', 'discount', 'transactionFees',
     'adFeeGeneral', 'cancelStatus', 'refunds', 'orderEarnings', 'trackingNumber',
     'amazonAccount', 'arriving', 'beforeTax', 'estimatedTax',
-    'azOrderId', 'amazonRefund', 'cardName', 'notes', 'messagingStatus', 'remark', 'issueFlags'
+    'azOrderId', 'amazonRefund', 'cardName', 'resolution', 'notes', 'messagingStatus', 'remark', 'issueFlags'
   ];
 
   const ALL_COLUMNS = [
@@ -1199,6 +1202,7 @@ function FulfillmentDashboard() {
     { id: 'azOrderId', label: 'Az OrderID' },
     { id: 'amazonRefund', label: 'Amazon Refund' },
     { id: 'cardName', label: 'Card Name' },
+    { id: 'resolution', label: 'Resolutions' },
     { id: 'notes', label: 'Notes' },
     { id: 'messagingStatus', label: 'Messaging' },
     { id: 'remark', label: 'Remark' },
@@ -1225,6 +1229,15 @@ function FulfillmentDashboard() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  const loadResolutionOptions = useCallback(async () => {
+    try {
+      const { data } = await api.get('/resolution-options');
+      setResolutionOptions(data || []);
+    } catch (e) {
+      console.error('Failed to load resolution options', e);
+    }
   }, []);
 
 
@@ -1443,10 +1456,11 @@ function FulfillmentDashboard() {
     if (!hasFetchedInitialData.current) {
       api.get('/amazon-accounts').then(({ data }) => setAmazonAccounts(data || [])).catch(console.error);
       api.get('/credit-cards').then(({ data }) => setCreditCards(data || [])).catch(console.error);
+      loadResolutionOptions();
     }
     // Issues index is always fetched fresh (independent of hasFetchedInitialData)
     api.get('/ebay/issues-by-order').then(({ data }) => setIssuesIndex(data?.index || {})).catch(console.error);
-  }, []);
+  }, [loadResolutionOptions]);
 
   // Initial load - fetch sellers and orders once
   useEffect(() => {
@@ -2569,6 +2583,7 @@ function FulfillmentDashboard() {
         'Az OrderID': 'azOrderId',
         'Amazon Refund': 'amazonRefund',
         'Card Name': 'cardName',
+        'Resolutions': 'resolution',
         'Notes': 'fulfillmentNotes',
         'Messaging': 'messagingStatus',
         'Remark': 'remark'
@@ -2611,6 +2626,7 @@ function FulfillmentDashboard() {
         'azOrderId': 'Az OrderID',
         'amazonRefund': 'Amazon Refund',
         'cardName': 'Card Name',
+        'resolution': 'Resolutions',
         'notes': 'Notes',
         'messagingStatus': 'Messaging',
         'remark': 'Remark'
@@ -3413,6 +3429,7 @@ function FulfillmentDashboard() {
                     {visibleColumns.includes('azOrderId') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Az OrderID</TableCell>}
                     {visibleColumns.includes('amazonRefund') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Refund</TableCell>}
                     {visibleColumns.includes('cardName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Card Name</TableCell>}
+                    {visibleColumns.includes('resolution') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Resolutions</TableCell>}
                     {visibleColumns.includes('notes') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>}
                     {visibleColumns.includes('messagingStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Messaging</TableCell>}
                     {visibleColumns.includes('remark') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>}
@@ -4142,6 +4159,28 @@ function FulfillmentDashboard() {
                           </TableCell>
                         )}
 
+                        {visibleColumns.includes('resolution') && (
+                          <TableCell sx={{ minWidth: 220 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <AutoSaveSelect
+                                value={order.resolution || ''}
+                                options={resolutionOptions}
+                                onSave={(val) => updateManualField(order._id, 'resolution', val)}
+                                onManage={() => setManageResolutionOptionsOpen(true)}
+                                manageLabel="Manage Options"
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(order.resolution || '-')}
+                                aria-label="copy resolution"
+                                sx={{ p: 0.5 }}
+                              >
+                                <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                        )}
+
 
                         {visibleColumns.includes('notes') && (
                           <TableCell>
@@ -4179,6 +4218,7 @@ function FulfillmentDashboard() {
                               options={remarkOptionsFromTemplates(remarkTemplates)}
                               onSave={(val) => handleRemarkUpdate(order._id, val)}
                               onManage={() => setManageRemarkTemplatesOpen(true)}
+                              manageLabel="Manage Templates"
                             />
                           </TableCell>
                         )}
@@ -4368,6 +4408,16 @@ function FulfillmentDashboard() {
         onClose={() => setManageRemarkTemplatesOpen(false)}
         templates={remarkTemplates}
         onSaveTemplates={handleSaveRemarkTemplates}
+      />
+
+      <ResolutionOptionsModal
+        open={manageResolutionOptionsOpen}
+        onClose={() => {
+          setManageResolutionOptionsOpen(false);
+          loadResolutionOptions();
+        }}
+        options={resolutionOptions}
+        onReload={loadResolutionOptions}
       />
 
 
@@ -4651,7 +4701,7 @@ function AutoSaveDatePicker({ value, onSave, sx = {} }) {
   );
 }
 
-function AutoSaveSelect({ value, options, onSave, onManage }) {
+function AutoSaveSelect({ value, options, onSave, onManage, manageLabel = 'Manage Options' }) {
   const [localValue, setLocalValue] = useState(value || '');
 
   useEffect(() => {
@@ -4693,7 +4743,7 @@ function AutoSaveSelect({ value, options, onSave, onManage }) {
       ))}
       {onManage ? (
         <MenuItem value="__manage_templates__" sx={{ borderTop: '1px solid', borderColor: 'divider', mt: 0.5 }}>
-          Manage Templates
+          {manageLabel}
         </MenuItem>
       ) : null}
     </Select>

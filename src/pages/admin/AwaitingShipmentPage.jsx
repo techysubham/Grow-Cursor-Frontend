@@ -469,6 +469,8 @@ export default function AwaitingShipmentPage() {
   const [searchMarketplace, setSearchMarketplace] = useState('');
   const [shipByDate, setShipByDate] = useState('');
   const [dateSold, setDateSold] = useState('');
+  const [arrivalDateFrom, setArrivalDateFrom] = useState('');
+  const [arrivalDateTo, setArrivalDateTo] = useState('');
 
   const [visibleColumns, setVisibleColumns] = useState([
     'seller', 'orderId', 'marketplace', 'dateSold', 'shipBy', 'deliveryDate', 'productName', 'buyerName', 'shippingAddress', 'trackingNumber', 'trackingId', 'arriving', 'notes'
@@ -536,7 +538,7 @@ export default function AwaitingShipmentPage() {
   useEffect(() => {
     fetchAwaitingOrders();
     // eslint-disable-next-line
-  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace, shipByDate, dateSold]);
+  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace, shipByDate, dateSold, arrivalDateFrom, arrivalDateTo]);
 
   // Handlers
   const handleSellerChange = (e) => {
@@ -553,6 +555,8 @@ export default function AwaitingShipmentPage() {
     setSearchMarketplace('');
     setShipByDate('');
     setDateSold('');
+    setArrivalDateFrom('');
+    setArrivalDateTo('');
     setPage(1);
   };
 
@@ -573,6 +577,8 @@ export default function AwaitingShipmentPage() {
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (shipByDate) params.shipByDate = shipByDate;
       if (dateSold) params.dateSold = dateSold;
+      if (arrivalDateFrom) params.arrivalDateFrom = arrivalDateFrom;
+      if (arrivalDateTo) params.arrivalDateTo = arrivalDateTo;
 
       // SMART CHECK: If params haven't changed since last fetch, STOP.
       const paramsString = JSON.stringify(params);
@@ -1236,6 +1242,34 @@ export default function AwaitingShipmentPage() {
               value={dateSold}
               onChange={(e) => {
                 setDateSold(e.target.value);
+                setPage(1);
+              }}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 160 }}
+            />
+
+            {/* 7. ARRIVAL DATE FROM FILTER */}
+            <TextField
+              type="date"
+              size="small"
+              label="Arrival From"
+              value={arrivalDateFrom}
+              onChange={(e) => {
+                setArrivalDateFrom(e.target.value);
+                setPage(1);
+              }}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 160 }}
+            />
+
+            {/* 8. ARRIVAL DATE TO FILTER */}
+            <TextField
+              type="date"
+              size="small"
+              label="Arrival To"
+              value={arrivalDateTo}
+              onChange={(e) => {
+                setArrivalDateTo(e.target.value);
                 setPage(1);
               }}
               InputLabelProps={{ shrink: true }}
