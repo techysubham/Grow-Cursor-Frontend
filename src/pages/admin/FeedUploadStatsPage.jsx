@@ -78,7 +78,15 @@ export default function FeedUploadStatsPage() {
   const dayTotal = dayStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
   const monthTotal = monthStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
 
-  const headSx = { fontWeight: 700, bgcolor: '#f5f5f5' };
+  const headSx = {
+    fontWeight: 700,
+    bgcolor: '#f0f0f0',
+    fontSize: '0.85rem',
+    py: 1.8,
+    borderBottom: '2px solid #d0d0d0',
+  };
+  const cellSx = { py: 1.6, fontSize: '0.9rem' };
+  const numCellSx = { py: 1.6, fontSize: '0.9rem', fontWeight: 600, minWidth: 140 };
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -89,8 +97,8 @@ export default function FeedUploadStatsPage() {
       <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
         {/* ── Day-wise ─────────────────────────────────────────────────── */}
         <Paper sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle1" fontWeight={700}>Day-wise</Typography>
+          <Box sx={{ px: 3, py: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem">Day-wise</Typography>
             <TextField
               type="date"
               size="small"
@@ -112,32 +120,36 @@ export default function FeedUploadStatsPage() {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={headSx}>#</TableCell>
+                    <TableCell sx={{ ...headSx, width: 52, pl: 3 }}>#</TableCell>
                     <TableCell sx={headSx}>Seller</TableCell>
-                    <TableCell sx={headSx} align="right">Successful Listings</TableCell>
+                    <TableCell sx={{ ...headSx, pr: 3 }} align="right">Successful Listings</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {dayStats.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                      <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
                         No data for this date
                       </TableCell>
                     </TableRow>
                   ) : (
                     <>
                       {dayStats.map((row, idx) => (
-                        <TableRow key={`d-${row.sellerId}-${idx}`} hover>
-                          <TableCell sx={{ color: 'text.secondary', width: 40 }}>{idx + 1}</TableCell>
-                          <TableCell>{row.sellerName}</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        <TableRow
+                          key={`d-${row.sellerId}-${idx}`}
+                          hover
+                          sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}
+                        >
+                          <TableCell sx={{ ...cellSx, color: 'text.disabled', width: 52, pl: 3 }}>{idx + 1}</TableCell>
+                          <TableCell sx={cellSx}>{row.sellerName}</TableCell>
+                          <TableCell align="right" sx={{ ...numCellSx, pr: 3 }}>
                             {row.totalSuccess.toLocaleString()}
                           </TableCell>
                         </TableRow>
                       ))}
-                      <TableRow sx={{ bgcolor: '#fafafa' }}>
-                        <TableCell colSpan={2} sx={{ fontWeight: 700 }}>Total</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      <TableRow sx={{ bgcolor: '#f5f5f5', borderTop: '2px solid #e0e0e0' }}>
+                        <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: '0.9rem', pl: 3, py: 1.6 }}>Total</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.9rem', pr: 3, py: 1.6 }}>
                           {dayTotal.toLocaleString()}
                         </TableCell>
                       </TableRow>
@@ -151,8 +163,8 @@ export default function FeedUploadStatsPage() {
 
         {/* ── Month-wise ───────────────────────────────────────────────── */}
         <Paper sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle1" fontWeight={700}>Month-wise</Typography>
+          <Box sx={{ px: 3, py: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem">Month-wise</Typography>
             <TextField
               type="month"
               size="small"
@@ -174,15 +186,15 @@ export default function FeedUploadStatsPage() {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={headSx}>#</TableCell>
+                    <TableCell sx={{ ...headSx, width: 52, pl: 3 }}>#</TableCell>
                     <TableCell sx={headSx}>Seller</TableCell>
-                    <TableCell sx={headSx} align="right">Successful Listings</TableCell>
+                    <TableCell sx={{ ...headSx, pr: 3 }} align="right">Successful Listings</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {monthStats.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                      <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
                         No data for this month
                       </TableCell>
                     </TableRow>
@@ -191,21 +203,25 @@ export default function FeedUploadStatsPage() {
                       {monthStats.map((row, idx) => {
                         const quota = getQuota(row.sellerName);
                         return (
-                          <TableRow key={`m-${row.sellerId}-${idx}`} hover>
-                            <TableCell sx={{ color: 'text.secondary', width: 40 }}>{idx + 1}</TableCell>
-                            <TableCell>{row.sellerName}</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          <TableRow
+                            key={`m-${row.sellerId}-${idx}`}
+                            hover
+                            sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}
+                          >
+                            <TableCell sx={{ ...cellSx, color: 'text.disabled', width: 52, pl: 3 }}>{idx + 1}</TableCell>
+                            <TableCell sx={cellSx}>{row.sellerName}</TableCell>
+                            <TableCell align="right" sx={{ ...numCellSx, pr: 3 }}>
                               {row.totalSuccess.toLocaleString()}
-                              <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                              <Typography component="span" sx={{ fontSize: '0.78rem', color: 'text.secondary', ml: 0.5, fontWeight: 400 }}>
                                 / {quota.toLocaleString()}
                               </Typography>
                             </TableCell>
                           </TableRow>
                         );
                       })}
-                      <TableRow sx={{ bgcolor: '#fafafa' }}>
-                        <TableCell colSpan={2} sx={{ fontWeight: 700 }}>Total</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      <TableRow sx={{ bgcolor: '#f5f5f5', borderTop: '2px solid #e0e0e0' }}>
+                        <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: '0.9rem', pl: 3, py: 1.6 }}>Total</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.9rem', pr: 3, py: 1.6 }}>
                           {monthTotal.toLocaleString()}
                         </TableCell>
                       </TableRow>
