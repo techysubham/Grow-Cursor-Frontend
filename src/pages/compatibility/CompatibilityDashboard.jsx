@@ -159,18 +159,99 @@ export default function CompatibilityDashboard() {
   // ---------------------------------------------------------------------------
   const resolveModel = (aiMake, aiModel) => {
     if (!aiModel) return aiModel;
+    const makeLower = (aiMake || '').toLowerCase();
+    const modelLower = aiModel.toLowerCase();
+
+    // Honda + Prologue EV → Prologue
+    if (makeLower === 'honda' && modelLower.includes('prologue')) {
+      return 'Prologue';
+    }
+
+    // Honda + Fit Jazz → Fit
+    if (makeLower === 'honda' && modelLower.includes('fit')) {
+      return 'Fit';
+    }
+
+    // Ram + Classic 1500 → Classic
+    if (makeLower === 'ram' && modelLower.includes('classic')) {
+      return 'Classic';
+    }
+
+    // Tesla + Model 3 → 3, Tesla + Model Y → Y
+    if (makeLower === 'tesla') {
+      if (/model\s*3/i.test(aiModel)) return '3';
+      if (/model\s*y/i.test(aiModel)) return 'Y';
+    }
+
+    // Jeep + Wrangler JS → Wrangler
+    if (makeLower === 'jeep' && /wrangler\s+j[a-z]/i.test(aiModel)) {
+      return 'Wrangler';
+    }
+
+    // Toyota + Land Cruiser Prado 250 → Land Cruiser
+    if (makeLower === 'toyota' && modelLower.includes('land cruiser')) {
+      return 'Land Cruiser';
+    }
 
     // Model normalization: silverado → silverado 1500
-    if (aiModel.toLowerCase().includes('silverado') && !aiModel.toLowerCase().includes('1500')) {
+    if (modelLower.includes('silverado') && !modelLower.includes('1500')) {
       return 'Silverado 1500';
     }
 
     // Special case: BMW 3 Series → 330i
-    if (aiMake && aiMake.toLowerCase() === 'bmw' && aiModel.toLowerCase().includes('3 series')) {
+    if (makeLower === 'bmw' && modelLower.includes('3 series')) {
       return '330i';
     }
 
     return aiModel;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Year-dependent model resolution (must be called after resolveModel, before eBay lookup)
+  // Uses the AI-suggested years to pick the correct model variant.
+  // ---------------------------------------------------------------------------
+  const resolveModelWithYear = (make, model, startYear, endYear) => {
+    const makeLower = (make || '').toLowerCase();
+    const modelNorm = (model || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Ford + F-250: before 1999 → "F-250", 1999 and after → "F-250 Super Duty"
+    if (makeLower === 'ford' && modelNorm === 'f250') {
+      const end = Number(endYear);
+      if (end && end < 1999) return 'F-250';
+      return 'F-250 Super Duty';
+    }
+
+    return model;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Clamp AI year ranges to known valid ranges for specific make/model combos
+  // ---------------------------------------------------------------------------
+  const clampYearRange = (make, model, startYear, endYear) => {
+    if (!startYear || !endYear) return { startYear, endYear };
+    const makeLower = (make || '').toLowerCase();
+    const modelLower = (model || '').toLowerCase();
+    let start = Number(startYear);
+    let end = Number(endYear);
+
+    // Dodge + Ram 1500 → restrict to 1994-2014
+    if (makeLower === 'dodge' && /ram\s*1500/i.test(model)) {
+      if (start < 1994) start = 1994;
+      if (end > 2014) end = 2014;
+      return { startYear: String(start), endYear: String(end) };
+    }
+
+    // Ram + 1500/2500/3500 → restrict to 2011-2026
+    if (makeLower === 'ram') {
+      const numMatch = model.match(/(\d{4})/);
+      if (numMatch && Number(numMatch[1]) >= 1500) {
+        if (start < 2011) start = 2011;
+        if (end > 2026) end = 2026;
+        return { startYear: String(start), endYear: String(end) };
+      }
+    }
+
+    return { startYear, endYear };
   };
 
   const displayedListings = filterNoFitment
@@ -430,7 +511,8 @@ export default function CompatibilityDashboard() {
       }
       // Step 1: Resolve Make alias (Chevy→Chevrolet etc.) then fetch models
       const resolvedMake = resolveMake(data.make);
-      const resolvedModelInput = resolveModel(resolvedMake, data.model); // Apply model normalization
+      const resolvedModelStep1 = resolveModel(resolvedMake, data.model); // Apply model normalization
+      const resolvedModelInput = resolveModelWithYear(resolvedMake, resolvedModelStep1, data.startYear, data.endYear); // year-aware model fix
       setSelectedMake(resolvedMake);
       setModelOptions([]);
       setSelectedModel(null);
@@ -476,8 +558,9 @@ export default function CompatibilityDashboard() {
         setYearOptions(yearList);
         // Step 3: Apply year range — use eBay-validated subset, NOT raw AI years
         if (data.startYear && data.endYear) {
-          const startNum = Number(data.startYear);
-          const endNum = Number(data.endYear);
+          const clamped = clampYearRange(resolvedMake, resolvedModel, data.startYear, data.endYear);
+          const startNum = Number(clamped.startYear);
+          const endNum = Number(clamped.endYear);
           const min = Math.min(startNum, endNum);
           const max = Math.max(startNum, endNum);
           const range = yearList.filter(y => Number(y) >= min && Number(y) <= max);
@@ -553,7 +636,8 @@ export default function CompatibilityDashboard() {
         let modelOpts = [], yearOpts = [], resolvedYears = [], trimsByYearResult = {};
         let modelExists = true, yearsExist = true;
         const resolvedMake = resolveMake(data.make); // Chevy→Chevrolet etc.
-        const resolvedModelInput = resolveModel(resolvedMake, data.model); // Apply model normalization
+        const resolvedModelStep1 = resolveModel(resolvedMake, data.model); // Apply model normalization
+        const resolvedModelInput = resolveModelWithYear(resolvedMake, resolvedModelStep1, data.startYear, data.endYear); // year-aware model fix
         let canonicalModel = resolvedModelInput; // hoisted — updated inside try if fuzzy match succeeds
         try {
           // 1. Models — use resolved make (alias-corrected)
@@ -575,8 +659,9 @@ export default function CompatibilityDashboard() {
           });
           yearOpts = (yearsRes.data.values || []).map(y => String(y)).sort((a, b) => Number(b) - Number(a));
           if (data.startYear && data.endYear) {
-            const min = Math.min(Number(data.startYear), Number(data.endYear));
-            const max = Math.max(Number(data.startYear), Number(data.endYear));
+            const clamped = clampYearRange(resolvedMake, canonicalModel, data.startYear, data.endYear);
+            const min = Math.min(Number(clamped.startYear), Number(clamped.endYear));
+            const max = Math.max(Number(clamped.startYear), Number(clamped.endYear));
             resolvedYears = yearOpts.filter(y => Number(y) >= min && Number(y) <= max);
           }
           yearsExist = resolvedYears.length > 0;
