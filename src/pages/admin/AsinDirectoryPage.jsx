@@ -96,9 +96,9 @@ export default function AsinDirectoryPage() {
     }
   };
 
-  const handleBulkAdd = async (asins) => {
+  const handleBulkAdd = async (asins, region = 'US') => {
     try {
-      const { data } = await api.post('/asin-directory/bulk-manual', { asins });
+      const { data } = await api.post('/asin-directory/bulk-manual', { asins, region });
       setSuccess(
         `Added ${data.added} ASINs successfully! ` +
         (data.duplicates > 0 ? `(${data.duplicates} duplicates skipped)` : '') +
@@ -112,9 +112,9 @@ export default function AsinDirectoryPage() {
     }
   };
 
-  const handleCsvImport = async (csvData) => {
+  const handleCsvImport = async (csvData, region = 'US') => {
     try {
-      const { data } = await api.post('/asin-directory/bulk-csv', { csvData });
+      const { data } = await api.post('/asin-directory/bulk-csv', { csvData, region });
       setSuccess(
         `Imported ${data.added} ASINs successfully! ` +
         (data.duplicates > 0 ? `(${data.duplicates} duplicates skipped)` : '') +

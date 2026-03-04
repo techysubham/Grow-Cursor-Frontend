@@ -88,6 +88,16 @@ export default function TemplateListingsPage() {
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
   const [processingLog, setProcessingLog] = useState([]);
 
+  // Marketplace / region state (for ScraperAPI)
+  const [region, setRegion] = useState('US');
+
+  const MARKETPLACE_OPTIONS = [
+    { value: 'US', label: '🇺🇸 Amazon.com (US)' },
+    { value: 'UK', label: '🇬🇧 Amazon.co.uk (UK)' },
+    { value: 'CA', label: '🇨🇦 Amazon.ca (Canada)' },
+    { value: 'AU', label: '🇦🇺 Amazon.com.au (Australia)' },
+  ];
+
   // Core field defaults dialog state
   const [defaultsDialog, setDefaultsDialog] = useState(false);
   
@@ -529,7 +539,8 @@ export default function TemplateListingsPage() {
     try {
       const { data } = await api.post('/template-listings/autofill-from-asin', {
         asin: asinInput.trim(),
-        templateId
+        templateId,
+        region
       });
 
       const { coreFields, customFields } = data.autoFilledData;
@@ -646,7 +657,7 @@ export default function TemplateListingsPage() {
       // Build SSE URL with auth token
       const asinParam = asins.join(',');
       const authToken = getAuthToken();
-      const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&token=${encodeURIComponent(authToken)}`;
+      const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(region)}&token=${encodeURIComponent(authToken)}`;
       
       // Create EventSource for SSE
       const eventSource = new EventSource(api.defaults.baseURL + sseUrl);
@@ -751,7 +762,8 @@ export default function TemplateListingsPage() {
     try {
       const { data } = await api.post('/template-listings/bulk-autofill-from-asins', {
         asins: [asin],
-        templateId
+        templateId,
+        region
       });
 
       if (data.results.length > 0) {
@@ -1464,6 +1476,20 @@ export default function TemplateListingsPage() {
                       : ''
                   }
                 />
+
+                <FormControl size="small" sx={{ maxWidth: 280 }}>
+                  <InputLabel>Marketplace</InputLabel>
+                  <Select
+                    value={region}
+                    label="Marketplace"
+                    onChange={(e) => setRegion(e.target.value)}
+                    disabled={loadingAsin || loadingBulk}
+                  >
+                    {MARKETPLACE_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
                 
                 <Stack direction="row" spacing={2}>
                   {!bulkMode ? (

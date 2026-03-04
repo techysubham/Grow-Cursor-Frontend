@@ -11,10 +11,21 @@ import {
   Stack,
   Chip,
   LinearProgress,
-  Paper
+  Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { CloudUpload as UploadIcon, Download as DownloadIcon } from '@mui/icons-material';
 import { readCsvFile, parseCsvContent, downloadCsv } from '../utils/asinDirectoryUtils.js';
+
+const MARKETPLACE_OPTIONS = [
+  { value: 'US', label: '🇺🇸 Amazon.com (US)' },
+  { value: 'UK', label: '🇬🇧 Amazon.co.uk (UK)' },
+  { value: 'CA', label: '🇨🇦 Amazon.ca (Canada)' },
+  { value: 'AU', label: '🇦🇺 Amazon.com.au (Australia)' },
+];
 
 export default function AsinCsvImportDialog({ open, onClose, onImport }) {
   const [file, setFile] = useState(null);
@@ -22,6 +33,7 @@ export default function AsinCsvImportDialog({ open, onClose, onImport }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [region, setRegion] = useState('US');
 
   const handleFileSelect = async (selectedFile) => {
     if (!selectedFile) return;
@@ -78,7 +90,7 @@ export default function AsinCsvImportDialog({ open, onClose, onImport }) {
 
     try {
       const content = await readCsvFile(file);
-      await onImport(content);
+      await onImport(content, region);
       setFile(null);
       setPreview(null);
       onClose();
@@ -124,6 +136,19 @@ export default function AsinCsvImportDialog({ open, onClose, onImport }) {
           >
             Download CSV Template
           </Button>
+
+          <FormControl size="small" sx={{ maxWidth: 280 }}>
+            <InputLabel>Marketplace</InputLabel>
+            <Select
+              value={region}
+              label="Marketplace"
+              onChange={(e) => setRegion(e.target.value)}
+            >
+              {MARKETPLACE_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           {/* File Upload Area */}
           <Paper
