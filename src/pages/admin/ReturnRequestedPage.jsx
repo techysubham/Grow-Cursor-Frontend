@@ -94,6 +94,21 @@ export default function ReturnRequestedPage({
   hideDateFilter = false,
   embedded = false
 }) {
+  const EBAY_STATUS_OPTIONS = [
+    'Fully Refunded',
+    'Partially Refunded',
+    'To be returned',
+    'Received Item',
+    'Awaiting Return Shipment'
+  ];
+
+  const AMAZON_STATUS_OPTIONS = [
+    'Received',
+    'Refund Issued',
+    'Replacement Delivered',
+    'Dropped Off'
+  ];
+
   const [returns, setReturns] = useState([]);
   const [sellers, setSellers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -115,6 +130,8 @@ export default function ReturnRequestedPage({
     { id: 'item', label: 'Item' },
     { id: 'reason', label: 'Reason' },
     { id: 'status', label: 'Status' },
+    { id: 'ebayStatus', label: 'eBay Status' },
+    { id: 'amazonStatus', label: 'Amazon Status' },
     { id: 'refundAmount', label: 'Refund Amount' },
     { id: 'worksheetStatus', label: 'Worksheet Status' },
     { id: 'logs', label: 'Logs' },
@@ -319,6 +336,29 @@ export default function ReturnRequestedPage({
     }
   };
 
+  const handleMarketplaceStatusChange = async (ret, field, value) => {
+    const nextEbayStatus = field === 'ebayStatus' ? value : (ret.ebayStatus || '');
+    const nextAmazonStatus = field === 'amazonStatus' ? value : (ret.amazonStatus || '');
+
+    try {
+      await api.patch(`/ebay/returns/${ret.returnId}/marketplace-statuses`, {
+        ebayStatus: nextEbayStatus,
+        amazonStatus: nextAmazonStatus
+      });
+
+      setReturns(prevReturns =>
+        prevReturns.map(item =>
+          item.returnId === ret.returnId
+            ? { ...item, ebayStatus: nextEbayStatus, amazonStatus: nextAmazonStatus }
+            : item
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update marketplace statuses:', err);
+      alert('Failed to update marketplace statuses: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   const handleCopy = (text) => {
     const val = text || '-';
     if (val === '-') return;
@@ -472,6 +512,8 @@ export default function ReturnRequestedPage({
           return reasonLabels[reason] || reason;
         },
         'Status': (r) => r.currentStatus || r.returnRequest?.currentType || '',
+        'eBay Status': 'ebayStatus',
+        'Amazon Status': 'amazonStatus',
         'RMA Number': 'RMANumber',
         'Created Date': (r) => r.creationDate ? new Date(r.creationDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
         'Response Due': (r) => r.responseDate ? new Date(r.responseDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
@@ -803,6 +845,8 @@ export default function ReturnRequestedPage({
                 {visibleColumns.includes('item') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Item</strong></TableCell>}
                 {visibleColumns.includes('reason') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Reason</strong></TableCell>}
                 {visibleColumns.includes('status') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Status</strong></TableCell>}
+                {visibleColumns.includes('ebayStatus') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>eBay Status</strong></TableCell>}
+                {visibleColumns.includes('amazonStatus') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Amazon Status</strong></TableCell>}
                 {visibleColumns.includes('refundAmount') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>}
                 {visibleColumns.includes('worksheetStatus') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Worksheet Status</strong></TableCell>}
                 {visibleColumns.includes('logs') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Logs</strong></TableCell>}
@@ -813,7 +857,7 @@ export default function ReturnRequestedPage({
             <TableBody>
               {returns.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={15} align="center">
+                  <TableCell colSpan={17} align="center">
                     <Typography variant="body2" color="text.secondary" py={2}>
                       No return requests found. Click "Fetch Returns from eBay" to load data.
                     </Typography>
@@ -964,6 +1008,40 @@ export default function ReturnRequestedPage({
                         size="small"
                         sx={{ fontSize: '0.7rem' }}
                       />
+                    </TableCell>}
+                    {visibleColumns.includes('ebayStatus') && <TableCell>
+                      <FormControl size="small" fullWidth>
+                        <Select
+                          value={ret.ebayStatus || ''}
+                          onChange={(e) => handleMarketplaceStatusChange(ret, 'ebayStatus', e.target.value)}
+                          displayEmpty
+                          sx={{ fontSize: '0.75rem', minWidth: 210 }}
+                        >
+                          <MenuItem value="">
+                            <em>-</em>
+                          </MenuItem>
+                          {EBAY_STATUS_OPTIONS.map((status) => (
+                            <MenuItem key={status} value={status}>{status}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </TableCell>}
+                    {visibleColumns.includes('amazonStatus') && <TableCell>
+                      <FormControl size="small" fullWidth>
+                        <Select
+                          value={ret.amazonStatus || ''}
+                          onChange={(e) => handleMarketplaceStatusChange(ret, 'amazonStatus', e.target.value)}
+                          displayEmpty
+                          sx={{ fontSize: '0.75rem', minWidth: 210 }}
+                        >
+                          <MenuItem value="">
+                            <em>-</em>
+                          </MenuItem>
+                          {AMAZON_STATUS_OPTIONS.map((status) => (
+                            <MenuItem key={status} value={status}>{status}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </TableCell>}
                     {visibleColumns.includes('refundAmount') && <TableCell>
                       <Typography variant="body2">
