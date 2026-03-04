@@ -935,6 +935,9 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       // Save current item first without closing modal
       await handleSaveCompatibility(false);
 
+      // Track save-and-next action (hadData = compatibility list is non-empty)
+      api.post('/ai/track-save-next', { hadData: editCompatList.length > 0 }).catch(() => {});
+
       // Check if there's a next item on current page
       if (currentListingIndex < listings.length - 1) {
         const nextItem = listings[currentListingIndex + 1];
@@ -1724,7 +1727,12 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 Save (Stay)
               </Button>
               <Button
-                onClick={async () => { await handleSaveCompatibility(false); handleBulkQueueNext(false); }}
+                onClick={async () => {
+                  await handleSaveCompatibility(false);
+                  // Track save-and-next — hadData = user had entries in the compatibility list
+                  api.post('/ai/track-save-next', { hadData: editCompatList.length > 0 }).catch(() => {});
+                  handleBulkQueueNext(false);
+                }}
                 variant="contained"
                 color="primary"
                 disabled={bulkQueue[bulkQueueIdx]?.status === 'loading'}
