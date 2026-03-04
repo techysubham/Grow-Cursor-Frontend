@@ -79,6 +79,7 @@ import RangeAnalyzerPage from '../pages/admin/RangeAnalyzerPage.jsx';
 import FeedUploadPage from '../pages/ebay/FeedUploadPage.jsx';
 import SellingPrivilegesPage from '../pages/admin/SellingPrivilegesPage.jsx';
 import EbayApiUsagePage from '../pages/admin/EbayApiUsagePage.jsx';
+import FeedUploadStatsPage from '../pages/admin/FeedUploadStatsPage.jsx';
 import SalaryPage from '../pages/admin/SalaryPage.jsx';
 
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -547,6 +548,7 @@ export default function AdminLayout({ user, onLogout }) {
             >
               <MenuItem component={Link} to="/admin/listing" onClick={closeAllMenus}>Product Table</MenuItem>
               <MenuItem component={Link} to="/admin/feed-upload" onClick={closeAllMenus}>Feed Upload (CSV)</MenuItem>
+              <MenuItem component={Link} to="/admin/feed-upload-stats" onClick={closeAllMenus}>Feed Upload Stats</MenuItem>
               <MenuItem
                 onMouseEnter={(e) => setMonitoringAnchorEl(e.currentTarget)}
                 onMouseLeave={() => setMonitoringAnchorEl(null)}
@@ -1042,6 +1044,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/listings-summary" element={<ListingsSummaryPage />} />
               <Route path="/selling-privileges" element={<SellingPrivilegesPage />} />
               <Route path="/ebay-api-usage" element={<EbayApiUsagePage />} />
+              <Route path="/feed-upload-stats" element={<FeedUploadStatsPage />} />
             </>
           ) : null}
           {isSuper && (
