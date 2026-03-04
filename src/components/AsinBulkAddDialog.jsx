@@ -10,15 +10,27 @@ import {
   Box,
   Typography,
   Stack,
-  Chip
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { parseBulkAsins } from '../utils/asinDirectoryUtils.js';
+
+const MARKETPLACE_OPTIONS = [
+  { value: 'US', label: '🇺🇸 Amazon.com (US)' },
+  { value: 'UK', label: '🇬🇧 Amazon.co.uk (UK)' },
+  { value: 'CA', label: '🇨🇦 Amazon.ca (Canada)' },
+  { value: 'AU', label: '🇦🇺 Amazon.com.au (Australia)' },
+];
 
 export default function AsinBulkAddDialog({ open, onClose, onAdd }) {
   const [asinText, setAsinText] = useState('');
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [region, setRegion] = useState('US');
 
   const handleTextChange = (e) => {
     const text = e.target.value;
@@ -43,7 +55,7 @@ export default function AsinBulkAddDialog({ open, onClose, onAdd }) {
     setError('');
 
     try {
-      await onAdd(preview.valid);
+      await onAdd(preview.valid, region);
       setAsinText('');
       setPreview(null);
       onClose();
@@ -75,6 +87,19 @@ export default function AsinBulkAddDialog({ open, onClose, onAdd }) {
               Each ASIN should be 10 characters starting with 'B'.
             </Typography>
           </Alert>
+
+          <FormControl size="small" sx={{ maxWidth: 280 }}>
+            <InputLabel>Marketplace</InputLabel>
+            <Select
+              value={region}
+              label="Marketplace"
+              onChange={(e) => setRegion(e.target.value)}
+            >
+              {MARKETPLACE_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <TextField
             multiline
