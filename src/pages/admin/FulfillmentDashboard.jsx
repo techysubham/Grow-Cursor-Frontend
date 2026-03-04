@@ -742,6 +742,13 @@ function ChatDialog({ open, onClose, order }) {
   );
 }
 
+// --- EARNINGS HELPER ---
+function getOrderEarnings(order) {
+  const adFee = parseFloat(order.adFeeGeneral) || 0;
+  const base = parseFloat(order.paymentSummary?.totalDueSeller?.value);
+  return isNaN(base) ? null : base - adFee;
+}
+
 // --- MOBILE ORDER CARD COMPONENT ---
 function MobileOrderCard({ order, index, onCopy, onMessage, onViewImages, formatCurrency, thumbnailImages }) {
   const [expanded, setExpanded] = useState(false);
@@ -861,10 +868,10 @@ function MobileOrderCard({ order, index, onCopy, onMessage, onViewImages, format
               fontWeight="bold"
               sx={{
                 fontSize: '0.9rem',
-                color: order.orderEarnings >= 0 ? 'success.main' : 'error.main'
+                color: getOrderEarnings(order) >= 0 ? 'success.main' : 'error.main'
               }}
             >
-              {formatCurrency(order.orderEarnings)}
+              {formatCurrency(getOrderEarnings(order))}
             </Typography>
           </Box>
           <Box>
@@ -2458,8 +2465,8 @@ function FulfillmentDashboard() {
             <Divider sx={{ my: 1 }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography fontWeight="bold" color="success.main">Order earnings</Typography>
-              <Typography fontWeight="bold" color={order.orderEarnings >= 0 ? 'success.main' : 'error.main'}>
-                {formatCurrency(order.orderEarnings)}
+              <Typography fontWeight="bold" color={getOrderEarnings(order) >= 0 ? 'success.main' : 'error.main'}>
+                {formatCurrency(getOrderEarnings(order))}
               </Typography>
             </Box>
           </Stack>
@@ -3967,15 +3974,15 @@ function FulfillmentDashboard() {
                                 }}
                                 inputProps={{ step: '0.01' }}
                               />
-                            ) : order.orderEarnings != null ? (
+                            ) : getOrderEarnings(order) != null ? (
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
+                                  color: getOrderEarnings(order) >= 0 ? 'success.main' : 'error.main',
                                   fontWeight: 'bold'
                                 }}
                               >
-                                {formatCurrency(order.orderEarnings)}
+                                {formatCurrency(getOrderEarnings(order))}
                               </Typography>
                             ) : (
                               <Typography variant="body2" color="text.secondary">-</Typography>
