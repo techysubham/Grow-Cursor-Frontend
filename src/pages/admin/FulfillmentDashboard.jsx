@@ -744,9 +744,11 @@ function ChatDialog({ open, onClose, order }) {
 
 // --- EARNINGS HELPER ---
 function getOrderEarnings(order) {
-  const adFee = parseFloat(order.adFeeGeneral) || 0;
   const base = parseFloat(order.paymentSummary?.totalDueSeller?.value);
-  return isNaN(base) ? null : base - adFee;
+  if (isNaN(base)) return null;
+  if (order.orderPaymentStatus === 'FULLY_REFUNDED') return base;
+  const adFee = parseFloat(order.adFeeGeneral) || 0;
+  return base - adFee;
 }
 
 // --- MOBILE ORDER CARD COMPONENT ---
