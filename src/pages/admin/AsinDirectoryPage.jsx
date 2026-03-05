@@ -32,7 +32,8 @@ import {
   BrokenImage as BrokenImageIcon,
   ErrorOutline as ErrorOutlineIcon,
   AccountTree as AccountTreeIcon,
-  Visibility as ViewIcon
+  Visibility as ViewIcon,
+  WarningAmber as WarningAmberIcon
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
 import AsinBulkAddDialog from '../../components/AsinBulkAddDialog.jsx';
@@ -366,6 +367,14 @@ export default function AsinDirectoryPage() {
                             <CopyIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         </Tooltip>
+                        {(!item.price || !item.description) && (
+                          <Tooltip title={[
+                            !item.price && 'Missing price',
+                            !item.description && 'Missing description'
+                          ].filter(Boolean).join(' · ')}>
+                            <WarningAmberIcon sx={{ fontSize: 14, color: 'warning.main', cursor: 'default' }} />
+                          </Tooltip>
+                        )}
                       </Stack>
                       {item.brand && (
                         <Typography variant="caption" color="text.secondary">{item.brand}</Typography>
@@ -490,6 +499,10 @@ export default function AsinDirectoryPage() {
         open={!!viewAsin}
         onClose={() => setViewAsin(null)}
         asin={viewAsin}
+        onUpdate={(updated) => {
+          setViewAsin(updated);
+          setAsins(prev => prev.map(a => a._id === updated._id ? updated : a));
+        }}
       />
     </Box>
   );

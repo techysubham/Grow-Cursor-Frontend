@@ -12,17 +12,45 @@ import {
   IconButton,
   Tooltip,
   Grid,
-  Paper
+  Paper,
+  TextField,
+  Alert,
+  CircularProgress,
+  FormControl,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Close as CloseIcon,
   ContentCopy as CopyIcon,
   CheckCircle as CheckIcon,
   ErrorOutline as ErrorIcon,
-  BrokenImage as BrokenImageIcon
+  BrokenImage as BrokenImageIcon,
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  OpenInNew as OpenInNewIcon,
+  WarningAmber as WarningAmberIcon,
+  DriveFileRenameOutline as ManualEditIcon
 } from '@mui/icons-material';
 import { useState } from 'react';
+import api from '../lib/api.js';
 
+const AMAZON_DOMAINS = {
+  US: 'amazon.com',
+  UK: 'amazon.co.uk',
+  CA: 'amazon.ca',
+  AU: 'amazon.com.au'
+};
+
+const MARKETPLACE_OPTIONS = [
+  { value: 'US', label: '🇺🇸 US' },
+  { value: 'UK', label: '🇬🇧 UK' },
+  { value: 'CA', label: '🇨🇦 CA' },
+  { value: 'AU', label: '🇦🇺 AU' }
+];
+
+/** Renders a static label + value row; returns null if value is empty. */
 function DetailRow({ label, value, mono }) {
   if (!value) return null;
   return (
@@ -40,9 +68,45 @@ function DetailRow({ label, value, mono }) {
   );
 }
 
-export default function AsinDetailDialog({ open, onClose, asin }) {
+/** Always-visible row — shows a warning chip when value is empty. */
+function RequiredDetailRow({ label, value, children }) {
+  return (
+    <Box>
+      <Typography variant="caption" color="text.secondary" fontWeight={600} display="block">
+        {label}
+      </Typography>
+      {value ? (
+        children || (
+          <Typography variant="body2" sx={{ mt: 0.25 }}>
+            {value}
+          </Typography>
+        )
+      ) : (
+        <Chip
+          icon={<WarningAmberIcon fontSize="small" />}
+          label="Missing"
+          color="warning"
+          size="small"
+          sx={{ mt: 0.5 }}
+        />
+      )}
+    </Box>
+  );
+}
+
+export default function AsinDetailDialog({ open, onClose, asin, onUpdate }) {
   const [copiedAsin, setCopiedAsin] = useState(false);
   const [imgErrors, setImgErrors] = useState({});
+
+  // Edit state
+  const [editMode, setEditMode] = useState(false);
+  const [editPrice, setEditPrice] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  // Amazon link region
+  const [amazonRegion, setAmazonRegion] = useState('US');
 
   if (!asin) return null;
 
@@ -54,36 +118,100 @@ export default function AsinDetailDialog({ open, onClose, asin }) {
 
   const handleImgError = (idx) => setImgErrors(prev => ({ ...prev, [idx]: true }));
 
-  const scrapeDate = asin.scrapedAt
-    ? new Date(asin.scrapedAt).toLocaleString()
-    : null;
+  const handleOpenAmazon = () => {
+    const domain = AMAZON_DOMAINS[amazonRegion] || 'amazon.com';
+    window.open(`https://www.${domain}/dp/${asin.asin}`, '_blank', 'noopener,noreferrer');
+  };
 
-  const addedDate = asin.addedAt
-    ? new Date(asin.addedAt).toLocaleString()
-    : null;
+  const handleEnterEdit = () => {
+    setEditPrice(asin.price || '');
+    setEditDescription(asin.description || '');
+    setSaveError('');
+    setEditMode(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setSaveError('');
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    try {
+      const { data } = await api.patch(`/asin-directory/${asin._id}`, {
+        price: editPrice,
+        description: editDescription
+      });
+      setEditMode(false);
+      if (onUpdate) onUpdate(data);
+    } catch (err) {
+      setSaveError(err.response?.data?.error || 'Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const scrapeDate = asin.scrapedAt ? new Date(asin.scrapedAt).toLocaleString() : null;
+  const addedDate = asin.addedAt ? new Date(asin.addedAt).toLocaleString() : null;
+  const editedDate = asin.manuallyEditedAt ? new Date(asin.manuallyEditedAt).toLocaleString() : null;
+
+  const displayPrice = editMode ? editPrice : (asin.price || '');
+  const displayDescription = editMode ? editDescription : (asin.description || '');
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth scroll="paper">
-      <DialogTitle sx={{ pr: 6 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          {/* Scrape status badge */}
+    <Dialog open={open} onClose={editMode ? undefined : onClose} maxWidth="md" fullWidth scroll="paper">
+      <DialogTitle sx={{ pr: 6, pb: 1 }}>
+        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+          {/* Scrape status */}
           {asin.scraped ? (
             <Chip icon={<CheckIcon />} label="Scraped" color="success" size="small" />
           ) : (
             <Chip icon={<ErrorIcon />} label="Not Scraped" color="warning" size="small" />
           )}
+          {asin.manuallyEdited && (
+            <Chip icon={<ManualEditIcon />} label="Manually Edited" color="info" size="small" />
+          )}
+
           <Typography variant="h6" fontWeight={700} component="span">
             {asin.asin}
           </Typography>
+
           <Tooltip title={copiedAsin ? 'Copied!' : 'Copy ASIN'}>
             <IconButton size="small" onClick={handleCopy}>
               {copiedAsin ? <CheckIcon fontSize="small" color="success" /> : <CopyIcon fontSize="small" />}
             </IconButton>
           </Tooltip>
+
+          {/* Open on Amazon — compact region picker + link button */}
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ ml: 'auto' }}>
+            <FormControl size="small">
+              <Select
+                value={amazonRegion}
+                onChange={(e) => setAmazonRegion(e.target.value)}
+                variant="outlined"
+                size="small"
+                sx={{ fontSize: '0.75rem', '& .MuiSelect-select': { py: 0.5, px: 1 } }}
+              >
+                {MARKETPLACE_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '0.85rem' }}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Tooltip title="Open on Amazon">
+              <IconButton size="small" onClick={handleOpenAmazon} color="primary">
+                <OpenInNewIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
         </Stack>
+
         <IconButton
           size="small"
-          onClick={onClose}
+          onClick={editMode ? undefined : onClose}
+          disabled={editMode}
           sx={{ position: 'absolute', top: 12, right: 12 }}
         >
           <CloseIcon />
@@ -135,9 +263,18 @@ export default function AsinDetailDialog({ open, onClose, asin }) {
 
           {/* ── Core product info ───────────────────────────────────────── */}
           <Box>
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-              Product Information
-            </Typography>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Typography variant="subtitle2" fontWeight={700}>
+                Product Information
+              </Typography>
+              {!editMode && (
+                <Tooltip title="Edit price & description">
+                  <IconButton size="small" onClick={handleEnterEdit}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Stack>
             <Paper variant="outlined" sx={{ p: 2 }}>
               <Grid container spacing={2}>
                 <Grid item xs={12}>
@@ -146,9 +283,34 @@ export default function AsinDetailDialog({ open, onClose, asin }) {
                 <Grid item xs={6} sm={4}>
                   <DetailRow label="Brand" value={asin.brand} />
                 </Grid>
+
+                {/* Price — always visible, editable */}
                 <Grid item xs={6} sm={4}>
-                  <DetailRow label="Price" value={asin.price ? `$${parseFloat(asin.price).toFixed(2)}` : ''} />
+                  {editMode ? (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600} display="block">
+                        Price (USD)
+                      </Typography>
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        placeholder="e.g. 29.99"
+                        inputProps={{ min: 0, step: 0.01 }}
+                        sx={{ mt: 0.5 }}
+                        fullWidth
+                      />
+                    </Box>
+                  ) : (
+                    <RequiredDetailRow label="Price" value={displayPrice}>
+                      <Typography variant="body2" sx={{ mt: 0.25 }}>
+                        ${parseFloat(displayPrice).toFixed(2)}
+                      </Typography>
+                    </RequiredDetailRow>
+                  )}
                 </Grid>
+
                 <Grid item xs={6} sm={4}>
                   <DetailRow label="Model" value={asin.model} mono />
                 </Grid>
@@ -175,21 +337,53 @@ export default function AsinDetailDialog({ open, onClose, asin }) {
             </Paper>
           </Box>
 
-          {/* ── Description ─────────────────────────────────────────────── */}
-          {asin.description && (
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                Description / Feature Bullets
-              </Typography>
+          {/* ── Description — always visible, editable ──────────────────── */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+              Description / Feature Bullets
+            </Typography>
+            {editMode ? (
+              <TextField
+                multiline
+                rows={8}
+                fullWidth
+                label="Description / Feature Bullets"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Enter each bullet on a new line"
+                helperText="Each line becomes a bullet point. Paste from Amazon or type manually."
+              />
+            ) : displayDescription ? (
               <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflow: 'auto' }}>
-                {asin.description.split('\n').filter(Boolean).map((line, i) => (
+                {displayDescription.split('\n').filter(Boolean).map((line, i) => (
                   <Stack key={i} direction="row" spacing={1} sx={{ mb: 0.5 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>•</Typography>
                     <Typography variant="body2">{line}</Typography>
                   </Stack>
                 ))}
               </Paper>
-            </Box>
+            ) : (
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Chip
+                    icon={<WarningAmberIcon fontSize="small" />}
+                    label="Missing"
+                    color="warning"
+                    size="small"
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    No description was scraped. Click the edit button above to add one manually.
+                  </Typography>
+                </Stack>
+              </Paper>
+            )}
+          </Box>
+
+          {/* ── Save error ─────────────────────────────────────────────── */}
+          {saveError && (
+            <Alert severity="error" onClose={() => setSaveError('')}>
+              {saveError}
+            </Alert>
           )}
 
           {/* ── Meta / scrape info ──────────────────────────────────────── */}
@@ -208,6 +402,11 @@ export default function AsinDetailDialog({ open, onClose, asin }) {
                 <Grid item xs={6} sm={3}>
                   <DetailRow label="Scraped At" value={scrapeDate || '—'} />
                 </Grid>
+                {editedDate && (
+                  <Grid item xs={6} sm={3}>
+                    <DetailRow label="Manually Edited At" value={editedDate} />
+                  </Grid>
+                )}
                 {asin.scrapeError && (
                   <Grid item xs={12} sm={6}>
                     <Box>
@@ -229,7 +428,28 @@ export default function AsinDetailDialog({ open, onClose, asin }) {
 
       <Divider />
       <DialogActions sx={{ px: 3, py: 1.5 }}>
-        <Button onClick={onClose} variant="outlined">Close</Button>
+        {editMode ? (
+          <>
+            <Button
+              onClick={handleCancelEdit}
+              disabled={saving}
+              startIcon={<CancelIcon />}
+              color="inherit"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              disabled={saving}
+              startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
+            </Button>
+          </>
+        ) : (
+          <Button onClick={onClose} variant="outlined">Close</Button>
+        )}
       </DialogActions>
     </Dialog>
   );
