@@ -1172,7 +1172,7 @@ function FulfillmentDashboard() {
 
   // Column visibility state - persisted in sessionStorage
   const DEFAULT_VISIBLE_COLUMNS = [
-    'seller', 'orderId', 'dateSold', 'shipBy', 'deliveryDate', 'productName',
+    'seller', 'orderId', 'dateSold', 'shipBy', 'deliveryDate', 'productName', 'buyerNote',
     'buyerName', 'shippingAddress', 'marketplace', 'subtotal',
     'shipping', 'salesTax', 'discount', 'transactionFees',
     'adFeeGeneral', 'cancelStatus', 'refunds', 'orderEarnings', 'trackingNumber',
@@ -1187,6 +1187,7 @@ function FulfillmentDashboard() {
     { id: 'shipBy', label: 'Ship By' },
     { id: 'deliveryDate', label: 'Delivery Date' },
     { id: 'productName', label: 'Product Name' },
+    { id: 'buyerNote', label: 'Buyer Note' },
     { id: 'buyerName', label: 'Buyer Name' },
     { id: 'shippingAddress', label: 'Shipping Address' },
     { id: 'marketplace', label: 'Marketplace' },
@@ -2564,6 +2565,7 @@ function FulfillmentDashboard() {
         'Seller': (o) => o.seller?.user?.username || '',
         'Date Sold': (o) => o.dateSold ? new Date(o.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
         'Product Name': 'productName',
+        'Buyer Note': 'buyerCheckoutNotes',
         'Item Number': 'itemNumber',
         'Buyer Name': 'shippingFullName',
         'Buyer Username': (o) => o.buyer?.username || '',
@@ -2611,6 +2613,7 @@ function FulfillmentDashboard() {
         // 'shipBy': 'Ship By', // Not in prev CSV but we can add if needed
         // 'deliveryDate': 'Delivery Date', // Not in prev CSV
         'productName': 'Product Name',
+        'buyerNote': 'Buyer Note',
         'buyerName': 'Buyer Name',
         'shippingAddress': 'Shipping Address',
         'marketplace': 'Marketplace',
@@ -3414,6 +3417,7 @@ function FulfillmentDashboard() {
                     {visibleColumns.includes('shipBy') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>}
                     {visibleColumns.includes('deliveryDate') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Delivery Date</TableCell>}
                     {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>}
+                    {visibleColumns.includes('buyerNote') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Note</TableCell>}
                     {visibleColumns.includes('buyerName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>}
                     {visibleColumns.includes('shippingAddress') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>}
                     {visibleColumns.includes('marketplace') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>}
@@ -3660,6 +3664,28 @@ function FulfillmentDashboard() {
                                 </Box>
                               )}
                             </Stack>
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('buyerNote') && (
+                          <TableCell sx={{ maxWidth: 300 }}>
+                            {order.buyerCheckoutNotes ? (
+                              <Tooltip title={order.buyerCheckoutNotes} arrow placement="top">
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    fontStyle: 'italic',
+                                    color: 'text.secondary'
+                                  }}
+                                >
+                                  {order.buyerCheckoutNotes}
+                                </Typography>
+                              </Tooltip>
+                            ) : (
+                              <Typography variant="body2" color="text.disabled">-</Typography>
+                            )}
                           </TableCell>
                         )}
                         {visibleColumns.includes('buyerName') && (
