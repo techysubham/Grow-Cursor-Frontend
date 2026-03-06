@@ -81,6 +81,7 @@ import SellingPrivilegesPage from '../pages/admin/SellingPrivilegesPage.jsx';
 import EbayApiUsagePage from '../pages/admin/EbayApiUsagePage.jsx';
 import FeedUploadStatsPage from '../pages/admin/FeedUploadStatsPage.jsx';
 import SalaryPage from '../pages/admin/SalaryPage.jsx';
+import SellerFundsPage from '../pages/admin/SellerFundsPage.jsx';
 
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -526,6 +527,22 @@ export default function AdminLayout({ user, onLogout }) {
                   <NavIcon icon={BarChartIcon} label="eBay API Usage" sidebarOpen={sidebarOpen} />
                 </ListItemIcon>
                 {sidebarOpen && <ListItemText primary="eBay API Usage" />}
+              </ListItemButton>
+            </ListItem>
+
+            {/* Seller Funds */}
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/admin/seller-funds"
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/seller-funds'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={AccountBalanceIcon} label="Seller Funds" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Seller Funds" />}
               </ListItemButton>
             </ListItem>
 
@@ -1050,6 +1067,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/listings-summary" element={<ListingsSummaryPage />} />
               <Route path="/selling-privileges" element={<SellingPrivilegesPage />} />
               <Route path="/ebay-api-usage" element={<EbayApiUsagePage />} />
+              <Route path="/seller-funds" element={<SellerFundsPage />} />
               <Route path="/feed-upload-stats" element={<FeedUploadStatsPage />} />
             </>
           ) : null}
