@@ -2,13 +2,11 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Box,
   Button,
-  ButtonGroup,
   Chip,
   CircularProgress,
   FormControl,
   InputAdornment,
   InputLabel,
-  Menu,
   MenuItem,
   OutlinedInput,
   Pagination,
@@ -33,13 +31,13 @@ import {
   Search as SearchIcon,
   FileDownload as DownloadIcon,
   Settings as SettingsIcon,
-  ArrowDropDown as ArrowDropDownIcon,
   RuleOutlined as ProofReadIcon,
   CalendarToday as CalendarIcon,
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
 import ListDirectlyDialog from '../../components/ListDirectlyDialog.jsx';
 import TemplateCustomizationDialog from '../../components/TemplateCustomizationDialog.jsx';
+import AsinReviewModal from '../../components/AsinReviewModal.jsx';
 
 // Core columns to display in the directory table (same as TemplateListingsPage)
 const CORE_COLUMNS = [
@@ -92,7 +90,8 @@ export default function ListingDirectoryPage() {
   // ── Dialogs ───────────────────────────────────────────────────────────────
   const [customizationDialog, setCustomizationDialog] = useState(false);
   const [listDirectlyDialog, setListDirectlyDialog] = useState(false);
-  const [proofReadAnchor, setProofReadAnchor] = useState(null);
+  const [reviewModal, setReviewModal] = useState(false);
+  const [previewItems, setPreviewItems] = useState([]);
 
   // Search debounce ref
   const searchTimeout = useRef(null);
@@ -183,6 +182,103 @@ export default function ListingDirectoryPage() {
   const handleToggleAll = () => {
     if (selectedListings.size === listings.length) setSelectedListings(new Set());
     else setSelectedListings(new Set(listings.map(l => l._id)));
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Proof Read – open AsinReviewModal over selected rows
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleProofRead = async () => {
+    const selected = listings.filter(l => selectedListings.has(l._id));
+
+    // Build items immediately with loading state so modal opens right away
+    const items = selected.map(l => ({
+      id: l._id,
+      asin: l._asinReference || '',
+      sku: l.customLabel || '',
+      status: 'loading',
+      sourceData: null,
+      generatedListing: {
+        _existingListingId: l._id,
+        action: l.action,
+        customLabel: l.customLabel,
+        title: l.title,
+        startPrice: l.startPrice,
+        categoryId: l.categoryId,
+        categoryName: l.categoryName,
+        relationship: l.relationship,
+        relationshipDetails: l.relationshipDetails,
+        scheduleTime: l.scheduleTime,
+        description: l.description,
+        condition: l.condition,
+        conditionDescription: l.conditionDescription,
+        quantity: l.quantity,
+        customFields: l.customFields,
+      },
+      warnings: [],
+      errors: []
+    }));
+    setPreviewItems(items);
+    setReviewModal(true);
+
+    // Fetch Amazon source data from the ASIN directory in the background
+    const asinList = selected.map(l => l._asinReference).filter(Boolean);
+    if (asinList.length === 0) {
+      // No ASINs — flip all to ready immediately
+      setPreviewItems(items.map(i => ({ ...i, status: 'ready' })));
+      return;
+    }
+    try {
+      const { data } = await api.get('/asin-directory/by-asins', {
+        params: { asins: asinList.join(',') },
+      });
+      const byAsin = {};
+      (data || []).forEach(d => { byAsin[d.asin] = d; });
+      setPreviewItems(prev => prev.map(item => {
+        const src = byAsin[item.asin?.toUpperCase()];
+        return {
+          ...item,
+          status: 'ready',
+          sourceData: src
+            ? {
+                title: src.title,
+                brand: src.brand,
+                price: src.price,
+                images: src.images || [],
+                description: src.description,
+                color: src.color,
+                compatibility: src.compatibility,
+              }
+            : null,
+        };
+      }));
+    } catch {
+      // If the fetch fails, still flip to ready so the modal is usable
+      setPreviewItems(prev => prev.map(i => ({ ...i, status: 'ready' })));
+    }
+  };
+
+  const handleSaveFromReview = async (listings) => {
+    try {
+      await api.put('/template-listings/bulk-update', { listings });
+      setReviewModal(false);
+      setPreviewItems([]);
+      setSuccess('Listings updated successfully!');
+      fetchListings(1);
+    } catch (e) {
+      setError('Failed to save changes');
+    }
+  };
+
+  const handleListDirectlyFromReview = async (listings) => {
+    try {
+      // Persist any edits first, then open List Directly dialog
+      await api.put('/template-listings/bulk-update', { listings });
+      setReviewModal(false);
+      setPreviewItems([]);
+      setListDirectlyDialog(true);
+    } catch (e) {
+      setError('Failed to save changes before listing');
+    }
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -388,37 +484,15 @@ export default function ListingDirectoryPage() {
             List Directly
           </Button>
 
-          {/* Proof Read dropdown */}
-          <ButtonGroup variant="outlined" disableElevation>
-            <Button
-              startIcon={<ProofReadIcon />}
-              disabled={!template}
-              onClick={() => setSuccess('Proof Read — logic coming soon')}
-            >
-              Proof Read
-            </Button>
-            <Button
-              size="small"
-              disabled={!template}
-              onClick={e => setProofReadAnchor(e.currentTarget)}
-              sx={{ px: 0.5 }}
-            >
-              <ArrowDropDownIcon fontSize="small" />
-            </Button>
-          </ButtonGroup>
-          <Menu
-            anchorEl={proofReadAnchor}
-            open={Boolean(proofReadAnchor)}
-            onClose={() => setProofReadAnchor(null)}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          {/* Proof Read */}
+          <Button
+            variant="outlined"
+            startIcon={<ProofReadIcon />}
+            disabled={!template || selectedListings.size === 0}
+            onClick={handleProofRead}
           >
-            <MenuItem disabled>
-              <Typography variant="caption" color="text.secondary">
-                Proof Read options — coming soon
-              </Typography>
-            </MenuItem>
-          </Menu>
+            Proof Read
+          </Button>
 
           {/* Download CSV */}
           <Button
@@ -584,6 +658,21 @@ export default function ListingDirectoryPage() {
         selectedListings={selectedListings}
         templateId={template?._id}
         sellerId={seller?._id}
+      />
+
+      <AsinReviewModal
+        open={reviewModal}
+        onClose={() => { setReviewModal(false); setPreviewItems([]); }}
+        previewItems={previewItems}
+        onSave={handleSaveFromReview}
+        onListDirectly={handleListDirectlyFromReview}
+        templateColumns={[
+          { name: 'title', label: 'Title', type: 'core' },
+          { name: 'description', label: 'Description', type: 'core' },
+          { name: 'startPrice', label: 'Start Price', type: 'core' },
+          { name: 'quantity', label: 'Quantity', type: 'core' },
+          ...(template?.customColumns?.map(col => ({ ...col, type: 'custom' })) || []),
+        ]}
       />
     </Box>
   );
