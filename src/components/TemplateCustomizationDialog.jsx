@@ -29,7 +29,8 @@ export default function TemplateCustomizationDialog({
   onClose, 
   templateId, 
   sellerId,
-  templateName 
+  templateName,
+  readOnly = false
 }) {
   const [currentTab, setCurrentTab] = useState(0);
   const [baseTemplate, setBaseTemplate] = useState(null);
@@ -132,7 +133,10 @@ export default function TemplateCustomizationDialog({
           <Stack direction="row" alignItems="center" spacing={1}>
             <SettingsIcon />
             <Typography variant="h6">Customize Template: {templateName}</Typography>
-            {hasAnyOverride && (
+            {readOnly && (
+              <Chip label="View only mode" color="default" size="small" />
+            )}
+            {!readOnly && hasAnyOverride && (
               <Chip 
                 label="Customized" 
                 color="primary" 
@@ -147,10 +151,15 @@ export default function TemplateCustomizationDialog({
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
         {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
         
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Your changes will only affect your listings. The base template remains unchanged for other sellers.
-        </Alert>
+        {readOnly ? (
+          <Alert severity="info" sx={{ mb: 2 }}>View only mode — changes cannot be saved from this context.</Alert>
+        ) : (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Your changes will only affect your listings. The base template remains unchanged for other sellers.
+          </Alert>
+        )}
         
+        <Box sx={{ pointerEvents: readOnly ? 'none' : 'auto', opacity: readOnly ? 0.85 : 1 }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -208,10 +217,11 @@ export default function TemplateCustomizationDialog({
             </Box>
           </>
         )}
+        </Box>
       </DialogContent>
       
       <DialogActions>
-        {hasAnyOverride && (
+        {!readOnly && hasAnyOverride && (
           <Button 
             onClick={handleResetAll} 
             color="warning"
