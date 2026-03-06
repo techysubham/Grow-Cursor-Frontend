@@ -425,7 +425,7 @@ const ProcessingByDateSection = ({ sellers }) => {
   const grandTotal = results.reduce((sum, r) => sum + r.totalAmount, 0);
 
   return (
-    <Box sx={{ mt: 4 }}>
+    <Paper elevation={3} sx={{ p: 4, borderRadius: 2, backgroundColor: '#fafafa' }}>
       <Typography variant="h5" fontWeight={700} sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <FilterListIcon sx={{ color: '#8b5cf6' }} />
         Processing Funds by Available Date
@@ -530,7 +530,7 @@ const ProcessingByDateSection = ({ sellers }) => {
           </TableContainer>
         </Box>
       )}
-    </Box>
+    </Paper>
   );
 };
 
@@ -778,70 +778,85 @@ const SellerFundsPage = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+      {/* ===== SECTION 1: SELLER FUNDS OVERVIEW ===== */}
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
       ) : sellers.length === 0 ? (
         <Alert severity="info">No sellers with eBay connections found.</Alert>
       ) : (
-        <TableContainer component={Paper} elevation={2}>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: '#f8fafc' }}>
-                <TableCell sx={{ fontWeight: 700 }}>Seller</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: '#3b82f6' }}>Total Funds</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: '#22c55e' }}>Available</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: '#f59e0b' }}>Processing</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: '#ef4444' }}>On Hold</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sellers.map((seller) => (
-                <SellerRow
-                  key={seller.sellerId}
-                  seller={seller}
-                  onHoldExpanded={!!expandedHolds[seller.sellerId]}
-                  onToggleHold={toggleHold}
-                />
-              ))}
-              {sellers.length > 1 && (
-                <TableRow sx={{ backgroundColor: '#f1f5f9' }}>
-                  <TableCell><Typography variant="body2" fontWeight={700}>TOTAL</Typography></TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body1" fontWeight={700} sx={{ color: '#3b82f6' }}>{fmtUSD(totals.total)}</Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body1" fontWeight={700} sx={{ color: '#22c55e' }}>{fmtUSD(totals.available)}</Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body1" fontWeight={700} sx={{ color: '#f59e0b' }}>{fmtUSD(totals.processing)}</Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body1" fontWeight={700} sx={{ color: '#ef4444' }}>{fmtUSD(totals.onHold)}</Typography>
-                  </TableCell>
+        <Paper elevation={3} sx={{ mb: 5, overflow: 'hidden', borderRadius: 2 }}>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f8fafc' }}>
+                  <TableCell sx={{ fontWeight: 700 }}>Seller</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, color: '#3b82f6' }}>Total Funds</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, color: '#22c55e' }}>Available</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, color: '#f59e0b' }}>Processing</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, color: '#ef4444' }}>On Hold</TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {sellers.map((seller) => (
+                  <SellerRow
+                    key={seller.sellerId}
+                    seller={seller}
+                    onHoldExpanded={!!expandedHolds[seller.sellerId]}
+                    onToggleHold={toggleHold}
+                  />
+                ))}
+                {sellers.length > 1 && (
+                  <TableRow sx={{ backgroundColor: '#f1f5f9' }}>
+                    <TableCell><Typography variant="body2" fontWeight={700}>TOTAL</Typography></TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body1" fontWeight={700} sx={{ color: '#3b82f6' }}>{fmtUSD(totals.total)}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body1" fontWeight={700} sx={{ color: '#22c55e' }}>{fmtUSD(totals.available)}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body1" fontWeight={700} sx={{ color: '#f59e0b' }}>{fmtUSD(totals.processing)}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body1" fontWeight={700} sx={{ color: '#ef4444' }}>{fmtUSD(totals.onHold)}</Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
       )}
 
-      {/* Date Filter for Processing Sums */}
-      {!loading && sellers.length > 0 && <ProcessingByDateSection sellers={sellers} />}
-
-      {/* Upcoming Payouts Section */}
+      {/* ===== SECTION 2: PROCESSING FUNDS BY AVAILABLE DATE ===== */}
       {!loading && sellers.length > 0 && (
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h5" fontWeight={700} sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <EventIcon sx={{ color: '#3b82f6' }} />
-            Upcoming Payouts Schedule
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            View upcoming and recent payouts for each seller
-          </Typography>
-          {sellers.filter(s => !s.error).map((seller) => (
-            <UpcomingPayoutsCard key={seller.sellerId} seller={seller} />
-          ))}
-        </Box>
+        <>
+          <Divider sx={{ my: 5 }}>
+            <Chip label="SECTION 2" size="small" sx={{ fontWeight: 600, backgroundColor: '#e0e7ff' }} />
+          </Divider>
+          <ProcessingByDateSection sellers={sellers} />
+        </>
+      )}
+
+      {/* ===== SECTION 3: UPCOMING PAYOUTS SCHEDULE ===== */}
+      {!loading && sellers.length > 0 && (
+        <>
+          <Divider sx={{ my: 5 }}>
+            <Chip label="SECTION 3" size="small" sx={{ fontWeight: 600, backgroundColor: '#e0f2fe' }} />
+          </Divider>
+          <Box>
+            <Typography variant="h5" fontWeight={700} sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <EventIcon sx={{ color: '#3b82f6' }} />
+              Upcoming Payouts Schedule
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              View upcoming and recent payouts for each seller
+            </Typography>
+            {sellers.filter(s => !s.error).map((seller) => (
+              <UpcomingPayoutsCard key={seller.sellerId} seller={seller} />
+            ))}
+          </Box>
+        </>
       )}
     </Box>
   );
