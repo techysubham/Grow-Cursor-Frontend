@@ -193,8 +193,8 @@ export default function CompatibilityDashboard() {
       return 'Land Cruiser';
     }
 
-    // Model normalization: silverado → silverado 1500
-    if (modelLower.includes('silverado') && !modelLower.includes('1500')) {
+    // Model normalization: silverado → silverado 1500 (only if no number like 2500, 3500 exists)
+    if (modelLower.includes('silverado') && !/\d{4}/.test(modelLower)) {
       return 'Silverado 1500';
     }
 
