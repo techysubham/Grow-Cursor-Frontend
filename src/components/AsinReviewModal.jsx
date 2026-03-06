@@ -44,6 +44,7 @@ export default function AsinReviewModal({
   onClose, 
   previewItems = [], 
   onSave,
+  onListDirectly = null,
   templateColumns = []
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -445,6 +446,33 @@ export default function AsinReviewModal({
                 Dismiss
               </Button>
             )}
+            {onListDirectly && (
+              <Button
+                variant="contained"
+                color="secondary"
+                size="small"
+                onClick={() => {
+                  const listingsToSave = activeItems
+                    .filter(item => !['error', 'loading', 'blocked'].includes(item.status))
+                    .map(item => {
+                      const listingData = editedItems[item.id] || item.generatedListing;
+                      if (item.status === 'duplicate_updateable') {
+                        return {
+                          ...listingData,
+                          _isDuplicateUpdate: true,
+                          _existingListingId: item.generatedListing?._existingListingId || listingData._existingListingId
+                        };
+                      }
+                      return listingData;
+                    });
+                  onListDirectly(listingsToSave);
+                }}
+                disabled={saving || activeItems.every(i => ['error', 'loading', 'blocked'].includes(i.status))}
+                sx={{ fontSize: showAmazonPreview ? '0.7rem' : undefined, whiteSpace: 'nowrap' }}
+              >
+                List Directly
+              </Button>
+            )}
             <Button
               variant="contained"
               startIcon={showAmazonPreview ? null : <SaveIcon />}
@@ -700,6 +728,29 @@ export default function AsinReviewModal({
                         </Grid>
                       ))}
                     </Grid>
+                  </Box>
+                )}
+              </Stack>
+            ) : !currentItem.sourceData ? (
+              <Stack spacing={2}>
+                <Alert severity="info" variant="outlined">
+                  <Typography variant="body2" fontWeight="bold" gutterBottom>
+                    Existing Listing
+                  </Typography>
+                  <Typography variant="caption">
+                    This is an existing listing from the directory. Edit any fields on the right, then click <strong>Save All</strong> to update or <strong>List Directly</strong> to proceed to listing.
+                  </Typography>
+                </Alert>
+                {currentItem.asin && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">ASIN</Typography>
+                    <Typography variant="body2" fontWeight="bold">{currentItem.asin}</Typography>
+                  </Box>
+                )}
+                {currentItem.sku && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">SKU</Typography>
+                    <Typography variant="body2">{currentItem.sku}</Typography>
                   </Box>
                 )}
               </Stack>

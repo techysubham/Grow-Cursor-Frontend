@@ -35,6 +35,8 @@ export default function ManageTemplatesPage() {
     },
     coreFieldDefaults: {},
     customActionField: '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)',
+    rangeId: null,
+    listProductId: null,
     pricingConfig: {
       enabled: false,
       spentRate: null,
@@ -74,9 +76,44 @@ export default function ManageTemplatesPage() {
   const [bulkResetLoading, setBulkResetLoading] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
 
+  // Directory assignment cascade
+  const [formCategories, setFormCategories] = useState([]);
+  const [allRanges, setAllRanges] = useState([]);    // all ranges, used for reverse lookup
+  const [formRanges, setFormRanges] = useState([]);  // filtered to selected category
+  const [formProducts, setFormProducts] = useState([]);
+  const [formCategoryId, setFormCategoryId] = useState(''); // UI-only, not saved
+
   useEffect(() => {
     fetchTemplates();
+    // Load categories and all ranges for the assignment cascade
+    Promise.all([
+      api.get('/asin-list-categories'),
+      api.get('/asin-list-ranges', { params: { all: true } }),
+    ]).then(([catRes, rangeRes]) => {
+      setFormCategories(catRes.data || []);
+      setAllRanges(rangeRes.data || []);
+    }).catch(() => {});
   }, []);
+
+  // Filter ranges when formCategoryId changes
+  useEffect(() => {
+    if (!formCategoryId) {
+      setFormRanges([]);
+      return;
+    }
+    setFormRanges(
+      allRanges.filter(r => String(r.categoryId?._id || r.categoryId) === String(formCategoryId))
+    );
+  }, [formCategoryId, allRanges]);
+
+  // Load products when rangeId changes in the form
+  useEffect(() => {
+    const rid = formData.rangeId;
+    if (!rid) { setFormProducts([]); return; }
+    api.get('/asin-list-products', { params: { rangeId: String(rid._id || rid) } })
+      .then(r => setFormProducts(r.data || []))
+      .catch(() => setFormProducts([]));
+  }, [formData.rangeId]);
 
   const fetchTemplates = async () => {
     try {
@@ -138,6 +175,21 @@ export default function ManageTemplatesPage() {
 
   const handleEdit = (template) => {
     setEditingTemplate(template);
+    // Pre-populate cascade for the assignment section
+    if (template.rangeId) {
+      const rangeIdStr = String(template.rangeId?._id || template.rangeId);
+      const matchingRange = allRanges.find(r => String(r._id) === rangeIdStr);
+      if (matchingRange) {
+        setFormCategoryId(String(matchingRange.categoryId?._id || matchingRange.categoryId));
+      }
+      api.get('/asin-list-products', { params: { rangeId: rangeIdStr } })
+        .then(r => setFormProducts(r.data || []))
+        .catch(() => {});
+    } else {
+      setFormCategoryId('');
+      setFormRanges([]);
+      setFormProducts([]);
+    }
     setFormData({
       name: template.name,
       customColumns: template.customColumns || [],
@@ -147,6 +199,8 @@ export default function ManageTemplatesPage() {
       },
       coreFieldDefaults: template.coreFieldDefaults || {},
       customActionField: template.customActionField || '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)',
+      rangeId: template.rangeId || null,
+      listProductId: template.listProductId || null,
       pricingConfig: template.pricingConfig || {
         enabled: false,
         spentRate: null,
@@ -168,6 +222,9 @@ export default function ManageTemplatesPage() {
     setEditDialog(false);
     setEditingTemplate(null);
     setCurrentTab(0);
+    setFormCategoryId('');
+    setFormRanges([]);
+    setFormProducts([]);
     setFormData({
       name: '',
       customColumns: [],
@@ -177,6 +234,8 @@ export default function ManageTemplatesPage() {
       },
       coreFieldDefaults: {},
       customActionField: '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)',
+      rangeId: null,
+      listProductId: null,
       pricingConfig: {
         enabled: false,
         spentRate: null,
@@ -203,6 +262,9 @@ export default function ManageTemplatesPage() {
       setSuccess('Template updated successfully!');
       setEditDialog(false);
       setEditingTemplate(null);
+      setFormCategoryId('');
+      setFormRanges([]);
+      setFormProducts([]);
       setFormData({
         name: '',
         customColumns: [],
@@ -212,6 +274,8 @@ export default function ManageTemplatesPage() {
         },
         coreFieldDefaults: {},
         customActionField: '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)',
+        rangeId: null,
+        listProductId: null,
         pricingConfig: {
           enabled: false,
           spentRate: null,
@@ -652,6 +716,56 @@ export default function ManageTemplatesPage() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
+
+                  {/* Directory Assignment */}
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1 }}>
+                    Listing Directory Assignment
+                  </Typography>
+
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      label="Category"
+                      value={formCategoryId}
+                      onChange={e => {
+                        setFormCategoryId(e.target.value);
+                        setFormData({ ...formData, rangeId: null, listProductId: null });
+                      }}
+                    >
+                      <MenuItem value=""><em>None</em></MenuItem>
+                      {formCategories.map(c => (
+                        <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <FormControl size="small" fullWidth disabled={!formCategoryId}>
+                    <InputLabel>Range</InputLabel>
+                    <Select
+                      label="Range"
+                      value={formData.rangeId ? String(formData.rangeId?._id || formData.rangeId) : ''}
+                      onChange={e => setFormData({ ...formData, rangeId: e.target.value || null, listProductId: null })}
+                    >
+                      <MenuItem value=""><em>None</em></MenuItem>
+                      {formRanges.map(r => (
+                        <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <FormControl size="small" fullWidth disabled={!formData.rangeId}>
+                    <InputLabel>Product (optional)</InputLabel>
+                    <Select
+                      label="Product (optional)"
+                      value={formData.listProductId ? String(formData.listProductId?._id || formData.listProductId) : ''}
+                      onChange={e => setFormData({ ...formData, listProductId: e.target.value || null })}
+                    >
+                      <MenuItem value=""><em>None — Range level</em></MenuItem>
+                      {formProducts.map(p => (
+                        <MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </Stack>
               )}
               

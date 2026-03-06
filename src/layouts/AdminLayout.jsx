@@ -125,6 +125,7 @@ import TemplateListingsPage from '../pages/admin/TemplateListingsPage.jsx';
 import TemplateListingAnalyticsPage from '../pages/admin/TemplateListingAnalyticsPage.jsx';
 import SelectSellerPage from '../pages/admin/SelectSellerPage.jsx';
 import SellerTemplatesPage from '../pages/admin/SellerTemplatesPage.jsx';
+import ListingDirectoryPage from '../pages/admin/ListingDirectoryPage.jsx';
 import TemplateDatabasePage from '../pages/admin/TemplateDatabasePage.jsx';
 import CsvStoragePage from '../pages/admin/CsvStoragePage.jsx';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -419,6 +420,7 @@ export default function AdminLayout({ user, onLogout }) {
               {isSuper && <MenuItem component={Link} to="/admin/manage-templates" onClick={closeAllMenus}>Manage Templates</MenuItem>}
               {isSuper && <MenuItem component={Link} to="/admin/listings-database" onClick={closeAllMenus}>Listings Database</MenuItem>}
               <MenuItem component={Link} to="/admin/select-seller" onClick={closeAllMenus}>Add Template Listings</MenuItem>
+              <MenuItem component={Link} to="/admin/listing-directory" onClick={closeAllMenus}>Listing Directory</MenuItem>
             </Menu>
           </>
         )}
@@ -1068,6 +1070,7 @@ export default function AdminLayout({ user, onLogout }) {
           {(isSuper || isAnyLister) && (
             <>
               <Route path="/template-listings" element={<TemplateListingsPage />} />
+              <Route path="/listing-directory" element={<ListingDirectoryPage />} />
               <Route path="/template-listing-analytics" element={<TemplateListingAnalyticsPage />} />
               <Route path="/select-seller" element={<SelectSellerPage />} />
               <Route path="/seller-templates" element={<SellerTemplatesPage />} />
