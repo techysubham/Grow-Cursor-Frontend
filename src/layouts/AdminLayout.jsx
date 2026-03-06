@@ -98,6 +98,8 @@ import InternalMessagesPage from '../pages/admin/InternalMessagesPage.jsx';
 import InternalMessagesAdminPage from '../pages/admin/InternalMessagesAdminPage.jsx';
 import ManageCreditCardsPage from '../pages/admin/ManageCreditCardsPage.jsx';
 import ManageCreditCardNamesPage from '../pages/admin/ManageCreditCardNamesPage.jsx';
+import AffiliateOrdersPage from '../pages/admin/AffiliateOrdersPage.jsx';
+import LinkIcon from '@mui/icons-material/Link';
 import IdeasPage from '../pages/IdeasPage.jsx';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
@@ -685,6 +687,8 @@ export default function AdminLayout({ user, onLogout }) {
               <MenuItem component={Link} to="/admin/conversation-management" onClick={closeAllMenus}>Conversation Mgmt</MenuItem>
               <MenuItem component={Link} to="/admin/amazon-accounts" onClick={closeAllMenus}>Manage Amazon Accts</MenuItem>
               <MenuItem component={Link} to="/admin/credit-cards" onClick={closeAllMenus}>Manage Credit Cards</MenuItem>
+              <Divider />
+              <MenuItem component={Link} to="/admin/affiliate-orders" onClick={closeAllMenus}>Affiliate Orders</MenuItem>
             </Menu>
           </>
         )}
@@ -1133,6 +1137,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/amazon-accounts" element={<ManageAmazonAccountsPage />} />
               <Route path="/credit-cards" element={<ManageCreditCardsPage />} />
               <Route path="/credit-card-names" element={<ManageCreditCardNamesPage />} />
+              <Route path="/affiliate-orders" element={<AffiliateOrdersPage />} />
             </>
           )}
 
