@@ -62,11 +62,12 @@ export default function AsinDirectoryPage() {
   const [exportDialog, setExportDialog] = useState(false);
   const [listManagerDialog, setListManagerDialog] = useState(false);
   const [viewAsin, setViewAsin] = useState(null);
+  const [showMoved, setShowMoved] = useState(false);
 
   useEffect(() => {
     fetchAsins();
     fetchStats();
-  }, [page, rowsPerPage, search]);
+  }, [page, rowsPerPage, search, showMoved]);
 
   const fetchAsins = async () => {
     try {
@@ -75,7 +76,8 @@ export default function AsinDirectoryPage() {
         params: {
           page: page + 1,
           limit: rowsPerPage,
-          search: search || undefined
+          search: search || undefined,
+          showMoved: showMoved ? 'true' : undefined
         }
       });
       setAsins(data.asins || []);
@@ -161,7 +163,7 @@ export default function AsinDirectoryPage() {
   const handleExport = async () => {
     try {
       const { data } = await api.get('/asin-directory', {
-        params: { limit: 999999 }
+        params: { limit: 999999, showMoved: 'true' }
       });
       const csv = generateCsvContent(data.asins);
       const date = new Date().toISOString().split('T')[0];
@@ -206,6 +208,11 @@ export default function AsinDirectoryPage() {
     setPage(0);
   };
 
+  const handleToggleShowMoved = () => {
+    setShowMoved(prev => !prev);
+    setPage(0);
+  };
+
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
@@ -213,8 +220,9 @@ export default function AsinDirectoryPage() {
         {stats && (
           <Stack direction="row" spacing={1}>
             <Chip label={`Total: ${stats.total}`} color="primary" size="small" />
+            <Chip label={`Unassigned: ${stats.unassigned ?? stats.total}`} color="success" size="small" />
+            <Chip label={`In Lists: ${stats.assigned ?? 0}`} color="info" size="small" />
             <Chip label={`Today: ${stats.recentlyAdded.today}`} size="small" />
-            <Chip label={`This Week: ${stats.recentlyAdded.thisWeek}`} size="small" />
           </Stack>
         )}
       </Stack>
@@ -261,6 +269,15 @@ export default function AsinDirectoryPage() {
           >
             Move to List
           </Button>
+
+          <Chip
+            label={showMoved ? 'Show All' : 'Unassigned Only'}
+            onClick={handleToggleShowMoved}
+            color={showMoved ? 'default' : 'warning'}
+            variant={showMoved ? 'outlined' : 'filled'}
+            size="small"
+            sx={{ cursor: 'pointer' }}
+          />
 
           <Box sx={{ flex: 1 }} />
 
