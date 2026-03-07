@@ -617,12 +617,15 @@ export default function CompatibilityDashboard() {
     setExpandedYears({}); setStartYear(''); setEndYear(''); setNewNotes('');
     fetchMakes();
 
-    // Fire AI + full data fetch for EVERY selected item in parallel
-    selectedItems.forEach((item, idx) => {
-      api.post('/ai/suggest-fitment', {
-        title: item.title || '',
-        description: item.descriptionPreview || ''
-      }).then(async ({ data }) => {
+    // Fire AI + full data fetch in throttled batches to avoid ERR_INSUFFICIENT_RESOURCES
+    const CONCURRENCY_LIMIT = 20;
+    const processItem = async (item, idx) => {
+      try {
+        const { data } = await api.post('/ai/suggest-fitment', {
+          title: item.title || '',
+          description: item.descriptionPreview || ''
+        });
+
         if (!data.make) {
           setBulkQueue(prev => {
             const u = [...prev];
@@ -719,14 +722,22 @@ export default function CompatibilityDashboard() {
           };
           return u;
         });
-      }).catch(err => {
+      } catch (err) {
         setBulkQueue(prev => {
           const u = [...prev];
           u[idx] = { ...u[idx], status: 'error', error: err.response?.data?.error || err.message || 'AI failed' };
           return u;
         });
-      });
-    });
+      }
+    };
+
+    // Process items in batches of CONCURRENCY_LIMIT
+    (async () => {
+      for (let i = 0; i < selectedItems.length; i += CONCURRENCY_LIMIT) {
+        const batch = selectedItems.slice(i, i + CONCURRENCY_LIMIT);
+        await Promise.all(batch.map((item, batchIdx) => processItem(item, i + batchIdx)));
+      }
+    })();
   };
 
   // Apply current bulk queue item data to modal state whenever it's ready
@@ -1813,10 +1824,15 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
               </Button>
               <Button
                 onClick={async () => {
-                  await handleSaveCompatibility(false);
-                  // Track save-and-next — hadData = user had entries in the compatibility list
-                  api.post('/ai/track-save-next', { hadData: editCompatList.length > 0 }).catch(() => {});
-                  handleBulkQueueNext(false);
+                  try {
+                    await handleSaveCompatibility(false);
+                    // Track save-and-next — hadData = user had entries in the compatibility list
+                    api.post('/ai/track-save-next', { hadData: editCompatList.length > 0 }).catch(() => {});
+                    handleBulkQueueNext(false);
+                  } catch (e) {
+                    // Error already shown by handleSaveCompatibility snackbar
+                    console.error('Bulk save and next failed:', e);
+                  }
                 }}
                 variant="contained"
                 color="primary"
