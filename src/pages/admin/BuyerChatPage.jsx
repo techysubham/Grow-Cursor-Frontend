@@ -78,6 +78,10 @@ export default function BuyerChatPage() {
   // Thread thumbnail image
   const [threadThumbnail, setThreadThumbnail] = useState(null);
 
+  // Store fetched product images for threads (itemId -> imageUrl)
+  const [threadImages, setThreadImages] = useState({});
+  const [fetchingImages, setFetchingImages] = useState(new Set());
+
   // Snackbar state for sync results
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
@@ -350,6 +354,65 @@ export default function BuyerChatPage() {
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     };
   }, [selectedThread]);
+
+  // 4. FETCH MISSING PRODUCT IMAGES (from eBay API)
+  useEffect(() => {
+    const fetchMissingImages = async () => {
+      // Find threads that need images (ORDER type without productImageUrl)
+      const threadsNeedingImages = threads.filter(thread => {
+        const msgType = thread.actualMessageType || thread.messageType;
+        return (
+          msgType === 'ORDER' &&
+          !thread.productImageUrl &&
+          thread.itemId &&
+          thread.itemId !== 'DIRECT_MESSAGE' &&
+          thread.sellerId &&
+          !threadImages[thread.itemId] && // Not already fetched
+          !fetchingImages.has(thread.itemId) // Not currently fetching
+        );
+      });
+
+      if (threadsNeedingImages.length === 0) return;
+
+      // Mark as fetching
+      const newFetching = new Set(fetchingImages);
+      threadsNeedingImages.forEach(t => newFetching.add(t.itemId));
+      setFetchingImages(newFetching);
+
+      // Fetch images in parallel (max 5 at a time to avoid overwhelming the server)
+      const batchSize = 5;
+      for (let i = 0; i < threadsNeedingImages.length; i += batchSize) {
+        const batch = threadsNeedingImages.slice(i, i + batchSize);
+        
+        await Promise.all(
+          batch.map(async (thread) => {
+            try {
+              const res = await api.get(`/ebay/item-images/${thread.itemId}`, {
+                params: { sellerId: thread.sellerId, thumbnail: true }
+              });
+              const url = res.data?.thumbnail || res.data?.images?.[0] || null;
+              
+              if (url) {
+                setThreadImages(prev => ({ ...prev, [thread.itemId]: url }));
+              }
+            } catch (err) {
+              // Silently fail - just won't show image for this thread
+              console.debug(`Failed to fetch image for ${thread.itemId}`, err.message);
+            } finally {
+              // Remove from fetching set
+              setFetchingImages(prev => {
+                const updated = new Set(prev);
+                updated.delete(thread.itemId);
+                return updated;
+              });
+            }
+          })
+        );
+      }
+    };
+
+    fetchMissingImages();
+  }, [threads]); // Re-run when threads change
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -891,20 +954,68 @@ export default function BuyerChatPage() {
                   >
                     <ListItemAvatar>
                       <Badge color="error" badgeContent={thread.unreadCount}>
-                        <Avatar sx={{
-                          bgcolor: thread.messageType === 'ORDER'
-                            ? 'primary.main'
-                            : thread.messageType === 'DIRECT'
-                              ? 'warning.main'
-                              : 'secondary.main'
-                        }}>
-                          {thread.messageType === 'ORDER'
-                            ? <ShoppingBagIcon fontSize="small" />
-                            : thread.messageType === 'DIRECT'
-                              ? <EmailIcon fontSize="small" />
-                              : <QuestionAnswerIcon fontSize="small" />
+                        {/* Use actualMessageType (computed in real-time) if available, else fallback to messageType */}
+                        {(() => {
+                          const msgType = thread.actualMessageType || thread.messageType;
+                          const isOrder = msgType === 'ORDER';
+                          const isDirect = msgType === 'DIRECT';
+
+                          // Get image URL from DB or fetched state
+                          const imageUrl = thread.productImageUrl || threadImages[thread.itemId] || null;
+                          const isLoadingImage = fetchingImages.has(thread.itemId);
+
+                          // Show product thumbnail for ORDER messages if image is available
+                          if (isOrder && imageUrl) {
+                            return (
+                              <Avatar
+                                src={imageUrl}
+                                variant="rounded"
+                                sx={{
+                                  width: 48,
+                                  height: 48,
+                                  border: '2px solid',
+                                  borderColor: 'primary.main'
+                                }}
+                              />
+                            );
                           }
-                        </Avatar>
+
+                          // Show loading spinner if fetching image for ORDER
+                          if (isOrder && isLoadingImage) {
+                            return (
+                              <Avatar
+                                variant="rounded"
+                                sx={{
+                                  width: 48,
+                                  height: 48,
+                                  border: '2px solid',
+                                  borderColor: 'primary.main',
+                                  bgcolor: 'primary.lighter'
+                                }}
+                              >
+                                <CircularProgress size={20} />
+                              </Avatar>
+                            );
+                          }
+
+                          // Otherwise show icon
+                          return (
+                            <Avatar sx={{
+                              bgcolor: isOrder
+                                ? 'primary.main'
+                                : isDirect
+                                  ? 'warning.main'
+                                  : 'secondary.main'
+                            }}>
+                              {isOrder
+                                ? <ShoppingBagIcon fontSize="small" />
+                                : isDirect
+                                  ? <EmailIcon fontSize="small" />
+                                  : <QuestionAnswerIcon fontSize="small" />
+                              }
+                            </Avatar>
+                          );
+                        })()}
                       </Badge>
                     </ListItemAvatar>
                     <ListItemText
