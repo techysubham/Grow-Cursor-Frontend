@@ -8,6 +8,7 @@ import {
     CircularProgress,
     Divider,
     FormControl,
+    FormControlLabel,
     IconButton,
     InputLabel,
     MenuItem,
@@ -15,6 +16,7 @@ import {
     Select,
     Snackbar,
     Stack,
+    Switch,
     Table,
     TableBody,
     TableCell,
@@ -159,6 +161,7 @@ function TabPanel({ children, value, index }) {
 export default function AffiliateOrdersPage() {
     const [date, setDate] = useState(getTodayStr());
     const [tab, setTab] = useState(0);
+    const [excludeLowValue, setExcludeLowValue] = useState(false);
 
     // Tab 1 state
     const [orders, setOrders] = useState([]);
@@ -186,14 +189,14 @@ export default function AffiliateOrdersPage() {
         setOrdersLoading(true);
         setOrdersError('');
         try {
-            const { data } = await api.get('/affiliate-orders/daily', { params: { date } });
+            const { data } = await api.get('/affiliate-orders/daily', { params: { date, excludeLowValue: excludeLowValue ? 'true' : 'false' } });
             setOrders(data);
         } catch (err) {
             setOrdersError(err?.response?.data?.error || 'Failed to load orders');
         } finally {
             setOrdersLoading(false);
         }
-    }, [date]);
+    }, [date, excludeLowValue]);
 
     const fetchAmazonAccounts = useCallback(async () => {
         try {
@@ -206,34 +209,34 @@ export default function AffiliateOrdersPage() {
         setBalancesLoading(true);
         setBalancesError('');
         try {
-            const { data } = await api.get('/affiliate-orders/balances', { params: { date } });
+            const { data } = await api.get('/affiliate-orders/balances', { params: { date, excludeLowValue: excludeLowValue ? 'true' : 'false' } });
             setBalances(data);
         } catch (err) {
             setBalancesError(err?.response?.data?.error || 'Failed to load balances');
         } finally {
             setBalancesLoading(false);
         }
-    }, [date]);
+    }, [date, excludeLowValue]);
 
     const fetchSummary = useCallback(async () => {
         setSummaryLoading(true);
         setSummaryError('');
         try {
-            const { data } = await api.get('/affiliate-orders/summary', { params: { date } });
+            const { data } = await api.get('/affiliate-orders/summary', { params: { date, excludeLowValue: excludeLowValue ? 'true' : 'false' } });
             setSummary(data);
         } catch (err) {
             setSummaryError(err?.response?.data?.error || 'Failed to load summary');
         } finally {
             setSummaryLoading(false);
         }
-    }, [date]);
+    }, [date, excludeLowValue]);
 
     useEffect(() => {
         fetchOrders();
         fetchAmazonAccounts();
         fetchBalances();
         fetchSummary();
-    }, [date, fetchOrders, fetchAmazonAccounts, fetchBalances, fetchSummary]);
+    }, [date, excludeLowValue, fetchOrders, fetchAmazonAccounts, fetchBalances, fetchSummary]);
 
     // ── Order field patch ──────────────────────────────────────────────────────
 
@@ -671,17 +674,24 @@ export default function AffiliateOrdersPage() {
     return (
         <Box sx={{ p: 2 }}>
             {/* Header */}
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, gap: 2 }}>
                 <Typography variant="h5" fontWeight="bold">Affiliate Orders</Typography>
-                <TextField
-                    type="date"
-                    size="small"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    label="Date"
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ width: 170 }}
-                />
+                <Stack direction="row" alignItems="center" spacing={2}>
+                    <FormControlLabel
+                        control={<Switch checked={excludeLowValue} onChange={(e) => setExcludeLowValue(e.target.checked)} />}
+                        label="Exclude < $3"
+                        sx={{ m: 0 }}
+                    />
+                    <TextField
+                        type="date"
+                        size="small"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        label="Date"
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ width: 170 }}
+                    />
+                </Stack>
             </Stack>
 
             {/* Tabs */}
