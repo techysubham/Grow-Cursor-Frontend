@@ -90,6 +90,7 @@ export default function ListingDirectoryPage() {
   // ── Dialogs ───────────────────────────────────────────────────────────────
   const [customizationDialog, setCustomizationDialog] = useState(false);
   const [listDirectlyDialog, setListDirectlyDialog] = useState(false);
+  const [pendingInlineListings, setPendingInlineListings] = useState(null);
   const [reviewModal, setReviewModal] = useState(false);
   const [previewItems, setPreviewItems] = useState([]);
 
@@ -269,16 +270,12 @@ export default function ListingDirectoryPage() {
     }
   };
 
-  const handleListDirectlyFromReview = async (listings) => {
-    try {
-      // Persist any edits first, then open List Directly dialog
-      await api.put('/template-listings/bulk-update', { listings });
-      setReviewModal(false);
-      setPreviewItems([]);
-      setListDirectlyDialog(true);
-    } catch (e) {
-      setError('Failed to save changes before listing');
-    }
+  const handleListDirectlyFromReview = (listings) => {
+    // Edits are carried into the CSV as-is — do NOT persist to DB here
+    setPendingInlineListings(listings);
+    setReviewModal(false);
+    setPreviewItems([]);
+    setListDirectlyDialog(true);
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -654,10 +651,11 @@ export default function ListingDirectoryPage() {
 
       <ListDirectlyDialog
         open={listDirectlyDialog}
-        onClose={() => setListDirectlyDialog(false)}
+        onClose={() => { setListDirectlyDialog(false); setPendingInlineListings(null); }}
         selectedListings={selectedListings}
         templateId={template?._id}
         sellerId={seller?._id}
+        inlineListings={pendingInlineListings}
       />
 
       <AsinReviewModal

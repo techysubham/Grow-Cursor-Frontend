@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import api from '../lib/api.js';
 
-export default function ListDirectlyDialog({ open, onClose, selectedListings, templateId, sellerId }) {
+export default function ListDirectlyDialog({ open, onClose, selectedListings, templateId, sellerId, inlineListings = null }) {
   const navigate = useNavigate();
 
   // Sellers
@@ -131,10 +131,19 @@ export default function ListDirectlyDialog({ open, onClose, selectedListings, te
     setError('');
 
     try {
-      const ids = [...selectedListings].join(',');
-      const url = `/template-listings/export-csv/${templateId}?sellerId=${selectedSeller}&listingIds=${ids}`;
-
-      const response = await api.get(url, { responseType: 'blob' });
+      let response;
+      if (inlineListings) {
+        // Proof Read → List Directly: field values come from the modal edits, not the DB
+        response = await api.post(
+          `/template-listings/export-csv-direct/${templateId}`,
+          { sellerId: selectedSeller, listings: inlineListings },
+          { responseType: 'blob' }
+        );
+      } else {
+        const ids = [...selectedListings].join(',');
+        const url = `/template-listings/export-csv/${templateId}?sellerId=${selectedSeller}&listingIds=${ids}`;
+        response = await api.get(url, { responseType: 'blob' });
+      }
 
       // Extract filename from Content-Disposition header
       const contentDisposition = response.headers['content-disposition'];
