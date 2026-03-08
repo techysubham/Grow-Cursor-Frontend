@@ -33,7 +33,7 @@ import {
   WarningAmber as WarningAmberIcon,
   DriveFileRenameOutline as ManualEditIcon
 } from '@mui/icons-material';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../lib/api.js';
 
 const AMAZON_DOMAINS = {
@@ -105,8 +105,14 @@ export default function AsinDetailDialog({ open, onClose, asin, onUpdate }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  // Amazon link region
+  // Amazon link region — defaults to the marketplace the ASIN was scraped from
   const [amazonRegion, setAmazonRegion] = useState('US');
+
+  useEffect(() => {
+    if (open && asin?.region) {
+      setAmazonRegion(asin.region);
+    }
+  }, [open, asin?.region]);
 
   if (!asin) return null;
 

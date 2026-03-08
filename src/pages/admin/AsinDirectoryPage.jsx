@@ -20,7 +20,11 @@ import {
   TablePagination,
   Toolbar,
   Tooltip,
-  CircularProgress
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -63,11 +67,12 @@ export default function AsinDirectoryPage() {
   const [listManagerDialog, setListManagerDialog] = useState(false);
   const [viewAsin, setViewAsin] = useState(null);
   const [showMoved, setShowMoved] = useState(false);
+  const [marketplaceFilter, setMarketplaceFilter] = useState('');
 
   useEffect(() => {
     fetchAsins();
     fetchStats();
-  }, [page, rowsPerPage, search, showMoved]);
+  }, [page, rowsPerPage, search, showMoved, marketplaceFilter]);
 
   const fetchAsins = async () => {
     try {
@@ -77,7 +82,8 @@ export default function AsinDirectoryPage() {
           page: page + 1,
           limit: rowsPerPage,
           search: search || undefined,
-          showMoved: showMoved ? 'true' : undefined
+          showMoved: showMoved ? 'true' : undefined,
+          region: marketplaceFilter || undefined
         }
       });
       setAsins(data.asins || []);
@@ -213,6 +219,15 @@ export default function AsinDirectoryPage() {
     setPage(0);
   };
 
+  const MARKETPLACE_FLAGS = { US: '🇺🇸', UK: '🇬🇧', CA: '🇨🇦', AU: '🇦🇺' };
+  const MARKETPLACE_OPTIONS = [
+    { value: '', label: 'All Marketplaces' },
+    { value: 'US', label: '🇺🇸 US' },
+    { value: 'UK', label: '🇬🇧 UK' },
+    { value: 'CA', label: '🇨🇦 CA' },
+    { value: 'AU', label: '🇦🇺 AU' },
+  ];
+
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
@@ -280,6 +295,19 @@ export default function AsinDirectoryPage() {
           />
 
           <Box sx={{ flex: 1 }} />
+
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel>Marketplace</InputLabel>
+            <Select
+              value={marketplaceFilter}
+              label="Marketplace"
+              onChange={(e) => { setMarketplaceFilter(e.target.value); setPage(0); }}
+            >
+              {MARKETPLACE_OPTIONS.map(o => (
+                <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <TextField
             size="small"
@@ -384,6 +412,14 @@ export default function AsinDirectoryPage() {
                             <CopyIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         </Tooltip>
+                        {item.region && (
+                          <Chip
+                            label={`${MARKETPLACE_FLAGS[item.region] || ''}${item.region}`}
+                            size="small"
+                            variant="outlined"
+                            sx={{ fontSize: 11, height: 18, '& .MuiChip-label': { px: 0.75 } }}
+                          />
+                        )}
                         {(!item.price || !item.description) && (
                           <Tooltip title={[
                             !item.price && 'Missing price',
