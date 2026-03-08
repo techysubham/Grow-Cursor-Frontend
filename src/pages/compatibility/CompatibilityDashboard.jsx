@@ -112,6 +112,7 @@ export default function CompatibilityDashboard() {
   const [pageInputValue, setPageInputValue] = useState('');
   const [filterNoFitment, setFilterNoFitment] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [trimFilterKeyword, setTrimFilterKeyword] = useState('');
 
   // BULK AI SUGGEST STATE
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -1637,6 +1638,39 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 const totalTrims = Object.values(trimsByYear).reduce((sum, arr) => sum + arr.length, 0);
                 const totalSelected = Object.values(selectedTrimsByYear).reduce((sum, arr) => sum + (arr?.length || 0), 0);
                 const allSelected = totalSelected === totalTrims && totalTrims > 0;
+                
+                // Filter trims based on keyword
+                const filterKeywordLower = trimFilterKeyword.toLowerCase().trim();
+                const getFilteredTrims = (entries) => {
+                  if (!filterKeywordLower) return entries;
+                  return entries.filter(entry => 
+                    entry.trim?.toLowerCase().includes(filterKeywordLower) || 
+                    entry.engine?.toLowerCase().includes(filterKeywordLower)
+                  );
+                };
+                
+                const filteredTrimsByYear = {};
+                Object.entries(trimsByYear).forEach(([year, entries]) => {
+                  const filtered = getFilteredTrims(entries);
+                  if (filtered.length > 0) {
+                    filteredTrimsByYear[year] = filtered;
+                  }
+                });
+                
+                const totalFilteredTrims = Object.values(filteredTrimsByYear).reduce((sum, arr) => sum + arr.length, 0);
+                const allFilteredSelected = (() => {
+                  if (totalFilteredTrims === 0) return false;
+                  let selectedCount = 0;
+                  Object.entries(filteredTrimsByYear).forEach(([year, entries]) => {
+                    const yearSelected = selectedTrimsByYear[year] || [];
+                    const yearSelectedKeys = new Set(yearSelected.map(trimKey));
+                    entries.forEach(entry => {
+                      if (yearSelectedKeys.has(trimKey(entry))) selectedCount++;
+                    });
+                  });
+                  return selectedCount === totalFilteredTrims;
+                })();
+                
                 return (
                   <Grid item xs={12}>
                     <Box sx={{ border: '1px solid #e0e0e0', borderRadius: 1, bgcolor: '#fafafa' }}>
@@ -1665,13 +1699,75 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                           {totalSelected} selected
                         </Typography>
                       </Box>
+                      {/* Filter Section */}
+                      <Box sx={{ p: 1.5, borderBottom: '1px solid #e0e0e0', bgcolor: '#fff' }}>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                          <TextField
+                            size="small"
+                            placeholder="Filter trims by keyword (e.g., Sport, Utility, HD)..."
+                            value={trimFilterKeyword}
+                            onChange={(e) => setTrimFilterKeyword(e.target.value)}
+                            fullWidth
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <SearchIcon fontSize="small" />
+                                </InputAdornment>
+                              ),
+                              endAdornment: trimFilterKeyword && (
+                                <InputAdornment position="end">
+                                  <IconButton size="small" onClick={() => setTrimFilterKeyword('')}>
+                                    <ClearIcon fontSize="small" />
+                                  </IconButton>
+                                </InputAdornment>
+                              )
+                            }}
+                          />
+                          {trimFilterKeyword && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => {
+                                if (allFilteredSelected) {
+                                  // Deselect all filtered trims
+                                  const updated = { ...selectedTrimsByYear };
+                                  Object.entries(filteredTrimsByYear).forEach(([year, entries]) => {
+                                    const yearSelected = updated[year] || [];
+                                    const filteredKeys = new Set(entries.map(trimKey));
+                                    updated[year] = yearSelected.filter(e => !filteredKeys.has(trimKey(e)));
+                                  });
+                                  setSelectedTrimsByYear(updated);
+                                } else {
+                                  // Select all filtered trims
+                                  const updated = { ...selectedTrimsByYear };
+                                  Object.entries(filteredTrimsByYear).forEach(([year, entries]) => {
+                                    const yearSelected = updated[year] || [];
+                                    const yearSelectedKeys = new Set(yearSelected.map(trimKey));
+                                    const toAdd = entries.filter(e => !yearSelectedKeys.has(trimKey(e)));
+                                    updated[year] = [...yearSelected, ...toAdd];
+                                  });
+                                  setSelectedTrimsByYear(updated);
+                                }
+                              }}
+                              sx={{ whiteSpace: 'nowrap', minWidth: 'auto' }}
+                            >
+                              {allFilteredSelected ? 'Deselect' : 'Select'} Filtered ({totalFilteredTrims})
+                            </Button>
+                          )}
+                        </Box>
+                        {trimFilterKeyword && (
+                          <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5, display: 'block' }}>
+                            Showing {totalFilteredTrims} of {totalTrims} trims
+                          </Typography>
+                        )}
+                      </Box>
                       {/* Year rows */}
                       <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
                         {selectedYears
                           .sort((a, b) => Number(b) - Number(a))
-                          .filter(year => trimsByYear[year] && trimsByYear[year].length > 0)
+                          .filter(year => trimFilterKeyword ? filteredTrimsByYear[year]?.length > 0 : (trimsByYear[year] && trimsByYear[year].length > 0))
                           .map(year => {
-                            const yearEntries = trimsByYear[year] || [];
+                            const yearEntries = trimFilterKeyword ? (filteredTrimsByYear[year] || []) : (trimsByYear[year] || []);
                             const yearSelected = selectedTrimsByYear[year] || [];
                             const yearSelectedKeys = new Set(yearSelected.map(trimKey));
                             const isExpanded = expandedYears[year] || false;
