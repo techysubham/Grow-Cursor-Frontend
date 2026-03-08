@@ -39,7 +39,7 @@ import ListDirectlyDialog from '../../components/ListDirectlyDialog.jsx';
 import TemplateCustomizationDialog from '../../components/TemplateCustomizationDialog.jsx';
 import AsinReviewModal from '../../components/AsinReviewModal.jsx';
 
-// Core columns to display in the directory table (same as TemplateListingsPage)
+// Core columns to display (same as ListingDirectoryPage)
 const CORE_COLUMNS = [
   { key: 'action',              label: '*Action',            width: 80  },
   { key: 'customLabel',         label: 'Custom Label (SKU)', width: 150 },
@@ -59,10 +59,11 @@ function renderCellValue(col, listing) {
   return v || '-';
 }
 
-export default function ListingDirectoryPage() {
-  // ── Seller (fixed: "Testing") ────────────────────────────────────────────
-  const [seller, setSeller] = useState(null);
-  const [sellerLoading, setSellerLoading] = useState(true);
+export default function TemplateDirectoryPage() {
+  // ── Sellers (all except Testing) ─────────────────────────────────────────
+  const [sellers, setSellers] = useState([]);
+  const [selectedSeller, setSelectedSeller] = useState(null);
+  const [sellersLoading, setSellersLoading] = useState(true);
 
   // ── Template selection ───────────────────────────────────────────────────
   const [templates, setTemplates] = useState([]);
@@ -82,7 +83,6 @@ export default function ListingDirectoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
-  // Schedule slug — UI only, no logic yet
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTimeFrom, setScheduleTimeFrom] = useState('');
   const [scheduleTimeTo, setScheduleTimeTo] = useState('');
@@ -98,7 +98,7 @@ export default function ListingDirectoryPage() {
   const searchTimeout = useRef(null);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Boot: find "Testing" seller + load all templates
+  // Boot: load all sellers (excluding Testing) + all templates
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const boot = async () => {
@@ -107,27 +107,28 @@ export default function ListingDirectoryPage() {
           api.get('/sellers/all'),
           api.get('/listing-templates'),
         ]);
-        const testingSeller = sellersRes.data.find(
-          s => s.user?.username?.toLowerCase() === 'testing'
+        const realSellers = (sellersRes.data || []).filter(
+          s => s.user?.username?.toLowerCase() !== 'testing'
         );
-        setSeller(testingSeller || null);
+        setSellers(realSellers);
+        setSelectedSeller(realSellers[0] || null);
         const tmps = templatesRes.data || [];
         setTemplates(tmps);
         setTemplate(tmps[0] || null);
       } catch (e) {
         setError('Failed to load initial data');
       } finally {
-        setSellerLoading(false);
+        setSellersLoading(false);
       }
     };
     boot();
-  }, [])
+  }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Fetch listings whenever template, seller, page, or price changes
   // ─────────────────────────────────────────────────────────────────────────
   const fetchListings = useCallback(async (pageOverride) => {
-    if (!template?._id || !seller?._id) {
+    if (!template?._id || !selectedSeller?._id) {
       setListings([]);
       return;
     }
@@ -135,7 +136,7 @@ export default function ListingDirectoryPage() {
     try {
       const params = {
         templateId: template._id,
-        sellerId: seller._id,
+        sellerId: selectedSeller._id,
         page: pageOverride ?? pagination.page,
         limit: pagination.limit,
         batchFilter: 'all',
@@ -153,18 +154,18 @@ export default function ListingDirectoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [template, seller, pagination.page, pagination.limit, priceMin, priceMax, searchQuery]);
+  }, [template, selectedSeller, pagination.page, pagination.limit, priceMin, priceMax, searchQuery]);
 
   useEffect(() => {
     fetchListings(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [template, seller, priceMin, priceMax]);
+  }, [template, selectedSeller, priceMin, priceMax]);
 
   // Debounced search
   useEffect(() => {
     clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
-      if (template && seller) fetchListings(1);
+      if (template && selectedSeller) fetchListings(1);
     }, 400);
     return () => clearTimeout(searchTimeout.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,12 +187,11 @@ export default function ListingDirectoryPage() {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Proof Read – open AsinReviewModal over selected rows
+  // Proof Read
   // ─────────────────────────────────────────────────────────────────────────
   const handleProofRead = async () => {
     const selected = listings.filter(l => selectedListings.has(l._id));
 
-    // Build items immediately with loading state so modal opens right away
     const items = selected.map(l => ({
       id: l._id,
       asin: l._asinReference || '',
@@ -221,10 +221,8 @@ export default function ListingDirectoryPage() {
     setPreviewItems(items);
     setReviewModal(true);
 
-    // Fetch Amazon source data from the ASIN directory in the background
     const asinList = selected.map(l => l._asinReference).filter(Boolean);
     if (asinList.length === 0) {
-      // No ASINs — flip all to ready immediately
       setPreviewItems(items.map(i => ({ ...i, status: 'ready' })));
       return;
     }
@@ -253,7 +251,6 @@ export default function ListingDirectoryPage() {
         };
       }));
     } catch {
-      // If the fetch fails, still flip to ready so the modal is usable
       setPreviewItems(prev => prev.map(i => ({ ...i, status: 'ready' })));
     }
   };
@@ -271,7 +268,6 @@ export default function ListingDirectoryPage() {
   };
 
   const handleListDirectlyFromReview = (listings) => {
-    // Edits are carried into the CSV as-is — do NOT persist to DB here
     setPendingInlineListings(listings);
     setReviewModal(false);
     setPreviewItems([]);
@@ -282,11 +278,11 @@ export default function ListingDirectoryPage() {
   // CSV Download
   // ─────────────────────────────────────────────────────────────────────────
   const handleDownloadCsv = async () => {
-    if (!template?._id || !seller?._id) return;
+    if (!template?._id || !selectedSeller?._id) return;
     try {
       setLoading(true);
       const ids = selectedListings.size > 0 ? [...selectedListings].join(',') : undefined;
-      let url = `/template-listings/export-csv/${template._id}?sellerId=${seller._id}`;
+      let url = `/template-listings/export-csv/${template._id}?sellerId=${selectedSeller._id}`;
       if (ids) url += `&listingIds=${ids}`;
 
       const response = await api.get(url, { responseType: 'blob' });
@@ -315,12 +311,12 @@ export default function ListingDirectoryPage() {
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
-  const totalCols = CORE_COLUMNS.length + (template?.customColumns?.length || 0) + 2; // +checkbox +actions
+  const totalCols = CORE_COLUMNS.length + (template?.customColumns?.length || 0) + 2;
 
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" fontWeight={700} gutterBottom>
-        Listing Directory
+        Template Directory
       </Typography>
 
       {error && (
@@ -336,7 +332,7 @@ export default function ListingDirectoryPage() {
 
       {/* ── Top filter bar ── */}
       <Stack spacing={1.5} sx={{ mb: 2 }}>
-        {/* Row 1: Template selector + Search */}
+        {/* Row 1: Template selector + Seller selector + Search */}
         <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
           {/* Template */}
           <FormControl size="small" sx={{ minWidth: 220 }}>
@@ -351,6 +347,27 @@ export default function ListingDirectoryPage() {
               )}
               {templates.map(t => (
                 <MenuItem key={t._id} value={t._id}>{t.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Seller */}
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>Seller</InputLabel>
+            <Select
+              label="Seller"
+              value={selectedSeller?._id || ''}
+              onChange={e => setSelectedSeller(sellers.find(s => s._id === e.target.value) || null)}
+              disabled={sellersLoading}
+              endAdornment={sellersLoading ? <CircularProgress size={16} sx={{ mr: 2 }} /> : null}
+            >
+              {sellers.length === 0 && (
+                <MenuItem value="" disabled><em>No sellers found</em></MenuItem>
+              )}
+              {sellers.map(s => (
+                <MenuItem key={s._id} value={s._id}>
+                  {s.storeName || s.user?.username || s._id}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -407,17 +424,13 @@ export default function ListingDirectoryPage() {
               variant="outlined"
               sx={{ px: 2, py: 1, cursor: 'default', borderRadius: 2 }}
             >
-              {/* Header */}
               <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
                 <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
                 <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
                   SCHEDULE
                 </Typography>
               </Stack>
-
-              {/* Fields row */}
               <Stack direction="row" alignItems="flex-end" spacing={2}>
-                {/* Date */}
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
                     Date
@@ -430,8 +443,6 @@ export default function ListingDirectoryPage() {
                     sx={{ width: 148, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
                   />
                 </Box>
-
-                {/* Time range */}
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
                     Time range
@@ -460,7 +471,7 @@ export default function ListingDirectoryPage() {
 
           <Box sx={{ flex: 1 }} />
 
-          {/* Customize (view only) */}
+          {/* Customize */}
           <Button
             variant="contained"
             startIcon={<SettingsIcon />}
@@ -474,7 +485,7 @@ export default function ListingDirectoryPage() {
           {/* List Directly */}
           <Button
             variant="contained"
-            disabled={!template || !seller || selectedListings.size === 0}
+            disabled={!template || !selectedSeller || selectedListings.size === 0}
             onClick={() => setListDirectlyDialog(true)}
             sx={{ bgcolor: '#222', '&:hover': { bgcolor: '#444' } }}
           >
@@ -495,7 +506,7 @@ export default function ListingDirectoryPage() {
           <Button
             variant="outlined"
             startIcon={<DownloadIcon />}
-            disabled={!template || !seller || loading}
+            disabled={!template || !selectedSeller || loading}
             onClick={handleDownloadCsv}
           >
             Download CSV
@@ -505,22 +516,21 @@ export default function ListingDirectoryPage() {
 
       {/* ── Listings panel ── */}
       <Paper variant="outlined">
-        {/* Template header + batch filter toolbar */}
         <Toolbar
           variant="dense"
           sx={{ borderBottom: 1, borderColor: 'divider', minHeight: 48, gap: 1, flexWrap: 'wrap' }}
         >
           <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1 }}>
-            {template ? `${template.name} — Listings` : 'Select a product to load listings'}
+            {template ? `${template.name} — Listings` : 'Select a template to load listings'}
           </Typography>
 
-          {sellerLoading && <CircularProgress size={16} />}
-          {!sellerLoading && !seller && (
-            <Chip label="Seller 'Testing' not found" color="error" size="small" />
+          {sellersLoading && <CircularProgress size={16} />}
+          {!sellersLoading && sellers.length === 0 && (
+            <Chip label="No sellers found" color="error" size="small" />
           )}
-          {seller && (
+          {selectedSeller && (
             <Chip
-              label={`Seller: ${seller.user?.username || 'Testing'}`}
+              label={`Seller: ${selectedSeller.storeName || selectedSeller.user?.username}`}
               size="small"
               color="default"
               variant="outlined"
@@ -544,9 +554,11 @@ export default function ListingDirectoryPage() {
           </Box>
         ) : !template ? (
           <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
-            <Typography variant="body2">
-              Select a template above to load listings.
-            </Typography>
+            <Typography variant="body2">Select a template above to load listings.</Typography>
+          </Box>
+        ) : !selectedSeller ? (
+          <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+            <Typography variant="body2">No seller accounts found. List Directly to a seller first.</Typography>
           </Box>
         ) : (
           <TableContainer sx={{ overflowX: 'auto' }}>
@@ -583,7 +595,7 @@ export default function ListingDirectoryPage() {
                 {listings.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={totalCols} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                      No listings found
+                      No listings found for this seller. Use "List Directly" from Listing Directory first.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -644,7 +656,7 @@ export default function ListingDirectoryPage() {
         open={customizationDialog}
         onClose={() => setCustomizationDialog(false)}
         templateId={template?._id}
-        sellerId={seller?._id}
+        sellerId={selectedSeller?._id}
         templateName={template?.name}
         readOnly
       />
@@ -654,7 +666,7 @@ export default function ListingDirectoryPage() {
         onClose={() => { setListDirectlyDialog(false); setPendingInlineListings(null); }}
         selectedListings={selectedListings}
         templateId={template?._id}
-        sellerId={seller?._id}
+        sellerId={selectedSeller?._id}
         inlineListings={pendingInlineListings}
       />
 
