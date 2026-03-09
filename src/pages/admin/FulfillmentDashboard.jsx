@@ -4084,7 +4084,12 @@ function FulfillmentDashboard() {
                               <AutoSaveTextField
                                 type="text"
                                 value={order.beforeTax}
-                                onSave={(val) => updateManualField(order._id, 'beforeTax', val === '' ? null : parseFloat(val))}
+                                onSave={(val) => updateManualField(order._id, 'beforeTax', parseCurrencyInput(val))}
+                                textFieldProps={{
+                                  InputProps: {
+                                    startAdornment: <InputAdornment position="start">$</InputAdornment>
+                                  }
+                                }}
                               />
                               <IconButton
                                 size="small"
@@ -4105,7 +4110,12 @@ function FulfillmentDashboard() {
                               <AutoSaveTextField
                                 type="text"
                                 value={order.estimatedTax}
-                                onSave={(val) => updateManualField(order._id, 'estimatedTax', val === '' ? null : parseFloat(val))}
+                                onSave={(val) => updateManualField(order._id, 'estimatedTax', parseCurrencyInput(val))}
+                                textFieldProps={{
+                                  InputProps: {
+                                    startAdornment: <InputAdornment position="start">$</InputAdornment>
+                                  }
+                                }}
                               />
                               <IconButton
                                 size="small"
@@ -4592,7 +4602,20 @@ function FulfillmentDashboard() {
 
 // --- ADD AT BOTTOM OF FILE ---
 
-function AutoSaveTextField({ value, type = 'text', onSave, sx = {} }) {
+function parseCurrencyInput(value) {
+  if (value === null || value === undefined) return null;
+
+  const trimmedValue = String(value).trim();
+  if (!trimmedValue) return null;
+
+  const normalizedValue = trimmedValue.replace(/[$,\s]/g, '');
+  if (!normalizedValue) return null;
+
+  const parsedValue = Number(normalizedValue);
+  return Number.isNaN(parsedValue) ? null : parsedValue;
+}
+
+function AutoSaveTextField({ value, type = 'text', onSave, sx = {}, textFieldProps = {} }) {
   // Format initial value for Date inputs (YYYY-MM-DD)
   const formatVal = (val) => {
     if (type === 'date' && val) return val.split('T')[0];
@@ -4628,6 +4651,7 @@ function AutoSaveTextField({ value, type = 'text', onSave, sx = {} }) {
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       placeholder="-"
+      {...textFieldProps}
       sx={{
         backgroundColor: '#fff',
         borderRadius: 1,
