@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Typography, Container, Paper, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -18,7 +18,7 @@ export default function ListingStatsPage() {
   const [error, setError] = useState(null);
   
   // Date filter mode: 'single' or 'range'
-  const [dateMode, setDateMode] = useState('range');
+  const [dateMode, setDateMode] = useState('single');
   
   // Single date
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -33,11 +33,7 @@ export default function ListingStatsPage() {
   
   const [sellerFilter, setSellerFilter] = useState('all');
 
-  useEffect(() => { 
-    fetchData(); 
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -58,7 +54,12 @@ export default function ListingStatsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateMode, selectedDate, startDate, endDate]);
+
+  // Auto-fetch data when dates or date mode change
+  useEffect(() => { 
+    fetchData(); 
+  }, [fetchData]);
 
   // Unique sellers for filter dropdown
   const sellerOptions = useMemo(() => {
@@ -176,15 +177,6 @@ export default function ListingStatsPage() {
               ))}
             </Select>
           </FormControl>
-
-          <Button 
-            variant="contained" 
-            onClick={fetchData} 
-            disabled={loading} 
-            sx={{ ml: 'auto' }}
-          >
-            Apply Filters
-          </Button>
         </Box>
         
         {filteredStats.length > 0 && (
