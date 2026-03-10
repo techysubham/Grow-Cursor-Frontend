@@ -24,6 +24,7 @@ import {
   TextField,
   Tooltip,
   IconButton,
+  InputAdornment,
   Pagination,
   Link,
   Checkbox,
@@ -998,6 +999,103 @@ function MobileOrderCard({ order, index, onCopy, onMessage, onViewImages, format
   );
 }
 
+function NotesCell({ order, onSave, onNotify }) {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [tempValue, setTempValue] = React.useState(order.fulfillmentNotes || '');
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isEditing) {
+      setTempValue(order.fulfillmentNotes || '');
+    }
+  }, [order.fulfillmentNotes, isEditing]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(order._id, tempValue);
+      setIsEditing(false);
+      onNotify('success', 'Note saved successfully');
+    } catch (e) {
+      onNotify('error', 'Failed to save note');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setTempValue(order.fulfillmentNotes || '');
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <Box
+        onClick={(e) => e.stopPropagation()}
+        sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 200 }}
+      >
+        <TextField
+          fullWidth
+          multiline
+          minRows={2}
+          size="small"
+          value={tempValue}
+          onChange={(e) => setTempValue(e.target.value)}
+          placeholder="Enter note..."
+          autoFocus
+        />
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleSave}
+            disabled={isSaving}
+            sx={{ fontSize: '0.7rem', py: 0.5 }}
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleCancel}
+            disabled={isSaving}
+            sx={{ fontSize: '0.7rem', py: 0.5 }}
+          >
+            Cancel
+          </Button>
+        </Stack>
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
+      sx={{
+        cursor: 'pointer',
+        minHeight: 30,
+        minWidth: 150,
+        display: 'flex',
+        alignItems: 'center',
+        '&:hover': { backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: 1 }
+      }}
+    >
+      {order.fulfillmentNotes ? (
+        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>
+          {order.fulfillmentNotes}
+        </Typography>
+      ) : (
+        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+          + Add Note
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 function EditableCell({ value, type = 'text', onSave }) {
   const [editing, setEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value || '');
@@ -1081,6 +1179,7 @@ function FulfillmentDashboard() {
   // Search filters - restored from sessionStorage
   const [selectedSeller, setSelectedSeller] = useState(() => getInitialState('selectedSeller', ''));
   const [searchOrderId, setSearchOrderId] = useState(() => getInitialState('searchOrderId', ''));
+  const [searchAzOrderId, setSearchAzOrderId] = useState(() => getInitialState('searchAzOrderId', ''));
   const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
   const [searchItemId, setSearchItemId] = useState(() => getInitialState('searchItemId', ''));
   const [searchProductName, setSearchProductName] = useState(() => getInitialState('searchProductName', ''));
@@ -1452,6 +1551,7 @@ function FulfillmentDashboard() {
   const prevFilters = useRef({
     selectedSeller,
     searchOrderId,
+    searchAzOrderId,
     searchBuyerName,
     searchItemId,
     searchProductName,
@@ -1499,6 +1599,7 @@ function FulfillmentDashboard() {
     const filtersChanged =
       prevFilters.current.selectedSeller !== selectedSeller ||
       prevFilters.current.searchOrderId !== searchOrderId ||
+      prevFilters.current.searchAzOrderId !== searchAzOrderId ||
       prevFilters.current.searchBuyerName !== searchBuyerName ||
       prevFilters.current.searchItemId !== searchItemId ||
       prevFilters.current.searchProductName !== searchProductName ||
@@ -1511,6 +1612,7 @@ function FulfillmentDashboard() {
     prevFilters.current = {
       selectedSeller,
       searchOrderId,
+      searchAzOrderId,
       searchBuyerName,
       searchItemId,
       searchProductName,
@@ -1534,7 +1636,7 @@ function FulfillmentDashboard() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, dateFilter]);
 
   // Handle order earnings change (update local state)
   const handleOrderEarningsChange = (orderId, orderIdStr, value) => {
@@ -1618,6 +1720,7 @@ function FulfillmentDashboard() {
       if (selectedSeller) params.sellerId = selectedSeller;
       if (searchProductName.trim()) params.productName = searchProductName.trim();
       if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
+      if (searchAzOrderId.trim()) params.searchAzOrderId = searchAzOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
@@ -1857,105 +1960,6 @@ function FulfillmentDashboard() {
     setSnackbarSeverity(severity);
     setSnackbarOpen(true);
   };
-
-
-  function NotesCell({ order, onSave, onNotify }) {
-    const [isEditing, setIsEditing] = React.useState(false);
-    const [tempValue, setTempValue] = React.useState(order.fulfillmentNotes || '');
-    const [isSaving, setIsSaving] = React.useState(false);
-
-    // Sync state if order data changes from outside (e.g. polling)
-    React.useEffect(() => {
-      if (!isEditing) {
-        setTempValue(order.fulfillmentNotes || '');
-      }
-    }, [order.fulfillmentNotes, isEditing]);
-
-    const handleSave = async () => {
-      setIsSaving(true);
-      try {
-        await onSave(order._id, tempValue);
-        setIsEditing(false);
-        onNotify('success', 'Note saved successfully');
-      } catch (e) {
-        onNotify('error', 'Failed to save note');
-      } finally {
-        setIsSaving(false);
-      }
-    };
-
-    const handleCancel = () => {
-      setTempValue(order.fulfillmentNotes || '');
-      setIsEditing(false);
-    };
-
-    if (isEditing) {
-      return (
-        <Box
-          onClick={(e) => e.stopPropagation()}
-          sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 200 }}
-        >
-          <TextField
-            fullWidth
-            multiline
-            minRows={2}
-            size="small"
-            value={tempValue}
-            onChange={(e) => setTempValue(e.target.value)}
-            placeholder="Enter note..."
-            autoFocus
-          />
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="contained"
-              size="small"
-              onClick={handleSave}
-              disabled={isSaving}
-              sx={{ fontSize: '0.7rem', py: 0.5 }}
-            >
-              {isSaving ? 'Saving...' : 'Save'}
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleCancel}
-              disabled={isSaving}
-              sx={{ fontSize: '0.7rem', py: 0.5 }}
-            >
-              Cancel
-            </Button>
-          </Stack>
-        </Box>
-      );
-    }
-
-    return (
-      <Box
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsEditing(true);
-        }}
-        sx={{
-          cursor: 'pointer',
-          minHeight: 30,
-          minWidth: 150,
-          display: 'flex',
-          alignItems: 'center',
-          '&:hover': { backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: 1 }
-        }}
-      >
-        {order.fulfillmentNotes ? (
-          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>
-            {order.fulfillmentNotes}
-          </Typography>
-        ) : (
-          <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-            + Add Note
-          </Typography>
-        )}
-      </Box>
-    );
-  }
 
   // Poll for NEW orders only
   async function pollNewOrders() {
@@ -2531,6 +2535,7 @@ function FulfillmentDashboard() {
 
       if (selectedSeller) params.sellerId = selectedSeller;
       if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
+      if (searchAzOrderId.trim()) params.searchAzOrderId = searchAzOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
@@ -3233,6 +3238,15 @@ function FulfillmentDashboard() {
                 />
                 <TextField
                   size="small"
+                  label="Amazon Order ID"
+                  value={searchAzOrderId}
+                  onChange={(e) => setSearchAzOrderId(e.target.value)}
+                  placeholder="Search by Amazon order ID..."
+                  sx={{ flex: 1 }}
+                  fullWidth
+                />
+                <TextField
+                  size="small"
                   label="Buyer Name"
                   value={searchBuyerName}
                   onChange={(e) => setSearchBuyerName(e.target.value)}
@@ -3320,6 +3334,7 @@ function FulfillmentDashboard() {
                   variant="outlined"
                   onClick={() => {
                     setSearchOrderId('');
+                    setSearchAzOrderId('');
                     setSearchBuyerName('');
                     setSearchItemId('');
                     setSearchProductName(''); // CLEAR NEW FILTER
@@ -4084,7 +4099,12 @@ function FulfillmentDashboard() {
                               <AutoSaveTextField
                                 type="text"
                                 value={order.beforeTax}
-                                onSave={(val) => updateManualField(order._id, 'beforeTax', val === '' ? null : parseFloat(val))}
+                                onSave={(val) => updateManualField(order._id, 'beforeTax', parseCurrencyInput(val))}
+                                textFieldProps={{
+                                  InputProps: {
+                                    startAdornment: <InputAdornment position="start">$</InputAdornment>
+                                  }
+                                }}
                               />
                               <IconButton
                                 size="small"
@@ -4105,7 +4125,12 @@ function FulfillmentDashboard() {
                               <AutoSaveTextField
                                 type="text"
                                 value={order.estimatedTax}
-                                onSave={(val) => updateManualField(order._id, 'estimatedTax', val === '' ? null : parseFloat(val))}
+                                onSave={(val) => updateManualField(order._id, 'estimatedTax', parseCurrencyInput(val))}
+                                textFieldProps={{
+                                  InputProps: {
+                                    startAdornment: <InputAdornment position="start">$</InputAdornment>
+                                  }
+                                }}
                               />
                               <IconButton
                                 size="small"
@@ -4592,7 +4617,20 @@ function FulfillmentDashboard() {
 
 // --- ADD AT BOTTOM OF FILE ---
 
-function AutoSaveTextField({ value, type = 'text', onSave, sx = {} }) {
+function parseCurrencyInput(value) {
+  if (value === null || value === undefined) return null;
+
+  const trimmedValue = String(value).trim();
+  if (!trimmedValue) return null;
+
+  const normalizedValue = trimmedValue.replace(/[$,\s]/g, '');
+  if (!normalizedValue) return null;
+
+  const parsedValue = Number(normalizedValue);
+  return Number.isNaN(parsedValue) ? null : parsedValue;
+}
+
+function AutoSaveTextField({ value, type = 'text', onSave, sx = {}, textFieldProps = {} }) {
   // Format initial value for Date inputs (YYYY-MM-DD)
   const formatVal = (val) => {
     if (type === 'date' && val) return val.split('T')[0];
@@ -4628,6 +4666,7 @@ function AutoSaveTextField({ value, type = 'text', onSave, sx = {} }) {
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       placeholder="-"
+      {...textFieldProps}
       sx={{
         backgroundColor: '#fff',
         borderRadius: 1,
