@@ -142,6 +142,7 @@ import AsinListPage from '../pages/admin/AsinListPage.jsx';
 import UserSellerAssignmentPage from '../pages/admin/UserSellerAssignmentPage.jsx';
 import UserPerformancePage from '../pages/admin/UserPerformancePage.jsx';
 import AiFitmentUsagePage from '../pages/admin/AiFitmentUsagePage.jsx';
+import ListingStatsPage from '../pages/admin/ListingStatsPage.jsx';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
@@ -632,6 +633,7 @@ export default function AdminLayout({ user, onLogout }) {
               <MenuItem component={Link} to="/admin/compatibility-tasks" onClick={closeAllMenus}>Compatibility Tasks</MenuItem>
               <MenuItem component={Link} to="/admin/compatibility-progress" onClick={closeAllMenus}>Progress Tracking</MenuItem>
               <MenuItem component={Link} to="/admin/ai-fitment-usage" onClick={closeAllMenus}>AI Fitment Usage</MenuItem>
+              <MenuItem component={Link} to="/admin/listing-stats" onClick={closeAllMenus}>Listing Statistics</MenuItem>
             </Menu>
           </>
         )}
@@ -1125,6 +1127,7 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/compatibility-tasks" element={<AdminTaskList />} />
               <Route path="/compatibility-progress" element={<ProgressTrackingPage />} />
               <Route path="/ai-fitment-usage" element={<AiFitmentUsagePage />} />
+              <Route path="/listing-stats" element={<ListingStatsPage />} />
             </>
           )}
           {isCompatibilityEditor && (
