@@ -885,6 +885,15 @@ export default function ManageTemplatesPage() {
                       <MenuItem value="*Action(SiteID=eBayMotors|Country=US|Currency=USD|Version=1193)">
                         eBay Motors &nbsp;—&nbsp; *Action(SiteID=eBayMotors|Country=US|Currency=USD|Version=1193)
                       </MenuItem>
+                      <MenuItem value="*Action(SiteID=Australia|Country=AU|Currency=AUD|Version=1193)">
+                        eBay Australia &nbsp;—&nbsp; *Action(SiteID=Australia|Country=AU|Currency=AUD|Version=1193)
+                      </MenuItem>
+                      <MenuItem value="*Action(SiteID=Canada|Country=CA|Currency=CAD|Version=1193)">
+                        eBay Canada &nbsp;—&nbsp; *Action(SiteID=Canada|Country=CA|Currency=CAD|Version=1193)
+                      </MenuItem>
+                      <MenuItem value="*Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)">
+                        eBay UK &nbsp;—&nbsp; *Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)
+                      </MenuItem>
                     </Select>
                   </FormControl>
 
