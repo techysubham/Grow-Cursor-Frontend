@@ -214,12 +214,13 @@ export default function ListingStatsPage() {
                   <TableCell><strong>Date (PST)</strong></TableCell>
                   <TableCell><strong>Seller Name</strong></TableCell>
                   <TableCell align="right"><strong>Listings Count</strong></TableCell>
+                  <TableCell align="right"><strong>Empty Compatibility</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {Object.keys(statsByDate).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} align="center" sx={{ py: 3 }}>
+                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
                       No data available for the selected filters
                     </TableCell>
                   </TableRow>
@@ -228,7 +229,7 @@ export default function ListingStatsPage() {
                     <>
                       {/* Date Header */}
                       <TableRow key={date} sx={{ bgcolor: 'grey.50' }}>
-                        <TableCell colSpan={3}>
+                        <TableCell colSpan={4}>
                           <Typography variant="subtitle2" fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <CalendarMonthIcon fontSize="small" />
                             {new Date(date + 'T00:00:00-08:00').toLocaleDateString('en-US', { 
@@ -244,6 +245,11 @@ export default function ListingStatsPage() {
                               color="primary" 
                               sx={{ ml: 1 }}
                             />
+                            <Chip 
+                              label={`${dateStats.reduce((sum, s) => sum + (s.emptyCompatibilityCount || 0), 0)} empty compatibility`} 
+                              size="small" 
+                              color="warning" 
+                            />
                           </Typography>
                         </TableCell>
                       </TableRow>
@@ -258,6 +264,13 @@ export default function ListingStatsPage() {
                               size="small" 
                               color="secondary" 
                               icon={<TrendingUpIcon />}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Chip 
+                              label={`${stat.emptyCompatibilityCount || 0}/${stat.count}`} 
+                              size="small" 
+                              color={stat.emptyCompatibilityCount > 0 ? "warning" : "success"}
                             />
                           </TableCell>
                         </TableRow>
