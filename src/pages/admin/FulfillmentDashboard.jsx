@@ -2534,12 +2534,14 @@ function FulfillmentDashboard() {
       const params = {};
 
       if (selectedSeller) params.sellerId = selectedSeller;
+      if (searchProductName.trim()) params.productName = searchProductName.trim();
       if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
       if (searchAzOrderId.trim()) params.searchAzOrderId = searchAzOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
+      params.excludeLowValue = excludeLowValue;
 
       // Apply date filters
       if (dateFilter.mode === 'single' && dateFilter.single) {
