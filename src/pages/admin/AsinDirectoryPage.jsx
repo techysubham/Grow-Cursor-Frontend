@@ -18,7 +18,6 @@ import {
   InputAdornment,
   Chip,
   TablePagination,
-  Toolbar,
   Tooltip,
   CircularProgress,
   FormControl,
@@ -166,6 +165,16 @@ export default function AsinDirectoryPage() {
     }
   };
 
+  const handleBulkCopy = () => {
+    const selectedAsins = asins
+      .filter(a => selected.includes(a._id))
+      .map(a => a.asin)
+      .join('\n');
+    navigator.clipboard.writeText(selectedAsins);
+    setSuccess(`Copied ${selected.length} ASIN${selected.length > 1 ? 's' : ''} to clipboard`);
+    setTimeout(() => setSuccess(''), 2000);
+  };
+
   const handleExport = async () => {
     try {
       const { data } = await api.get('/asin-directory', {
@@ -285,6 +294,28 @@ export default function AsinDirectoryPage() {
             Move to List
           </Button>
 
+          {selected.length > 0 && (
+            <Button
+              startIcon={<CopyIcon />}
+              variant="outlined"
+              color="info"
+              onClick={handleBulkCopy}
+            >
+              Copy ASINs ({selected.length})
+            </Button>
+          )}
+
+          {selected.length > 0 && (
+            <Button
+              startIcon={<DeleteIcon />}
+              variant="outlined"
+              color="error"
+              onClick={handleBulkDelete}
+            >
+              Delete Selected ({selected.length})
+            </Button>
+          )}
+
           <Chip
             label={showMoved ? 'Show All' : 'Unassigned Only'}
             onClick={handleToggleShowMoved}
@@ -311,7 +342,7 @@ export default function AsinDirectoryPage() {
 
           <TextField
             size="small"
-            placeholder="Search ASIN..."
+            placeholder="Search ASIN or title..."
             value={search}
             onChange={handleSearchChange}
             InputProps={{
@@ -497,26 +528,6 @@ export default function AsinDirectoryPage() {
           onRowsPerPageChange={handleChangeRowsPerPage}
           rowsPerPageOptions={[25, 50, 100]}
         />
-
-        {selected.length > 0 && (
-          <Toolbar
-            sx={{
-              bgcolor: 'primary.light',
-              color: 'primary.contrastText'
-            }}
-          >
-            <Typography variant="subtitle1" sx={{ flex: 1 }}>
-              {selected.length} selected
-            </Typography>
-            <Button
-              startIcon={<DeleteIcon />}
-              onClick={handleBulkDelete}
-              sx={{ color: 'inherit' }}
-            >
-              Delete Selected
-            </Button>
-          </Toolbar>
-        )}
       </Paper>
 
       <AsinBulkAddDialog
