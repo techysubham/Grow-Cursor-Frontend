@@ -6,12 +6,19 @@ import {
     Checkbox,
     Chip,
     CircularProgress,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
     Divider,
     FormControl,
     FormControlLabel,
     IconButton,
     InputLabel,
+    Link,
+    ListSubheader,
     MenuItem,
+    Menu,
     Paper,
     Select,
     Snackbar,
@@ -28,12 +35,24 @@ import {
     TextField,
     Tooltip,
     Typography,
+    useMediaQuery,
+    useTheme,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SaveIcon from '@mui/icons-material/Save';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ChatIcon from '@mui/icons-material/Chat';
+import SendIcon from '@mui/icons-material/Send';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import PersonIcon from '@mui/icons-material/Person';
+import SettingsIcon from '@mui/icons-material/Settings';
 import api from '../../lib/api';
+import TemplateManagementModal from '../../components/TemplateManagementModal';
+import { CHAT_TEMPLATES, personalizeTemplate } from '../../constants/chatTemplates';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -148,6 +167,613 @@ function InlineText({ value, onSave, placeholder = '—', multiline = false }) {
     );
 }
 
+function ImageDialog({ open, onClose, images }) {
+    const theme = useTheme();
+    const isMobileDialog = useMediaQuery(theme.breakpoints.down('sm'));
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    useEffect(() => {
+        if (open) {
+            setCurrentIndex(0);
+        }
+    }, [open]);
+
+    const handleNext = () => {
+        setCurrentIndex((prev) => (prev + 1) % images.length);
+    };
+
+    const handlePrev = () => {
+        setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth fullScreen={isMobileDialog}>
+            <DialogTitle sx={{ p: { xs: 1.5, sm: 2 } }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+                        Images ({currentIndex + 1}/{images.length})
+                    </Typography>
+                    <IconButton onClick={onClose} size="small">
+                        <CloseIcon />
+                    </IconButton>
+                </Stack>
+            </DialogTitle>
+            <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>
+                {images.length > 0 ? (
+                    <Box>
+                        <Box
+                            sx={{
+                                width: '100%',
+                                height: { xs: 'calc(100vh - 200px)', sm: 500 },
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: 'grey.100',
+                                borderRadius: 1,
+                                mb: 2,
+                                position: 'relative'
+                            }}
+                        >
+                            <img
+                                src={images[currentIndex]}
+                                alt={`Item ${currentIndex + 1}`}
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    objectFit: 'contain'
+                                }}
+                            />
+
+                            {images.length > 1 && isMobileDialog && (
+                                <>
+                                    <IconButton
+                                        onClick={handlePrev}
+                                        sx={{
+                                            position: 'absolute',
+                                            left: 4,
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            bgcolor: 'rgba(255,255,255,0.8)',
+                                            '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
+                                        }}
+                                    >
+                                        <NavigateBeforeIcon />
+                                    </IconButton>
+                                    <IconButton
+                                        onClick={handleNext}
+                                        sx={{
+                                            position: 'absolute',
+                                            right: 4,
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            bgcolor: 'rgba(255,255,255,0.8)',
+                                            '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
+                                        }}
+                                    >
+                                        <NavigateNextIcon />
+                                    </IconButton>
+                                </>
+                            )}
+                        </Box>
+
+                        {images.length > 1 && !isMobileDialog && (
+                            <Stack direction="row" justifyContent="space-between" sx={{ mb: 2 }}>
+                                <Button onClick={handlePrev} startIcon={<NavigateBeforeIcon />} variant="outlined">
+                                    Previous
+                                </Button>
+                                <Button onClick={handleNext} endIcon={<NavigateNextIcon />} variant="outlined">
+                                    Next
+                                </Button>
+                            </Stack>
+                        )}
+
+                        {images.length > 1 && (
+                            <Stack
+                                direction="row"
+                                spacing={0.5}
+                                sx={{
+                                    overflowX: 'auto',
+                                    pb: 1,
+                                    justifyContent: { xs: 'flex-start', sm: 'center' },
+                                    flexWrap: { xs: 'nowrap', sm: 'wrap' }
+                                }}
+                            >
+                                {images.map((img, idx) => (
+                                    <Box
+                                        key={idx}
+                                        onClick={() => setCurrentIndex(idx)}
+                                        sx={{
+                                            width: { xs: 60, sm: 80 },
+                                            height: { xs: 60, sm: 80 },
+                                            cursor: 'pointer',
+                                            border: idx === currentIndex ? '3px solid' : '1px solid',
+                                            borderColor: idx === currentIndex ? 'primary.main' : 'grey.300',
+                                            borderRadius: 1,
+                                            overflow: 'hidden',
+                                            flexShrink: 0,
+                                            '&:hover': {
+                                                borderColor: 'primary.main',
+                                                opacity: 0.8
+                                            }
+                                        }}
+                                    >
+                                        <img
+                                            src={img}
+                                            alt={`Thumbnail ${idx + 1}`}
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover'
+                                            }}
+                                        />
+                                    </Box>
+                                ))}
+                            </Stack>
+                        )}
+                    </Box>
+                ) : (
+                    <Alert severity="info">No images available for this item</Alert>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function ChatDialog({ open, onClose, order }) {
+    const theme = useTheme();
+    const isMobileChat = useMediaQuery(theme.breakpoints.down('sm'));
+
+    const [messages, setMessages] = useState([]);
+    const [newMessage, setNewMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [sending, setSending] = useState(false);
+    const messagesEndRef = useRef(null);
+    const pollingInterval = useRef(null);
+    const [templateAnchorEl, setTemplateAnchorEl] = useState(null);
+    const [chatTemplates, setChatTemplates] = useState([]);
+    const [templatesLoading, setTemplatesLoading] = useState(false);
+    const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
+
+    useEffect(() => {
+        if (open && order) {
+            loadMessages();
+            startPolling();
+        } else {
+            stopPolling();
+            setMessages([]);
+            setNewMessage('');
+        }
+        return () => stopPolling();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, order]);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    useEffect(() => {
+        loadChatTemplates();
+    }, []);
+
+    const stopPolling = () => {
+        if (pollingInterval.current) clearInterval(pollingInterval.current);
+    };
+
+    const startPolling = () => {
+        stopPolling();
+        pollingInterval.current = setInterval(() => {
+            if (order) {
+                const itemId = order.itemNumber || order.lineItems?.[0]?.legacyItemId;
+                api.post('/ebay/sync-thread', {
+                    sellerId: order.seller?._id || order.seller,
+                    buyerUsername: order.buyer?.username,
+                    itemId
+                }).then((res) => {
+                    if (res.data.newMessagesFound) {
+                        loadMessages(false);
+                    }
+                }).catch((err) => console.error('Polling error', err));
+            }
+        }, 10000);
+    };
+
+    async function loadMessages(showLoading = true) {
+        if (showLoading) setLoading(true);
+        try {
+            const { data } = await api.get('/ebay/chat/messages', {
+                params: { orderId: order.orderId }
+            });
+            setMessages(data || []);
+        } catch (e) {
+            console.error('Failed to load messages', e);
+        } finally {
+            if (showLoading) setLoading(false);
+        }
+    }
+
+    async function handleSendMessage() {
+        if (!newMessage.trim()) return;
+        setSending(true);
+        try {
+            const itemId = order.itemNumber || order.lineItems?.[0]?.legacyItemId;
+            const { data } = await api.post('/ebay/send-message', {
+                orderId: order.orderId,
+                buyerUsername: order.buyer?.username,
+                itemId,
+                body: newMessage,
+                subject: `Regarding Order #${order.orderId}`
+            });
+
+            setMessages([...messages, data.message]);
+            setNewMessage('');
+        } catch (e) {
+            alert('Failed to send: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setSending(false);
+        }
+    }
+
+    async function loadChatTemplates() {
+        setTemplatesLoading(true);
+        try {
+            const { data } = await api.get('/chat-templates');
+            if (data.templates && data.templates.length > 0) {
+                setChatTemplates(data.templates);
+            }
+        } catch (e) {
+            console.error('Failed to load chat templates:', e);
+            setChatTemplates(CHAT_TEMPLATES);
+        } finally {
+            setTemplatesLoading(false);
+        }
+    }
+
+    const handleTemplateClick = (event) => {
+        setTemplateAnchorEl(event.currentTarget);
+    };
+
+    const handleTemplateClose = () => {
+        setTemplateAnchorEl(null);
+    };
+
+    const handleSelectTemplate = (templateText) => {
+        const nameToUse = order.shippingFullName || order.buyer?.username || 'Buyer';
+        const personalizedText = personalizeTemplate(templateText, nameToUse);
+
+        setNewMessage(personalizedText);
+        handleTemplateClose();
+    };
+
+    const sellerName = order?.seller?.user?.username || 'Seller';
+    const buyerName = order?.buyer?.buyerRegistrationAddress?.fullName || '-';
+    const buyerUsername = order?.buyer?.username || '-';
+    const itemId = order?.itemNumber || order?.lineItems?.[0]?.legacyItemId || '';
+    let itemTitle = order?.productName || order?.lineItems?.[0]?.title || '';
+    const itemCount = order?.lineItems?.length || 0;
+    if (itemCount > 1) {
+        itemTitle = `${itemTitle} (+ ${itemCount - 1} other${itemCount - 1 > 1 ? 's' : ''})`;
+    }
+
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" fullScreen={isMobileChat}>
+            <Box sx={{ p: { xs: 1.5, sm: 2 }, borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', position: 'relative' }}>
+                <Stack
+                    direction="column"
+                    spacing={1}
+                    alignItems="flex-end"
+                    sx={{ position: 'absolute', top: { xs: 8, sm: 12 }, right: { xs: 8, sm: 12 }, zIndex: 10 }}
+                >
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                        {!isMobileChat && (
+                            <Chip
+                                label={sellerName}
+                                size="small"
+                                icon={<PersonIcon style={{ fontSize: 16 }} />}
+                                sx={{
+                                    bgcolor: '#e3f2fd',
+                                    color: '#1565c0',
+                                    fontWeight: 'bold',
+                                    height: 24,
+                                    fontSize: '0.75rem'
+                                }}
+                            />
+                        )}
+                        <IconButton onClick={onClose} size="small" sx={{ color: 'text.disabled' }}>
+                            <CloseIcon />
+                        </IconButton>
+                    </Stack>
+
+                    <Tooltip title="Choose a response template">
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleTemplateClick}
+                            disabled={sending}
+                            sx={{
+                                minWidth: { xs: 'auto', sm: 100 },
+                                px: { xs: 1, sm: 2 },
+                                fontSize: { xs: '0.7rem', sm: '0.875rem' },
+                                bgcolor: 'white'
+                            }}
+                            endIcon={<ExpandMoreIcon />}
+                        >
+                            Templates
+                        </Button>
+                    </Tooltip>
+                </Stack>
+
+                <Stack spacing={1} sx={{ pr: { xs: 6, sm: 12 } }}>
+                    <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                        spacing={{ xs: 0.5, sm: 3 }}
+                        sx={{ mt: 0.5 }}
+                    >
+                        <Box>
+                            <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                                Buyer
+                            </Typography>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+                                {buyerName}
+                            </Typography>
+                        </Box>
+
+                        {!isMobileChat && (
+                            <Divider orientation="vertical" flexItem sx={{ height: 20, alignSelf: 'center', opacity: 0.5 }} />
+                        )}
+
+                        <Box>
+                            <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                                Username
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', px: 0.5, borderRadius: 0.5, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                {buyerUsername}
+                            </Typography>
+                        </Box>
+                    </Stack>
+
+                    <Box>
+                        <Link
+                            href={`https://www.ebay.com/itm/${itemId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            underline="hover"
+                            sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5 }}
+                        >
+                            <Typography
+                                variant="subtitle2"
+                                sx={{
+                                    color: 'primary.main',
+                                    fontWeight: 600,
+                                    lineHeight: 1.3,
+                                    fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: isMobileChat ? 1 : 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                {itemTitle || `Item ID: ${itemId}`}
+                            </Typography>
+                            <OpenInNewIcon sx={{ fontSize: 14, color: 'primary.main', mt: 0.3, flexShrink: 0 }} />
+                        </Link>
+
+                        <Chip
+                            label={`Order: ${order?.orderId || order?.legacyOrderId || 'N/A'}`}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                                borderRadius: 1,
+                                height: 20,
+                                fontSize: '0.65rem',
+                                color: 'text.secondary',
+                                borderColor: 'divider',
+                                bgcolor: '#fafafa'
+                            }}
+                        />
+                    </Box>
+                </Stack>
+            </Box>
+
+            <DialogContent sx={{ p: 0, bgcolor: '#f0f2f5', height: { xs: 'calc(100vh - 180px)', sm: '500px' }, display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ flex: 1, p: 2, overflowY: 'auto' }}>
+                    {loading ? (
+                        <Box display="flex" justifyContent="center" mt={4}><CircularProgress /></Box>
+                    ) : (
+                        <Stack spacing={2}>
+                            {messages.length === 0 && (
+                                <Alert severity="info" sx={{ mx: 'auto', width: 'fit-content' }}>
+                                    No messages yet. Start the conversation below!
+                                </Alert>
+                            )}
+
+                            {messages.map((msg) => (
+                                <Box
+                                    key={msg._id}
+                                    sx={{
+                                        alignSelf: msg.sender === 'SELLER' ? 'flex-end' : 'flex-start',
+                                        maxWidth: '70%'
+                                    }}
+                                >
+                                    <Paper
+                                        elevation={1}
+                                        sx={{
+                                            p: 1.5,
+                                            bgcolor: msg.sender === 'SELLER' ? '#1976d2' : '#ffffff',
+                                            color: msg.sender === 'SELLER' ? '#fff' : 'text.primary',
+                                            borderRadius: 2,
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{msg.body}</Typography>
+
+                                        {msg.mediaUrls && msg.mediaUrls.length > 0 && (
+                                            <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                {msg.mediaUrls.map((url, idx) => (
+                                                    <Box
+                                                        key={idx}
+                                                        component="img"
+                                                        src={url}
+                                                        alt="Attachment"
+                                                        sx={{
+                                                            width: 100,
+                                                            height: 100,
+                                                            objectFit: 'cover',
+                                                            borderRadius: 1,
+                                                            cursor: 'pointer',
+                                                            border: '1px solid #ccc'
+                                                        }}
+                                                        onClick={() => window.open(url, '_blank')}
+                                                    />
+                                                ))}
+                                            </Box>
+                                        )}
+                                    </Paper>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, textAlign: msg.sender === 'SELLER' ? 'right' : 'left', fontSize: '0.7rem' }}>
+                                        {new Date(msg.messageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} PT
+                                        {msg.sender === 'SELLER' && (msg.read ? ' • Read' : ' • Sent')}
+                                    </Typography>
+                                </Box>
+                            ))}
+                            <div ref={messagesEndRef} />
+                        </Stack>
+                    )}
+                </Box>
+
+                <Box sx={{ p: { xs: 1, sm: 2 }, bgcolor: '#fff', borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1 }}>
+                    <TextField
+                        fullWidth
+                        multiline
+                        maxRows={3}
+                        placeholder="Type a message..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage();
+                            }
+                        }}
+                        disabled={sending}
+                        size="small"
+                        sx={{
+                            '& .MuiInputBase-input': {
+                                fontSize: { xs: '0.875rem', sm: '1rem' }
+                            }
+                        }}
+                    />
+                    <Menu
+                        anchorEl={templateAnchorEl}
+                        open={Boolean(templateAnchorEl)}
+                        onClose={handleTemplateClose}
+                        anchorOrigin={{
+                            vertical: 'bottom',
+                            horizontal: 'right',
+                        }}
+                        transformOrigin={{
+                            vertical: 'top',
+                            horizontal: 'right',
+                        }}
+                        PaperProps={{
+                            style: {
+                                maxHeight: 400,
+                                width: 320,
+                            },
+                        }}
+                    >
+                        <MenuItem
+                            onClick={() => { handleTemplateClose(); setManageTemplatesOpen(true); }}
+                            sx={{
+                                borderBottom: '2px solid #e0e0e0',
+                                bgcolor: '#f9f9ff',
+                                py: 1.5
+                            }}
+                        >
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <SettingsIcon fontSize="small" color="primary" />
+                                <Typography variant="subtitle2" color="primary">Manage Templates</Typography>
+                            </Stack>
+                        </MenuItem>
+
+                        {templatesLoading ? (
+                            <Box sx={{ p: 2, textAlign: 'center' }}>
+                                <CircularProgress size={20} />
+                            </Box>
+                        ) : chatTemplates.length === 0 ? (
+                            <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+                                No templates available. Click "Manage Templates" to add some.
+                            </Typography>
+                        ) : (
+                            chatTemplates.map((group, index) => (
+                                <Box key={index}>
+                                    <ListSubheader
+                                        sx={{
+                                            bgcolor: '#f5f5f5',
+                                            fontWeight: 'bold',
+                                            lineHeight: '32px',
+                                            color: 'primary.main',
+                                            fontSize: '0.75rem'
+                                        }}
+                                    >
+                                        {group.category}
+                                    </ListSubheader>
+                                    {group.items.map((item, idx) => (
+                                        <MenuItem
+                                            key={item._id || idx}
+                                            onClick={() => handleSelectTemplate(item.text)}
+                                            sx={{
+                                                fontSize: '0.85rem',
+                                                whiteSpace: 'normal',
+                                                py: 1,
+                                                borderBottom: '1px solid #f0f0f0',
+                                                display: 'block'
+                                            }}
+                                        >
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                                                {item.label}
+                                            </Typography>
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{
+                                                    display: '-webkit-box',
+                                                    WebkitLineClamp: 2,
+                                                    WebkitBoxOrient: 'vertical',
+                                                    overflow: 'hidden',
+                                                    fontSize: '0.75rem'
+                                                }}
+                                            >
+                                                {item.text}
+                                            </Typography>
+                                        </MenuItem>
+                                    ))}
+                                </Box>
+                            ))
+                        )}
+                    </Menu>
+                    <Button
+                        variant="contained"
+                        sx={{ px: { xs: 2, sm: 3 }, minWidth: { xs: 'auto', sm: 80 } }}
+                        endIcon={!isMobileChat && (sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />)}
+                        onClick={handleSendMessage}
+                        disabled={sending || !newMessage.trim()}
+                    >
+                        {isMobileChat ? <SendIcon /> : 'Send'}
+                    </Button>
+                </Box>
+            </DialogContent>
+
+            <TemplateManagementModal
+                open={manageTemplatesOpen}
+                onClose={() => {
+                    setManageTemplatesOpen(false);
+                    loadChatTemplates();
+                }}
+            />
+        </Dialog>
+    );
+}
+
 // ─── Tab Panel Helper ─────────────────────────────────────────────────────────
 
 function TabPanel({ children, value, index }) {
@@ -182,6 +808,17 @@ export default function AffiliateOrdersPage() {
     // Snackbar
     const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
     const notify = (severity, msg) => setSnack({ open: true, msg, severity });
+
+    // Product images
+    const [itemImages, setItemImages] = useState({});
+    const [thumbnailImages, setThumbnailImages] = useState({});
+    const [loadingImages, setLoadingImages] = useState({});
+    const [imageDialogOpen, setImageDialogOpen] = useState(false);
+    const [selectedImages, setSelectedImages] = useState([]);
+
+    // Messaging modal
+    const [messageModalOpen, setMessageModalOpen] = useState(false);
+    const [selectedOrderForMessage, setSelectedOrderForMessage] = useState(null);
 
     // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -288,6 +925,79 @@ export default function AffiliateOrdersPage() {
         }
     }, [balances, date, fetchSummary]);
 
+    const fetchThumbnail = async (order) => {
+        const orderId = order._id;
+        const itemId = order.itemNumber || order.lineItems?.[0]?.legacyItemId;
+        const sellerId = order.seller?._id || order.seller;
+
+        if (!itemId || !sellerId || thumbnailImages[orderId]) {
+            return;
+        }
+
+        try {
+            const { data } = await api.get(`/ebay/item-images/${itemId}?sellerId=${sellerId}&thumbnail=true`);
+            if (data.images && data.images.length > 0) {
+                setThumbnailImages((prev) => ({ ...prev, [orderId]: data.images[0] }));
+                if (data.total > 1) {
+                    setItemImages((prev) => ({ ...prev, [orderId]: { count: data.total } }));
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching thumbnail:', error);
+        }
+    };
+
+    const fetchAllImages = async (order) => {
+        const orderId = order._id;
+        const itemId = order.itemNumber || order.lineItems?.[0]?.legacyItemId;
+        const sellerId = order.seller?._id || order.seller;
+
+        if (itemImages[orderId]?.images) {
+            return itemImages[orderId].images;
+        }
+
+        setLoadingImages((prev) => ({ ...prev, [orderId]: true }));
+
+        try {
+            const { data } = await api.get(`/ebay/item-images/${itemId}?sellerId=${sellerId}`);
+            const allImages = data.images || [];
+            setItemImages((prev) => ({ ...prev, [orderId]: { images: allImages, count: allImages.length } }));
+            return allImages;
+        } catch (error) {
+            console.error('Error fetching all images:', error);
+            return [];
+        } finally {
+            setLoadingImages((prev) => ({ ...prev, [orderId]: false }));
+        }
+    };
+
+    useEffect(() => {
+        if (orders.length > 0) {
+            orders.forEach((order) => {
+                fetchThumbnail(order);
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orders]);
+
+    const handleViewImages = async (order) => {
+        const allImages = await fetchAllImages(order);
+        if (allImages.length > 0) {
+            setSelectedImages(allImages);
+            setImageDialogOpen(true);
+        }
+    };
+
+    const handleOpenMessageDialog = (order) => {
+        setSelectedOrderForMessage(order);
+        setMessageModalOpen(true);
+    };
+
+    const handleCloseMessageDialog = () => {
+        setMessageModalOpen(false);
+        setSelectedOrderForMessage(null);
+    };
+
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER — Tab 1: Daily Orders
     // ─────────────────────────────────────────────────────────────────────────
@@ -311,10 +1021,10 @@ export default function AffiliateOrdersPage() {
                         <TableHead>
                             <TableRow sx={{ bgcolor: '#fce4ec' }}>
                                 {[
-                                    '#', 'Order ID', 'Product', 'Seller',
-                                    'Affiliate Link', 'Price (USD)',
+                                    '#', 'Order ID', 'Product Name', 'Seller',
+                                    'Supplier Link', 'Affiliate Links', 'Price (USD)',
                                     'Amazon Account', 'Status', 'Purchaser',
-                                    'Message Status', 'Note',
+                                    'Message Status', 'Messaging', 'Notes',
                                 ].map((h) => (
                                     <TableCell key={h} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>
                                         {h}
@@ -325,13 +1035,15 @@ export default function AffiliateOrdersPage() {
                         <TableBody>
                             {orders.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={11} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                                    <TableCell colSpan={13} align="center" sx={{ color: 'text.secondary', py: 4 }}>
                                         No orders found for this date.
                                     </TableCell>
                                 </TableRow>
                             )}
                             {orders.map((order, idx) => {
                                 const sellerName = order.seller?.user?.username || '—';
+                                const itemId = order.lineItems?.[0]?.legacyItemId || order.itemNumber;
+                                const productTitle = order.lineItems?.[0]?.title || order.productName || '—';
                                 return (
                                     <TableRow key={order._id} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#fafafa' } }}>
                                         {/* # */}
@@ -350,23 +1062,128 @@ export default function AffiliateOrdersPage() {
                                         </TableCell>
 
                                         {/* Product Name */}
-                                        <TableCell sx={{ fontSize: '0.78rem', maxWidth: 200 }}>
-                                            <Tooltip title={order.productName || ''}>
-                                                <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
-                                                    {order.productName || '—'}
+                                        <TableCell sx={{ minWidth: 300, maxWidth: 360 }}>
+                                            <Stack direction="row" spacing={1} alignItems="flex-start">
+                                                {thumbnailImages[order._id] && (
+                                                    <Box
+                                                        onClick={() => handleViewImages(order)}
+                                                        sx={{
+                                                            width: 50,
+                                                            height: 50,
+                                                            cursor: 'pointer',
+                                                            border: '1px solid',
+                                                            borderColor: 'grey.300',
+                                                            borderRadius: 1,
+                                                            overflow: 'hidden',
+                                                            flexShrink: 0,
+                                                            position: 'relative',
+                                                            '&:hover': {
+                                                                borderColor: 'primary.main',
+                                                                boxShadow: 2
+                                                            }
+                                                        }}
+                                                    >
+                                                        <img
+                                                            src={thumbnailImages[order._id]}
+                                                            alt="Product"
+                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                        />
+                                                        {itemImages[order._id]?.count > 1 && (
+                                                            <Chip
+                                                                label={`+${itemImages[order._id].count - 1}`}
+                                                                size="small"
+                                                                sx={{
+                                                                    position: 'absolute',
+                                                                    bottom: 2,
+                                                                    right: 2,
+                                                                    height: 18,
+                                                                    fontSize: '0.65rem',
+                                                                    bgcolor: 'rgba(0,0,0,0.7)',
+                                                                    color: 'white',
+                                                                    '& .MuiChip-label': { px: 0.5 }
+                                                                }}
+                                                            />
+                                                        )}
+                                                        {loadingImages[order._id] && (
+                                                            <Box
+                                                                sx={{
+                                                                    position: 'absolute',
+                                                                    inset: 0,
+                                                                    bgcolor: 'rgba(255,255,255,0.8)',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center'
+                                                                }}
+                                                            >
+                                                                <CircularProgress size={18} />
+                                                            </Box>
+                                                        )}
+                                                    </Box>
+                                                )}
+
+                                                <Box sx={{ minWidth: 0 }}>
+                                                    {itemId ? (
+                                                        <Link
+                                                            href={`https://www.ebay.com/itm/${itemId}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            underline="hover"
+                                                            sx={{ display: 'inline-flex', alignItems: 'flex-start', gap: 0.5 }}
+                                                        >
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{
+                                                                    fontSize: '0.78rem',
+                                                                    fontWeight: 600,
+                                                                    color: 'primary.main',
+                                                                    display: '-webkit-box',
+                                                                    WebkitLineClamp: 2,
+                                                                    WebkitBoxOrient: 'vertical',
+                                                                    overflow: 'hidden'
+                                                                }}
+                                                            >
+                                                                {productTitle}
+                                                            </Typography>
+                                                            <OpenInNewIcon sx={{ fontSize: 13, mt: 0.2, flexShrink: 0 }} />
+                                                        </Link>
+                                                    ) : (
+                                                        <Typography
+                                                            variant="body2"
+                                                            sx={{
+                                                                fontSize: '0.78rem',
+                                                                fontWeight: 600,
+                                                                display: '-webkit-box',
+                                                                WebkitLineClamp: 2,
+                                                                WebkitBoxOrient: 'vertical',
+                                                                overflow: 'hidden'
+                                                            }}
+                                                        >
+                                                            {productTitle}
+                                                        </Typography>
+                                                    )}
+                                                    {itemId && (
+                                                        <Link
+                                                            href={`https://www.ebay.com/itm/${itemId}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            sx={{ display: 'inline-block', mt: 0.25, fontSize: '0.72rem' }}
+                                                        >
+                                                            ID: {itemId}
+                                                        </Link>
+                                                    )}
                                                 </Box>
-                                            </Tooltip>
+                                            </Stack>
                                         </TableCell>
 
                                         {/* Seller */}
                                         <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{sellerName}</TableCell>
 
-                                        {/* Affiliate Link */}
+                                        {/* Supplier Link */}
                                         <TableCell sx={{ minWidth: 220 }}>
                                             <Stack direction="row" alignItems="center" spacing={0.5}>
                                                 <InlineText
                                                     value={order.affiliateLink}
-                                                    placeholder="Paste link…"
+                                                    placeholder="Paste supplier link…"
                                                     onSave={(v) => patchOrder(order._id, 'affiliateLink', v)}
                                                 />
                                                 {order.affiliateLink && (
@@ -379,9 +1196,30 @@ export default function AffiliateOrdersPage() {
                                             </Stack>
                                         </TableCell>
 
-                                        {/* Price */}
-                                        <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                                            ${fmt(order.beforeTaxUSD)}
+                                        {/* Affiliate Links */}
+                                        <TableCell sx={{ minWidth: 220 }}>
+                                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                <InlineText
+                                                    value={order.affiliateLinks}
+                                                    placeholder="Paste affiliate link…"
+                                                    onSave={(v) => patchOrder(order._id, 'affiliateLinks', v)}
+                                                />
+                                                {order.affiliateLinks && (
+                                                    <Tooltip title="Open link">
+                                                        <IconButton size="small" component="a" href={order.affiliateLinks} target="_blank" rel="noopener noreferrer">
+                                                            <OpenInNewIcon sx={{ fontSize: 12 }} />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                            </Stack>
+                                        </TableCell>
+
+                                        {/* Price — editable */}
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                            <BalanceNumberCell
+                                                value={order.beforeTaxUSD ?? null}
+                                                onSave={(v) => patchOrder(order._id, 'beforeTaxUSD', v)}
+                                            />
                                         </TableCell>
 
                                         {/* Amazon Account */}
@@ -462,13 +1300,26 @@ export default function AffiliateOrdersPage() {
                                             </FormControl>
                                         </TableCell>
 
-                                        {/* Note */}
+                                        {/* Messaging */}
+                                        <TableCell align="center">
+                                            <Tooltip title="Send message to buyer">
+                                                <IconButton
+                                                    size="small"
+                                                    color="primary"
+                                                    onClick={() => handleOpenMessageDialog(order)}
+                                                >
+                                                    <ChatIcon sx={{ fontSize: 18 }} />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </TableCell>
+
+                                        {/* Notes */}
                                         <TableCell sx={{ minWidth: 160 }}>
                                             <InlineText
-                                                value={order.notes}
+                                                value={order.fulfillmentNotes}
                                                 placeholder="Add note…"
                                                 multiline
-                                                onSave={(v) => patchOrder(order._id, 'notes', v)}
+                                                onSave={(v) => patchOrder(order._id, 'fulfillmentNotes', v)}
                                             />
                                         </TableCell>
                                     </TableRow>
@@ -726,6 +1577,18 @@ export default function AffiliateOrdersPage() {
                     {snack.msg}
                 </Alert>
             </Snackbar>
+
+            <ChatDialog
+                open={messageModalOpen}
+                onClose={handleCloseMessageDialog}
+                order={selectedOrderForMessage}
+            />
+
+            <ImageDialog
+                open={imageDialogOpen}
+                onClose={() => setImageDialogOpen(false)}
+                images={selectedImages}
+            />
         </Box>
     );
 }
