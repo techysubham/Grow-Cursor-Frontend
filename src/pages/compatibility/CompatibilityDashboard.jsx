@@ -6,6 +6,7 @@ import {
   InputLabel, Select, MenuItem, Snackbar, Alert, Pagination, OutlinedInput, Checkbox, ListItemText,
   Autocomplete, InputAdornment, Tooltip, Switch, FormControlLabel, Collapse
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CloseIcon from '@mui/icons-material/Close';
@@ -67,6 +68,7 @@ const formatDate = (dateString) => {
 };
 
 export default function CompatibilityDashboard() {
+  const navigate = useNavigate();
   const [sellers, setSellers] = useState([]);
   const [currentSellerId, setCurrentSellerId] = useState('');
   const [listings, setListings] = useState([]);
@@ -117,10 +119,16 @@ export default function CompatibilityDashboard() {
   // BULK AI SUGGEST STATE
   const [selectedIds, setSelectedIds] = useState(new Set());
   // bulkQueue entries: { item, status: 'loading'|'ready'|'no-match'|'error',
-  //   aiData, modelOptions, yearOptions, trimsByYear, selectedYears, modelExists, yearsExist, error }
+  //   aiData, modelOptions, yearOptions, trimsByYear, selectedYears, modelExists, yearsExist, error,
+  //   reviewStatus: 'pending'|'correct'|'skipped', finalCompatList: [] }
   const [bulkQueue, setBulkQueue] = useState([]);
   const [bulkQueueIdx, setBulkQueueIdx] = useState(0);
   const [bulkMode, setBulkMode] = useState(false);
+
+  // BULK REVIEW SUMMARY STATE
+  const [showBulkSummary, setShowBulkSummary] = useState(false);
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkSendResults, setBulkSendResults] = useState(null); // { successCount, failureCount, results }
 
   // ---------------------------------------------------------------------------
   // Normalize a model string for fuzzy comparison:
@@ -750,7 +758,12 @@ export default function CompatibilityDashboard() {
 
     // Always update the modal's item
     setSelectedItem(entry.item);
-    setEditCompatList(JSON.parse(JSON.stringify(entry.item.compatibility || [])));
+    // If previously marked correct, restore the finalCompatList; otherwise use original
+    if (entry.reviewStatus === 'correct' && entry.finalCompatList?.length > 0) {
+      setEditCompatList(JSON.parse(JSON.stringify(entry.finalCompatList)));
+    } else {
+      setEditCompatList(JSON.parse(JSON.stringify(entry.item.compatibility || [])));
+    }
     const newIdx = listings.findIndex(l => l.itemId === entry.item.itemId);
     setCurrentListingIndex(newIdx >= 0 ? newIdx : 0);
 
@@ -786,18 +799,106 @@ export default function CompatibilityDashboard() {
     }
   }, [bulkQueueIdx, bulkQueue, bulkMode, openModal]);
 
-  // Advance to next item in queue (or close modal)
+  // Advance to next item in queue (or show summary)
   const handleBulkQueueNext = (skip = false) => {
+    // Mark current item's review status
+    setBulkQueue(prev => {
+      const u = [...prev];
+      if (skip) {
+        u[bulkQueueIdx] = { ...u[bulkQueueIdx], reviewStatus: 'skipped', finalCompatList: [] };
+      }
+      // If not skip, it should already be marked as 'correct' by handleMarkCorrect
+      return u;
+    });
+
     const nextIdx = bulkQueueIdx + 1;
     if (nextIdx >= bulkQueue.length) {
-      // Finished queue
-      setBulkMode(false);
-      setBulkQueue([]);
+      // All items reviewed — show summary
       setOpenModal(false);
-      showSnackbar('All bulk items processed!', 'success');
+      setShowBulkSummary(true);
     } else {
       setBulkQueueIdx(nextIdx);
     }
+  };
+
+  // Mark current item as "Correct" — capture the current editCompatList and advance
+  const handleMarkCorrect = () => {
+    setBulkQueue(prev => {
+      const u = [...prev];
+      u[bulkQueueIdx] = {
+        ...u[bulkQueueIdx],
+        reviewStatus: 'correct',
+        finalCompatList: JSON.parse(JSON.stringify(editCompatList))
+      };
+      return u;
+    });
+
+    const nextIdx = bulkQueueIdx + 1;
+    if (nextIdx >= bulkQueue.length) {
+      setOpenModal(false);
+      setShowBulkSummary(true);
+    } else {
+      setBulkQueueIdx(nextIdx);
+    }
+  };
+
+  // Send all "correct" items to eBay in bulk
+  const handleBulkSendToEbay = async () => {
+    const correctItems = bulkQueue.filter(q => q.reviewStatus === 'correct');
+    if (correctItems.length === 0) {
+      showSnackbar('No items marked as correct to send', 'warning');
+      return;
+    }
+
+    setBulkSending(true);
+    try {
+      const payload = correctItems.map(q => ({
+        itemId: q.item.itemId,
+        title: q.item.title,
+        sku: q.item.sku,
+        compatibilityList: q.finalCompatList
+      }));
+
+      const { data } = await api.post('/ebay/bulk-update-compatibility', {
+        sellerId: currentSellerId,
+        items: payload,
+        totalItems: bulkQueue.length,
+        skippedCount: bulkQueue.filter(q => q.reviewStatus !== 'correct').length
+      });
+
+      setBulkSendResults(data);
+
+      // Update local listings state for successful items
+      const successItemIds = new Set(data.results.filter(r => r.status === 'success').map(r => r.itemId));
+      setListings(prevListings =>
+        prevListings.map(item => {
+          if (successItemIds.has(item.itemId)) {
+            const correctEntry = correctItems.find(q => q.item.itemId === item.itemId);
+            if (correctEntry) return { ...item, compatibility: correctEntry.finalCompatList };
+          }
+          return item;
+        })
+      );
+
+      // Track usage
+      api.post('/ai/track-save-next', { hadData: true }).catch(() => {});
+      fetchApiUsage();
+
+      showSnackbar(`Bulk send complete: ${data.successCount} success, ${data.failureCount} failed`, data.failureCount > 0 ? 'warning' : 'success');
+    } catch (e) {
+      showSnackbar('Bulk send failed: ' + (e.response?.data?.error || e.message), 'error');
+    } finally {
+      setBulkSending(false);
+    }
+  };
+
+  // Close bulk summary and reset
+  const handleCloseBulkSummary = () => {
+    setShowBulkSummary(false);
+    setBulkSendResults(null);
+    setBulkMode(false);
+    setBulkQueue([]);
+    setBulkQueueIdx(0);
   };
 
   // Go back to previous item in queue
@@ -1138,6 +1239,15 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
               />
             </Tooltip>
           )}
+
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => navigate('/admin/compatibility-batch-history')}
+            sx={{ fontSize: '0.75rem', textTransform: 'none' }}
+          >
+            Batch History
+          </Button>
         </Box>
 
         <Box display="flex" gap={2} alignItems="center">
@@ -1368,6 +1478,8 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                   <Typography variant="caption" fontWeight={700} sx={{ color: '#7c3aed' }}>
                     Bulk AI Queue — Item {bulkQueueIdx + 1} of {bulkQueue.length}
                   </Typography>
+                  <Chip label={`✓ ${bulkQueue.filter(q => q.reviewStatus === 'correct').length}`} size="small" color="success" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                  <Chip label={`⊘ ${bulkQueue.filter(q => q.reviewStatus === 'skipped').length}`} size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
                   {bulkQueue[bulkQueueIdx]?.status === 'loading' && (
                     <><CircularProgress size={11} sx={{ color: '#7c3aed', ml: 0.5 }} />
                       <Typography variant="caption" color="textSecondary">AI analyzing...</Typography></>
@@ -1911,30 +2023,13 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 Skip → ({bulkQueueIdx + 1}/{bulkQueue.length})
               </Button>
               <Button
-                onClick={() => handleSaveCompatibility(true)}
-                variant="outlined"
-                color="primary"
-                title="Save this item and stay on it"
-              >
-                Save (Stay)
-              </Button>
-              <Button
-                onClick={async () => {
-                  try {
-                    await handleSaveCompatibility(false);
-                    // Track save-and-next — hadData = user had entries in the compatibility list
-                    api.post('/ai/track-save-next', { hadData: editCompatList.length > 0 }).catch(() => {});
-                    handleBulkQueueNext(false);
-                  } catch (e) {
-                    // Error already shown by handleSaveCompatibility snackbar
-                    console.error('Bulk save and next failed:', e);
-                  }
-                }}
+                onClick={handleMarkCorrect}
                 variant="contained"
-                color="primary"
-                disabled={bulkQueue[bulkQueueIdx]?.status === 'loading'}
+                color="success"
+                disabled={bulkQueue[bulkQueueIdx]?.status === 'loading' || editCompatList.length === 0}
+                sx={{ fontWeight: 700 }}
               >
-                Save & Next → ({bulkQueueIdx + 1}/{bulkQueue.length})
+                ✓ Correct ({bulkQueueIdx + 1}/{bulkQueue.length})
               </Button>
             </>
           ) : (
@@ -1949,6 +2044,143 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 Save and Go to Next
               </Button>
             </>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* BULK REVIEW SUMMARY DIALOG */}
+      <Dialog open={showBulkSummary} onClose={() => { if (!bulkSending) handleCloseBulkSummary(); }} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ borderBottom: '1px solid #eee' }}>
+          <Typography variant="h6" fontWeight="bold">
+            {bulkSendResults ? 'Bulk Send Results' : 'Bulk Review Summary'}
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          {!bulkSendResults ? (
+            // PRE-SEND SUMMARY
+            <>
+              <Box sx={{ display: 'flex', gap: 3, mb: 3, mt: 1 }}>
+                <Paper sx={{ flex: 1, p: 2, textAlign: 'center', bgcolor: '#f0f4ff', border: '1px solid #c7d7fd' }}>
+                  <Typography variant="h4" fontWeight="bold" color="primary">{bulkQueue.length}</Typography>
+                  <Typography variant="body2" color="textSecondary">Total Items</Typography>
+                </Paper>
+                <Paper sx={{ flex: 1, p: 2, textAlign: 'center', bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                  <Typography variant="h4" fontWeight="bold" color="success.main">{bulkQueue.filter(q => q.reviewStatus === 'correct').length}</Typography>
+                  <Typography variant="body2" color="textSecondary">Marked Correct</Typography>
+                </Paper>
+                <Paper sx={{ flex: 1, p: 2, textAlign: 'center', bgcolor: '#fefce8', border: '1px solid #fef08a' }}>
+                  <Typography variant="h4" fontWeight="bold" color="warning.main">{bulkQueue.filter(q => q.reviewStatus === 'skipped' || q.reviewStatus === 'pending' || !q.reviewStatus).length}</Typography>
+                  <Typography variant="body2" color="textSecondary">Skipped</Typography>
+                </Paper>
+              </Box>
+
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Items to send to eBay:</Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300, mb: 2 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Title</TableCell>
+                      <TableCell>Item ID</TableCell>
+                      <TableCell align="right">Vehicles</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {bulkQueue.map((q, idx) => (
+                      <TableRow key={idx} sx={{ bgcolor: q.reviewStatus === 'correct' ? '#f0fdf4' : '#fafafa' }}>
+                        <TableCell>
+                          <Chip
+                            label={q.reviewStatus === 'correct' ? '✓ Correct' : 'Skipped'}
+                            size="small"
+                            color={q.reviewStatus === 'correct' ? 'success' : 'default'}
+                            variant={q.reviewStatus === 'correct' ? 'filled' : 'outlined'}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {q.item.title}
+                        </TableCell>
+                        <TableCell><Typography variant="caption">{q.item.itemId}</Typography></TableCell>
+                        <TableCell align="right">{q.reviewStatus === 'correct' ? q.finalCompatList?.length || 0 : '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          ) : (
+            // POST-SEND RESULTS
+            <>
+              <Box sx={{ display: 'flex', gap: 3, mb: 3, mt: 1 }}>
+                <Paper sx={{ flex: 1, p: 2, textAlign: 'center', bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                  <Typography variant="h4" fontWeight="bold" color="success.main">{bulkSendResults.successCount}</Typography>
+                  <Typography variant="body2" color="textSecondary">Successful</Typography>
+                </Paper>
+                <Paper sx={{ flex: 1, p: 2, textAlign: 'center', bgcolor: '#fef2f2', border: '1px solid #fecaca' }}>
+                  <Typography variant="h4" fontWeight="bold" color="error.main">{bulkSendResults.failureCount}</Typography>
+                  <Typography variant="body2" color="textSecondary">Failed</Typography>
+                </Paper>
+              </Box>
+
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Title</TableCell>
+                      <TableCell>Item ID</TableCell>
+                      <TableCell>Vehicles</TableCell>
+                      <TableCell>Error / Warning</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {bulkSendResults.results.map((r, idx) => (
+                      <TableRow key={idx} sx={{ bgcolor: r.status === 'success' ? '#f0fdf4' : '#fef2f2' }}>
+                        <TableCell>
+                          <Chip
+                            label={r.status === 'success' ? '✓ Success' : '✗ Failed'}
+                            size="small"
+                            color={r.status === 'success' ? 'success' : 'error'}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {r.title}
+                        </TableCell>
+                        <TableCell><Typography variant="caption">{r.itemId}</Typography></TableCell>
+                        <TableCell>{r.compatibilityCount}</TableCell>
+                        <TableCell>
+                          {r.error && (
+                            <Typography variant="caption" color={r.status === 'success' ? 'warning.main' : 'error.main'}>
+                              {r.error}
+                            </Typography>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {!bulkSendResults ? (
+            <>
+              <Button onClick={handleCloseBulkSummary} disabled={bulkSending}>Cancel</Button>
+              <Button
+                onClick={handleBulkSendToEbay}
+                variant="contained"
+                color="primary"
+                disabled={bulkSending || bulkQueue.filter(q => q.reviewStatus === 'correct').length === 0}
+                startIcon={bulkSending ? <CircularProgress size={16} color="inherit" /> : null}
+                sx={{ fontWeight: 700 }}
+              >
+                {bulkSending
+                  ? `Sending ${bulkQueue.filter(q => q.reviewStatus === 'correct').length} items...`
+                  : `Send ${bulkQueue.filter(q => q.reviewStatus === 'correct').length} Items to eBay`}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={handleCloseBulkSummary} variant="contained">Done</Button>
           )}
         </DialogActions>
       </Dialog>

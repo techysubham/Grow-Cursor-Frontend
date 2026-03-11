@@ -55,6 +55,7 @@ import ListerInfoDetailPage from '../pages/admin/ListerInfoDetailPage.jsx';
 import AdminTaskList from '../pages/compatibility/AdminTaskList.jsx';
 import EditorDashboard from '../pages/compatibility/EditorDashboard.jsx';
 import ProgressTrackingPage from '../pages/compatibility/ProgressTrackingPage.jsx';
+import CompatibilityBatchHistoryPage from '../pages/compatibility/CompatibilityBatchHistoryPage.jsx';
 
 import FulfillmentDashboard from '../pages/admin/FulfillmentDashboard.jsx';
 import AllOrdersSheetPage from '../pages/admin/AllOrdersSheetPage.jsx';
@@ -634,6 +635,7 @@ export default function AdminLayout({ user, onLogout }) {
               <MenuItem component={Link} to="/admin/compatibility-progress" onClick={closeAllMenus}>Progress Tracking</MenuItem>
               <MenuItem component={Link} to="/admin/ai-fitment-usage" onClick={closeAllMenus}>AI Fitment Usage</MenuItem>
               <MenuItem component={Link} to="/admin/listing-stats" onClick={closeAllMenus}>Listing Statistics</MenuItem>
+              <MenuItem component={Link} to="/admin/compatibility-batch-history" onClick={closeAllMenus}>Batch History</MenuItem>
             </Menu>
           </>
         )}
@@ -1137,6 +1139,7 @@ export default function AdminLayout({ user, onLogout }) {
           {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
             <>
               <Route path="/compatibility-dashboard" element={<CompatibilityDashboard />} />
+              <Route path="/compatibility-batch-history" element={<CompatibilityBatchHistoryPage />} />
               <Route path="/edit-listings" element={<EditListingsDashboard />} />
             </>
           )}
