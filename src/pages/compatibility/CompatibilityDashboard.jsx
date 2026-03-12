@@ -74,6 +74,8 @@ export default function CompatibilityDashboard() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [syncAllProgress, setSyncAllProgress] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -380,6 +382,49 @@ export default function CompatibilityDashboard() {
       await loadListings();
     } catch (e) { showSnackbar('Sync Failed: ' + (e.response?.data?.error || e.message), 'error'); }
     finally { setSyncing(false); }
+  };
+
+  const handleSyncAll = async () => {
+    setSyncingAll(true);
+    setSyncAllProgress('Starting...');
+    try {
+      const { data } = await api.post('/ebay/sync-all-sellers-listings');
+      if (!data.success) {
+        showSnackbar(data.message || 'Sync failed to start', 'error');
+        setSyncingAll(false);
+        setSyncAllProgress('');
+        return;
+      }
+      showSnackbar(`Sync started for ${data.sellersTotal} seller(s)...`, 'info');
+
+      // Poll status every 3 seconds
+      const pollInterval = setInterval(async () => {
+        try {
+          const { data: status } = await api.get('/ebay/sync-all-sellers-status');
+          if (status.running) {
+            const pageInfo = status.currentTotalPages > 0 ? ` (page ${status.currentPage}/${status.currentTotalPages})` : '';
+            setSyncAllProgress(`${status.currentSeller}${pageInfo} — ${status.sellersComplete}/${status.sellersTotal} done`);
+          } else {
+            // Sync finished
+            clearInterval(pollInterval);
+            const summary = status.results?.map(r => `${r.sellerName}: ${r.processedCount}${r.error ? ' ❌' : ''}`).join(' | ') || 'Done';
+            showSnackbar(`✅ ${summary}`, status.errors?.length ? 'warning' : 'success');
+            setSyncingAll(false);
+            setSyncAllProgress('');
+            if (currentSellerId) {
+              setPage(1);
+              await loadListings();
+            }
+          }
+        } catch (pollErr) {
+          console.error('Status poll error:', pollErr);
+        }
+      }, 3000);
+    } catch (e) {
+      showSnackbar('Sync All Failed: ' + (e.response?.data?.message || e.response?.data?.error || e.message), 'error');
+      setSyncingAll(false);
+      setSyncAllProgress('');
+    }
   };
 
   // --- API FETCHING ---
@@ -881,7 +926,7 @@ export default function CompatibilityDashboard() {
       );
 
       // Track usage
-      api.post('/ai/track-save-next', { hadData: true }).catch(() => {});
+      api.post('/ai/track-save-next', { hadData: true }).catch(() => { });
       fetchApiUsage();
 
       showSnackbar(`Bulk send complete: ${data.successCount} success, ${data.failureCount} failed`, data.failureCount > 0 ? 'warning' : 'success');
@@ -1134,7 +1179,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       await handleSaveCompatibility(false);
 
       // Track save-and-next action (hadData = compatibility list is non-empty)
-      api.post('/ai/track-save-next', { hadData: editCompatList.length > 0 }).catch(() => {});
+      api.post('/ai/track-save-next', { hadData: editCompatList.length > 0 }).catch(() => { });
 
       // Check if there's a next item on current page
       if (currentListingIndex < listings.length - 1) {
@@ -1333,8 +1378,11 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
               {sellers.map((s) => (<MenuItem key={s._id} value={s._id}>{s.user?.username || s.user?.email}</MenuItem>))}
             </Select>
           </FormControl>
-          <Button variant="contained" startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />} onClick={handleSync} disabled={syncing || !currentSellerId}>
+          <Button variant="contained" startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />} onClick={handleSync} disabled={syncing || syncingAll || !currentSellerId}>
             {syncing ? 'Syncing...' : 'Poll eBay'}
+          </Button>
+          <Button variant="outlined" color="secondary" startIcon={syncingAll ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />} onClick={handleSyncAll} disabled={syncing || syncingAll}>
+            {syncingAll ? (syncAllProgress || 'Syncing All...') : 'Poll All Sellers'}
           </Button>
         </Box>
       </Box>
@@ -1613,8 +1661,8 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 <Autocomplete
                   options={makeOptions}
                   value={selectedMake}
-                  onChange={(e, val) => { 
-                    setSelectedMake(val); 
+                  onChange={(e, val) => {
+                    setSelectedMake(val);
                     if (val) {
                       fetchModels(val);
                     } else {
@@ -1639,20 +1687,20 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 <Autocomplete
                   options={modelOptions}
                   value={selectedModel}
-                  onChange={(e, val) => { 
-                    setSelectedModel(val); 
-                    if (val) { 
-                      fetchYears(selectedMake, val); 
-                    } else { 
+                  onChange={(e, val) => {
+                    setSelectedModel(val);
+                    if (val) {
+                      fetchYears(selectedMake, val);
+                    } else {
                       // Reset all dependent fields when model is cleared
                       setYearOptions([]);
                       setSelectedYears([]);
-                      setTrimsByYear({}); 
-                      setSelectedTrimsByYear({}); 
+                      setTrimsByYear({});
+                      setSelectedTrimsByYear({});
                       setExpandedYears({});
                       setStartYear('');
                       setEndYear('');
-                    } 
+                    }
                   }}
                   loading={loadingModels}
                   disabled={!selectedMake}
@@ -1750,17 +1798,17 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 const totalTrims = Object.values(trimsByYear).reduce((sum, arr) => sum + arr.length, 0);
                 const totalSelected = Object.values(selectedTrimsByYear).reduce((sum, arr) => sum + (arr?.length || 0), 0);
                 const allSelected = totalSelected === totalTrims && totalTrims > 0;
-                
+
                 // Filter trims based on keyword
                 const filterKeywordLower = trimFilterKeyword.toLowerCase().trim();
                 const getFilteredTrims = (entries) => {
                   if (!filterKeywordLower) return entries;
-                  return entries.filter(entry => 
-                    entry.trim?.toLowerCase().includes(filterKeywordLower) || 
+                  return entries.filter(entry =>
+                    entry.trim?.toLowerCase().includes(filterKeywordLower) ||
                     entry.engine?.toLowerCase().includes(filterKeywordLower)
                   );
                 };
-                
+
                 const filteredTrimsByYear = {};
                 Object.entries(trimsByYear).forEach(([year, entries]) => {
                   const filtered = getFilteredTrims(entries);
@@ -1768,7 +1816,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                     filteredTrimsByYear[year] = filtered;
                   }
                 });
-                
+
                 const totalFilteredTrims = Object.values(filteredTrimsByYear).reduce((sum, arr) => sum + arr.length, 0);
                 const allFilteredSelected = (() => {
                   if (totalFilteredTrims === 0) return false;
@@ -1782,7 +1830,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                   });
                   return selectedCount === totalFilteredTrims;
                 })();
-                
+
                 return (
                   <Grid item xs={12}>
                     <Box sx={{ border: '1px solid #e0e0e0', borderRadius: 1, bgcolor: '#fafafa' }}>
