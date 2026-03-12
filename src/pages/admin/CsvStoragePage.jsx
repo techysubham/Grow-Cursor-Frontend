@@ -29,9 +29,11 @@ import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import api from '../../lib/api';
+import ScheduleUploadDialog from '../../components/ScheduleUploadDialog';
 
 const statusColor = (status) => {
     switch (status) {
@@ -81,6 +83,7 @@ export default function CsvStoragePage() {
     const [downloadingId, setDownloadingId] = useState(null);
     const [deletingId, setDeletingId] = useState(null);
     const [uploadingId, setUploadingId] = useState(null);
+    const [scheduleDialog, setScheduleDialog] = useState({ open: false, record: null });
 
     // ── Initial data loads ──────────────────────────────────────────
     useEffect(() => {
@@ -442,19 +445,20 @@ export default function CsvStoragePage() {
                             <TableCell align="center">Listings</TableCell>
                             <TableCell>Category › Range › Product</TableCell>
                             <TableCell align="center">Listed / Failed</TableCell>
+                            <TableCell align="center">Scheduled Upload</TableCell>
                             <TableCell align="center">Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                                     <CircularProgress size={28} />
                                 </TableCell>
                             </TableRow>
                         ) : records.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                                <TableCell colSpan={9} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                                     No CSV records found.
                                 </TableCell>
                             </TableRow>
@@ -525,8 +529,42 @@ export default function CsvStoragePage() {
                                                 />
                                             )}
                                         </TableCell>
+                                        {/* ── Scheduled Upload column ── */}
+                                        <TableCell align="center">
+                                            {record.scheduledUploadStatus === 'pending' && record.scheduledUploadAt ? (
+                                                <Chip
+                                                    icon={<ScheduleIcon />}
+                                                    label={new Date(record.scheduledUploadAt).toLocaleString()}
+                                                    color="warning"
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={() => setScheduleDialog({ open: true, record })}
+                                                    sx={{ cursor: 'pointer' }}
+                                                />
+                                            ) : record.scheduledUploadStatus === 'processing' ? (
+                                                <Chip icon={<CircularProgress size={12} />} label="Processing" size="small" color="info" />
+                                            ) : record.scheduledUploadStatus === 'done' ? (
+                                                <Chip label="Auto-uploaded" size="small" color="success" variant="outlined" />
+                                            ) : record.scheduledUploadStatus === 'failed' ? (
+                                                <Chip label="Auto-upload failed" size="small" color="error" variant="outlined" />
+                                            ) : (
+                                                <Typography variant="caption" color="text.disabled">—</Typography>
+                                            )}
+                                        </TableCell>
                                         <TableCell align="center">
                                             <Stack direction="row" spacing={0.5} justifyContent="center">
+                                                <Tooltip title="Schedule Auto-Upload">
+                                                    <span>
+                                                        <IconButton
+                                                            size="small"
+                                                            color={record.scheduledUploadStatus === 'pending' ? 'warning' : 'default'}
+                                                            onClick={() => setScheduleDialog({ open: true, record })}
+                                                            disabled={record.scheduledUploadStatus === 'processing'}
+                                                        >
+                                                            <ScheduleIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </span>
+                                                </Tooltip>
                                                 <Tooltip title="Download CSV">
                                                     <span>
                                                         <IconButton
@@ -617,6 +655,17 @@ export default function CsvStoragePage() {
                     {total} record{total !== 1 ? 's' : ''} total
                 </Typography>
             )}
+
+            <ScheduleUploadDialog
+                open={scheduleDialog.open}
+                onClose={() => setScheduleDialog({ open: false, record: null })}
+                record={scheduleDialog.record}
+                sellers={sellers}
+                onUpdated={(updatedRecord) => {
+                    setRecords(prev => prev.map(r => r._id === updatedRecord._id ? updatedRecord : r));
+                    setScheduleDialog({ open: false, record: null });
+                }}
+            />
         </Box>
     );
 }
