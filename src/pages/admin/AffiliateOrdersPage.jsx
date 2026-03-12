@@ -42,6 +42,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SaveIcon from '@mui/icons-material/Save';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ChatIcon from '@mui/icons-material/Chat';
 import SendIcon from '@mui/icons-material/Send';
@@ -51,6 +52,7 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import PersonIcon from '@mui/icons-material/Person';
 import SettingsIcon from '@mui/icons-material/Settings';
 import api from '../../lib/api';
+import ColumnSelector from '../../components/ColumnSelector';
 import TemplateManagementModal from '../../components/TemplateManagementModal';
 import { CHAT_TEMPLATES, personalizeTemplate } from '../../constants/chatTemplates';
 
@@ -65,6 +67,7 @@ const MESSAGE_STATUSES = [
     'Alternative Message',
     'Confirmation Message',
 ];
+const AMAZON_ACCOUNT_DAILY_LIMIT = 9;
 
 const SOURCING_STATUS_COLORS = {
     'Done': 'success',
@@ -80,6 +83,28 @@ const MSG_STATUS_COLORS = {
     'Alternative Message': '#ab47bc',
     'Confirmation Message': '#bdbdbd',
 };
+
+const DAILY_ORDER_ALL_COLUMNS = [
+    { id: 'index', label: '#' },
+    { id: 'orderId', label: 'Order ID' },
+    { id: 'productName', label: 'Product Name' },
+    { id: 'seller', label: 'Seller' },
+    { id: 'supplierLink', label: 'Supplier Link' },
+    { id: 'affiliateLinks', label: 'Affiliate Links' },
+    { id: 'priceUsd', label: 'Price (USD)' },
+    { id: 'amazonAccount', label: 'Amazon Account' },
+    { id: 'arriving', label: 'Arriving' },
+    { id: 'beforeTax', label: 'Before Tax' },
+    { id: 'estimatedTax', label: 'Estimated Tax' },
+    { id: 'azOrderId', label: 'Az OrderID' },
+    { id: 'status', label: 'Status' },
+    { id: 'purchaser', label: 'Purchaser' },
+    { id: 'messageStatus', label: 'Message Status' },
+    { id: 'messaging', label: 'Messaging' },
+    { id: 'notes', label: 'Notes' },
+];
+
+const DEFAULT_DAILY_VISIBLE_COLUMNS = DAILY_ORDER_ALL_COLUMNS.map((c) => c.id);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -785,9 +810,20 @@ function TabPanel({ children, value, index }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AffiliateOrdersPage() {
+    const COLUMN_STORAGE_KEY = 'affiliate_orders_visible_columns';
     const [date, setDate] = useState(getTodayStr());
     const [tab, setTab] = useState(0);
     const [excludeLowValue, setExcludeLowValue] = useState(false);
+    const [visibleColumns, setVisibleColumns] = useState(() => {
+        try {
+            const stored = JSON.parse(sessionStorage.getItem(COLUMN_STORAGE_KEY) || 'null');
+            if (!Array.isArray(stored)) return DEFAULT_DAILY_VISIBLE_COLUMNS;
+            const missing = DEFAULT_DAILY_VISIBLE_COLUMNS.filter((col) => !stored.includes(col));
+            return [...stored, ...missing];
+        } catch {
+            return DEFAULT_DAILY_VISIBLE_COLUMNS;
+        }
+    });
 
     // Tab 1 state
     const [orders, setOrders] = useState([]);
@@ -819,6 +855,16 @@ export default function AffiliateOrdersPage() {
     // Messaging modal
     const [messageModalOpen, setMessageModalOpen] = useState(false);
     const [selectedOrderForMessage, setSelectedOrderForMessage] = useState(null);
+
+    const amazonAssignedCounts = (summary?.byAmazonAccount || []).reduce((acc, row) => {
+        if (!row?.name || row.name === '(Unassigned)') return acc;
+        acc[row.name] = row.count || 0;
+        return acc;
+    }, {});
+
+    useEffect(() => {
+        sessionStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns));
+    }, [visibleColumns]);
 
     // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -877,15 +923,20 @@ export default function AffiliateOrdersPage() {
 
     // ── Order field patch ──────────────────────────────────────────────────────
 
-    const patchOrder = useCallback(async (orderId, field, value) => {
+    const patchOrder = useCallback(async (orderId, field, value, options = {}) => {
+        const { refreshAfter = true } = options;
         try {
             const { data } = await api.patch(`/affiliate-orders/${orderId}/sourcing`, { [field]: value });
             setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data } : o)));
-            // refresh balances & summary since expense may have changed
-            fetchBalances();
-            fetchSummary();
+            if (refreshAfter) {
+                // Refresh balances and summary when order values change.
+                fetchBalances();
+                fetchSummary();
+            }
+            return true;
         } catch (err) {
             notify('error', err?.response?.data?.error || `Failed to update ${field}`);
+            return false;
         }
     }, [fetchBalances, fetchSummary]);
 
@@ -900,7 +951,6 @@ export default function AffiliateOrdersPage() {
                 date,
                 availableBalance: current.availableBalance ?? 0,
                 addedBalance: current.addedBalance ?? 0,
-                giftCardStatus: current.giftCardStatus ?? false,
                 note: current.note ?? '',
                 [field]: value,
             };
@@ -908,14 +958,17 @@ export default function AffiliateOrdersPage() {
             setBalances((prev) =>
                 prev.map((b) => {
                     if (b.amazonAccountName !== accountName) return b;
-                    const avail = field === 'availableBalance' ? value : b.availableBalance;
-                    const added = field === 'addedBalance' ? value : b.addedBalance;
+                    const avail = Number(field === 'availableBalance' ? value : b.availableBalance) || 0;
+                    const added = Number(field === 'addedBalance' ? value : b.addedBalance) || 0;
+                    const totalExpense = Number(b.totalExpense) || 0;
+                    const difference = avail + added - totalExpense;
                     return {
                         ...b,
                         ...updated,
                         availableBalance: avail,
                         addedBalance: added,
-                        difference: avail + added - b.totalExpense,
+                        difference,
+                        giftCardStatus: difference > 0,
                     };
                 })
             );
@@ -998,6 +1051,61 @@ export default function AffiliateOrdersPage() {
         setSelectedOrderForMessage(null);
     };
 
+    const handleBulkAssignAmazonAccount = async (startIndex, accountName) => {
+        if (!accountName) {
+            notify('warning', 'Select an Amazon account first for this row');
+            return;
+        }
+
+        const raw = window.prompt('Assign this account to next how many entries? (1-9)', '1');
+        if (raw == null) return;
+
+        const parsed = parseInt(raw, 10);
+        if (!Number.isFinite(parsed) || parsed < 1) {
+            notify('error', 'Please enter a valid number between 1 and 9');
+            return;
+        }
+
+        const count = Math.min(parsed, AMAZON_ACCOUNT_DAILY_LIMIT);
+        const targets = orders.slice(startIndex + 1, startIndex + 1 + count);
+        if (targets.length === 0) {
+            notify('info', 'No next entries available');
+            return;
+        }
+
+        let assignedCount = amazonAssignedCounts[accountName] || 0;
+        let updated = 0;
+        let blockedByLimit = false;
+
+        for (const target of targets) {
+            if (target.amazonAccount === accountName) continue;
+
+            if (assignedCount >= AMAZON_ACCOUNT_DAILY_LIMIT) {
+                blockedByLimit = true;
+                break;
+            }
+
+            const ok = await patchOrder(target._id, 'amazonAccount', accountName, { refreshAfter: false });
+            if (!ok) continue;
+
+            assignedCount += 1;
+            updated += 1;
+        }
+
+        fetchBalances();
+        fetchSummary();
+
+        if (blockedByLimit) {
+            notify('warning', `Assigned ${updated} entr${updated === 1 ? 'y' : 'ies'}. Reached daily limit (${AMAZON_ACCOUNT_DAILY_LIMIT}) for ${accountName}.`);
+            return;
+        }
+
+        notify('success', `Assigned ${updated} entr${updated === 1 ? 'y' : 'ies'} to ${accountName}`);
+    };
+
+    const isColVisible = (id) => visibleColumns.includes(id);
+    const visibleColumnCount = DAILY_ORDER_ALL_COLUMNS.filter((c) => visibleColumns.includes(c.id)).length;
+
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER — Tab 1: Daily Orders
     // ─────────────────────────────────────────────────────────────────────────
@@ -1008,7 +1116,16 @@ export default function AffiliateOrdersPage() {
                 <Typography variant="subtitle2" color="text.secondary">
                     {ordersLoading ? 'Loading…' : `${orders.length} order${orders.length !== 1 ? 's' : ''} for ${date}`}
                 </Typography>
-                <Button size="small" startIcon={<RefreshIcon />} onClick={fetchOrders}>Refresh</Button>
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                    <ColumnSelector
+                        allColumns={DAILY_ORDER_ALL_COLUMNS}
+                        visibleColumns={visibleColumns}
+                        onColumnChange={setVisibleColumns}
+                        onReset={() => setVisibleColumns(DEFAULT_DAILY_VISIBLE_COLUMNS)}
+                        page="affiliate-orders"
+                    />
+                    <Button size="small" startIcon={<RefreshIcon />} onClick={fetchOrders}>Refresh</Button>
+                </Stack>
             </Stack>
 
             {ordersError && <Alert severity="error" sx={{ mb: 1 }}>{ordersError}</Alert>}
@@ -1020,14 +1137,9 @@ export default function AffiliateOrdersPage() {
                     <Table size="small" sx={{ minWidth: 1100 }}>
                         <TableHead>
                             <TableRow sx={{ bgcolor: '#fce4ec' }}>
-                                {[
-                                    '#', 'Order ID', 'Product Name', 'Seller',
-                                    'Supplier Link', 'Affiliate Links', 'Price (USD)',
-                                    'Amazon Account', 'Status', 'Purchaser',
-                                    'Message Status', 'Messaging', 'Notes',
-                                ].map((h) => (
-                                    <TableCell key={h} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>
-                                        {h}
+                                {DAILY_ORDER_ALL_COLUMNS.filter((c) => visibleColumns.includes(c.id)).map((column) => (
+                                    <TableCell key={column.id} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>
+                                        {column.label}
                                     </TableCell>
                                 ))}
                             </TableRow>
@@ -1035,7 +1147,7 @@ export default function AffiliateOrdersPage() {
                         <TableBody>
                             {orders.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={13} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                                    <TableCell colSpan={visibleColumnCount || 1} align="center" sx={{ color: 'text.secondary', py: 4 }}>
                                         No orders found for this date.
                                     </TableCell>
                                 </TableRow>
@@ -1047,10 +1159,10 @@ export default function AffiliateOrdersPage() {
                                 return (
                                     <TableRow key={order._id} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#fafafa' } }}>
                                         {/* # */}
-                                        <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{idx + 1}</TableCell>
+                                        {isColVisible('index') && <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{idx + 1}</TableCell>}
 
                                         {/* Order ID */}
-                                        <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                                        {isColVisible('orderId') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                                             <Stack direction="row" alignItems="center" spacing={0.5}>
                                                 <span>{order.orderId}</span>
                                                 <Tooltip title="Copy">
@@ -1059,10 +1171,10 @@ export default function AffiliateOrdersPage() {
                                                     </IconButton>
                                                 </Tooltip>
                                             </Stack>
-                                        </TableCell>
+                                        </TableCell>}
 
                                         {/* Product Name */}
-                                        <TableCell sx={{ minWidth: 300, maxWidth: 360 }}>
+                                        {isColVisible('productName') && <TableCell sx={{ minWidth: 300, maxWidth: 360 }}>
                                             <Stack direction="row" spacing={1} alignItems="flex-start">
                                                 {thumbnailImages[order._id] && (
                                                     <Box
@@ -1173,13 +1285,13 @@ export default function AffiliateOrdersPage() {
                                                     )}
                                                 </Box>
                                             </Stack>
-                                        </TableCell>
+                                        </TableCell>}
 
                                         {/* Seller */}
-                                        <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{sellerName}</TableCell>
+                                        {isColVisible('seller') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{sellerName}</TableCell>}
 
                                         {/* Supplier Link */}
-                                        <TableCell sx={{ minWidth: 220 }}>
+                                        {isColVisible('supplierLink') && <TableCell sx={{ minWidth: 220 }}>
                                             <Stack direction="row" alignItems="center" spacing={0.5}>
                                                 <InlineText
                                                     value={order.affiliateLink}
@@ -1194,10 +1306,10 @@ export default function AffiliateOrdersPage() {
                                                     </Tooltip>
                                                 )}
                                             </Stack>
-                                        </TableCell>
+                                        </TableCell>}
 
                                         {/* Affiliate Links */}
-                                        <TableCell sx={{ minWidth: 220 }}>
+                                        {isColVisible('affiliateLinks') && <TableCell sx={{ minWidth: 220 }}>
                                             <Stack direction="row" alignItems="center" spacing={0.5}>
                                                 <InlineText
                                                     value={order.affiliateLinks}
@@ -1212,27 +1324,80 @@ export default function AffiliateOrdersPage() {
                                                     </Tooltip>
                                                 )}
                                             </Stack>
-                                        </TableCell>
+                                        </TableCell>}
 
                                         {/* Price — editable */}
-                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                        {isColVisible('priceUsd') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
                                             <BalanceNumberCell
                                                 value={order.beforeTaxUSD ?? null}
                                                 onSave={(v) => patchOrder(order._id, 'beforeTaxUSD', v)}
                                             />
-                                        </TableCell>
+                                        </TableCell>}
 
                                         {/* Amazon Account */}
-                                        <TableCell>
-                                            <InlineSelect
-                                                value={order.amazonAccount}
-                                                options={amazonAccounts}
-                                                onChange={(v) => patchOrder(order._id, 'amazonAccount', v)}
+                                        {isColVisible('amazonAccount') && <TableCell>
+                                            <Stack direction="row" spacing={0.5} alignItems="center">
+                                                <InlineSelect
+                                                    value={order.amazonAccount}
+                                                    options={amazonAccounts}
+                                                    onChange={(v) => {
+                                                        if (v && v !== order.amazonAccount && (amazonAssignedCounts[v] || 0) >= AMAZON_ACCOUNT_DAILY_LIMIT) {
+                                                            notify('error', `Cannot assign more than ${AMAZON_ACCOUNT_DAILY_LIMIT} orders to ${v} in one day`);
+                                                            return;
+                                                        }
+                                                        patchOrder(order._id, 'amazonAccount', v);
+                                                    }}
+                                                />
+                                                <Tooltip title="Assign same account to next entries">
+                                                    <span>
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleBulkAssignAmazonAccount(idx, order.amazonAccount)}
+                                                            disabled={!order.amazonAccount}
+                                                        >
+                                                            <PlaylistAddIcon sx={{ fontSize: 16 }} />
+                                                        </IconButton>
+                                                    </span>
+                                                </Tooltip>
+                                            </Stack>
+                                        </TableCell>}
+
+                                        {/* Arriving */}
+                                        {isColVisible('arriving') && <TableCell sx={{ minWidth: 130 }}>
+                                            <InlineText
+                                                value={order.arrivingDate}
+                                                placeholder="YYYY-MM-DD"
+                                                onSave={(v) => patchOrder(order._id, 'arrivingDate', v)}
                                             />
-                                        </TableCell>
+                                        </TableCell>}
+
+                                        {/* Before Tax */}
+                                        {isColVisible('beforeTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                            <BalanceNumberCell
+                                                value={order.beforeTax ?? null}
+                                                onSave={(v) => patchOrder(order._id, 'beforeTax', v)}
+                                            />
+                                        </TableCell>}
+
+                                        {/* Estimated Tax */}
+                                        {isColVisible('estimatedTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                            <BalanceNumberCell
+                                                value={order.estimatedTax ?? null}
+                                                onSave={(v) => patchOrder(order._id, 'estimatedTax', v)}
+                                            />
+                                        </TableCell>}
+
+                                        {/* Az OrderID */}
+                                        {isColVisible('azOrderId') && <TableCell sx={{ minWidth: 150 }}>
+                                            <InlineText
+                                                value={order.azOrderId}
+                                                placeholder="Amazon order ID"
+                                                onSave={(v) => patchOrder(order._id, 'azOrderId', v)}
+                                            />
+                                        </TableCell>}
 
                                         {/* Status */}
-                                        <TableCell>
+                                        {isColVisible('status') && <TableCell>
                                             <FormControl size="small">
                                                 <Select
                                                     value={order.sourcingStatus || 'Not Yet'}
@@ -1255,19 +1420,19 @@ export default function AffiliateOrdersPage() {
                                                     ))}
                                                 </Select>
                                             </FormControl>
-                                        </TableCell>
+                                        </TableCell>}
 
                                         {/* Purchaser */}
-                                        <TableCell>
+                                        {isColVisible('purchaser') && <TableCell>
                                             <InlineSelect
                                                 value={order.purchaser}
                                                 options={PURCHASERS}
                                                 onChange={(v) => patchOrder(order._id, 'purchaser', v)}
                                             />
-                                        </TableCell>
+                                        </TableCell>}
 
                                         {/* Message Status */}
-                                        <TableCell>
+                                        {isColVisible('messageStatus') && <TableCell>
                                             <FormControl size="small">
                                                 <Select
                                                     value={order.sourcingMessageStatus || 'Being Processed'}
@@ -1298,10 +1463,10 @@ export default function AffiliateOrdersPage() {
                                                     ))}
                                                 </Select>
                                             </FormControl>
-                                        </TableCell>
+                                        </TableCell>}
 
                                         {/* Messaging */}
-                                        <TableCell align="center">
+                                        {isColVisible('messaging') && <TableCell align="center">
                                             <Tooltip title="Send message to buyer">
                                                 <IconButton
                                                     size="small"
@@ -1311,17 +1476,17 @@ export default function AffiliateOrdersPage() {
                                                     <ChatIcon sx={{ fontSize: 18 }} />
                                                 </IconButton>
                                             </Tooltip>
-                                        </TableCell>
+                                        </TableCell>}
 
                                         {/* Notes */}
-                                        <TableCell sx={{ minWidth: 160 }}>
+                                        {isColVisible('notes') && <TableCell sx={{ minWidth: 160 }}>
                                             <InlineText
                                                 value={order.fulfillmentNotes}
                                                 placeholder="Add note…"
                                                 multiline
                                                 onSave={(v) => patchOrder(order._id, 'fulfillmentNotes', v)}
                                             />
-                                        </TableCell>
+                                        </TableCell>}
                                     </TableRow>
                                 );
                             })}
@@ -1373,7 +1538,7 @@ export default function AffiliateOrdersPage() {
                                 </TableRow>
                             )}
                             {balances.map((row) => {
-                                const diff = (row.availableBalance || 0) + (row.addedBalance || 0) - (row.totalExpense || 0);
+                                const diff = (Number(row.availableBalance) || 0) + (Number(row.addedBalance) || 0) - (Number(row.totalExpense) || 0);
                                 return (
                                     <TableRow key={row.amazonAccountName} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#f9fbe7' } }}>
                                         {/* Account Name */}
@@ -1394,8 +1559,8 @@ export default function AffiliateOrdersPage() {
                                         {/* Gift Card Status — checkbox */}
                                         <TableCell align="center">
                                             <Checkbox
-                                                checked={!!row.giftCardStatus}
-                                                onChange={(e) => patchBalance(row.amazonAccountName, 'giftCardStatus', e.target.checked)}
+                                                checked={diff > 0}
+                                                disabled
                                                 size="small"
                                                 color="success"
                                             />
@@ -1458,7 +1623,7 @@ export default function AffiliateOrdersPage() {
             {summaryLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
             ) : summary ? (
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start" flexWrap="wrap">
 
                     {/* Left: Per-Purchaser */}
                     <Paper variant="outlined" sx={{ p: 2, minWidth: 260 }}>
@@ -1508,6 +1673,48 @@ export default function AffiliateOrdersPage() {
                                         <TableCell sx={{ fontSize: '0.88rem', fontWeight: 700, color, border: 'none', py: 0.5 }}>{value}</TableCell>
                                     </TableRow>
                                 ))}
+                            </TableBody>
+                        </Table>
+                    </Paper>
+
+                    <Paper variant="outlined" sx={{ p: 2, minWidth: 360 }}>
+                        <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                            Amazon Account Assignments (Max {summary.maxOrdersPerAmazonAccount || AMAZON_ACCOUNT_DAILY_LIMIT})
+                        </Typography>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow sx={{ bgcolor: '#e3f2fd' }}>
+                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Assigned</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Remaining</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="center">Status</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {!summary.byAmazonAccount || summary.byAmazonAccount.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} align="center" sx={{ color: 'text.secondary' }}>No account assignments yet</TableCell>
+                                    </TableRow>
+                                ) : (
+                                    summary.byAmazonAccount.map((row) => (
+                                        <TableRow key={row.name} hover>
+                                            <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.name}</TableCell>
+                                            <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>{row.count}</TableCell>
+                                            <TableCell align="right" sx={{ fontSize: '0.82rem' }}>
+                                                {row.remaining == null ? '—' : row.remaining}
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                {row.max == null ? (
+                                                    <Chip size="small" label="N/A" variant="outlined" />
+                                                ) : row.isFull ? (
+                                                    <Chip size="small" label="Full" color="error" />
+                                                ) : (
+                                                    <Chip size="small" label="Available" color="success" variant="outlined" />
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
                             </TableBody>
                         </Table>
                     </Paper>
