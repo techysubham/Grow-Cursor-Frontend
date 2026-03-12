@@ -14,7 +14,13 @@ import {
   Alert,
   Stack,
   Typography,
+  Switch,
+  FormControlLabel,
+  Divider,
 } from '@mui/material';
+import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import api from '../lib/api.js';
 
 export default function ListDirectlyDialog({ open, onClose, selectedListings, templateId, sellerId, inlineListings = null }) {
@@ -42,6 +48,10 @@ export default function ListDirectlyDialog({ open, onClose, selectedListings, te
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Schedule mode
+  const [scheduleMode, setScheduleMode] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState(null);
+
   // Fetch sellers + categories when dialog opens
   useEffect(() => {
     if (!open) return;
@@ -51,6 +61,8 @@ export default function ListDirectlyDialog({ open, onClose, selectedListings, te
     setSelectedProductId('');
     setRanges([]);
     setProducts([]);
+    setScheduleMode(false);
+    setScheduledAt(null);
 
     const fetchInitial = async () => {
       setLoadingSellers(true);
@@ -191,6 +203,74 @@ export default function ListDirectlyDialog({ open, onClose, selectedListings, te
     }
   };
 
+  const handleScheduleUpload = async () => {
+    if (!selectedSeller) { setError('Please select a seller account.'); return; }
+    if (!scheduledAt) { setError('Please select a date and time for the upload.'); return; }
+    if (scheduledAt <= new Date()) { setError('Scheduled time must be in the future.'); return; }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      let response;
+      if (inlineListings) {
+        response = await api.post(
+          `/template-listings/export-csv-direct/${templateId}`,
+          { sellerId: selectedSeller, listings: inlineListings },
+          { responseType: 'blob' }
+        );
+      } else {
+        const ids = [...selectedListings].join(',');
+        const url = `/template-listings/export-csv/${templateId}?sellerId=${selectedSeller}&listingIds=${ids}`;
+        response = await api.get(url, { responseType: 'blob' });
+      }
+
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `listings_${Date.now()}.csv`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?(.+?)"?$/i);
+        if (match?.[1]) filename = match[1].replace(/"/g, '');
+      }
+
+      const csvFile = new File([response.data], filename, { type: 'text/csv' });
+
+      // Save to CSV Storage first
+      const storageForm = new FormData();
+      storageForm.append('csvFile', csvFile, csvFile.name);
+      storageForm.append('sellerId', selectedSeller);
+      if (templateId) storageForm.append('templateId', templateId);
+      storageForm.append('listingCount', String(selectedListings?.size ?? 0));
+      if (selectedCategoryId) storageForm.append('categoryId', selectedCategoryId);
+      storageForm.append('categoryName', categories.find(c => c._id === selectedCategoryId)?.name || '');
+      if (selectedRangeId) storageForm.append('rangeId', selectedRangeId);
+      storageForm.append('rangeName', ranges.find(r => r._id === selectedRangeId)?.name || '');
+      if (selectedProductId) storageForm.append('productId', selectedProductId);
+      storageForm.append('productName', products.find(p => p._id === selectedProductId)?.name || '');
+
+      const saveRes = await api.post('/csv-storage', storageForm, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const csvStorageId = saveRes.data._id;
+
+      // Schedule the upload
+      await api.post(`/csv-storage/${csvStorageId}/schedule-upload`, {
+        scheduledAt: scheduledAt.toISOString(),
+        sellerId: selectedSeller,
+      });
+
+      onClose();
+    } catch (err) {
+      const msg = err.response?.data
+        ? (err.response.data instanceof Blob
+            ? await err.response.data.text().then(t => { try { return JSON.parse(t).error; } catch { return t; } })
+            : err.response.data.error)
+        : 'Failed to schedule upload.';
+      setError(msg || 'Failed to schedule upload.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const selectedCount = selectedListings?.size ?? 0;
 
   return (
@@ -274,18 +354,55 @@ export default function ListDirectlyDialog({ open, onClose, selectedListings, te
               ))}
             </Select>
           </FormControl>
+
+          <Divider />
+
+          {/* Schedule Auto-Upload */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={scheduleMode}
+                onChange={(e) => {
+                  setScheduleMode(e.target.checked);
+                  if (!e.target.checked) setScheduledAt(null);
+                }}
+                size="small"
+              />
+            }
+            label={<Typography variant="body2">Schedule Auto-Upload instead</Typography>}
+          />
+
+          {scheduleMode && (
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DateTimePicker
+                label="Upload Date & Time"
+                value={scheduledAt}
+                onChange={setScheduledAt}
+                minDateTime={new Date()}
+                slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+              />
+            </LocalizationProvider>
+          )}
         </Stack>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={loading}>Cancel</Button>
         <Button
-          variant="contained"
+          variant="outlined"
           onClick={handleListNow}
-          disabled={loading || !selectedSeller || selectedCount === 0}
-          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : null}
+          disabled={loading || !selectedSeller || selectedCount === 0 || scheduleMode}
+          startIcon={loading && !scheduleMode ? <CircularProgress size={16} color="inherit" /> : null}
         >
-          {loading ? 'Preparing...' : 'List Now'}
+          {loading && !scheduleMode ? 'Preparing...' : 'List Now'}
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleScheduleUpload}
+          disabled={loading || !selectedSeller || selectedCount === 0 || !scheduleMode || !scheduledAt}
+          startIcon={loading && scheduleMode ? <CircularProgress size={16} color="inherit" /> : <ScheduleIcon />}
+        >
+          {loading && scheduleMode ? 'Scheduling...' : 'Schedule Upload'}
         </Button>
       </DialogActions>
     </Dialog>
