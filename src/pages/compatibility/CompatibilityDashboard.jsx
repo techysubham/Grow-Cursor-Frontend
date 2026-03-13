@@ -835,12 +835,14 @@ export default function CompatibilityDashboard() {
       Object.keys(entry.trimsByYear || {}).forEach(y => { expanded[y] = true; });
       setExpandedYears(expanded);
       setNewNotes('');
+      setTrimFilterKeyword('');
     } else if (entry.status !== 'loading') {
       // no-match or error — reset fields so user can fill manually
       setSelectedMake(null); setSelectedModel(null);
       setSelectedYears([]); setSelectedTrimsByYear({});
       setTrimsByYear({}); setYearOptions([]); setModelOptions([]);
       setExpandedYears({}); setStartYear(''); setEndYear(''); setNewNotes('');
+      setTrimFilterKeyword('');
     }
   }, [bulkQueueIdx, bulkQueue, bulkMode, openModal]);
 
@@ -1026,6 +1028,7 @@ export default function CompatibilityDashboard() {
     setTrimsByYear({});
     setExpandedYears({});
     setNewNotes('');
+    setTrimFilterKeyword('');
     fetchMakes();
     // Reset bulk mode when opening manually
     setBulkMode(false);
@@ -1273,6 +1276,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       setStartYear('');
       setEndYear('');
       setNewNotes('');
+      setTrimFilterKeyword('');
     } else if (page > 1) {
       // Load previous page and open last item
       setPendingNavigation('last');
@@ -1295,6 +1299,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       setStartYear('');
       setEndYear('');
       setNewNotes('');
+      setTrimFilterKeyword('');
     } else if (page < totalPages) {
       // Load next page and open first item
       setPendingNavigation('first');
