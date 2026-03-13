@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { 
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, 
@@ -18,6 +18,24 @@ import api from '../../lib/api.js';
 import FieldConfigList from '../../components/FieldConfigList.jsx';
 import CoreFieldDefaultsForm from '../../components/CoreFieldDefaultsForm.jsx';
 import PricingConfigSection from '../../components/PricingConfigSection.jsx';
+
+// ── Marketplace helpers (derived from customActionField) ─────────────────
+function extractMarketplace(customActionField) {
+  if (!customActionField) return 'US';
+  if (customActionField.includes('SiteID=eBayMotors'))  return 'Motors';
+  if (customActionField.includes('SiteID=Australia'))   return 'Australia';
+  if (customActionField.includes('SiteID=Canada'))      return 'Canada';
+  if (customActionField.includes('SiteID=UK'))          return 'UK';
+  return 'US';
+}
+
+const MARKETPLACE_LABELS = {
+  US:        'eBay US',
+  Motors:    'eBay Motors',
+  Australia: 'eBay AU',
+  Canada:    'eBay CA',
+  UK:        'eBay UK',
+};
 
 export default function ManageTemplatesPage() {
   const navigate = useNavigate();
@@ -76,6 +94,13 @@ export default function ManageTemplatesPage() {
   const [bulkResetLoading, setBulkResetLoading] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
 
+  // Filter state
+  const [marketplaceFilter, setMarketplaceFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter]       = useState('all');
+  const [asinFilter, setAsinFilter]               = useState('all');
+  const [pricingFilter, setPricingFilter]         = useState('all');
+  const [colsFilter, setColsFilter]               = useState('all');
+
   // Directory assignment cascade
   const [formCategories, setFormCategories] = useState([]);
   const [allRanges, setAllRanges] = useState([]);    // all ranges, used for reverse lookup
@@ -126,6 +151,44 @@ export default function ManageTemplatesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ── Derived filter values ────────────────────────────────────────────────
+  const availableMarketplaces = useMemo(() => {
+    const mp = templates.map(t => extractMarketplace(t.customActionField));
+    return [...new Set(mp)];
+  }, [templates]);
+
+  const availableCategories = useMemo(() => {
+    const cats = templates.map(t => t.category).filter(c => c && c.trim() !== '');
+    return [...new Set(cats)].sort();
+  }, [templates]);
+
+  const filteredTemplates = useMemo(() => {
+    return templates.filter(t => {
+      if (templateSearch && !t.name.toLowerCase().includes(templateSearch.toLowerCase())) return false;
+      if (marketplaceFilter !== 'all' && extractMarketplace(t.customActionField) !== marketplaceFilter) return false;
+      if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+      if (asinFilter === 'enabled'  && !t.asinAutomation?.enabled) return false;
+      if (asinFilter === 'disabled' &&  t.asinAutomation?.enabled) return false;
+      if (pricingFilter === 'enabled'  && !t.pricingConfig?.enabled) return false;
+      if (pricingFilter === 'disabled' &&  t.pricingConfig?.enabled) return false;
+      if (colsFilter === 'yes' && !(t.customColumns?.length > 0)) return false;
+      if (colsFilter === 'no'  &&   t.customColumns?.length > 0)  return false;
+      return true;
+    });
+  }, [templates, templateSearch, marketplaceFilter, categoryFilter, asinFilter, pricingFilter, colsFilter]);
+
+  const hasActiveFilters = templateSearch || marketplaceFilter !== 'all' || categoryFilter !== 'all'
+    || asinFilter !== 'all' || pricingFilter !== 'all' || colsFilter !== 'all';
+
+  const clearAllFilters = () => {
+    setTemplateSearch('');
+    setMarketplaceFilter('all');
+    setCategoryFilter('all');
+    setAsinFilter('all');
+    setPricingFilter('all');
+    setColsFilter('all');
   };
 
   const handleSubmit = async (e) => {
@@ -588,7 +651,7 @@ export default function ManageTemplatesPage() {
       <Paper>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 2, bgcolor: 'grey.100', borderBottom: 1, borderColor: 'divider' }}>
           <Typography variant="h6">
-            Existing Templates ({templates.filter(t => t.name.toLowerCase().includes(templateSearch.toLowerCase())).length}{templateSearch ? ` of ${templates.length}` : ''})
+            Existing Templates ({filteredTemplates.length}{hasActiveFilters ? ` of ${templates.length}` : ''})
           </Typography>
           <TextField
             size="small"
@@ -598,12 +661,95 @@ export default function ManageTemplatesPage() {
             sx={{ width: 240 }}
           />
         </Stack>
+
+        {/* ── Filter Bar ── */}
+        <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
+          <Stack spacing={1.5}>
+
+            {/* Marketplace chips — only shown when more than one marketplace exists */}
+            {availableMarketplaces.length > 1 && (
+              <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                <Typography variant="caption" color="text.secondary" sx={{ minWidth: 90, fontWeight: 600 }}>
+                  Marketplace
+                </Typography>
+                {[{ v: 'all', label: 'All' }, ...availableMarketplaces.map(mp => ({ v: mp, label: MARKETPLACE_LABELS[mp] }))].map(({ v, label }) => (
+                  <Chip
+                    key={v}
+                    label={label}
+                    size="small"
+                    variant={marketplaceFilter === v ? 'filled' : 'outlined'}
+                    color={marketplaceFilter === v ? 'primary' : 'default'}
+                    onClick={() => setMarketplaceFilter(v)}
+                    clickable
+                  />
+                ))}
+              </Stack>
+            )}
+
+            {/* Category dropdown — only shown when templates have category values */}
+            {availableCategories.length > 0 && (
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="caption" color="text.secondary" sx={{ minWidth: 90, fontWeight: 600 }}>
+                  Category
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <Select
+                    value={categoryFilter}
+                    onChange={e => setCategoryFilter(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="all"><em>All Categories</em></MenuItem>
+                    {availableCategories.map(c => (
+                      <MenuItem key={c} value={c}>{c}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+            )}
+
+            {/* Quick toggle chips */}
+            <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+              <Typography variant="caption" color="text.secondary" sx={{ minWidth: 90, fontWeight: 600 }}>
+                Quick
+              </Typography>
+
+              {[{ v: 'all', label: 'All ASIN' }, { v: 'enabled', label: 'ASIN ✓' }, { v: 'disabled', label: 'ASIN ✗' }].map(({ v, label }) => (
+                <Chip key={v} label={label} size="small"
+                  variant={asinFilter === v ? 'filled' : 'outlined'}
+                  color={asinFilter === v ? 'primary' : 'default'}
+                  onClick={() => setAsinFilter(v)} clickable />
+              ))}
+
+              {[{ v: 'all', label: 'All Pricing' }, { v: 'enabled', label: 'Pricing ✓' }, { v: 'disabled', label: 'Pricing ✗' }].map(({ v, label }) => (
+                <Chip key={v} label={label} size="small"
+                  variant={pricingFilter === v ? 'filled' : 'outlined'}
+                  color={pricingFilter === v ? 'primary' : 'default'}
+                  onClick={() => setPricingFilter(v)} clickable />
+              ))}
+
+              {[{ v: 'all', label: 'All Cols' }, { v: 'yes', label: 'Has Cols' }, { v: 'no', label: 'No Cols' }].map(({ v, label }) => (
+                <Chip key={v} label={label} size="small"
+                  variant={colsFilter === v ? 'filled' : 'outlined'}
+                  color={colsFilter === v ? 'primary' : 'default'}
+                  onClick={() => setColsFilter(v)} clickable />
+              ))}
+            </Stack>
+
+            {/* Clear all filters */}
+            {hasActiveFilters && (
+              <Box>
+                <Button size="small" onClick={clearAllFilters}>Clear all filters</Button>
+              </Box>
+            )}
+          </Stack>
+        </Box>
+
         <TableContainer>
           <Table size="small">
             <TableHead sx={{ bgcolor: 'grey.50' }}>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
-
+                <TableCell sx={{ fontWeight: 'bold' }}>Marketplace</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Custom Columns</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Created</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
@@ -612,18 +758,18 @@ export default function ManageTemplatesPage() {
             <TableBody>
               {templates.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                     No templates found. Create one above!
                   </TableCell>
                 </TableRow>
-              ) : templates.filter(t => t.name.toLowerCase().includes(templateSearch.toLowerCase())).length === 0 ? (
+              ) : filteredTemplates.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                    No templates match "{templateSearch}"
+                  <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                    No templates match the current filters.
                   </TableCell>
                 </TableRow>
               ) : (
-                templates.filter(t => t.name.toLowerCase().includes(templateSearch.toLowerCase())).map((template) => (
+                filteredTemplates.map((template) => (
                   <TableRow 
                     key={template._id} 
                     hover
@@ -633,6 +779,13 @@ export default function ManageTemplatesPage() {
                     }}
                   >
                     <TableCell><strong>{template.name}</strong></TableCell>
+                    <TableCell>
+                      <Chip
+                        label={MARKETPLACE_LABELS[extractMarketplace(template.customActionField)] || 'eBay US'}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </TableCell>
                     <TableCell>
                       {template.customColumns?.length > 0 ? (
                         <Chip label={`${template.customColumns.length} columns`} size="small" color="primary" variant="outlined" />

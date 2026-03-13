@@ -159,7 +159,6 @@ export default function TemplateCustomizationDialog({
           </Alert>
         )}
         
-        <Box sx={{ pointerEvents: readOnly ? 'none' : 'auto', opacity: readOnly ? 0.85 : 1 }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -172,8 +171,8 @@ export default function TemplateCustomizationDialog({
               <Tab label="Pricing Config" />
               <Tab label="Action Field" />
             </Tabs>
-            
-            <Box sx={{ mt: 2, minHeight: 400 }}>
+
+            <Box sx={{ mt: 2, minHeight: 400, pointerEvents: readOnly ? 'none' : 'auto', opacity: readOnly ? 0.85 : 1 }}>
               {currentTab === 0 && (
                 <CustomColumnsEditor 
                   baseColumns={baseTemplate?.customColumns}
@@ -217,7 +216,6 @@ export default function TemplateCustomizationDialog({
             </Box>
           </>
         )}
-        </Box>
       </DialogContent>
       
       <DialogActions>
