@@ -850,7 +850,10 @@ export default function CompatibilityDashboard() {
     setBulkQueue(prev => {
       const u = [...prev];
       if (skip) {
-        u[bulkQueueIdx] = { ...u[bulkQueueIdx], reviewStatus: 'skipped', finalCompatList: [] };
+        // Only mark as skipped if it wasn't already marked ended
+        if (u[bulkQueueIdx] && u[bulkQueueIdx].reviewStatus !== 'ended') {
+          u[bulkQueueIdx] = { ...u[bulkQueueIdx], reviewStatus: 'skipped', finalCompatList: [] };
+        }
       }
       // If not skip, it should already be marked as 'correct' by handleMarkCorrect
       return u;
@@ -863,6 +866,50 @@ export default function CompatibilityDashboard() {
       setShowBulkSummary(true);
     } else {
       setBulkQueueIdx(nextIdx);
+    }
+  };
+
+  const handleEndListing = async () => {
+    if (!bulkMode || bulkQueueIdx < 0 || bulkQueueIdx >= bulkQueue.length) return;
+    const currentItem = bulkQueue[bulkQueueIdx].item;
+
+    if (!window.confirm(`Are you sure you want to end listing ${currentItem.itemId} (${currentItem.title})?`)) {
+      return;
+    }
+
+    try {
+      setBulkQueue(prev => {
+        const u = [...prev];
+        u[bulkQueueIdx] = { ...u[bulkQueueIdx], endingLoading: true };
+        return u;
+      });
+
+      const { data } = await api.post('/ebay/end-item', {
+        sellerId: currentSellerId,
+        itemId: currentItem.itemId,
+        endingReason: 'NotAvailable'
+      });
+
+      if (data.success) {
+        showSnackbar(`Successfully ended listing ${currentItem.itemId}`, 'success');
+        setBulkQueue(prev => {
+          const u = [...prev];
+          u[bulkQueueIdx] = {
+            ...u[bulkQueueIdx],
+            endingLoading: false,
+            reviewStatus: 'ended'
+          };
+          return u;
+        });
+        handleBulkQueueNext(false); // Advance without overwriting 'ended'
+      }
+    } catch (e) {
+      showSnackbar('Failed to end listing: ' + (e.response?.data?.error || e.message), 'error');
+      setBulkQueue(prev => {
+        const u = [...prev];
+        u[bulkQueueIdx] = { ...u[bulkQueueIdx], endingLoading: false };
+        return u;
+      });
     }
   };
 
@@ -2064,6 +2111,15 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 ← Previous
               </Button>
               <Button
+                onClick={handleEndListing}
+                variant="outlined"
+                color="error"
+                disabled={bulkQueue[bulkQueueIdx]?.status === 'loading' || bulkQueue[bulkQueueIdx]?.endingLoading}
+                startIcon={bulkQueue[bulkQueueIdx]?.endingLoading ? <CircularProgress size={16} color="inherit" /> : null}
+              >
+                {bulkQueue[bulkQueueIdx]?.endingLoading ? 'Ending...' : 'End Listing'}
+              </Button>
+              <Button
                 onClick={() => handleBulkQueueNext(true)}
                 variant="outlined"
                 color="secondary"
@@ -2074,7 +2130,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 onClick={handleMarkCorrect}
                 variant="contained"
                 color="success"
-                disabled={bulkQueue[bulkQueueIdx]?.status === 'loading' || editCompatList.length === 0}
+                disabled={bulkQueue[bulkQueueIdx]?.status === 'loading' || bulkQueue[bulkQueueIdx]?.endingLoading || editCompatList.length === 0}
                 sx={{ fontWeight: 700 }}
               >
                 ✓ Correct ({bulkQueueIdx + 1}/{bulkQueue.length})
@@ -2120,6 +2176,10 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                   <Typography variant="h4" fontWeight="bold" color="warning.main">{bulkQueue.filter(q => q.reviewStatus === 'skipped' || q.reviewStatus === 'pending' || !q.reviewStatus).length}</Typography>
                   <Typography variant="body2" color="textSecondary">Skipped</Typography>
                 </Paper>
+                <Paper sx={{ flex: 1, p: 2, textAlign: 'center', bgcolor: '#fef2f2', border: '1px solid #fecaca' }}>
+                  <Typography variant="h4" fontWeight="bold" color="error.main">{bulkQueue.filter(q => q.reviewStatus === 'ended').length}</Typography>
+                  <Typography variant="body2" color="textSecondary">Ended</Typography>
+                </Paper>
               </Box>
 
               <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Items to send to eBay:</Typography>
@@ -2138,9 +2198,9 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                       <TableRow key={idx} sx={{ bgcolor: q.reviewStatus === 'correct' ? '#f0fdf4' : '#fafafa' }}>
                         <TableCell>
                           <Chip
-                            label={q.reviewStatus === 'correct' ? '✓ Correct' : 'Skipped'}
+                            label={q.reviewStatus === 'correct' ? '✓ Correct' : q.reviewStatus === 'ended' ? 'Ended' : 'Skipped'}
                             size="small"
-                            color={q.reviewStatus === 'correct' ? 'success' : 'default'}
+                            color={q.reviewStatus === 'correct' ? 'success' : q.reviewStatus === 'ended' ? 'error' : 'default'}
                             variant={q.reviewStatus === 'correct' ? 'filled' : 'outlined'}
                           />
                         </TableCell>
