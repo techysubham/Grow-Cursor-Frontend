@@ -1362,140 +1362,156 @@ export default function AffiliateOrdersPage() {
                                     const showSectionHeader = idx === 0 && section.label;
 
                                     return (
-                                    <React.Fragment key={`${section.key}-${order._id}`}>
-                                        {showSectionHeader && (
-                                            <TableRow>
-                                                <TableCell colSpan={visibleColumnCount || 1} sx={{ bgcolor: '#f3f4f6', py: 1 }}>
-                                                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                                                            {section.label}
-                                                        </Typography>
-                                                        <Chip size="small" variant="outlined" label={`${section.orders.length} order${section.orders.length !== 1 ? 's' : ''}`} />
-                                                    </Stack>
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                        {showSellerHeader && (
-                                            <TableRow>
-                                                <TableCell colSpan={visibleColumnCount || 1} sx={{ bgcolor: '#eef6ff', py: 1.25 }}>
-                                                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0d47a1' }}>
-                                                            {sellerName}
-                                                        </Typography>
-                                                        <Chip size="small" label={`${sectionSellerGroupStats[sellerName]?.total || 0} order${(sectionSellerGroupStats[sellerName]?.total || 0) !== 1 ? 's' : ''}`} variant="outlined" />
-                                                        {(sectionSellerGroupStats[sellerName]?.carryOver || 0) > 0 && (
-                                                            <Chip size="small" color="warning" label={`${sectionSellerGroupStats[sellerName].carryOver} carried over`} />
-                                                        )}
-                                                    </Stack>
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                        <TableRow hover sx={{ bgcolor: order.isCarryOver ? '#fffdf4' : undefined, '&:nth-of-type(even)': { bgcolor: order.isCarryOver ? '#fff8e1' : '#fafafa' } }}>
-                                            {/* # */}
-                                            {isColVisible('index') && <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{idx + 1}</TableCell>}
-
-                                            {/* Order ID */}
-                                            {isColVisible('orderId') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                                                <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                    <span>{order.orderId}</span>
-                                                    <Tooltip title="Copy">
-                                                        <IconButton size="small" onClick={() => { navigator.clipboard.writeText(order.orderId); notify('info', 'Copied'); }}>
-                                                            <ContentCopyIcon sx={{ fontSize: 12 }} />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Stack>
-                                            </TableCell>}
-
-                                            {/* Product Name */}
-                                            {isColVisible('productName') && <TableCell sx={{ minWidth: 300, maxWidth: 360 }}>
-                                                <Stack direction="row" spacing={1} alignItems="flex-start">
-                                                    {thumbnailImages[order._id] && (
-                                                        <Box
-                                                            onClick={() => handleViewImages(order)}
-                                                            sx={{
-                                                                width: 50,
-                                                                height: 50,
-                                                                cursor: 'pointer',
-                                                                border: '1px solid',
-                                                                borderColor: 'grey.300',
-                                                                borderRadius: 1,
-                                                                overflow: 'hidden',
-                                                                flexShrink: 0,
-                                                                position: 'relative',
-                                                                '&:hover': {
-                                                                    borderColor: 'primary.main',
-                                                                    boxShadow: 2
-                                                                }
-                                                            }}
-                                                        >
-                                                            <img
-                                                                src={thumbnailImages[order._id]}
-                                                                alt="Product"
-                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                            />
-                                                            {itemImages[order._id]?.count > 1 && (
-                                                                <Chip
-                                                                    label={`+${itemImages[order._id].count - 1}`}
-                                                                    size="small"
-                                                                    sx={{
-                                                                        position: 'absolute',
-                                                                        bottom: 2,
-                                                                        right: 2,
-                                                                        height: 18,
-                                                                        fontSize: '0.65rem',
-                                                                        bgcolor: 'rgba(0,0,0,0.7)',
-                                                                        color: 'white',
-                                                                        '& .MuiChip-label': { px: 0.5 }
-                                                                    }}
-                                                                />
+                                        <React.Fragment key={`${section.key}-${order._id}`}>
+                                            {showSectionHeader && (
+                                                <TableRow>
+                                                    <TableCell colSpan={visibleColumnCount || 1} sx={{ bgcolor: '#f3f4f6', py: 1 }}>
+                                                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                                                                {section.label}
+                                                            </Typography>
+                                                            <Chip size="small" variant="outlined" label={`${section.orders.length} order${section.orders.length !== 1 ? 's' : ''}`} />
+                                                        </Stack>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                            {showSellerHeader && (
+                                                <TableRow>
+                                                    <TableCell colSpan={visibleColumnCount || 1} sx={{ bgcolor: '#eef6ff', py: 1.25 }}>
+                                                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0d47a1' }}>
+                                                                {sellerName}
+                                                            </Typography>
+                                                            <Chip size="small" label={`${sectionSellerGroupStats[sellerName]?.total || 0} order${(sectionSellerGroupStats[sellerName]?.total || 0) !== 1 ? 's' : ''}`} variant="outlined" />
+                                                            {(sectionSellerGroupStats[sellerName]?.carryOver || 0) > 0 && (
+                                                                <Chip size="small" color="warning" label={`${sectionSellerGroupStats[sellerName].carryOver} carried over`} />
                                                             )}
-                                                            {loadingImages[order._id] && (
-                                                                <Box
-                                                                    sx={{
-                                                                        position: 'absolute',
-                                                                        inset: 0,
-                                                                        bgcolor: 'rgba(255,255,255,0.8)',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        justifyContent: 'center'
-                                                                    }}
-                                                                >
-                                                                    <CircularProgress size={18} />
-                                                                </Box>
-                                                            )}
-                                                        </Box>
-                                                    )}
+                                                        </Stack>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                            <TableRow hover sx={{ bgcolor: order.isCarryOver ? '#fffdf4' : undefined, '&:nth-of-type(even)': { bgcolor: order.isCarryOver ? '#fff8e1' : '#fafafa' } }}>
+                                                {/* # */}
+                                                {isColVisible('index') && <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{idx + 1}</TableCell>}
 
-                                                    <Box sx={{ minWidth: 0 }}>
-                                                        {order.isCarryOver && (
-                                                            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
-                                                                <Chip
-                                                                    label={order.carryOverLabel || 'Carry over'}
-                                                                    size="small"
-                                                                    color="warning"
-                                                                    sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700 }}
-                                                                />
-                                                                {order.sourceDate && (
-                                                                    <Typography variant="caption" color="text.secondary">
-                                                                        From {order.sourceDate}
-                                                                    </Typography>
-                                                                )}
-                                                            </Stack>
-                                                        )}
-                                                        {itemId ? (
-                                                            <Link
-                                                                href={`https://www.ebay.com/itm/${itemId}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                underline="hover"
-                                                                sx={{ display: 'inline-flex', alignItems: 'flex-start', gap: 0.5 }}
+                                                {/* Order ID */}
+                                                {isColVisible('orderId') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                        <span>{order.orderId}</span>
+                                                        <Tooltip title="Copy">
+                                                            <IconButton size="small" onClick={() => { navigator.clipboard.writeText(order.orderId); notify('info', 'Copied'); }}>
+                                                                <ContentCopyIcon sx={{ fontSize: 12 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Stack>
+                                                </TableCell>}
+
+                                                {/* Product Name */}
+                                                {isColVisible('productName') && <TableCell sx={{ minWidth: 300, maxWidth: 360 }}>
+                                                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                                                        {thumbnailImages[order._id] && (
+                                                            <Box
+                                                                onClick={() => handleViewImages(order)}
+                                                                sx={{
+                                                                    width: 50,
+                                                                    height: 50,
+                                                                    cursor: 'pointer',
+                                                                    border: '1px solid',
+                                                                    borderColor: 'grey.300',
+                                                                    borderRadius: 1,
+                                                                    overflow: 'hidden',
+                                                                    flexShrink: 0,
+                                                                    position: 'relative',
+                                                                    '&:hover': {
+                                                                        borderColor: 'primary.main',
+                                                                        boxShadow: 2
+                                                                    }
+                                                                }}
                                                             >
+                                                                <img
+                                                                    src={thumbnailImages[order._id]}
+                                                                    alt="Product"
+                                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                />
+                                                                {itemImages[order._id]?.count > 1 && (
+                                                                    <Chip
+                                                                        label={`+${itemImages[order._id].count - 1}`}
+                                                                        size="small"
+                                                                        sx={{
+                                                                            position: 'absolute',
+                                                                            bottom: 2,
+                                                                            right: 2,
+                                                                            height: 18,
+                                                                            fontSize: '0.65rem',
+                                                                            bgcolor: 'rgba(0,0,0,0.7)',
+                                                                            color: 'white',
+                                                                            '& .MuiChip-label': { px: 0.5 }
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                                {loadingImages[order._id] && (
+                                                                    <Box
+                                                                        sx={{
+                                                                            position: 'absolute',
+                                                                            inset: 0,
+                                                                            bgcolor: 'rgba(255,255,255,0.8)',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center'
+                                                                        }}
+                                                                    >
+                                                                        <CircularProgress size={18} />
+                                                                    </Box>
+                                                                )}
+                                                            </Box>
+                                                        )}
+
+                                                        <Box sx={{ minWidth: 0 }}>
+                                                            {order.isCarryOver && (
+                                                                <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
+                                                                    <Chip
+                                                                        label={order.carryOverLabel || 'Carry over'}
+                                                                        size="small"
+                                                                        color="warning"
+                                                                        sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700 }}
+                                                                    />
+                                                                    {order.sourceDate && (
+                                                                        <Typography variant="caption" color="text.secondary">
+                                                                            From {order.sourceDate}
+                                                                        </Typography>
+                                                                    )}
+                                                                </Stack>
+                                                            )}
+                                                            {itemId ? (
+                                                                <Link
+                                                                    href={`https://www.ebay.com/itm/${itemId}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    underline="hover"
+                                                                    sx={{ display: 'inline-flex', alignItems: 'flex-start', gap: 0.5 }}
+                                                                >
+                                                                    <Typography
+                                                                        variant="body2"
+                                                                        sx={{
+                                                                            fontSize: '0.78rem',
+                                                                            fontWeight: 600,
+                                                                            color: 'primary.main',
+                                                                            display: '-webkit-box',
+                                                                            WebkitLineClamp: 2,
+                                                                            WebkitBoxOrient: 'vertical',
+                                                                            overflow: 'hidden'
+                                                                        }}
+                                                                    >
+                                                                        {productTitle}
+                                                                    </Typography>
+                                                                    <OpenInNewIcon sx={{ fontSize: 13, mt: 0.2, flexShrink: 0 }} />
+                                                                </Link>
+                                                            ) : (
                                                                 <Typography
                                                                     variant="body2"
                                                                     sx={{
                                                                         fontSize: '0.78rem',
                                                                         fontWeight: 600,
-                                                                        color: 'primary.main',
                                                                         display: '-webkit-box',
                                                                         WebkitLineClamp: 2,
                                                                         WebkitBoxOrient: 'vertical',
@@ -1504,240 +1520,224 @@ export default function AffiliateOrdersPage() {
                                                                 >
                                                                     {productTitle}
                                                                 </Typography>
-                                                                <OpenInNewIcon sx={{ fontSize: 13, mt: 0.2, flexShrink: 0 }} />
-                                                            </Link>
-                                                        ) : (
-                                                            <Typography
-                                                                variant="body2"
-                                                                sx={{
-                                                                    fontSize: '0.78rem',
-                                                                    fontWeight: 600,
-                                                                    display: '-webkit-box',
-                                                                    WebkitLineClamp: 2,
-                                                                    WebkitBoxOrient: 'vertical',
-                                                                    overflow: 'hidden'
-                                                                }}
-                                                            >
-                                                                {productTitle}
-                                                            </Typography>
-                                                        )}
-                                                        {itemId && (
-                                                            <Link
-                                                                href={`https://www.ebay.com/itm/${itemId}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                sx={{ display: 'inline-block', mt: 0.25, fontSize: '0.72rem' }}
-                                                            >
-                                                                ID: {itemId}
-                                                            </Link>
-                                                        )}
-                                                    </Box>
-                                                </Stack>
-                                            </TableCell>}
+                                                            )}
+                                                            {itemId && (
+                                                                <Link
+                                                                    href={`https://www.ebay.com/itm/${itemId}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    sx={{ display: 'inline-block', mt: 0.25, fontSize: '0.72rem' }}
+                                                                >
+                                                                    ID: {itemId}
+                                                                </Link>
+                                                            )}
+                                                        </Box>
+                                                    </Stack>
+                                                </TableCell>}
 
-                                            {/* Seller */}
-                                            {isColVisible('seller') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{sellerName}</TableCell>}
+                                                {/* Seller */}
+                                                {isColVisible('seller') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{sellerName}</TableCell>}
 
-                                            {/* Supplier Link */}
-                                            {isColVisible('supplierLink') && <TableCell sx={{ minWidth: 220 }}>
-                                                <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                    <InlineText
-                                                        value={order.affiliateLink}
-                                                        placeholder="Paste supplier link…"
-                                                        onSave={(v) => patchOrder(order._id, 'affiliateLink', v)}
+                                                {/* Supplier Link */}
+                                                {isColVisible('supplierLink') && <TableCell sx={{ minWidth: 220 }}>
+                                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                        <InlineText
+                                                            value={order.affiliateLink}
+                                                            placeholder="Paste supplier link…"
+                                                            onSave={(v) => patchOrder(order._id, 'affiliateLink', v)}
+                                                        />
+                                                        {order.affiliateLink && (
+                                                            <Tooltip title="Open link">
+                                                                <IconButton size="small" component="a" href={order.affiliateLink} target="_blank" rel="noopener noreferrer">
+                                                                    <OpenInNewIcon sx={{ fontSize: 12 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                    </Stack>
+                                                </TableCell>}
+
+                                                {/* Affiliate Links */}
+                                                {isColVisible('affiliateLinks') && <TableCell sx={{ minWidth: 220 }}>
+                                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                        <InlineText
+                                                            value={order.affiliateLinks}
+                                                            placeholder="Paste affiliate link…"
+                                                            onSave={(v) => patchOrder(order._id, 'affiliateLinks', v)}
+                                                        />
+                                                        {order.affiliateLinks && (
+                                                            <Tooltip title="Open link">
+                                                                <IconButton size="small" component="a" href={order.affiliateLinks} target="_blank" rel="noopener noreferrer">
+                                                                    <OpenInNewIcon sx={{ fontSize: 12 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                    </Stack>
+                                                </TableCell>}
+
+                                                {/* Price — editable */}
+                                                {isColVisible('priceUsd') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                    <BalanceNumberCell
+                                                        value={order.beforeTaxUSD ?? null}
+                                                        onSave={(v) => patchOrder(order._id, 'beforeTaxUSD', v)}
                                                     />
-                                                    {order.affiliateLink && (
-                                                        <Tooltip title="Open link">
-                                                            <IconButton size="small" component="a" href={order.affiliateLink} target="_blank" rel="noopener noreferrer">
-                                                                <OpenInNewIcon sx={{ fontSize: 12 }} />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                    )}
-                                                </Stack>
-                                            </TableCell>}
+                                                </TableCell>}
 
-                                            {/* Affiliate Links */}
-                                            {isColVisible('affiliateLinks') && <TableCell sx={{ minWidth: 220 }}>
-                                                <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                    <InlineText
-                                                        value={order.affiliateLinks}
-                                                        placeholder="Paste affiliate link…"
-                                                        onSave={(v) => patchOrder(order._id, 'affiliateLinks', v)}
-                                                    />
-                                                    {order.affiliateLinks && (
-                                                        <Tooltip title="Open link">
-                                                            <IconButton size="small" component="a" href={order.affiliateLinks} target="_blank" rel="noopener noreferrer">
-                                                                <OpenInNewIcon sx={{ fontSize: 12 }} />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                    )}
-                                                </Stack>
-                                            </TableCell>}
-
-                                            {/* Price — editable */}
-                                            {isColVisible('priceUsd') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                                <BalanceNumberCell
-                                                    value={order.beforeTaxUSD ?? null}
-                                                    onSave={(v) => patchOrder(order._id, 'beforeTaxUSD', v)}
-                                                />
-                                            </TableCell>}
-
-                                            {/* Amazon Account */}
-                                            {isColVisible('amazonAccount') && <TableCell>
-                                                <Stack direction="row" spacing={0.5} alignItems="center">
-                                                    <InlineSelect
-                                                        value={order.amazonAccount}
-                                                        options={amazonAccounts}
-                                                        onChange={(v) => {
-                                                            if (v && v !== order.amazonAccount && (amazonAssignedCounts[v] || 0) >= AMAZON_ACCOUNT_DAILY_LIMIT) {
-                                                                notify('error', `Cannot assign more than ${AMAZON_ACCOUNT_DAILY_LIMIT} orders to ${v} in one day`);
-                                                                return;
-                                                            }
-                                                            patchOrder(order._id, 'amazonAccount', v);
-                                                        }}
-                                                    />
-                                                    <Tooltip title="Assign same account to next entries">
-                                                        <span>
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => handleBulkAssignAmazonAccount(section.orders, idx, order.amazonAccount)}
-                                                                disabled={!order.amazonAccount}
-                                                            >
-                                                                <PlaylistAddIcon sx={{ fontSize: 16 }} />
-                                                            </IconButton>
-                                                        </span>
-                                                    </Tooltip>
-                                                </Stack>
-                                            </TableCell>}
-
-                                            {/* Arriving */}
-                                            {isColVisible('arriving') && <TableCell sx={{ minWidth: 130 }}>
-                                                <InlineText
-                                                    value={order.arrivingDate}
-                                                    placeholder="YYYY-MM-DD"
-                                                    onSave={(v) => patchOrder(order._id, 'arrivingDate', v)}
-                                                />
-                                            </TableCell>}
-
-                                            {/* Before Tax */}
-                                            {isColVisible('beforeTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                                <BalanceNumberCell
-                                                    value={order.beforeTax ?? null}
-                                                    onSave={(v) => patchOrder(order._id, 'beforeTax', v)}
-                                                />
-                                            </TableCell>}
-
-                                            {/* Estimated Tax */}
-                                            {isColVisible('estimatedTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                                <BalanceNumberCell
-                                                    value={order.estimatedTax ?? null}
-                                                    onSave={(v) => patchOrder(order._id, 'estimatedTax', v)}
-                                                />
-                                            </TableCell>}
-
-                                            {/* Az OrderID */}
-                                            {isColVisible('azOrderId') && <TableCell sx={{ minWidth: 150 }}>
-                                                <InlineText
-                                                    value={order.azOrderId}
-                                                    placeholder="Amazon order ID"
-                                                    onSave={(v) => patchOrder(order._id, 'azOrderId', v)}
-                                                />
-                                            </TableCell>}
-
-                                            {/* Status */}
-                                            {isColVisible('status') && <TableCell>
-                                                <FormControl size="small">
-                                                    <Select
-                                                        value={order.sourcingStatus || 'Not Yet'}
-                                                        onChange={(e) => patchOrder(order._id, 'sourcingStatus', e.target.value)}
-                                                        size="small"
-                                                        sx={{ minWidth: 130, fontSize: '0.8rem' }}
-                                                        renderValue={(v) => (
-                                                            <Chip
-                                                                label={v}
-                                                                size="small"
-                                                                color={SOURCING_STATUS_COLORS[v] || 'default'}
-                                                                sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}
-                                                            />
-                                                        )}
-                                                    >
-                                                        {SOURCING_STATUSES.map((s) => (
-                                                            <MenuItem key={s} value={s} sx={{ fontSize: '0.8rem' }}>
-                                                                <Chip label={s} size="small" color={SOURCING_STATUS_COLORS[s] || 'default'} sx={{ fontWeight: 'bold', fontSize: '0.75rem' }} />
-                                                            </MenuItem>
-                                                        ))}
-                                                    </Select>
-                                                </FormControl>
-                                            </TableCell>}
-
-                                            {/* Purchaser */}
-                                            {isColVisible('purchaser') && <TableCell>
-                                                <InlineSelect
-                                                    value={order.purchaser}
-                                                    options={PURCHASERS}
-                                                    onChange={(v) => patchOrder(order._id, 'purchaser', v)}
-                                                />
-                                            </TableCell>}
-
-                                            {/* Message Status */}
-                                            {isColVisible('messageStatus') && <TableCell>
-                                                <FormControl size="small">
-                                                    <Select
-                                                        value={order.sourcingMessageStatus || 'Being Processed'}
-                                                        onChange={(e) => patchOrder(order._id, 'sourcingMessageStatus', e.target.value)}
-                                                        size="small"
-                                                        sx={{ minWidth: 160, fontSize: '0.8rem' }}
-                                                        renderValue={(v) => (
-                                                            <Chip
-                                                                label={v}
-                                                                size="small"
-                                                                sx={{
-                                                                    fontWeight: 'bold',
-                                                                    fontSize: '0.72rem',
-                                                                    bgcolor: MSG_STATUS_COLORS[v] || '#e0e0e0',
-                                                                    color: '#fff',
-                                                                }}
-                                                            />
-                                                        )}
-                                                    >
-                                                        {MESSAGE_STATUSES.map((s) => (
-                                                            <MenuItem key={s} value={s} sx={{ fontSize: '0.8rem' }}>
-                                                                <Chip
-                                                                    label={s}
+                                                {/* Amazon Account */}
+                                                {isColVisible('amazonAccount') && <TableCell>
+                                                    <Stack direction="row" spacing={0.5} alignItems="center">
+                                                        <InlineSelect
+                                                            value={order.amazonAccount}
+                                                            options={amazonAccounts}
+                                                            onChange={(v) => {
+                                                                if (v && v !== order.amazonAccount && (amazonAssignedCounts[v] || 0) >= AMAZON_ACCOUNT_DAILY_LIMIT) {
+                                                                    notify('error', `Cannot assign more than ${AMAZON_ACCOUNT_DAILY_LIMIT} orders to ${v} in one day`);
+                                                                    return;
+                                                                }
+                                                                patchOrder(order._id, 'amazonAccount', v);
+                                                            }}
+                                                        />
+                                                        <Tooltip title="Assign same account to next entries">
+                                                            <span>
+                                                                <IconButton
                                                                     size="small"
-                                                                    sx={{ bgcolor: MSG_STATUS_COLORS[s] || '#e0e0e0', color: '#fff', fontSize: '0.72rem' }}
+                                                                    onClick={() => handleBulkAssignAmazonAccount(section.orders, idx, order.amazonAccount)}
+                                                                    disabled={!order.amazonAccount}
+                                                                >
+                                                                    <PlaylistAddIcon sx={{ fontSize: 16 }} />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                    </Stack>
+                                                </TableCell>}
+
+                                                {/* Arriving */}
+                                                {isColVisible('arriving') && <TableCell sx={{ minWidth: 130 }}>
+                                                    <InlineText
+                                                        value={order.arrivingDate}
+                                                        placeholder="YYYY-MM-DD"
+                                                        onSave={(v) => patchOrder(order._id, 'arrivingDate', v)}
+                                                    />
+                                                </TableCell>}
+
+                                                {/* Before Tax */}
+                                                {isColVisible('beforeTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                    <BalanceNumberCell
+                                                        value={order.beforeTax ?? null}
+                                                        onSave={(v) => patchOrder(order._id, 'beforeTax', v)}
+                                                    />
+                                                </TableCell>}
+
+                                                {/* Estimated Tax */}
+                                                {isColVisible('estimatedTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                    <BalanceNumberCell
+                                                        value={order.estimatedTax ?? null}
+                                                        onSave={(v) => patchOrder(order._id, 'estimatedTax', v)}
+                                                    />
+                                                </TableCell>}
+
+                                                {/* Az OrderID */}
+                                                {isColVisible('azOrderId') && <TableCell sx={{ minWidth: 150 }}>
+                                                    <InlineText
+                                                        value={order.azOrderId}
+                                                        placeholder="Amazon order ID"
+                                                        onSave={(v) => patchOrder(order._id, 'azOrderId', v)}
+                                                    />
+                                                </TableCell>}
+
+                                                {/* Status */}
+                                                {isColVisible('status') && <TableCell>
+                                                    <FormControl size="small">
+                                                        <Select
+                                                            value={order.sourcingStatus || 'Not Yet'}
+                                                            onChange={(e) => patchOrder(order._id, 'sourcingStatus', e.target.value)}
+                                                            size="small"
+                                                            sx={{ minWidth: 130, fontSize: '0.8rem' }}
+                                                            renderValue={(v) => (
+                                                                <Chip
+                                                                    label={v}
+                                                                    size="small"
+                                                                    color={SOURCING_STATUS_COLORS[v] || 'default'}
+                                                                    sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}
                                                                 />
-                                                            </MenuItem>
-                                                        ))}
-                                                    </Select>
-                                                </FormControl>
-                                            </TableCell>}
+                                                            )}
+                                                        >
+                                                            {SOURCING_STATUSES.map((s) => (
+                                                                <MenuItem key={s} value={s} sx={{ fontSize: '0.8rem' }}>
+                                                                    <Chip label={s} size="small" color={SOURCING_STATUS_COLORS[s] || 'default'} sx={{ fontWeight: 'bold', fontSize: '0.75rem' }} />
+                                                                </MenuItem>
+                                                            ))}
+                                                        </Select>
+                                                    </FormControl>
+                                                </TableCell>}
 
-                                            {/* Messaging */}
-                                            {isColVisible('messaging') && <TableCell align="center">
-                                                <Tooltip title="Send message to buyer">
-                                                    <IconButton
-                                                        size="small"
-                                                        color="primary"
-                                                        onClick={() => handleOpenMessageDialog(order)}
-                                                    >
-                                                        <ChatIcon sx={{ fontSize: 18 }} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </TableCell>}
+                                                {/* Purchaser */}
+                                                {isColVisible('purchaser') && <TableCell>
+                                                    <InlineSelect
+                                                        value={order.purchaser}
+                                                        options={PURCHASERS}
+                                                        onChange={(v) => patchOrder(order._id, 'purchaser', v)}
+                                                    />
+                                                </TableCell>}
 
-                                            {/* Notes */}
-                                            {isColVisible('notes') && <TableCell sx={{ minWidth: 160 }}>
-                                                <InlineText
-                                                    value={order.fulfillmentNotes}
-                                                    placeholder="Add note…"
-                                                    multiline
-                                                    onSave={(v) => patchOrder(order._id, 'fulfillmentNotes', v)}
-                                                />
-                                            </TableCell>}
-                                        </TableRow>
-                                    </React.Fragment>
-                                );
+                                                {/* Message Status */}
+                                                {isColVisible('messageStatus') && <TableCell>
+                                                    <FormControl size="small">
+                                                        <Select
+                                                            value={order.sourcingMessageStatus || 'Being Processed'}
+                                                            onChange={(e) => patchOrder(order._id, 'sourcingMessageStatus', e.target.value)}
+                                                            size="small"
+                                                            sx={{ minWidth: 160, fontSize: '0.8rem' }}
+                                                            renderValue={(v) => (
+                                                                <Chip
+                                                                    label={v}
+                                                                    size="small"
+                                                                    sx={{
+                                                                        fontWeight: 'bold',
+                                                                        fontSize: '0.72rem',
+                                                                        bgcolor: MSG_STATUS_COLORS[v] || '#e0e0e0',
+                                                                        color: '#fff',
+                                                                    }}
+                                                                />
+                                                            )}
+                                                        >
+                                                            {MESSAGE_STATUSES.map((s) => (
+                                                                <MenuItem key={s} value={s} sx={{ fontSize: '0.8rem' }}>
+                                                                    <Chip
+                                                                        label={s}
+                                                                        size="small"
+                                                                        sx={{ bgcolor: MSG_STATUS_COLORS[s] || '#e0e0e0', color: '#fff', fontSize: '0.72rem' }}
+                                                                    />
+                                                                </MenuItem>
+                                                            ))}
+                                                        </Select>
+                                                    </FormControl>
+                                                </TableCell>}
+
+                                                {/* Messaging */}
+                                                {isColVisible('messaging') && <TableCell align="center">
+                                                    <Tooltip title="Send message to buyer">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="primary"
+                                                            onClick={() => handleOpenMessageDialog(order)}
+                                                        >
+                                                            <ChatIcon sx={{ fontSize: 18 }} />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </TableCell>}
+
+                                                {/* Notes */}
+                                                {isColVisible('notes') && <TableCell sx={{ minWidth: 160 }}>
+                                                    <InlineText
+                                                        value={order.fulfillmentNotes}
+                                                        placeholder="Add note…"
+                                                        multiline
+                                                        onSave={(v) => patchOrder(order._id, 'fulfillmentNotes', v)}
+                                                    />
+                                                </TableCell>}
+                                            </TableRow>
+                                        </React.Fragment>
+                                    );
                                 });
                             })}
                         </TableBody>
