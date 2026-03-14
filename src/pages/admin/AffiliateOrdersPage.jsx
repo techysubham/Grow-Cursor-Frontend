@@ -40,6 +40,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import DownloadIcon from '@mui/icons-material/Download';
 import SaveIcon from '@mui/icons-material/Save';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
@@ -55,6 +56,7 @@ import api from '../../lib/api';
 import ColumnSelector from '../../components/ColumnSelector';
 import TemplateManagementModal from '../../components/TemplateManagementModal';
 import { CHAT_TEMPLATES, personalizeTemplate } from '../../constants/chatTemplates';
+import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -106,6 +108,12 @@ const DAILY_ORDER_ALL_COLUMNS = [
 
 const DEFAULT_DAILY_VISIBLE_COLUMNS = DAILY_ORDER_ALL_COLUMNS.map((c) => c.id);
 
+const AFFILIATE_EXPORT_COLUMNS = [
+    ...DAILY_ORDER_ALL_COLUMNS,
+    { id: 'carryOver', label: 'Carry Over' },
+    { id: 'sourceDate', label: 'Source Date' },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getTodayStr() {
@@ -115,6 +123,76 @@ function getTodayStr() {
 function fmt(val, digits = 2) {
     if (val == null || val === '') return '—';
     return Number(val).toFixed(digits);
+}
+
+function getCarryOverLabel(carryOverDays) {
+    if (carryOverDays <= 0) return '';
+    if (carryOverDays === 1) return 'Yesterday';
+    return `${carryOverDays} days ago`;
+}
+
+function getSellerGroupName(order) {
+    return order?.sellerGroupName || order?.seller?.user?.username || order?.sellerId || 'Unknown Seller';
+}
+
+function normalizeAffiliateOrder(order) {
+    const carryOverDays = Math.max(0, Number(order?.carryOverDays) || 0);
+    const isCarryOver = order?.sourcingStatus === 'Not Yet' && (Boolean(order?.isCarryOver) || carryOverDays > 0);
+
+    return {
+        ...order,
+        sellerGroupName: getSellerGroupName(order),
+        carryOverDays,
+        isCarryOver,
+        carryOverLabel: order?.carryOverLabel || getCarryOverLabel(carryOverDays),
+        sourceDate: order?.sourceDate || '',
+    };
+}
+
+function sortAffiliateOrders(orderList) {
+    return [...orderList].sort((leftOrder, rightOrder) => {
+        const left = normalizeAffiliateOrder(leftOrder);
+        const right = normalizeAffiliateOrder(rightOrder);
+
+        const sellerCompare = left.sellerGroupName.localeCompare(right.sellerGroupName);
+        if (sellerCompare !== 0) return sellerCompare;
+
+        const leftDate = new Date(left.dateSold || left.creationDate || 0).getTime();
+        const rightDate = new Date(right.dateSold || right.creationDate || 0).getTime();
+        if (leftDate !== rightDate) return leftDate - rightDate;
+
+        return String(left.orderId || '').localeCompare(String(right.orderId || ''));
+    });
+}
+
+function buildOrderSections(orderList, showNotYetFirst) {
+    if (!showNotYetFirst) {
+        return [{ key: 'all', label: '', orders: orderList }];
+    }
+
+    const notYetOrders = orderList.filter((order) => order.sourcingStatus === 'Not Yet');
+    const remainingOrders = orderList.filter((order) => order.sourcingStatus !== 'Not Yet');
+
+    return [
+        { key: 'not-yet', label: 'Not Yet Orders', orders: notYetOrders },
+        { key: 'other-statuses', label: 'Other Statuses', orders: remainingOrders },
+    ].filter((section) => section.orders.length > 0);
+}
+
+function getSellerGroupStats(orderList) {
+    return orderList.reduce((acc, order) => {
+        const sellerName = order.sellerGroupName || 'Unknown Seller';
+        if (!acc[sellerName]) {
+            acc[sellerName] = { total: 0, carryOver: 0 };
+        }
+
+        acc[sellerName].total += 1;
+        if (order.isCarryOver) {
+            acc[sellerName].carryOver += 1;
+        }
+
+        return acc;
+    }, {});
 }
 
 // ─── Inline Select Cell ───────────────────────────────────────────────────────
@@ -814,6 +892,8 @@ export default function AffiliateOrdersPage() {
     const [date, setDate] = useState(getTodayStr());
     const [tab, setTab] = useState(0);
     const [excludeLowValue, setExcludeLowValue] = useState(false);
+    const [showNotYetFirst, setShowNotYetFirst] = useState(true);
+    const [exportDialogOpen, setExportDialogOpen] = useState(false);
     const [visibleColumns, setVisibleColumns] = useState(() => {
         try {
             const stored = JSON.parse(sessionStorage.getItem(COLUMN_STORAGE_KEY) || 'null');
@@ -851,6 +931,7 @@ export default function AffiliateOrdersPage() {
     const [loadingImages, setLoadingImages] = useState({});
     const [imageDialogOpen, setImageDialogOpen] = useState(false);
     const [selectedImages, setSelectedImages] = useState([]);
+    const [selectedExportColumns, setSelectedExportColumns] = useState(AFFILIATE_EXPORT_COLUMNS.map((column) => column.id));
 
     // Messaging modal
     const [messageModalOpen, setMessageModalOpen] = useState(false);
@@ -873,7 +954,7 @@ export default function AffiliateOrdersPage() {
         setOrdersError('');
         try {
             const { data } = await api.get('/affiliate-orders/daily', { params: { date, excludeLowValue: excludeLowValue ? 'true' : 'false' } });
-            setOrders(data);
+            setOrders((data || []).map(normalizeAffiliateOrder));
         } catch (err) {
             setOrdersError(err?.response?.data?.error || 'Failed to load orders');
         } finally {
@@ -927,7 +1008,7 @@ export default function AffiliateOrdersPage() {
         const { refreshAfter = true } = options;
         try {
             const { data } = await api.patch(`/affiliate-orders/${orderId}/sourcing`, { [field]: value });
-            setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data } : o)));
+            setOrders((prev) => prev.map((o) => (o._id === orderId ? normalizeAffiliateOrder({ ...o, ...data }) : o)));
             if (refreshAfter) {
                 // Refresh balances and summary when order values change.
                 fetchBalances();
@@ -1051,7 +1132,7 @@ export default function AffiliateOrdersPage() {
         setSelectedOrderForMessage(null);
     };
 
-    const handleBulkAssignAmazonAccount = async (startIndex, accountName) => {
+    const handleBulkAssignAmazonAccount = async (orderList, startIndex, accountName) => {
         if (!accountName) {
             notify('warning', 'Select an Amazon account first for this row');
             return;
@@ -1067,7 +1148,7 @@ export default function AffiliateOrdersPage() {
         }
 
         const count = Math.min(parsed, AMAZON_ACCOUNT_DAILY_LIMIT);
-        const targets = orders.slice(startIndex + 1, startIndex + 1 + count);
+        const targets = orderList.slice(startIndex + 1, startIndex + 1 + count);
         if (targets.length === 0) {
             notify('info', 'No next entries available');
             return;
@@ -1105,6 +1186,90 @@ export default function AffiliateOrdersPage() {
 
     const isColVisible = (id) => visibleColumns.includes(id);
     const visibleColumnCount = DAILY_ORDER_ALL_COLUMNS.filter((c) => visibleColumns.includes(c.id)).length;
+    const displayedOrders = sortAffiliateOrders(orders);
+    const orderSections = buildOrderSections(displayedOrders, showNotYetFirst);
+    const exportOrders = orderSections.flatMap((section) => section.orders);
+    const notYetCount = displayedOrders.filter((order) => order.sourcingStatus === 'Not Yet').length;
+    const carryOverCount = displayedOrders.filter((order) => order.isCarryOver).length;
+    const sellerGroupStats = getSellerGroupStats(displayedOrders);
+    const sellerGroupCount = Object.keys(sellerGroupStats).length;
+
+    const handleOpenExportDialog = () => {
+        setSelectedExportColumns(AFFILIATE_EXPORT_COLUMNS.map((column) => column.id));
+        setExportDialogOpen(true);
+    };
+
+    const handleToggleExportColumn = (columnId) => {
+        setSelectedExportColumns((prev) => {
+            if (prev.includes(columnId)) {
+                return prev.filter((id) => id !== columnId);
+            }
+
+            return [...prev, columnId];
+        });
+    };
+
+    const handleToggleAllExportColumns = () => {
+        if (selectedExportColumns.length === AFFILIATE_EXPORT_COLUMNS.length) {
+            setSelectedExportColumns([]);
+            return;
+        }
+
+        setSelectedExportColumns(AFFILIATE_EXPORT_COLUMNS.map((column) => column.id));
+    };
+
+    const handleExecuteExport = () => {
+        if (exportOrders.length === 0) {
+            notify('warning', 'No affiliate orders to export');
+            return;
+        }
+
+        if (selectedExportColumns.length === 0) {
+            notify('warning', 'Select at least one column to export');
+            return;
+        }
+
+        const rowsWithIndex = exportOrders.map((order, index) => ({
+            ...order,
+            exportIndex: index + 1,
+        }));
+
+        const exportFieldMap = {
+            index: 'exportIndex',
+            orderId: 'orderId',
+            productName: (order) => order.lineItems?.[0]?.title || order.productName || '',
+            seller: (order) => order.sellerGroupName || '',
+            supplierLink: 'affiliateLink',
+            affiliateLinks: 'affiliateLinks',
+            priceUsd: (order) => order.beforeTaxUSD ?? '',
+            amazonAccount: 'amazonAccount',
+            arriving: 'arrivingDate',
+            beforeTax: 'beforeTax',
+            estimatedTax: 'estimatedTax',
+            azOrderId: 'azOrderId',
+            status: 'sourcingStatus',
+            purchaser: 'purchaser',
+            messageStatus: 'sourcingMessageStatus',
+            messaging: (order) => order.buyer?.username || '',
+            notes: 'fulfillmentNotes',
+            carryOver: (order) => order.isCarryOver ? (order.carryOverLabel || 'Yes') : 'No',
+            sourceDate: (order) => order.sourceDate || '',
+        };
+
+        const selectedColumns = AFFILIATE_EXPORT_COLUMNS.filter((column) => selectedExportColumns.includes(column.id));
+        const csvFieldMapping = selectedColumns.reduce((acc, column) => {
+            const accessor = exportFieldMap[column.id];
+            if (accessor) {
+                acc[column.label] = accessor;
+            }
+            return acc;
+        }, {});
+
+        const csvData = prepareCSVData(rowsWithIndex, csvFieldMapping);
+        downloadCSV(csvData, `Affiliate_Orders_${date}`);
+        setExportDialogOpen(false);
+        notify('success', `Exported ${rowsWithIndex.length} affiliate orders`);
+    };
 
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER — Tab 1: Daily Orders
@@ -1113,10 +1278,43 @@ export default function AffiliateOrdersPage() {
     const renderTab1 = () => (
         <>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                <Typography variant="subtitle2" color="text.secondary">
-                    {ordersLoading ? 'Loading…' : `${orders.length} order${orders.length !== 1 ? 's' : ''} for ${date}`}
-                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Typography variant="subtitle2" color="text.secondary">
+                        {ordersLoading ? 'Loading…' : `${displayedOrders.length} order${displayedOrders.length !== 1 ? 's' : ''} in queue for ${date}`}
+                    </Typography>
+                    {!ordersLoading && carryOverCount > 0 && (
+                        <Chip
+                            size="small"
+                            color="warning"
+                            label={`${carryOverCount} carried over`}
+                            sx={{ fontWeight: 600 }}
+                        />
+                    )}
+                    {!ordersLoading && sellerGroupCount > 0 && (
+                        <Chip
+                            size="small"
+                            variant="outlined"
+                            label={`${sellerGroupCount} seller group${sellerGroupCount !== 1 ? 's' : ''}`}
+                        />
+                    )}
+                    {!ordersLoading && notYetCount > 0 && (
+                        <Chip
+                            size="small"
+                            color="info"
+                            variant="outlined"
+                            label={`${notYetCount} not yet`}
+                        />
+                    )}
+                </Stack>
                 <Stack direction="row" spacing={0.5} alignItems="center">
+                    <FormControlLabel
+                        control={<Switch size="small" checked={showNotYetFirst} onChange={(e) => setShowNotYetFirst(e.target.checked)} />}
+                        label="Not Yet first"
+                        sx={{ mr: 0.5, '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
+                    />
+                    <Button size="small" variant="outlined" color="success" startIcon={<DownloadIcon />} onClick={handleOpenExportDialog}>
+                        CSV
+                    </Button>
                     <ColumnSelector
                         allColumns={DAILY_ORDER_ALL_COLUMNS}
                         visibleColumns={visibleColumns}
@@ -1145,109 +1343,175 @@ export default function AffiliateOrdersPage() {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {orders.length === 0 && (
+                            {displayedOrders.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={visibleColumnCount || 1} align="center" sx={{ color: 'text.secondary', py: 4 }}>
                                         No orders found for this date.
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {orders.map((order, idx) => {
-                                const sellerName = order.seller?.user?.username || '—';
-                                const itemId = order.lineItems?.[0]?.legacyItemId || order.itemNumber;
-                                const productTitle = order.lineItems?.[0]?.title || order.productName || '—';
-                                return (
-                                    <TableRow key={order._id} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#fafafa' } }}>
-                                        {/* # */}
-                                        {isColVisible('index') && <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{idx + 1}</TableCell>}
+                            {orderSections.map((section) => {
+                                const sectionSellerGroupStats = getSellerGroupStats(section.orders);
 
-                                        {/* Order ID */}
-                                        {isColVisible('orderId') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                <span>{order.orderId}</span>
-                                                <Tooltip title="Copy">
-                                                    <IconButton size="small" onClick={() => { navigator.clipboard.writeText(order.orderId); notify('info', 'Copied'); }}>
-                                                        <ContentCopyIcon sx={{ fontSize: 12 }} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Stack>
-                                        </TableCell>}
+                                return section.orders.map((order, idx) => {
+                                    const sellerName = order.sellerGroupName || '—';
+                                    const itemId = order.lineItems?.[0]?.legacyItemId || order.itemNumber;
+                                    const productTitle = order.lineItems?.[0]?.title || order.productName || '—';
+                                    const previousSellerName = idx > 0 ? section.orders[idx - 1].sellerGroupName : null;
+                                    const showSellerHeader = idx === 0 || sellerName !== previousSellerName;
+                                    const showSectionHeader = idx === 0 && section.label;
 
-                                        {/* Product Name */}
-                                        {isColVisible('productName') && <TableCell sx={{ minWidth: 300, maxWidth: 360 }}>
-                                            <Stack direction="row" spacing={1} alignItems="flex-start">
-                                                {thumbnailImages[order._id] && (
-                                                    <Box
-                                                        onClick={() => handleViewImages(order)}
-                                                        sx={{
-                                                            width: 50,
-                                                            height: 50,
-                                                            cursor: 'pointer',
-                                                            border: '1px solid',
-                                                            borderColor: 'grey.300',
-                                                            borderRadius: 1,
-                                                            overflow: 'hidden',
-                                                            flexShrink: 0,
-                                                            position: 'relative',
-                                                            '&:hover': {
-                                                                borderColor: 'primary.main',
-                                                                boxShadow: 2
-                                                            }
-                                                        }}
-                                                    >
-                                                        <img
-                                                            src={thumbnailImages[order._id]}
-                                                            alt="Product"
-                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                        />
-                                                        {itemImages[order._id]?.count > 1 && (
-                                                            <Chip
-                                                                label={`+${itemImages[order._id].count - 1}`}
-                                                                size="small"
-                                                                sx={{
-                                                                    position: 'absolute',
-                                                                    bottom: 2,
-                                                                    right: 2,
-                                                                    height: 18,
-                                                                    fontSize: '0.65rem',
-                                                                    bgcolor: 'rgba(0,0,0,0.7)',
-                                                                    color: 'white',
-                                                                    '& .MuiChip-label': { px: 0.5 }
-                                                                }}
-                                                            />
+                                    return (
+                                    <React.Fragment key={`${section.key}-${order._id}`}>
+                                        {showSectionHeader && (
+                                            <TableRow>
+                                                <TableCell colSpan={visibleColumnCount || 1} sx={{ bgcolor: '#f3f4f6', py: 1 }}>
+                                                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                                                            {section.label}
+                                                        </Typography>
+                                                        <Chip size="small" variant="outlined" label={`${section.orders.length} order${section.orders.length !== 1 ? 's' : ''}`} />
+                                                    </Stack>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                        {showSellerHeader && (
+                                            <TableRow>
+                                                <TableCell colSpan={visibleColumnCount || 1} sx={{ bgcolor: '#eef6ff', py: 1.25 }}>
+                                                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0d47a1' }}>
+                                                            {sellerName}
+                                                        </Typography>
+                                                        <Chip size="small" label={`${sectionSellerGroupStats[sellerName]?.total || 0} order${(sectionSellerGroupStats[sellerName]?.total || 0) !== 1 ? 's' : ''}`} variant="outlined" />
+                                                        {(sectionSellerGroupStats[sellerName]?.carryOver || 0) > 0 && (
+                                                            <Chip size="small" color="warning" label={`${sectionSellerGroupStats[sellerName].carryOver} carried over`} />
                                                         )}
-                                                        {loadingImages[order._id] && (
-                                                            <Box
-                                                                sx={{
-                                                                    position: 'absolute',
-                                                                    inset: 0,
-                                                                    bgcolor: 'rgba(255,255,255,0.8)',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center'
-                                                                }}
-                                                            >
-                                                                <CircularProgress size={18} />
-                                                            </Box>
-                                                        )}
-                                                    </Box>
-                                                )}
+                                                    </Stack>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                        <TableRow hover sx={{ bgcolor: order.isCarryOver ? '#fffdf4' : undefined, '&:nth-of-type(even)': { bgcolor: order.isCarryOver ? '#fff8e1' : '#fafafa' } }}>
+                                            {/* # */}
+                                            {isColVisible('index') && <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{idx + 1}</TableCell>}
 
-                                                <Box sx={{ minWidth: 0 }}>
-                                                    {itemId ? (
-                                                        <Link
-                                                            href={`https://www.ebay.com/itm/${itemId}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            underline="hover"
-                                                            sx={{ display: 'inline-flex', alignItems: 'flex-start', gap: 0.5 }}
+                                            {/* Order ID */}
+                                            {isColVisible('orderId') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                                                <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                    <span>{order.orderId}</span>
+                                                    <Tooltip title="Copy">
+                                                        <IconButton size="small" onClick={() => { navigator.clipboard.writeText(order.orderId); notify('info', 'Copied'); }}>
+                                                            <ContentCopyIcon sx={{ fontSize: 12 }} />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Stack>
+                                            </TableCell>}
+
+                                            {/* Product Name */}
+                                            {isColVisible('productName') && <TableCell sx={{ minWidth: 300, maxWidth: 360 }}>
+                                                <Stack direction="row" spacing={1} alignItems="flex-start">
+                                                    {thumbnailImages[order._id] && (
+                                                        <Box
+                                                            onClick={() => handleViewImages(order)}
+                                                            sx={{
+                                                                width: 50,
+                                                                height: 50,
+                                                                cursor: 'pointer',
+                                                                border: '1px solid',
+                                                                borderColor: 'grey.300',
+                                                                borderRadius: 1,
+                                                                overflow: 'hidden',
+                                                                flexShrink: 0,
+                                                                position: 'relative',
+                                                                '&:hover': {
+                                                                    borderColor: 'primary.main',
+                                                                    boxShadow: 2
+                                                                }
+                                                            }}
                                                         >
+                                                            <img
+                                                                src={thumbnailImages[order._id]}
+                                                                alt="Product"
+                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                            />
+                                                            {itemImages[order._id]?.count > 1 && (
+                                                                <Chip
+                                                                    label={`+${itemImages[order._id].count - 1}`}
+                                                                    size="small"
+                                                                    sx={{
+                                                                        position: 'absolute',
+                                                                        bottom: 2,
+                                                                        right: 2,
+                                                                        height: 18,
+                                                                        fontSize: '0.65rem',
+                                                                        bgcolor: 'rgba(0,0,0,0.7)',
+                                                                        color: 'white',
+                                                                        '& .MuiChip-label': { px: 0.5 }
+                                                                    }}
+                                                                />
+                                                            )}
+                                                            {loadingImages[order._id] && (
+                                                                <Box
+                                                                    sx={{
+                                                                        position: 'absolute',
+                                                                        inset: 0,
+                                                                        bgcolor: 'rgba(255,255,255,0.8)',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center'
+                                                                    }}
+                                                                >
+                                                                    <CircularProgress size={18} />
+                                                                </Box>
+                                                            )}
+                                                        </Box>
+                                                    )}
+
+                                                    <Box sx={{ minWidth: 0 }}>
+                                                        {order.isCarryOver && (
+                                                            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
+                                                                <Chip
+                                                                    label={order.carryOverLabel || 'Carry over'}
+                                                                    size="small"
+                                                                    color="warning"
+                                                                    sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700 }}
+                                                                />
+                                                                {order.sourceDate && (
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        From {order.sourceDate}
+                                                                    </Typography>
+                                                                )}
+                                                            </Stack>
+                                                        )}
+                                                        {itemId ? (
+                                                            <Link
+                                                                href={`https://www.ebay.com/itm/${itemId}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                underline="hover"
+                                                                sx={{ display: 'inline-flex', alignItems: 'flex-start', gap: 0.5 }}
+                                                            >
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{
+                                                                        fontSize: '0.78rem',
+                                                                        fontWeight: 600,
+                                                                        color: 'primary.main',
+                                                                        display: '-webkit-box',
+                                                                        WebkitLineClamp: 2,
+                                                                        WebkitBoxOrient: 'vertical',
+                                                                        overflow: 'hidden'
+                                                                    }}
+                                                                >
+                                                                    {productTitle}
+                                                                </Typography>
+                                                                <OpenInNewIcon sx={{ fontSize: 13, mt: 0.2, flexShrink: 0 }} />
+                                                            </Link>
+                                                        ) : (
                                                             <Typography
                                                                 variant="body2"
                                                                 sx={{
                                                                     fontSize: '0.78rem',
                                                                     fontWeight: 600,
-                                                                    color: 'primary.main',
                                                                     display: '-webkit-box',
                                                                     WebkitLineClamp: 2,
                                                                     WebkitBoxOrient: 'vertical',
@@ -1256,239 +1520,225 @@ export default function AffiliateOrdersPage() {
                                                             >
                                                                 {productTitle}
                                                             </Typography>
-                                                            <OpenInNewIcon sx={{ fontSize: 13, mt: 0.2, flexShrink: 0 }} />
-                                                        </Link>
-                                                    ) : (
-                                                        <Typography
-                                                            variant="body2"
-                                                            sx={{
-                                                                fontSize: '0.78rem',
-                                                                fontWeight: 600,
-                                                                display: '-webkit-box',
-                                                                WebkitLineClamp: 2,
-                                                                WebkitBoxOrient: 'vertical',
-                                                                overflow: 'hidden'
-                                                            }}
-                                                        >
-                                                            {productTitle}
-                                                        </Typography>
-                                                    )}
-                                                    {itemId && (
-                                                        <Link
-                                                            href={`https://www.ebay.com/itm/${itemId}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            sx={{ display: 'inline-block', mt: 0.25, fontSize: '0.72rem' }}
-                                                        >
-                                                            ID: {itemId}
-                                                        </Link>
-                                                    )}
-                                                </Box>
-                                            </Stack>
-                                        </TableCell>}
+                                                        )}
+                                                        {itemId && (
+                                                            <Link
+                                                                href={`https://www.ebay.com/itm/${itemId}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                sx={{ display: 'inline-block', mt: 0.25, fontSize: '0.72rem' }}
+                                                            >
+                                                                ID: {itemId}
+                                                            </Link>
+                                                        )}
+                                                    </Box>
+                                                </Stack>
+                                            </TableCell>}
 
-                                        {/* Seller */}
-                                        {isColVisible('seller') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{sellerName}</TableCell>}
+                                            {/* Seller */}
+                                            {isColVisible('seller') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{sellerName}</TableCell>}
 
-                                        {/* Supplier Link */}
-                                        {isColVisible('supplierLink') && <TableCell sx={{ minWidth: 220 }}>
-                                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                <InlineText
-                                                    value={order.affiliateLink}
-                                                    placeholder="Paste supplier link…"
-                                                    onSave={(v) => patchOrder(order._id, 'affiliateLink', v)}
+                                            {/* Supplier Link */}
+                                            {isColVisible('supplierLink') && <TableCell sx={{ minWidth: 220 }}>
+                                                <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                    <InlineText
+                                                        value={order.affiliateLink}
+                                                        placeholder="Paste supplier link…"
+                                                        onSave={(v) => patchOrder(order._id, 'affiliateLink', v)}
+                                                    />
+                                                    {order.affiliateLink && (
+                                                        <Tooltip title="Open link">
+                                                            <IconButton size="small" component="a" href={order.affiliateLink} target="_blank" rel="noopener noreferrer">
+                                                                <OpenInNewIcon sx={{ fontSize: 12 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
+                                                </Stack>
+                                            </TableCell>}
+
+                                            {/* Affiliate Links */}
+                                            {isColVisible('affiliateLinks') && <TableCell sx={{ minWidth: 220 }}>
+                                                <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                    <InlineText
+                                                        value={order.affiliateLinks}
+                                                        placeholder="Paste affiliate link…"
+                                                        onSave={(v) => patchOrder(order._id, 'affiliateLinks', v)}
+                                                    />
+                                                    {order.affiliateLinks && (
+                                                        <Tooltip title="Open link">
+                                                            <IconButton size="small" component="a" href={order.affiliateLinks} target="_blank" rel="noopener noreferrer">
+                                                                <OpenInNewIcon sx={{ fontSize: 12 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
+                                                </Stack>
+                                            </TableCell>}
+
+                                            {/* Price — editable */}
+                                            {isColVisible('priceUsd') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                <BalanceNumberCell
+                                                    value={order.beforeTaxUSD ?? null}
+                                                    onSave={(v) => patchOrder(order._id, 'beforeTaxUSD', v)}
                                                 />
-                                                {order.affiliateLink && (
-                                                    <Tooltip title="Open link">
-                                                        <IconButton size="small" component="a" href={order.affiliateLink} target="_blank" rel="noopener noreferrer">
-                                                            <OpenInNewIcon sx={{ fontSize: 12 }} />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                )}
-                                            </Stack>
-                                        </TableCell>}
+                                            </TableCell>}
 
-                                        {/* Affiliate Links */}
-                                        {isColVisible('affiliateLinks') && <TableCell sx={{ minWidth: 220 }}>
-                                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                <InlineText
-                                                    value={order.affiliateLinks}
-                                                    placeholder="Paste affiliate link…"
-                                                    onSave={(v) => patchOrder(order._id, 'affiliateLinks', v)}
-                                                />
-                                                {order.affiliateLinks && (
-                                                    <Tooltip title="Open link">
-                                                        <IconButton size="small" component="a" href={order.affiliateLinks} target="_blank" rel="noopener noreferrer">
-                                                            <OpenInNewIcon sx={{ fontSize: 12 }} />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                )}
-                                            </Stack>
-                                        </TableCell>}
-
-                                        {/* Price — editable */}
-                                        {isColVisible('priceUsd') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                            <BalanceNumberCell
-                                                value={order.beforeTaxUSD ?? null}
-                                                onSave={(v) => patchOrder(order._id, 'beforeTaxUSD', v)}
-                                            />
-                                        </TableCell>}
-
-                                        {/* Amazon Account */}
-                                        {isColVisible('amazonAccount') && <TableCell>
-                                            <Stack direction="row" spacing={0.5} alignItems="center">
-                                                <InlineSelect
-                                                    value={order.amazonAccount}
-                                                    options={amazonAccounts}
-                                                    onChange={(v) => {
-                                                        if (v && v !== order.amazonAccount && (amazonAssignedCounts[v] || 0) >= AMAZON_ACCOUNT_DAILY_LIMIT) {
-                                                            notify('error', `Cannot assign more than ${AMAZON_ACCOUNT_DAILY_LIMIT} orders to ${v} in one day`);
-                                                            return;
-                                                        }
-                                                        patchOrder(order._id, 'amazonAccount', v);
-                                                    }}
-                                                />
-                                                <Tooltip title="Assign same account to next entries">
-                                                    <span>
-                                                        <IconButton
-                                                            size="small"
-                                                            onClick={() => handleBulkAssignAmazonAccount(idx, order.amazonAccount)}
-                                                            disabled={!order.amazonAccount}
-                                                        >
-                                                            <PlaylistAddIcon sx={{ fontSize: 16 }} />
-                                                        </IconButton>
-                                                    </span>
-                                                </Tooltip>
-                                            </Stack>
-                                        </TableCell>}
-
-                                        {/* Arriving */}
-                                        {isColVisible('arriving') && <TableCell sx={{ minWidth: 130 }}>
-                                            <InlineText
-                                                value={order.arrivingDate}
-                                                placeholder="YYYY-MM-DD"
-                                                onSave={(v) => patchOrder(order._id, 'arrivingDate', v)}
-                                            />
-                                        </TableCell>}
-
-                                        {/* Before Tax */}
-                                        {isColVisible('beforeTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                            <BalanceNumberCell
-                                                value={order.beforeTax ?? null}
-                                                onSave={(v) => patchOrder(order._id, 'beforeTax', v)}
-                                            />
-                                        </TableCell>}
-
-                                        {/* Estimated Tax */}
-                                        {isColVisible('estimatedTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                            <BalanceNumberCell
-                                                value={order.estimatedTax ?? null}
-                                                onSave={(v) => patchOrder(order._id, 'estimatedTax', v)}
-                                            />
-                                        </TableCell>}
-
-                                        {/* Az OrderID */}
-                                        {isColVisible('azOrderId') && <TableCell sx={{ minWidth: 150 }}>
-                                            <InlineText
-                                                value={order.azOrderId}
-                                                placeholder="Amazon order ID"
-                                                onSave={(v) => patchOrder(order._id, 'azOrderId', v)}
-                                            />
-                                        </TableCell>}
-
-                                        {/* Status */}
-                                        {isColVisible('status') && <TableCell>
-                                            <FormControl size="small">
-                                                <Select
-                                                    value={order.sourcingStatus || 'Not Yet'}
-                                                    onChange={(e) => patchOrder(order._id, 'sourcingStatus', e.target.value)}
-                                                    size="small"
-                                                    sx={{ minWidth: 130, fontSize: '0.8rem' }}
-                                                    renderValue={(v) => (
-                                                        <Chip
-                                                            label={v}
-                                                            size="small"
-                                                            color={SOURCING_STATUS_COLORS[v] || 'default'}
-                                                            sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}
-                                                        />
-                                                    )}
-                                                >
-                                                    {SOURCING_STATUSES.map((s) => (
-                                                        <MenuItem key={s} value={s} sx={{ fontSize: '0.8rem' }}>
-                                                            <Chip label={s} size="small" color={SOURCING_STATUS_COLORS[s] || 'default'} sx={{ fontWeight: 'bold', fontSize: '0.75rem' }} />
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                            </FormControl>
-                                        </TableCell>}
-
-                                        {/* Purchaser */}
-                                        {isColVisible('purchaser') && <TableCell>
-                                            <InlineSelect
-                                                value={order.purchaser}
-                                                options={PURCHASERS}
-                                                onChange={(v) => patchOrder(order._id, 'purchaser', v)}
-                                            />
-                                        </TableCell>}
-
-                                        {/* Message Status */}
-                                        {isColVisible('messageStatus') && <TableCell>
-                                            <FormControl size="small">
-                                                <Select
-                                                    value={order.sourcingMessageStatus || 'Being Processed'}
-                                                    onChange={(e) => patchOrder(order._id, 'sourcingMessageStatus', e.target.value)}
-                                                    size="small"
-                                                    sx={{ minWidth: 160, fontSize: '0.8rem' }}
-                                                    renderValue={(v) => (
-                                                        <Chip
-                                                            label={v}
-                                                            size="small"
-                                                            sx={{
-                                                                fontWeight: 'bold',
-                                                                fontSize: '0.72rem',
-                                                                bgcolor: MSG_STATUS_COLORS[v] || '#e0e0e0',
-                                                                color: '#fff',
-                                                            }}
-                                                        />
-                                                    )}
-                                                >
-                                                    {MESSAGE_STATUSES.map((s) => (
-                                                        <MenuItem key={s} value={s} sx={{ fontSize: '0.8rem' }}>
-                                                            <Chip
-                                                                label={s}
+                                            {/* Amazon Account */}
+                                            {isColVisible('amazonAccount') && <TableCell>
+                                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                                    <InlineSelect
+                                                        value={order.amazonAccount}
+                                                        options={amazonAccounts}
+                                                        onChange={(v) => {
+                                                            if (v && v !== order.amazonAccount && (amazonAssignedCounts[v] || 0) >= AMAZON_ACCOUNT_DAILY_LIMIT) {
+                                                                notify('error', `Cannot assign more than ${AMAZON_ACCOUNT_DAILY_LIMIT} orders to ${v} in one day`);
+                                                                return;
+                                                            }
+                                                            patchOrder(order._id, 'amazonAccount', v);
+                                                        }}
+                                                    />
+                                                    <Tooltip title="Assign same account to next entries">
+                                                        <span>
+                                                            <IconButton
                                                                 size="small"
-                                                                sx={{ bgcolor: MSG_STATUS_COLORS[s] || '#e0e0e0', color: '#fff', fontSize: '0.72rem' }}
+                                                                onClick={() => handleBulkAssignAmazonAccount(section.orders, idx, order.amazonAccount)}
+                                                                disabled={!order.amazonAccount}
+                                                            >
+                                                                <PlaylistAddIcon sx={{ fontSize: 16 }} />
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
+                                                </Stack>
+                                            </TableCell>}
+
+                                            {/* Arriving */}
+                                            {isColVisible('arriving') && <TableCell sx={{ minWidth: 130 }}>
+                                                <InlineText
+                                                    value={order.arrivingDate}
+                                                    placeholder="YYYY-MM-DD"
+                                                    onSave={(v) => patchOrder(order._id, 'arrivingDate', v)}
+                                                />
+                                            </TableCell>}
+
+                                            {/* Before Tax */}
+                                            {isColVisible('beforeTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                <BalanceNumberCell
+                                                    value={order.beforeTax ?? null}
+                                                    onSave={(v) => patchOrder(order._id, 'beforeTax', v)}
+                                                />
+                                            </TableCell>}
+
+                                            {/* Estimated Tax */}
+                                            {isColVisible('estimatedTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                <BalanceNumberCell
+                                                    value={order.estimatedTax ?? null}
+                                                    onSave={(v) => patchOrder(order._id, 'estimatedTax', v)}
+                                                />
+                                            </TableCell>}
+
+                                            {/* Az OrderID */}
+                                            {isColVisible('azOrderId') && <TableCell sx={{ minWidth: 150 }}>
+                                                <InlineText
+                                                    value={order.azOrderId}
+                                                    placeholder="Amazon order ID"
+                                                    onSave={(v) => patchOrder(order._id, 'azOrderId', v)}
+                                                />
+                                            </TableCell>}
+
+                                            {/* Status */}
+                                            {isColVisible('status') && <TableCell>
+                                                <FormControl size="small">
+                                                    <Select
+                                                        value={order.sourcingStatus || 'Not Yet'}
+                                                        onChange={(e) => patchOrder(order._id, 'sourcingStatus', e.target.value)}
+                                                        size="small"
+                                                        sx={{ minWidth: 130, fontSize: '0.8rem' }}
+                                                        renderValue={(v) => (
+                                                            <Chip
+                                                                label={v}
+                                                                size="small"
+                                                                color={SOURCING_STATUS_COLORS[v] || 'default'}
+                                                                sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}
                                                             />
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                            </FormControl>
-                                        </TableCell>}
+                                                        )}
+                                                    >
+                                                        {SOURCING_STATUSES.map((s) => (
+                                                            <MenuItem key={s} value={s} sx={{ fontSize: '0.8rem' }}>
+                                                                <Chip label={s} size="small" color={SOURCING_STATUS_COLORS[s] || 'default'} sx={{ fontWeight: 'bold', fontSize: '0.75rem' }} />
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </TableCell>}
 
-                                        {/* Messaging */}
-                                        {isColVisible('messaging') && <TableCell align="center">
-                                            <Tooltip title="Send message to buyer">
-                                                <IconButton
-                                                    size="small"
-                                                    color="primary"
-                                                    onClick={() => handleOpenMessageDialog(order)}
-                                                >
-                                                    <ChatIcon sx={{ fontSize: 18 }} />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </TableCell>}
+                                            {/* Purchaser */}
+                                            {isColVisible('purchaser') && <TableCell>
+                                                <InlineSelect
+                                                    value={order.purchaser}
+                                                    options={PURCHASERS}
+                                                    onChange={(v) => patchOrder(order._id, 'purchaser', v)}
+                                                />
+                                            </TableCell>}
 
-                                        {/* Notes */}
-                                        {isColVisible('notes') && <TableCell sx={{ minWidth: 160 }}>
-                                            <InlineText
-                                                value={order.fulfillmentNotes}
-                                                placeholder="Add note…"
-                                                multiline
-                                                onSave={(v) => patchOrder(order._id, 'fulfillmentNotes', v)}
-                                            />
-                                        </TableCell>}
-                                    </TableRow>
+                                            {/* Message Status */}
+                                            {isColVisible('messageStatus') && <TableCell>
+                                                <FormControl size="small">
+                                                    <Select
+                                                        value={order.sourcingMessageStatus || 'Being Processed'}
+                                                        onChange={(e) => patchOrder(order._id, 'sourcingMessageStatus', e.target.value)}
+                                                        size="small"
+                                                        sx={{ minWidth: 160, fontSize: '0.8rem' }}
+                                                        renderValue={(v) => (
+                                                            <Chip
+                                                                label={v}
+                                                                size="small"
+                                                                sx={{
+                                                                    fontWeight: 'bold',
+                                                                    fontSize: '0.72rem',
+                                                                    bgcolor: MSG_STATUS_COLORS[v] || '#e0e0e0',
+                                                                    color: '#fff',
+                                                                }}
+                                                            />
+                                                        )}
+                                                    >
+                                                        {MESSAGE_STATUSES.map((s) => (
+                                                            <MenuItem key={s} value={s} sx={{ fontSize: '0.8rem' }}>
+                                                                <Chip
+                                                                    label={s}
+                                                                    size="small"
+                                                                    sx={{ bgcolor: MSG_STATUS_COLORS[s] || '#e0e0e0', color: '#fff', fontSize: '0.72rem' }}
+                                                                />
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </TableCell>}
+
+                                            {/* Messaging */}
+                                            {isColVisible('messaging') && <TableCell align="center">
+                                                <Tooltip title="Send message to buyer">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="primary"
+                                                        onClick={() => handleOpenMessageDialog(order)}
+                                                    >
+                                                        <ChatIcon sx={{ fontSize: 18 }} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </TableCell>}
+
+                                            {/* Notes */}
+                                            {isColVisible('notes') && <TableCell sx={{ minWidth: 160 }}>
+                                                <InlineText
+                                                    value={order.fulfillmentNotes}
+                                                    placeholder="Add note…"
+                                                    multiline
+                                                    onSave={(v) => patchOrder(order._id, 'fulfillmentNotes', v)}
+                                                />
+                                            </TableCell>}
+                                        </TableRow>
+                                    </React.Fragment>
                                 );
+                                });
                             })}
                         </TableBody>
                     </Table>
@@ -1685,7 +1935,8 @@ export default function AffiliateOrdersPage() {
                             <TableHead>
                                 <TableRow sx={{ bgcolor: '#e3f2fd' }}>
                                     <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Assigned</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Assigned Today</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Carry Over</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Remaining</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="center">Status</TableCell>
                                 </TableRow>
@@ -1693,13 +1944,14 @@ export default function AffiliateOrdersPage() {
                             <TableBody>
                                 {!summary.byAmazonAccount || summary.byAmazonAccount.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={4} align="center" sx={{ color: 'text.secondary' }}>No account assignments yet</TableCell>
+                                        <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>No account assignments yet</TableCell>
                                     </TableRow>
                                 ) : (
                                     summary.byAmazonAccount.map((row) => (
                                         <TableRow key={row.name} hover>
                                             <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.name}</TableCell>
                                             <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>{row.count}</TableCell>
+                                            <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.carryOverCount || 0}</TableCell>
                                             <TableCell align="right" sx={{ fontSize: '0.82rem' }}>
                                                 {row.remaining == null ? '—' : row.remaining}
                                             </TableCell>
@@ -1796,6 +2048,48 @@ export default function AffiliateOrdersPage() {
                 onClose={() => setImageDialogOpen(false)}
                 images={selectedImages}
             />
+
+            <Dialog
+                open={exportDialogOpen}
+                onClose={() => setExportDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="h6">Select Columns to Export</Typography>
+                        <Button size="small" onClick={handleToggleAllExportColumns}>
+                            {selectedExportColumns.length === AFFILIATE_EXPORT_COLUMNS.length ? 'Deselect All' : 'Select All'}
+                        </Button>
+                    </Stack>
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 2, maxHeight: 420 }}>
+                    <Stack spacing={1}>
+                        {AFFILIATE_EXPORT_COLUMNS.map((column) => (
+                            <Box key={column.id} sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Checkbox
+                                    checked={selectedExportColumns.includes(column.id)}
+                                    onChange={() => handleToggleExportColumn(column.id)}
+                                    size="small"
+                                />
+                                <Typography variant="body2">{column.label}</Typography>
+                            </Box>
+                        ))}
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setExportDialogOpen(false)} color="inherit">Cancel</Button>
+                    <Button
+                        onClick={handleExecuteExport}
+                        variant="contained"
+                        color="primary"
+                        startIcon={<DownloadIcon />}
+                        disabled={selectedExportColumns.length === 0}
+                    >
+                        Export CSV
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }
