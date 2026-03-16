@@ -553,6 +553,7 @@ export default function AmazonArrivalsPage() {
               <MenuItem value="EBAY_US">US</MenuItem>
               <MenuItem value="EBAY_ENCA">Canada</MenuItem>
               <MenuItem value="EBAY_AU">Australia</MenuItem>
+              <MenuItem value="EBAY_GB">UK</MenuItem>
             </Select>
           </FormControl>
 

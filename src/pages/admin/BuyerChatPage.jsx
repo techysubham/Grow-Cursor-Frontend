@@ -879,6 +879,7 @@ export default function BuyerChatPage() {
                 <MenuItem value="EBAY_US">United States (US)</MenuItem>
                 <MenuItem value="EBAY_CA">Canada (CA)</MenuItem>
                 <MenuItem value="EBAY_AU">Australia (AU)</MenuItem>
+                <MenuItem value="EBAY_GB">United Kingdom (GB)</MenuItem>
               </Select>
             </FormControl>
 
