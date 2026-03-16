@@ -21,7 +21,8 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Tooltip
 } from '@mui/material';
 import { DESCRIPTION_FOOTER_TEMPLATES, FOOTER_SENTINEL_START, FOOTER_SENTINEL_END } from '../constants/descriptionFooterTemplates';
 import {
@@ -36,8 +37,10 @@ import {
   Delete as DeleteIcon,
   Code as CodeIcon,
   Visibility as VisibilityIcon,
-  Update as UpdateIcon
+  Update as UpdateIcon,
+  Autorenew as AutorenewIcon
 } from '@mui/icons-material';
+import api from '../lib/api.js';
 
 export default function AsinReviewModal({ 
   open, 
@@ -56,6 +59,7 @@ export default function AsinReviewModal({
   const [amazonWindowRef, setAmazonWindowRef] = useState(null);
   const [showAmazonPreview, setShowAmazonPreview] = useState(false);
   const [appliedDescTemplates, setAppliedDescTemplates] = useState({}); // { [itemId]: templateKey | '' }
+  const [rephrasing, setRephrasing] = useState({}); // { [itemId]: true|false }
 
   // Filter out dismissed items
   const activeItems = previewItems.filter(item => !dismissedItems.has(item.id));
@@ -218,6 +222,25 @@ export default function AsinReviewModal({
       console.error('Save failed:', error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRephrase = async () => {
+    if (!currentItem || !itemData.title) return;
+    setRephrasing(prev => ({ ...prev, [currentItem.id]: true }));
+    try {
+      const { data } = await api.post('/ai/rephrase-title', {
+        currentTitle: itemData.title,
+        sourceTitle: currentItem.sourceData?.title || '',
+        brand: currentItem.sourceData?.brand || '',
+        color: currentItem.sourceData?.color || '',
+        compatibility: currentItem.sourceData?.compatibility || ''
+      });
+      handleFieldChange('title', data.rephrasedTitle, false);
+    } catch (error) {
+      console.error('[Rephrase Title] Error:', error);
+    } finally {
+      setRephrasing(prev => ({ ...prev, [currentItem.id]: false }));
     }
   };
 
@@ -886,6 +909,38 @@ export default function AsinReviewModal({
                     );
                   }
 
+                  // Title field — with rephrase button
+                  if (col.name === 'title') {
+                    return (
+                      <Stack key="title" direction="row" alignItems="flex-start" spacing={1}>
+                        <TextField
+                          label={col.label || col.name}
+                          value={itemData.title || ''}
+                          onChange={(e) => handleFieldChange('title', e.target.value, false)}
+                          size="small"
+                          fullWidth
+                          required
+                          helperText={`${(itemData.title || '').length}/80`}
+                          sx={{ flex: 1 }}
+                        />
+                        <Tooltip title="Rephrase title">
+                          <span>
+                            <IconButton
+                              onClick={handleRephrase}
+                              disabled={!itemData.title || !!rephrasing[currentItem.id]}
+                              size="small"
+                              sx={{ mt: 0.5 }}
+                            >
+                              {rephrasing[currentItem.id]
+                                ? <CircularProgress size={18} />
+                                : <AutorenewIcon fontSize="small" />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    );
+                  }
+
                   // Regular fields
                   return (
                     <TextField
@@ -895,10 +950,9 @@ export default function AsinReviewModal({
                       onChange={(e) => handleFieldChange(col.name, e.target.value, false)}
                       size="small"
                       fullWidth
-                      required={col.name === 'title' || col.name === 'startPrice'}
+                      required={col.name === 'startPrice'}
                       type={col.name === 'startPrice' || col.name === 'quantity' ? 'number' : 'text'}
                       helperText={
-                        col.name === 'title' ? `${(itemData.title || '').length}/80` :
                         col.name !== 'startPrice' && col.name !== 'quantity' ? `${(itemData[col.name] || '').length}/60` :
                         ''
                       }
