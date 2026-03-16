@@ -111,6 +111,7 @@ export default function AwaitingSheetPage() {
                             <MenuItem value="EBAY_US">EBAY_US</MenuItem>
                             <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
                             <MenuItem value="EBAY_CA">EBAY_CA</MenuItem>
+                            <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
                         </Select>
                     </FormControl>
                 </Stack>

@@ -2281,6 +2281,9 @@ function FulfillmentDashboard() {
       } else if (marketplaceId === 'EBAY_AU') {
         timeZone = 'Australia/Sydney';    // Covers AEST and AEDT automatically
         timeZoneLabel = 'AET';
+      } else if (marketplaceId === 'EBAY_GB') {
+        timeZone = 'Europe/London';       // Covers GMT and BST automatically
+        timeZoneLabel = 'GMT';
       }
 
       const formattedDate = date.toLocaleDateString('en-US', {
@@ -2970,6 +2973,7 @@ function FulfillmentDashboard() {
                   <MenuItem value="EBAY_US">EBAY_US</MenuItem>
                   <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
                   <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+                  <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
                 </Select>
               </FormControl>
 
@@ -3136,6 +3140,7 @@ function FulfillmentDashboard() {
                 <MenuItem value="EBAY_US">EBAY_US</MenuItem>
                 <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
                 <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+                <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
               </Select>
             </FormControl>
 
