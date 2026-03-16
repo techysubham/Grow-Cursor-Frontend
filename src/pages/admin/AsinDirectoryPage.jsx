@@ -359,18 +359,18 @@ export default function AsinDirectoryPage() {
 
       <Paper>
         <TableContainer>
-          <Table size="small">
+          <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
             <TableHead sx={{ bgcolor: 'grey.50' }}>
               <TableRow>
-                <TableCell padding="checkbox">
+                <TableCell padding="checkbox" sx={{ width: 60 }}>
                   <Checkbox
                     checked={asins.length > 0 && selected.length === asins.length}
                     indeterminate={selected.length > 0 && selected.length < asins.length}
                     onChange={handleSelectAll}
                   />
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: 64 }}>Image</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>ASIN</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: 64, pl: 2 }}>Image</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: 220 }}>ASIN</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: 90 }}>Price</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', width: 90 }}>Actions</TableCell>
@@ -403,7 +403,7 @@ export default function AsinDirectoryPage() {
                     </TableCell>
 
                     {/* Image */}
-                    <TableCell sx={{ py: 0.5 }}>
+                    <TableCell sx={{ py: 0.5, pl: 2 }}>
                       {item.images?.[0] ? (
                         <Box
                           component="img"
@@ -477,12 +477,12 @@ export default function AsinDirectoryPage() {
                     </TableCell>
 
                     {/* Title */}
-                    <TableCell sx={{ maxWidth: 420 }}>
+                    <TableCell>
                       {item.title ? (
                         <Tooltip title={item.title} placement="top-start">
                           <Typography
                             variant="body2"
-                            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 400, display: 'block' }}
+                            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}
                           >
                             {item.title}
                           </Typography>
