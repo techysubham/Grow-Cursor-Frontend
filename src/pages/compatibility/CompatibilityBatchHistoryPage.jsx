@@ -3,35 +3,54 @@ import {
   Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Button, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, Chip, TextField, FormControl, InputLabel, Select, MenuItem,
-  Pagination, Collapse, IconButton
+  Pagination
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import api from '../../lib/api';
 
-const formatDate = (dateString) => {
+// Format time only in IST (e.g. "2:35 PM")
+const formatTimeIST = (dateString) => {
   if (!dateString) return '-';
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit', minute: '2-digit', hour12: true
+  }).format(new Date(dateString));
+};
+
+// Format full date+time in IST for dialog
+const formatFullIST = (dateString) => {
+  if (!dateString) return '-';
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: true
   }).format(new Date(dateString));
 };
 
+// Get today's date string in IST (YYYY-MM-DD)
+const getTodayIST = () => {
+  const now = new Date();
+  const istParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(now);
+  return istParts; // en-CA gives YYYY-MM-DD format
+};
+
 export default function CompatibilityBatchHistoryPage() {
   const [sellers, setSellers] = useState([]);
+  const [users, setUsers] = useState([]);
   const [selectedSellerId, setSelectedSellerId] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedDate, setSelectedDate] = useState(getTodayIST());
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [expandedLogId, setExpandedLogId] = useState(null);
-  const [detailDialog, setDetailDialog] = useState(null); // log object
+  const [detailDialog, setDetailDialog] = useState(null);
 
   useEffect(() => {
-    const loadSellers = async () => {
+    const loadFilters = async () => {
+      // Load sellers
       try {
         const { data } = await api.get('/sellers/all');
         setSellers(data);
@@ -41,28 +60,25 @@ export default function CompatibilityBatchHistoryPage() {
           setSellers([data]);
         } catch (e) { console.error(e); }
       }
+      // Load users
+      try {
+        const { data } = await api.get('/users');
+        setUsers(data);
+      } catch (e) { console.error('Failed to load users:', e); }
     };
-    loadSellers();
-
-    // Default date range: last 7 days
-    const now = new Date();
-    const weekAgo = new Date(now);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    setEndDate(now.toISOString().slice(0, 10));
-    setStartDate(weekAgo.toISOString().slice(0, 10));
+    loadFilters();
   }, []);
 
   useEffect(() => {
-    if (startDate && endDate) fetchLogs();
-  }, [page, selectedSellerId, startDate, endDate]);
+    if (selectedDate) fetchLogs();
+  }, [page, selectedSellerId, selectedUserId, selectedDate]);
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const params = { page, limit: 20 };
+      const params = { page, limit: 50, date: selectedDate };
       if (selectedSellerId) params.sellerId = selectedSellerId;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
+      if (selectedUserId) params.userId = selectedUserId;
 
       const { data } = await api.get('/ebay/compatibility-batch-history', { params });
       setLogs(data.logs);
@@ -74,24 +90,50 @@ export default function CompatibilityBatchHistoryPage() {
     }
   };
 
-  // Group logs by date for day-wise view
-  const logsByDate = {};
-  logs.forEach(log => {
-    const d = log.date || 'Unknown';
-    if (!logsByDate[d]) logsByDate[d] = [];
-    logsByDate[d].push(log);
-  });
-  const sortedDates = Object.keys(logsByDate).sort((a, b) => b.localeCompare(a));
+  // Compute totals for the selected date
+  const totals = logs.reduce((acc, log) => ({
+    totalItems: acc.totalItems + (log.totalItems || 0),
+    correctCount: acc.correctCount + (log.correctCount || 0),
+    skippedCount: acc.skippedCount + (log.skippedCount || 0),
+    successCount: acc.successCount + (log.successCount || 0),
+    failureCount: acc.failureCount + (log.failureCount || 0),
+  }), { totalItems: 0, correctCount: 0, skippedCount: 0, successCount: 0, failureCount: 0 });
+
+  // Format selected date for display
+  const displayDate = selectedDate
+    ? new Intl.DateTimeFormat('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(selectedDate + 'T00:00:00'))
+    : '';
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Typography variant="h5" gutterBottom>Compatibility Batch History</Typography>
       <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
         Day-wise and seller-wise history of bulk compatibility sends to eBay
+        <Typography component="span" variant="caption" color="textSecondary" sx={{ ml: 1 }}>
+          (All times in IST)
+        </Typography>
       </Typography>
 
       {/* Filters */}
       <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+        <TextField
+          type="date"
+          label="Date"
+          size="small"
+          InputLabelProps={{ shrink: true }}
+          value={selectedDate}
+          onChange={(e) => { setSelectedDate(e.target.value); setPage(1); }}
+          sx={{ minWidth: 160 }}
+        />
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>User</InputLabel>
+          <Select value={selectedUserId} label="User" onChange={(e) => { setSelectedUserId(e.target.value); setPage(1); }}>
+            <MenuItem value="">All Users</MenuItem>
+            {users.map((u) => (
+              <MenuItem key={u._id} value={u._id}>{u.username || u.email}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <FormControl size="small" sx={{ minWidth: 200 }}>
           <InputLabel>Seller</InputLabel>
           <Select value={selectedSellerId} label="Seller" onChange={(e) => { setSelectedSellerId(e.target.value); setPage(1); }}>
@@ -101,117 +143,121 @@ export default function CompatibilityBatchHistoryPage() {
             ))}
           </Select>
         </FormControl>
-        <TextField
-          type="date"
-          label="Start Date"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          value={startDate}
-          onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-        />
-        <TextField
-          type="date"
-          label="End Date"
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          value={endDate}
-          onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-        />
+      </Box>
+
+      {/* Date Header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+        <Typography variant="h6" fontWeight="bold">{displayDate}</Typography>
+        {!loading && logs.length > 0 && (
+          <>
+            <Chip label={`${logs.length} batch${logs.length > 1 ? 'es' : ''}`} size="small" variant="outlined" />
+            <Chip label={`${totals.successCount} success`} size="small" color="success" variant="outlined" />
+            {totals.failureCount > 0 && (
+              <Chip label={`${totals.failureCount} failed`} size="small" color="error" variant="outlined" />
+            )}
+          </>
+        )}
       </Box>
 
       {loading ? (
         <Box display="flex" justifyContent="center" mt={5}><CircularProgress /></Box>
       ) : logs.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="body1" color="textSecondary">No batch history found for selected filters</Typography>
+          <Typography variant="body1" color="textSecondary">No batch history found for {displayDate}</Typography>
         </Paper>
       ) : (
         <>
-          {sortedDates.map(date => (
-            <Box key={date} sx={{ mb: 3 }}>
-              <Box
-                sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, cursor: 'pointer' }}
-                onClick={() => setExpandedLogId(expandedLogId === date ? null : date)}
-              >
-                <IconButton size="small">
-                  {expandedLogId === date ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
-                <Typography variant="h6" fontWeight="bold">{date}</Typography>
-                <Chip
-                  label={`${logsByDate[date].length} batch${logsByDate[date].length > 1 ? 'es' : ''}`}
-                  size="small"
-                  variant="outlined"
-                />
-                <Chip
-                  label={`${logsByDate[date].reduce((s, l) => s + l.successCount, 0)} success`}
-                  size="small"
-                  color="success"
-                  variant="outlined"
-                />
-                <Chip
-                  label={`${logsByDate[date].reduce((s, l) => s + l.failureCount, 0)} failed`}
-                  size="small"
-                  color={logsByDate[date].reduce((s, l) => s + l.failureCount, 0) > 0 ? 'error' : 'default'}
-                  variant="outlined"
-                />
-              </Box>
+          <TableContainer
+            component={Paper}
+            variant="outlined"
+            sx={{
+              flex: 1,
+              maxHeight: 'calc(100vh - 340px)',
+              overflow: 'auto',
+            }}
+          >
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5', zIndex: 2 }}>Time (IST)</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5', zIndex: 2 }}>User</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5', zIndex: 2 }}>Seller</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5', zIndex: 2 }}>Total</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5', zIndex: 2 }}>Correct</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5', zIndex: 2 }}>Skipped</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5', zIndex: 2 }}>Success</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5', zIndex: 2 }}>Failed</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5', zIndex: 2 }}>Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {logs.map((log) => (
+                  <TableRow key={log._id} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={500}>{formatTimeIST(log.createdAt)}</Typography>
+                    </TableCell>
+                    <TableCell>{log.user?.username || log.user?.name || 'Unknown'}</TableCell>
+                    <TableCell>{log.sellerUsername || 'Unknown'}</TableCell>
+                    <TableCell align="center">{log.totalItems}</TableCell>
+                    <TableCell align="center">
+                      <Chip label={log.correctCount} size="small" color="success" variant="outlined" />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip label={log.skippedCount} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip label={log.successCount} size="small" color="success" />
+                    </TableCell>
+                    <TableCell align="center">
+                      {log.failureCount > 0 ? (
+                        <Chip label={log.failureCount} size="small" color="error" />
+                      ) : (
+                        <Chip label="0" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button size="small" variant="outlined" onClick={() => setDetailDialog(log)}>
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
 
-              <Collapse in={expandedLogId === date || expandedLogId === null}>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                        <TableCell>Time</TableCell>
-                        <TableCell>User</TableCell>
-                        <TableCell>Seller</TableCell>
-                        <TableCell align="center">Total</TableCell>
-                        <TableCell align="center">Correct</TableCell>
-                        <TableCell align="center">Skipped</TableCell>
-                        <TableCell align="center">Success</TableCell>
-                        <TableCell align="center">Failed</TableCell>
-                        <TableCell>Action</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {logsByDate[date].map((log) => (
-                        <TableRow key={log._id} hover>
-                          <TableCell><Typography variant="caption">{formatDate(log.createdAt)}</Typography></TableCell>
-                          <TableCell>{log.user?.username || log.user?.name || 'Unknown'}</TableCell>
-                          <TableCell>{log.sellerUsername || 'Unknown'}</TableCell>
-                          <TableCell align="center">{log.totalItems}</TableCell>
-                          <TableCell align="center">
-                            <Chip label={log.correctCount} size="small" color="success" variant="outlined" />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip label={log.skippedCount} size="small" variant="outlined" />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip label={log.successCount} size="small" color="success" />
-                          </TableCell>
-                          <TableCell align="center">
-                            {log.failureCount > 0 ? (
-                              <Chip label={log.failureCount} size="small" color="error" />
-                            ) : (
-                              <Chip label="0" size="small" variant="outlined" />
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Button size="small" variant="outlined" onClick={() => setDetailDialog(log)}>
-                              View Details
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Collapse>
+                {/* Total Summary Row */}
+                <TableRow sx={{ bgcolor: '#e3f2fd', position: 'sticky', bottom: 0, zIndex: 1 }}>
+                  <TableCell colSpan={3} sx={{ fontWeight: 'bold', borderTop: '2px solid #1976d2' }}>
+                    <Typography variant="body2" fontWeight="bold">Day Total</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', borderTop: '2px solid #1976d2' }}>
+                    {totals.totalItems}
+                  </TableCell>
+                  <TableCell align="center" sx={{ borderTop: '2px solid #1976d2' }}>
+                    <Chip label={totals.correctCount} size="small" color="success" variant="outlined" sx={{ fontWeight: 'bold' }} />
+                  </TableCell>
+                  <TableCell align="center" sx={{ borderTop: '2px solid #1976d2' }}>
+                    <Chip label={totals.skippedCount} size="small" variant="outlined" sx={{ fontWeight: 'bold' }} />
+                  </TableCell>
+                  <TableCell align="center" sx={{ borderTop: '2px solid #1976d2' }}>
+                    <Chip label={totals.successCount} size="small" color="success" sx={{ fontWeight: 'bold' }} />
+                  </TableCell>
+                  <TableCell align="center" sx={{ borderTop: '2px solid #1976d2' }}>
+                    {totals.failureCount > 0 ? (
+                      <Chip label={totals.failureCount} size="small" color="error" sx={{ fontWeight: 'bold' }} />
+                    ) : (
+                      <Chip label="0" size="small" variant="outlined" sx={{ fontWeight: 'bold' }} />
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ borderTop: '2px solid #1976d2' }} />
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {totalPages > 1 && (
+            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+              <Pagination count={totalPages} page={page} onChange={(e, v) => setPage(v)} color="primary" />
             </Box>
-          ))}
-
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-            <Pagination count={totalPages} page={page} onChange={(e, v) => setPage(v)} color="primary" />
-          </Box>
+          )}
         </>
       )}
 
@@ -220,7 +266,7 @@ export default function CompatibilityBatchHistoryPage() {
         <DialogTitle sx={{ borderBottom: '1px solid #eee' }}>
           <Typography variant="h6" fontWeight="bold">Batch Details</Typography>
           <Typography variant="body2" color="textSecondary">
-            {detailDialog && `${formatDate(detailDialog.createdAt)} • ${detailDialog.user?.username || 'Unknown'} • ${detailDialog.sellerUsername || 'Unknown Seller'}`}
+            {detailDialog && `${formatFullIST(detailDialog.createdAt)} • ${detailDialog.user?.username || 'Unknown'} • ${detailDialog.sellerUsername || 'Unknown Seller'}`}
           </Typography>
         </DialogTitle>
         <DialogContent sx={{ p: 2 }}>
