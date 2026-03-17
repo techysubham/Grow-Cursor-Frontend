@@ -33,7 +33,14 @@ import {
   Settings as SettingsIcon,
   RuleOutlined as ProofReadIcon,
   CalendarToday as CalendarIcon,
+  PlayArrow as ApplyIcon,
 } from '@mui/icons-material';
+import {
+  Dialog as MuiDialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from '@mui/material';
 import api from '../../lib/api.js';
 import ListDirectlyDialog from '../../components/ListDirectlyDialog.jsx';
 import TemplateCustomizationDialog from '../../components/TemplateCustomizationDialog.jsx';
@@ -85,7 +92,8 @@ export default function TemplateDirectoryPage() {
   const [priceMax, setPriceMax] = useState('');
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTimeFrom, setScheduleTimeFrom] = useState('');
-  const [scheduleTimeTo, setScheduleTimeTo] = useState('');
+  const [scheduleStep, setScheduleStep] = useState(3);
+  const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
 
   // ── Dialogs ───────────────────────────────────────────────────────────────
   const [customizationDialog, setCustomizationDialog] = useState(false);
@@ -184,6 +192,49 @@ export default function TemplateDirectoryPage() {
   const handleToggleAll = () => {
     if (selectedListings.size === listings.length) setSelectedListings(new Set());
     else setSelectedListings(new Set(listings.map(l => l._id)));
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Schedule Time helpers
+  // ─────────────────────────────────────────────────────────────────────────
+  const scheduleReady = !!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1 && template && selectedSeller);
+
+  // Compute the preview of the last listing's timestamp given current inputs + total loaded
+  const computeSchedulePreview = () => {
+    if (!scheduleReady || listings.length === 0) return null;
+    const startMs = Date.parse(`${scheduleDate}T${scheduleTimeFrom}:00`);
+    if (isNaN(startMs)) return null;
+    const lastMs = startMs + (pagination.total - 1) * scheduleStep * 60 * 1000;
+    const d = new Date(lastMs);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  const schedulePreviewLast = computeSchedulePreview();
+
+  const handleApplySchedule = async () => {
+    if (!scheduleReady) return;
+    setScheduleConfirmOpen(false);
+    setLoading(true);
+    try {
+      const startDateTime = `${scheduleDate} ${scheduleTimeFrom}:00`;
+      const { data } = await api.post('/template-listings/bulk-apply-schedule', {
+        templateId: template._id,
+        sellerId: selectedSeller._id,
+        startDateTime,
+        stepMinutes: scheduleStep,
+      });
+      if (data.updated === 0) {
+        setSuccess('No listings found for this template and seller.');
+      } else {
+        setSuccess(`Schedule applied to ${data.updated} listings (${data.firstTime} → ${data.lastTime})`);
+      }
+      fetchListings(1);
+    } catch (e) {
+      setError(e.response?.data?.error || 'Failed to apply schedule times');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -418,56 +469,73 @@ export default function TemplateDirectoryPage() {
             />
           </Paper>
 
-          {/* Schedule slug */}
-          <Tooltip title="Schedule logic coming soon">
-            <Paper
-              variant="outlined"
-              sx={{ px: 2, py: 1, cursor: 'default', borderRadius: 2 }}
-            >
-              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-                <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
-                <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
-                  SCHEDULE
+          {/* Schedule block */}
+          <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
+              <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
+              <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
+                SCHEDULE
+              </Typography>
+              {schedulePreviewLast && (
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11, ml: 1 }}>
+                  — last: {schedulePreviewLast}
                 </Typography>
-              </Stack>
-              <Stack direction="row" alignItems="flex-end" spacing={2}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
-                    Date
-                  </Typography>
-                  <OutlinedInput
+              )}
+            </Stack>
+            <Stack direction="row" alignItems="flex-end" spacing={1.5}>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+                  Date
+                </Typography>
+                <OutlinedInput
+                  size="small"
+                  type="date"
+                  value={scheduleDate}
+                  onChange={e => setScheduleDate(e.target.value)}
+                  sx={{ width: 148, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                />
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+                  Start time
+                </Typography>
+                <OutlinedInput
+                  size="small"
+                  type="time"
+                  value={scheduleTimeFrom}
+                  onChange={e => setScheduleTimeFrom(e.target.value)}
+                  sx={{ width: 118, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                />
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+                  Interval (min)
+                </Typography>
+                <OutlinedInput
+                  size="small"
+                  type="number"
+                  value={scheduleStep}
+                  onChange={e => setScheduleStep(Math.max(1, parseInt(e.target.value) || 1))}
+                  inputProps={{ min: 1 }}
+                  sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                />
+              </Box>
+              <Tooltip title={!scheduleReady ? 'Fill in date, start time, and interval first' : `Apply schedule to all ${pagination.total} listings`}>
+                <span>
+                  <Button
+                    variant="contained"
                     size="small"
-                    type="date"
-                    value={scheduleDate}
-                    onChange={e => setScheduleDate(e.target.value)}
-                    sx={{ width: 148, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
-                  />
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
-                    Time range
-                  </Typography>
-                  <Stack direction="row" alignItems="center" spacing={0.75}>
-                    <OutlinedInput
-                      size="small"
-                      type="time"
-                      value={scheduleTimeFrom}
-                      onChange={e => setScheduleTimeFrom(e.target.value)}
-                      sx={{ width: 118, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
-                    />
-                    <Typography variant="body2" color="text.secondary">—</Typography>
-                    <OutlinedInput
-                      size="small"
-                      type="time"
-                      value={scheduleTimeTo}
-                      onChange={e => setScheduleTimeTo(e.target.value)}
-                      sx={{ width: 118, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
-                    />
-                  </Stack>
-                </Box>
-              </Stack>
-            </Paper>
-          </Tooltip>
+                    startIcon={<ApplyIcon />}
+                    disabled={!scheduleReady || loading}
+                    onClick={() => setScheduleConfirmOpen(true)}
+                    sx={{ mb: 0.2, bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}
+                  >
+                    Apply
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
+          </Paper>
 
           <Box sx={{ flex: 1 }} />
 
@@ -684,6 +752,36 @@ export default function TemplateDirectoryPage() {
           ...(template?.customColumns?.map(col => ({ ...col, type: 'custom' })) || []),
         ]}
       />
+
+      {/* Schedule confirmation dialog */}
+      <MuiDialog open={scheduleConfirmOpen} onClose={() => setScheduleConfirmOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Apply Schedule Times</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" gutterBottom>
+            Schedule times will be assigned to <strong>{pagination.total} listings</strong> in <strong>{template?.name}</strong>:
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            • Starting: <strong>{scheduleDate} {scheduleTimeFrom}:00</strong>
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            • Interval: <strong>{scheduleStep} minute{scheduleStep !== 1 ? 's' : ''}</strong> between each listing
+          </Typography>
+          {schedulePreviewLast && (
+            <Typography variant="body2" gutterBottom>
+              • Last listing: <strong>{schedulePreviewLast}</strong>
+            </Typography>
+          )}
+          <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+            Existing Schedule Time values will be overwritten.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setScheduleConfirmOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleApplySchedule} sx={{ bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}>
+            Confirm
+          </Button>
+        </DialogActions>
+      </MuiDialog>
     </Box>
   );
 }
