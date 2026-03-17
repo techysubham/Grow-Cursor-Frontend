@@ -202,12 +202,14 @@ export default function TemplateDirectoryPage() {
   // Compute the preview of the last listing's timestamp given current inputs + total loaded
   const computeSchedulePreview = () => {
     if (!scheduleReady || listings.length === 0) return null;
-    const startMs = Date.parse(`${scheduleDate}T${scheduleTimeFrom}:00`);
+    const [h, m] = scheduleTimeFrom.split(':').map(Number);
+    const [y, mo, d2] = scheduleDate.split('-').map(Number);
+    const startMs = Date.UTC(y, mo - 1, d2, h, m, 0);
     if (isNaN(startMs)) return null;
     const lastMs = startMs + (pagination.total - 1) * scheduleStep * 60 * 1000;
     const d = new Date(lastMs);
     const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
   };
 
   const schedulePreviewLast = computeSchedulePreview();
@@ -497,14 +499,17 @@ export default function TemplateDirectoryPage() {
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
-                  Start time
+                  Start time (24h)
                 </Typography>
                 <OutlinedInput
                   size="small"
-                  type="time"
+                  placeholder="HH:MM"
                   value={scheduleTimeFrom}
-                  onChange={e => setScheduleTimeFrom(e.target.value)}
-                  sx={{ width: 118, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^0-9:]/g, '');
+                    if (v.length <= 5) setScheduleTimeFrom(v);
+                  }}
+                  sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
                 />
               </Box>
               <Box>
