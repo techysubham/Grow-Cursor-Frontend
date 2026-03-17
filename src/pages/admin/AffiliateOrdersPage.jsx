@@ -169,6 +169,10 @@ function normalizeAffiliateOrder(order) {
     };
 }
 
+function getOrderSpendAmount(order) {
+    return Number(order?.beforeTaxUSD ?? order?.beforeTax) || 0;
+}
+
 function sortAffiliateOrders(orderList) {
     return [...orderList].sort((leftOrder, rightOrder) => {
         const left = normalizeAffiliateOrder(leftOrder);
@@ -941,6 +945,11 @@ export default function AffiliateOrdersPage() {
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [summaryError, setSummaryError] = useState('');
 
+    // Tab 4 state
+    const [spendOrders, setSpendOrders] = useState([]);
+    const [spendOrdersLoading, setSpendOrdersLoading] = useState(false);
+    const [spendOrdersError, setSpendOrdersError] = useState('');
+
     // Snackbar
     const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
     const notify = (severity, msg) => setSnack({ open: true, msg, severity });
@@ -1021,12 +1030,26 @@ export default function AffiliateOrdersPage() {
         }
     }, [date, excludeLowValue]);
 
+    const fetchSpendOrders = useCallback(async () => {
+        setSpendOrdersLoading(true);
+        setSpendOrdersError('');
+        try {
+            const { data } = await api.get('/affiliate-orders/spend', { params: { date, excludeLowValue: excludeLowValue ? 'true' : 'false' } });
+            setSpendOrders((data || []).map(normalizeAffiliateOrder));
+        } catch (err) {
+            setSpendOrdersError(err?.response?.data?.error || 'Failed to load spend orders');
+        } finally {
+            setSpendOrdersLoading(false);
+        }
+    }, [date, excludeLowValue]);
+
     useEffect(() => {
         fetchOrders();
         fetchAmazonAccounts();
         fetchBalances();
         fetchSummary();
-    }, [date, excludeLowValue, fetchOrders, fetchAmazonAccounts, fetchBalances, fetchSummary]);
+        fetchSpendOrders();
+    }, [date, excludeLowValue, fetchOrders, fetchAmazonAccounts, fetchBalances, fetchSummary, fetchSpendOrders]);
 
     // ── Order field patch ──────────────────────────────────────────────────────
 
@@ -1220,15 +1243,15 @@ export default function AffiliateOrdersPage() {
     const sellerGroupStats = getSellerGroupStats(displayedOrders);
     const sellerGroupCount = Object.keys(sellerGroupStats).length;
     const actualSpendRows = useMemo(() => (
-        displayedOrders.map((order, index) => {
-            const amounts = calculateActualSpend(order.beforeTaxUSD);
+        spendOrders.map((order, index) => {
+            const amounts = calculateActualSpend(getOrderSpendAmount(order));
             return {
                 ...order,
                 rowIndex: index + 1,
                 ...amounts,
             };
         })
-    ), [displayedOrders]);
+    ), [spendOrders]);
     const actualSpendSummary = useMemo(() => actualSpendRows.reduce((acc, row) => ({
         orderCount: acc.orderCount + 1,
         base: roundMoney(acc.base + row.base),
@@ -2059,138 +2082,144 @@ export default function AffiliateOrdersPage() {
                         Final amount = Base + 3.5% markup + 18% IGST on markup only
                     </Typography>
                 </Stack>
-                <Button size="small" startIcon={<RefreshIcon />} onClick={fetchOrders}>Refresh</Button>
+                <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSpendOrders}>Refresh</Button>
             </Stack>
 
-            {ordersError && <Alert severity="error" sx={{ mb: 1 }}>{ordersError}</Alert>}
+            {spendOrdersError && <Alert severity="error" sx={{ mb: 1 }}>{spendOrdersError}</Alert>}
 
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
-                <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
-                    <Typography variant="caption" color="text.secondary">Base Amount</Typography>
-                    <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.base)}</Typography>
-                </Paper>
-                <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
-                    <Typography variant="caption" color="text.secondary">Markup 3.5%</Typography>
-                    <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.markup)}</Typography>
-                </Paper>
-                <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
-                    <Typography variant="caption" color="text.secondary">IGST on Markup 18%</Typography>
-                    <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.igstOnMarkup)}</Typography>
-                </Paper>
-                <Paper variant="outlined" sx={{ p: 2, minWidth: 220, flex: 1.2, bgcolor: '#f7fbff' }}>
-                    <Typography variant="caption" color="text.secondary">Final Actual Spend</Typography>
-                    <Typography variant="h5" fontWeight={800} color="primary.main">${fmt(actualSpendSummary.total)}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        {actualSpendSummary.orderCount} order{actualSpendSummary.orderCount !== 1 ? 's' : ''}
-                    </Typography>
-                </Paper>
-            </Stack>
+            {spendOrdersLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+            ) : (
+                <>
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
+                        <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Base Amount</Typography>
+                            <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.base)}</Typography>
+                        </Paper>
+                        <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Markup 3.5%</Typography>
+                            <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.markup)}</Typography>
+                        </Paper>
+                        <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary">IGST on Markup 18%</Typography>
+                            <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.igstOnMarkup)}</Typography>
+                        </Paper>
+                        <Paper variant="outlined" sx={{ p: 2, minWidth: 220, flex: 1.2, bgcolor: '#f7fbff' }}>
+                            <Typography variant="caption" color="text.secondary">Final Actual Spend</Typography>
+                            <Typography variant="h5" fontWeight={800} color="primary.main">${fmt(actualSpendSummary.total)}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                {actualSpendSummary.orderCount} order{actualSpendSummary.orderCount !== 1 ? 's' : ''}
+                            </Typography>
+                        </Paper>
+                    </Stack>
 
-            <Stack direction={{ xs: 'column', xl: 'row' }} spacing={2} alignItems="flex-start">
-                <Paper variant="outlined" sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 380 } }}>
-                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
-                        By Amazon Account
-                    </Typography>
-                    <Table size="small">
-                        <TableHead>
-                            <TableRow sx={{ bgcolor: '#e8f1ff' }}>
-                                <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Orders</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Final</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {actualSpendByAccount.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary' }}>
-                                        No orders available.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                actualSpendByAccount.map((row) => (
-                                    <TableRow key={row.amazonAccount} hover>
-                                        <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
-                                        <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
-                                        <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
+                    <Stack direction={{ xs: 'column', xl: 'row' }} spacing={2} alignItems="flex-start">
+                        <Paper variant="outlined" sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 380 } }}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
+                                By Amazon Account
+                            </Typography>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: '#e8f1ff' }}>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Orders</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Final</TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </Paper>
-
-                <TableContainer component={Paper} variant="outlined" sx={{ flex: 1, overflowX: 'auto' }}>
-                    <Table size="small" sx={{ minWidth: 980 }}>
-                        <TableHead>
-                            <TableRow sx={{ bgcolor: '#edf7ed' }}>
-                                {['#', 'Order ID', 'Product', 'Seller', 'Amazon Account', 'Base Amount', 'Markup 3.5%', 'IGST 18% on Markup', 'Final Actual Spend'].map((label) => (
-                                    <TableCell key={label} sx={{ fontWeight: 'bold', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                                        {label}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {actualSpendRows.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ color: 'text.secondary', py: 4 }}>
-                                        No orders found for this date.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                actualSpendRows.map((row) => {
-                                    const itemId = row.lineItems?.[0]?.legacyItemId || row.itemNumber;
-                                    const productTitle = row.lineItems?.[0]?.title || row.productName || '—';
-
-                                    return (
-                                        <TableRow key={row._id} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#fafafa' } }}>
-                                            <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{row.rowIndex}</TableCell>
-                                            <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.orderId || '—'}</TableCell>
-                                            <TableCell sx={{ minWidth: 260 }}>
-                                                {itemId ? (
-                                                    <Link
-                                                        href={`https://www.ebay.com/itm/${itemId}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        underline="hover"
-                                                        sx={{ display: 'inline-flex', alignItems: 'flex-start', gap: 0.5 }}
-                                                    >
-                                                        <Typography
-                                                            variant="body2"
-                                                            sx={{
-                                                                fontSize: '0.78rem',
-                                                                fontWeight: 600,
-                                                                color: 'primary.main',
-                                                                display: '-webkit-box',
-                                                                WebkitLineClamp: 2,
-                                                                WebkitBoxOrient: 'vertical',
-                                                                overflow: 'hidden'
-                                                            }}
-                                                        >
-                                                            {productTitle}
-                                                        </Typography>
-                                                        <OpenInNewIcon sx={{ fontSize: 13, mt: 0.2, flexShrink: 0 }} />
-                                                    </Link>
-                                                ) : (
-                                                    <Typography variant="body2" sx={{ fontSize: '0.78rem', fontWeight: 600 }}>
-                                                        {productTitle}
-                                                    </Typography>
-                                                )}
+                                </TableHead>
+                                <TableBody>
+                                    {actualSpendByAccount.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary' }}>
+                                                No orders available.
                                             </TableCell>
-                                            <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.sellerGroupName || '—'}</TableCell>
-                                            <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.amazonAccount || '—'}</TableCell>
-                                            <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.base)}</TableCell>
-                                            <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.markup)}</TableCell>
-                                            <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.igstOnMarkup)}</TableCell>
-                                            <TableCell sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'success.dark', whiteSpace: 'nowrap' }}>${fmt(row.total)}</TableCell>
                                         </TableRow>
-                                    );
-                                })
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Stack>
+                                    ) : (
+                                        actualSpendByAccount.map((row) => (
+                                            <TableRow key={row.amazonAccount} hover>
+                                                <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </Paper>
+
+                        <TableContainer component={Paper} variant="outlined" sx={{ flex: 1, overflowX: 'auto' }}>
+                            <Table size="small" sx={{ minWidth: 980 }}>
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: '#edf7ed' }}>
+                                        {['#', 'Order ID', 'Product', 'Seller', 'Amazon Account', 'Base Amount', 'Markup 3.5%', 'IGST 18% on Markup', 'Final Actual Spend'].map((label) => (
+                                            <TableCell key={label} sx={{ fontWeight: 'bold', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                                                {label}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {actualSpendRows.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={9} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                                                No orders found for this date.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        actualSpendRows.map((row) => {
+                                            const itemId = row.lineItems?.[0]?.legacyItemId || row.itemNumber;
+                                            const productTitle = row.lineItems?.[0]?.title || row.productName || '—';
+
+                                            return (
+                                                <TableRow key={row._id} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#fafafa' } }}>
+                                                    <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{row.rowIndex}</TableCell>
+                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.orderId || '—'}</TableCell>
+                                                    <TableCell sx={{ minWidth: 260 }}>
+                                                        {itemId ? (
+                                                            <Link
+                                                                href={`https://www.ebay.com/itm/${itemId}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                underline="hover"
+                                                                sx={{ display: 'inline-flex', alignItems: 'flex-start', gap: 0.5 }}
+                                                            >
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{
+                                                                        fontSize: '0.78rem',
+                                                                        fontWeight: 600,
+                                                                        color: 'primary.main',
+                                                                        display: '-webkit-box',
+                                                                        WebkitLineClamp: 2,
+                                                                        WebkitBoxOrient: 'vertical',
+                                                                        overflow: 'hidden'
+                                                                    }}
+                                                                >
+                                                                    {productTitle}
+                                                                </Typography>
+                                                                <OpenInNewIcon sx={{ fontSize: 13, mt: 0.2, flexShrink: 0 }} />
+                                                            </Link>
+                                                        ) : (
+                                                            <Typography variant="body2" sx={{ fontSize: '0.78rem', fontWeight: 600 }}>
+                                                                {productTitle}
+                                                            </Typography>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.sellerGroupName || '—'}</TableCell>
+                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.amazonAccount || '—'}</TableCell>
+                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.base)}</TableCell>
+                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.markup)}</TableCell>
+                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.igstOnMarkup)}</TableCell>
+                                                    <TableCell sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'success.dark', whiteSpace: 'nowrap' }}>${fmt(row.total)}</TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Stack>
+                </>
+            )}
         </>
     );
 
