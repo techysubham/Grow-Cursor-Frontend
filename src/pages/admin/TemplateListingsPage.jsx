@@ -1293,13 +1293,16 @@ export default function TemplateListingsPage() {
             </Typography>
             {scheduleDate && scheduleTimeFrom && scheduleStep >= 1 && pagination.total > 0 && (() => {
               const [h, m] = scheduleTimeFrom.split(':').map(Number);
+              const totalMin = h * 60 + m + (pagination.total - 1) * scheduleStep;
+              const lh = Math.floor((totalMin % 1440) / 60);
+              const lm = totalMin % 60;
+              const extraDays = Math.floor(totalMin / 1440);
               const [y, mo, d2] = scheduleDate.split('-').map(Number);
-              const startMs = Date.UTC(y, mo - 1, d2, h, m, 0);
-              if (isNaN(startMs)) return null;
-              const lastMs = startMs + (pagination.total - 1) * scheduleStep * 60 * 1000;
-              const d = new Date(lastMs);
+              const daysIn = (yy, mm) => new Date(yy, mm, 0).getDate();
+              let ny = y, nm = mo, nd = d2 + extraDays;
+              while (nd > daysIn(ny, nm)) { nd -= daysIn(ny, nm); nm++; if (nm > 12) { nm = 1; ny++; } }
               const pad = n => String(n).padStart(2, '0');
-              const lastLabel = `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+              const lastLabel = `${ny}-${pad(nm)}-${pad(nd)} ${pad(lh)}:${pad(lm)}:00`;
               return (
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11, ml: 1 }}>
                   — last: {lastLabel}
@@ -2426,6 +2429,8 @@ export default function TemplateListingsPage() {
                   sellerId,
                   startDateTime,
                   stepMinutes: scheduleStep,
+                  batchFilter: batchFilter === 'active' || batchFilter === 'all' ? batchFilter : undefined,
+                  batchId: batchFilter !== 'active' && batchFilter !== 'all' ? batchFilter : undefined,
                 });
                 if (data.updated === 0) {
                   setSuccess('No listings found for this template and seller.');

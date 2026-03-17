@@ -62,7 +62,7 @@ const CORE_COLUMNS = [
 function renderCellValue(col, listing) {
   const v = listing[col.key];
   if (col.key === 'startPrice') return v != null ? `$${v}` : '-';
-  if (col.key === 'scheduleTime') return v ? new Date(v).toLocaleString() : '-';
+  if (col.key === 'scheduleTime') return v || '-';
   return v || '-';
 }
 
@@ -203,13 +203,16 @@ export default function TemplateDirectoryPage() {
   const computeSchedulePreview = () => {
     if (!scheduleReady || listings.length === 0) return null;
     const [h, m] = scheduleTimeFrom.split(':').map(Number);
+    const totalMin = h * 60 + m + (pagination.total - 1) * scheduleStep;
+    const lh = Math.floor((totalMin % 1440) / 60);
+    const lm = totalMin % 60;
+    const extraDays = Math.floor(totalMin / 1440);
     const [y, mo, d2] = scheduleDate.split('-').map(Number);
-    const startMs = Date.UTC(y, mo - 1, d2, h, m, 0);
-    if (isNaN(startMs)) return null;
-    const lastMs = startMs + (pagination.total - 1) * scheduleStep * 60 * 1000;
-    const d = new Date(lastMs);
+    const daysIn = (yy, mm) => new Date(yy, mm, 0).getDate();
+    let ny = y, nm = mo, nd = d2 + extraDays;
+    while (nd > daysIn(ny, nm)) { nd -= daysIn(ny, nm); nm++; if (nm > 12) { nm = 1; ny++; } }
     const pad = n => String(n).padStart(2, '0');
-    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+    return `${ny}-${pad(nm)}-${pad(nd)} ${pad(lh)}:${pad(lm)}:00`;
   };
 
   const schedulePreviewLast = computeSchedulePreview();
@@ -225,6 +228,7 @@ export default function TemplateDirectoryPage() {
         sellerId: selectedSeller._id,
         startDateTime,
         stepMinutes: scheduleStep,
+        batchFilter: 'all',
       });
       if (data.updated === 0) {
         setSuccess('No listings found for this template and seller.');
