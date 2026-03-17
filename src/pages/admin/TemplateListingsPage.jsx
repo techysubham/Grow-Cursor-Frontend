@@ -5,7 +5,7 @@ import {
   TableHead, TableRow, Typography, IconButton, Dialog, DialogTitle, 
   DialogContent, DialogActions, Alert, Pagination, TextField, Tabs, Tab, MenuItem,
   Chip, CircularProgress, Switch, FormControlLabel, LinearProgress, FormControl,
-  InputLabel, Select, Breadcrumbs, Link, Checkbox
+  InputLabel, Select, Breadcrumbs, Link, Checkbox, OutlinedInput, Tooltip
 } from '@mui/material';
 import { 
   Delete as DeleteIcon, 
@@ -15,7 +15,9 @@ import {
   Upload as UploadIcon,
   ContentCopy as CopyIcon,
   Settings as SettingsIcon,
-  Calculate as CalculatorIcon
+  Calculate as CalculatorIcon,
+  CalendarToday as CalendarIcon,
+  PlayArrow as ApplyIcon,
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
 import { getAuthToken } from '../../lib/api.js';
@@ -107,6 +109,12 @@ export default function TemplateListingsPage() {
   // ASIN Review Modal state
   const [reviewModal, setReviewModal] = useState(false);
   const [previewItems, setPreviewItems] = useState([]);
+
+  // Schedule Time state
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTimeFrom, setScheduleTimeFrom] = useState('');
+  const [scheduleStep, setScheduleStep] = useState(3);
+  const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
 
   // List Directly dialog state
   const [listDirectlyDialog, setListDirectlyDialog] = useState(false);
@@ -1274,7 +1282,90 @@ export default function TemplateListingsPage() {
           )}
         </Button>
       </Stack>
-      
+
+      {/* Schedule block */}
+      {!fromAsinList && (
+        <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column' }}>
+          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
+            <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
+            <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
+              SCHEDULE
+            </Typography>
+            {scheduleDate && scheduleTimeFrom && scheduleStep >= 1 && pagination.total > 0 && (() => {
+              const [h, m] = scheduleTimeFrom.split(':').map(Number);
+              const [y, mo, d2] = scheduleDate.split('-').map(Number);
+              const startMs = Date.UTC(y, mo - 1, d2, h, m, 0);
+              if (isNaN(startMs)) return null;
+              const lastMs = startMs + (pagination.total - 1) * scheduleStep * 60 * 1000;
+              const d = new Date(lastMs);
+              const pad = n => String(n).padStart(2, '0');
+              const lastLabel = `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+              return (
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11, ml: 1 }}>
+                  — last: {lastLabel}
+                </Typography>
+              );
+            })()}
+          </Stack>
+          <Stack direction="row" alignItems="flex-end" spacing={1.5}>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+                Date
+              </Typography>
+              <OutlinedInput
+                size="small"
+                type="date"
+                value={scheduleDate}
+                onChange={e => setScheduleDate(e.target.value)}
+                sx={{ width: 148, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+              />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+                Start time (24h)
+              </Typography>
+              <OutlinedInput
+                size="small"
+                placeholder="HH:MM"
+                value={scheduleTimeFrom}
+                onChange={e => {
+                  const v = e.target.value.replace(/[^0-9:]/g, '');
+                  if (v.length <= 5) setScheduleTimeFrom(v);
+                }}
+                sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+              />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+                Interval (min)
+              </Typography>
+              <OutlinedInput
+                size="small"
+                type="number"
+                value={scheduleStep}
+                onChange={e => setScheduleStep(Math.max(1, parseInt(e.target.value) || 1))}
+                inputProps={{ min: 1 }}
+                sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+              />
+            </Box>
+            <Tooltip title={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) ? 'Fill in date, start time, and interval first' : `Apply schedule to all ${pagination.total} listings`}>
+              <span>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<ApplyIcon />}
+                  disabled={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) || loading}
+                  onClick={() => setScheduleConfirmOpen(true)}
+                  sx={{ mb: 0.2, bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}
+                >
+                  Apply
+                </Button>
+              </span>
+            </Tooltip>
+          </Stack>
+        </Paper>
+      )}
+
       {/* Batch Filter */}
       {!fromAsinList && (
       <Paper sx={{ p: 2, mb: 2 }}>
@@ -2303,6 +2394,57 @@ export default function TemplateListingsPage() {
           { name: 'quantity', label: 'Quantity', type: 'core' }
         ]}
       />
+
+      {/* Schedule confirmation dialog */}
+      <Dialog open={scheduleConfirmOpen} onClose={() => setScheduleConfirmOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Apply Schedule Times</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" gutterBottom>
+            Schedule times will be assigned to <strong>{pagination.total} listings</strong> in <strong>{template?.name}</strong>:
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            • Starting: <strong>{scheduleDate} {scheduleTimeFrom}:00</strong>
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            • Interval: <strong>{scheduleStep} minute{scheduleStep !== 1 ? 's' : ''}</strong> between each listing
+          </Typography>
+          <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+            Existing Schedule Time values will be overwritten.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setScheduleConfirmOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              setScheduleConfirmOpen(false);
+              setLoading(true);
+              try {
+                const startDateTime = `${scheduleDate} ${scheduleTimeFrom}:00`;
+                const { data } = await api.post('/template-listings/bulk-apply-schedule', {
+                  templateId,
+                  sellerId,
+                  startDateTime,
+                  stepMinutes: scheduleStep,
+                });
+                if (data.updated === 0) {
+                  setSuccess('No listings found for this template and seller.');
+                } else {
+                  setSuccess(`Schedule applied to ${data.updated} listings (${data.firstTime} → ${data.lastTime})`);
+                }
+                fetchListings();
+              } catch (e) {
+                setError(e.response?.data?.error || 'Failed to apply schedule times');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            sx={{ bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}
+          >
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
