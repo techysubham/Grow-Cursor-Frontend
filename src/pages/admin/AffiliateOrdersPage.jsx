@@ -173,6 +173,55 @@ function getOrderSpendAmount(order) {
     return Number(order?.beforeTaxUSD ?? order?.beforeTax) || 0;
 }
 
+function getOrderCreditCardBaseAmount(order) {
+    const beforeTax = Number(order?.beforeTax) || 0;
+    const estimatedTax = Number(order?.estimatedTax) || 0;
+    const combinedAmount = beforeTax + estimatedTax;
+
+    return combinedAmount > 0 ? combinedAmount : getOrderSpendAmount(order);
+}
+
+function summarizeActualSpendRows(rowList) {
+    return rowList.reduce((acc, row) => ({
+        orderCount: acc.orderCount + 1,
+        base: roundMoney(acc.base + row.base),
+        markup: roundMoney(acc.markup + row.markup),
+        igstOnMarkup: roundMoney(acc.igstOnMarkup + row.igstOnMarkup),
+        total: roundMoney(acc.total + row.total),
+    }), {
+        orderCount: 0,
+        base: 0,
+        markup: 0,
+        igstOnMarkup: 0,
+        total: 0,
+    });
+}
+
+function summarizeActualSpendByAccount(rowList) {
+    return Object.values(rowList.reduce((acc, row) => {
+        const accountName = row.amazonAccount || '(Unassigned)';
+
+        if (!acc[accountName]) {
+            acc[accountName] = {
+                amazonAccount: accountName,
+                orderCount: 0,
+                base: 0,
+                markup: 0,
+                igstOnMarkup: 0,
+                total: 0,
+            };
+        }
+
+        acc[accountName].orderCount += 1;
+        acc[accountName].base = roundMoney(acc[accountName].base + row.base);
+        acc[accountName].markup = roundMoney(acc[accountName].markup + row.markup);
+        acc[accountName].igstOnMarkup = roundMoney(acc[accountName].igstOnMarkup + row.igstOnMarkup);
+        acc[accountName].total = roundMoney(acc[accountName].total + row.total);
+
+        return acc;
+    }, {})).sort((left, right) => left.amazonAccount.localeCompare(right.amazonAccount));
+}
+
 function sortAffiliateOrders(orderList) {
     return [...orderList].sort((leftOrder, rightOrder) => {
         const left = normalizeAffiliateOrder(leftOrder);
@@ -1242,51 +1291,35 @@ export default function AffiliateOrdersPage() {
     const carryOverCount = displayedOrders.filter((order) => order.isCarryOver).length;
     const sellerGroupStats = getSellerGroupStats(displayedOrders);
     const sellerGroupCount = Object.keys(sellerGroupStats).length;
+    const balanceByAccountName = useMemo(() => balances.reduce((acc, row) => {
+        acc[row.amazonAccountName] = row;
+        return acc;
+    }, {}), [balances]);
     const actualSpendRows = useMemo(() => (
         spendOrders.map((order, index) => {
-            const amounts = calculateActualSpend(getOrderSpendAmount(order));
+            const balanceRow = balanceByAccountName[order.amazonAccount] || null;
+            const paymentType = Number(balanceRow?.addedBalance) > 0 ? 'Gift Card' : 'Credit Card';
+            const baseAmount = paymentType === 'Gift Card'
+                ? getOrderSpendAmount(order)
+                : getOrderCreditCardBaseAmount(order);
+            const amounts = calculateActualSpend(baseAmount);
+
             return {
                 ...order,
                 rowIndex: index + 1,
+                paymentType,
                 ...amounts,
             };
         })
-    ), [spendOrders]);
-    const actualSpendSummary = useMemo(() => actualSpendRows.reduce((acc, row) => ({
-        orderCount: acc.orderCount + 1,
-        base: roundMoney(acc.base + row.base),
-        markup: roundMoney(acc.markup + row.markup),
-        igstOnMarkup: roundMoney(acc.igstOnMarkup + row.igstOnMarkup),
-        total: roundMoney(acc.total + row.total),
-    }), {
-        orderCount: 0,
-        base: 0,
-        markup: 0,
-        igstOnMarkup: 0,
-        total: 0,
-    }), [actualSpendRows]);
-    const actualSpendByAccount = useMemo(() => Object.values(actualSpendRows.reduce((acc, row) => {
-        const accountName = row.amazonAccount || '(Unassigned)';
-
-        if (!acc[accountName]) {
-            acc[accountName] = {
-                amazonAccount: accountName,
-                orderCount: 0,
-                base: 0,
-                markup: 0,
-                igstOnMarkup: 0,
-                total: 0,
-            };
-        }
-
-        acc[accountName].orderCount += 1;
-        acc[accountName].base = roundMoney(acc[accountName].base + row.base);
-        acc[accountName].markup = roundMoney(acc[accountName].markup + row.markup);
-        acc[accountName].igstOnMarkup = roundMoney(acc[accountName].igstOnMarkup + row.igstOnMarkup);
-        acc[accountName].total = roundMoney(acc[accountName].total + row.total);
-
-        return acc;
-    }, {})).sort((left, right) => left.amazonAccount.localeCompare(right.amazonAccount)), [actualSpendRows]);
+    ), [balanceByAccountName, spendOrders]);
+    const giftCardSpendRows = useMemo(() => actualSpendRows.filter((row) => row.paymentType === 'Gift Card'), [actualSpendRows]);
+    const creditCardSpendRows = useMemo(() => actualSpendRows.filter((row) => row.paymentType === 'Credit Card'), [actualSpendRows]);
+    const actualSpendSummary = useMemo(() => summarizeActualSpendRows(actualSpendRows), [actualSpendRows]);
+    const giftCardSpendSummary = useMemo(() => summarizeActualSpendRows(giftCardSpendRows), [giftCardSpendRows]);
+    const creditCardSpendSummary = useMemo(() => summarizeActualSpendRows(creditCardSpendRows), [creditCardSpendRows]);
+    const actualSpendByAccount = useMemo(() => summarizeActualSpendByAccount(actualSpendRows), [actualSpendRows]);
+    const giftCardSpendByAccount = useMemo(() => summarizeActualSpendByAccount(giftCardSpendRows), [giftCardSpendRows]);
+    const creditCardSpendByAccount = useMemo(() => summarizeActualSpendByAccount(creditCardSpendRows), [creditCardSpendRows]);
 
     const handleOpenExportDialog = () => {
         setSelectedExportColumns(AFFILIATE_EXPORT_COLUMNS.map((column) => column.id));
@@ -2079,7 +2112,7 @@ export default function AffiliateOrdersPage() {
                         Actual spend view for {date}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                        Final amount = Base + 3.5% markup + 18% IGST on markup only
+                        Gift Card uses before tax. Credit Card uses before tax + estimated tax. Markup and IGST apply to both.
                     </Typography>
                 </Stack>
                 <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSpendOrders}>Refresh</Button>
@@ -2093,7 +2126,7 @@ export default function AffiliateOrdersPage() {
                 <>
                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
                         <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
-                            <Typography variant="caption" color="text.secondary">Base Amount</Typography>
+                            <Typography variant="caption" color="text.secondary">Overall Base Amount</Typography>
                             <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.base)}</Typography>
                         </Paper>
                         <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
@@ -2113,8 +2146,58 @@ export default function AffiliateOrdersPage() {
                         </Paper>
                     </Stack>
 
+                    <Stack direction={{ xs: 'column', xl: 'row' }} spacing={2} sx={{ mb: 2 }}>
+                        <Paper variant="outlined" sx={{ p: 2, flex: 1, bgcolor: '#fff8e1' }}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                                Gift Cards
+                            </Typography>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} flexWrap="wrap">
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Orders</Typography>
+                                    <Typography variant="h6" fontWeight={700}>{giftCardSpendSummary.orderCount}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Base</Typography>
+                                    <Typography variant="h6" fontWeight={700}>${fmt(giftCardSpendSummary.base)}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Markup + IGST</Typography>
+                                    <Typography variant="h6" fontWeight={700}>${fmt(giftCardSpendSummary.markup + giftCardSpendSummary.igstOnMarkup)}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Final</Typography>
+                                    <Typography variant="h6" fontWeight={700} color="warning.dark">${fmt(giftCardSpendSummary.total)}</Typography>
+                                </Box>
+                            </Stack>
+                        </Paper>
+
+                        <Paper variant="outlined" sx={{ p: 2, flex: 1, bgcolor: '#eef7ff' }}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                                Credit Cards
+                            </Typography>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} flexWrap="wrap">
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Orders</Typography>
+                                    <Typography variant="h6" fontWeight={700}>{creditCardSpendSummary.orderCount}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Base</Typography>
+                                    <Typography variant="h6" fontWeight={700}>${fmt(creditCardSpendSummary.base)}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Markup + IGST</Typography>
+                                    <Typography variant="h6" fontWeight={700}>${fmt(creditCardSpendSummary.markup + creditCardSpendSummary.igstOnMarkup)}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Final</Typography>
+                                    <Typography variant="h6" fontWeight={700} color="primary.main">${fmt(creditCardSpendSummary.total)}</Typography>
+                                </Box>
+                            </Stack>
+                        </Paper>
+                    </Stack>
+
                     <Stack direction={{ xs: 'column', xl: 'row' }} spacing={2} alignItems="flex-start">
-                        <Paper variant="outlined" sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 380 } }}>
+                        <Paper variant="outlined" sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 420 } }}>
                             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
                                 By Amazon Account
                             </Typography>
@@ -2122,6 +2205,7 @@ export default function AffiliateOrdersPage() {
                                 <TableHead>
                                     <TableRow sx={{ bgcolor: '#e8f1ff' }}>
                                         <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Type</TableCell>
                                         <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Orders</TableCell>
                                         <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Final</TableCell>
                                     </TableRow>
@@ -2129,12 +2213,84 @@ export default function AffiliateOrdersPage() {
                                 <TableBody>
                                     {actualSpendByAccount.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary' }}>
+                                            <TableCell colSpan={4} align="center" sx={{ color: 'text.secondary' }}>
                                                 No orders available.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         actualSpendByAccount.map((row) => (
+                                            <TableRow key={row.amazonAccount} hover>
+                                                <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
+                                                <TableCell sx={{ fontSize: '0.82rem' }}>
+                                                    <Chip
+                                                        size="small"
+                                                        label={(balanceByAccountName[row.amazonAccount]?.addedBalance || 0) > 0 ? 'Gift Card' : 'Credit Card'}
+                                                        color={(balanceByAccountName[row.amazonAccount]?.addedBalance || 0) > 0 ? 'warning' : 'primary'}
+                                                        variant="outlined"
+                                                    />
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </Paper>
+
+                        <Paper variant="outlined" sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 380 } }}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
+                                Gift Card Accounts
+                            </Typography>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: '#fff3cd' }}>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Orders</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Final</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {giftCardSpendByAccount.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary' }}>
+                                                No gift card orders.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        giftCardSpendByAccount.map((row) => (
+                                            <TableRow key={row.amazonAccount} hover>
+                                                <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </Paper>
+
+                        <Paper variant="outlined" sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 380 } }}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
+                                Credit Card Accounts
+                            </Typography>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: '#dceeff' }}>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Orders</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Final</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {creditCardSpendByAccount.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary' }}>
+                                                No credit card orders.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        creditCardSpendByAccount.map((row) => (
                                             <TableRow key={row.amazonAccount} hover>
                                                 <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
                                                 <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
@@ -2150,7 +2306,7 @@ export default function AffiliateOrdersPage() {
                             <Table size="small" sx={{ minWidth: 980 }}>
                                 <TableHead>
                                     <TableRow sx={{ bgcolor: '#edf7ed' }}>
-                                        {['#', 'Order ID', 'Product', 'Seller', 'Amazon Account', 'Base Amount', 'Markup 3.5%', 'IGST 18% on Markup', 'Final Actual Spend'].map((label) => (
+                                        {['#', 'Order ID', 'Product', 'Seller', 'Amazon Account', 'Type', 'Base Amount', 'Markup 3.5%', 'IGST 18% on Markup', 'Final Actual Spend'].map((label) => (
                                             <TableCell key={label} sx={{ fontWeight: 'bold', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                                                 {label}
                                             </TableCell>
@@ -2160,7 +2316,7 @@ export default function AffiliateOrdersPage() {
                                 <TableBody>
                                     {actualSpendRows.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={9} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                                            <TableCell colSpan={10} align="center" sx={{ color: 'text.secondary', py: 4 }}>
                                                 No orders found for this date.
                                             </TableCell>
                                         </TableRow>
@@ -2206,6 +2362,14 @@ export default function AffiliateOrdersPage() {
                                                     </TableCell>
                                                     <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.sellerGroupName || '—'}</TableCell>
                                                     <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.amazonAccount || '—'}</TableCell>
+                                                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                        <Chip
+                                                            size="small"
+                                                            label={row.paymentType}
+                                                            color={row.paymentType === 'Gift Card' ? 'warning' : 'primary'}
+                                                            variant="outlined"
+                                                        />
+                                                    </TableCell>
                                                     <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.base)}</TableCell>
                                                     <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.markup)}</TableCell>
                                                     <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.igstOnMarkup)}</TableCell>
