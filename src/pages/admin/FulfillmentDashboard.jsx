@@ -744,12 +744,10 @@ function ChatDialog({ open, onClose, order }) {
 }
 
 // --- EARNINGS HELPER ---
+// Returns the stored orderEarnings value directly (calculated backend-side as totalDueSeller.value - adFeeGeneral)
 function getOrderEarnings(order) {
-  const base = parseFloat(order.paymentSummary?.totalDueSeller?.value);
-  if (isNaN(base)) return null;
-  if (order.orderPaymentStatus === 'FULLY_REFUNDED') return base;
-  const adFee = parseFloat(order.adFeeGeneral) || 0;
-  return base - adFee;
+  if (order.orderEarnings === null || order.orderEarnings === undefined) return null;
+  return order.orderEarnings;
 }
 
 // --- MOBILE ORDER CARD COMPONENT ---
@@ -1212,6 +1210,8 @@ function FulfillmentDashboard() {
   // Backfill Ad Fees state
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillResults, setBackfillResults] = useState(null);
+  // Recalculate Earnings state
+  const [recalcEarningsLoading, setRecalcEarningsLoading] = useState(false);
 
   // Auto-message state
   const [autoMessageLoading, setAutoMessageLoading] = useState(false);
@@ -2147,6 +2147,44 @@ function FulfillmentDashboard() {
     }
   };
 
+  // Recalculate Earnings for all orders of selected seller
+  const recalculateEarnings = async () => {
+    const SINCE_DATE = '2026-02-28';
+    const scopeMsg = selectedSeller
+      ? `seller "${sellers.find(s => s._id === selectedSeller)?.user?.username || selectedSeller}"`
+      : 'ALL sellers';
+
+    const confirmed = window.confirm(
+      `This will recalculate orderEarnings for ${scopeMsg}, orders on/after ${SINCE_DATE}, across ALL marketplaces.\n\n` +
+      'Formula: totalDueSeller.value − adFeeGeneral\n\n' +
+      '• FULLY_REFUNDED → $0\n' +
+      '• PARTIALLY_REFUNDED → skipped (enter manually)\n' +
+      '• All other statuses → recalculated\n\n' +
+      'Continue?'
+    );
+    if (!confirmed) return;
+
+    setRecalcEarningsLoading(true);
+    try {
+      const payload = selectedSeller
+        ? { sellerId: selectedSeller, sinceDate: SINCE_DATE }
+        : { allSellers: true, sinceDate: SINCE_DATE };
+
+      const res = await api.post('/ebay/backfill-earnings', payload);
+      await fetchOrders();
+      setSnackbarMsg(res.data.message);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (e) {
+      console.error('Recalculate earnings error:', e);
+      setSnackbarMsg(e?.response?.data?.error || 'Failed to recalculate earnings');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setRecalcEarningsLoading(false);
+    }
+  };
+
   // Backfill Ad Fees for selected seller
   const backfillAdFees = async () => {
     if (!selectedSeller) {
@@ -3030,6 +3068,22 @@ function FulfillmentDashboard() {
                   </Button>
                 </span>
               </Tooltip>
+              <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
+                <span style={{ flex: 1 }}>
+                  <Button
+                    variant="outlined"
+                    color="info"
+                    size="small"
+                    fullWidth
+                    startIcon={recalcEarningsLoading ? <CircularProgress size={14} color="inherit" /> : <SyncIcon />}
+                    onClick={recalculateEarnings}
+                    disabled={recalcEarningsLoading}
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
+                  </Button>
+                </span>
+              </Tooltip>
               <Tooltip title="Select Columns">
                 <IconButton
                   color="primary"
@@ -3121,6 +3175,21 @@ function FulfillmentDashboard() {
                   sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
                 >
                   {backfillLoading ? 'Fetching Fees...' : 'Backfill Fees'}
+                </Button>
+              </span>
+            </Tooltip>
+
+            <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
+              <span>
+                <Button
+                  variant="outlined"
+                  color="info"
+                  startIcon={recalcEarningsLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                  onClick={recalculateEarnings}
+                  disabled={recalcEarningsLoading}
+                  sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                >
+                  {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
                 </Button>
               </span>
             </Tooltip>
