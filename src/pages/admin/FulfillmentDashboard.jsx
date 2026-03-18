@@ -899,16 +899,16 @@ function MobileOrderCard({ order, index, onCopy, onMessage, onViewImages, format
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Subtotal</Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.subtotalUSD)}</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.subtotal)}</Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Shipping</Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.shippingUSD)}</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.shipping)}</Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Transaction Fees</Typography>
                 <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'error.main' }}>
-                  {formatCurrency(order.transactionFeesUSD)}
+                  {formatCurrency(order.transactionFees)}
                 </Typography>
               </Box>
               {order.adFeeGeneral > 0 && (
@@ -2446,19 +2446,19 @@ function FulfillmentDashboard() {
           <Stack spacing={1} sx={{ mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography>Subtotal</Typography>
-              <Typography fontWeight="medium">{formatCurrency(order.subtotalUSD || order.subtotal)}</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.subtotal)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography>Shipping</Typography>
-              <Typography fontWeight="medium">{formatCurrency(order.shippingUSD || order.shipping)}</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.shipping)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography>Sales tax*</Typography>
-              <Typography fontWeight="medium">{formatCurrency(order.salesTaxUSD || order.salesTax)}</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.salesTax)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography>Discount</Typography>
-              <Typography fontWeight="medium" color="success.main">{formatCurrency(order.discountUSD || order.discount)}</Typography>
+              <Typography fontWeight="medium" color="success.main">{formatCurrency(order.discount)}</Typography>
             </Box>
             {order.refundTotalToBuyerUSD > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -2494,7 +2494,7 @@ function FulfillmentDashboard() {
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 4 }}>
               <Typography variant="body2">Sales tax</Typography>
-              <Typography variant="body2" color="error.main">-{formatCurrency(order.salesTaxUSD || order.salesTax)}</Typography>
+              <Typography variant="body2" color="error.main">-{formatCurrency(order.salesTax)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 2 }}>
               <Typography variant="body2" color="text.secondary">Selling costs</Typography>
@@ -2502,12 +2502,12 @@ function FulfillmentDashboard() {
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 4 }}>
               <Typography variant="body2">Transaction fees</Typography>
-              <Typography variant="body2" color="error.main">-{formatCurrency(order.transactionFeesUSD || order.transactionFees)}</Typography>
+              <Typography variant="body2" color="error.main">-{formatCurrency(order.transactionFees)}</Typography>
             </Box>
-            {order.adFeeGeneralUSD > 0 && (
+            {order.adFeeGeneral > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 4 }}>
                 <Typography variant="body2">Ad Fee General</Typography>
-                <Typography variant="body2" color="error.main">-{formatCurrency(order.adFeeGeneralUSD || order.adFeeGeneral)}</Typography>
+                <Typography variant="body2" color="error.main">-{formatCurrency(order.adFeeGeneral)}</Typography>
               </Box>
             )}
             <Divider sx={{ my: 1 }} />
@@ -2618,11 +2618,11 @@ function FulfillmentDashboard() {
         'Buyer Name': 'shippingFullName',
         'Buyer Username': (o) => o.buyer?.username || '',
         'Marketplace': 'purchaseMarketplaceId',
-        'Subtotal (USD)': 'subtotalUSD',
-        'Shipping (USD)': 'shippingUSD',
-        'Sales Tax (USD)': 'salesTaxUSD',
-        'Discount (USD)': 'discountUSD',
-        'Transaction Fees (USD)': 'transactionFeesUSD',
+        'Subtotal': 'subtotal',
+        'Shipping': 'shipping',
+        'Sales Tax': 'salesTax',
+        'Discount': 'discount',
+        'Transaction Fees': 'transactionFees',
         'Ad Fees': 'adFeeGeneral',
         'Cancel Status': 'cancelState',
         'Refunds': (o) => o.refunds?.map(r => `${r.orderPaymentStatus === 'FULLY_REFUNDED' ? 'Full' : 'Partial'}: $${(Number(r.amount?.value || r.refundAmount?.value || 0) * (o.conversionRate || 1)).toFixed(2)}`).join('; ') || '',
@@ -3919,33 +3919,33 @@ function FulfillmentDashboard() {
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">
                               <Typography variant="body2" fontWeight="medium">
-                                {formatCurrency(order.subtotalUSD)}
+                                {formatCurrency(order.subtotal)}
                               </Typography>
                             </TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('shipping') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                            <TableCell align="right">{formatCurrency(order.shippingUSD)}</TableCell>
+                            <TableCell align="right">{formatCurrency(order.shipping)}</TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('salesTax') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                            <TableCell align="right">{formatCurrency(order.salesTaxUSD)}</TableCell>
+                            <TableCell align="right">{formatCurrency(order.salesTax)}</TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('discount') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">
                               <Typography variant="body2">
-                                {formatCurrency(order.discountUSD)}
+                                {formatCurrency(order.discount)}
                               </Typography>
                             </TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('transactionFees') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                            <TableCell align="right">{formatCurrency(order.transactionFeesUSD)}</TableCell>
+                            <TableCell align="right">{formatCurrency(order.transactionFees)}</TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('adFeeGeneral') && (
