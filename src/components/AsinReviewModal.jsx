@@ -42,14 +42,23 @@ import {
 } from '@mui/icons-material';
 import api from '../lib/api.js';
 
+const MARKETPLACE_DOMAINS = {
+  US: 'www.amazon.com',
+  UK: 'www.amazon.co.uk',
+  CA: 'www.amazon.ca',
+  AU: 'www.amazon.com.au',
+};
+
 export default function AsinReviewModal({ 
   open, 
   onClose, 
   previewItems = [], 
   onSave,
   onListDirectly = null,
-  templateColumns = []
+  templateColumns = [],
+  marketplace = 'US'
 }) {
+  const amazonDomain = MARKETPLACE_DOMAINS[marketplace] || MARKETPLACE_DOMAINS.US;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [editedItems, setEditedItems] = useState({});
   const [dismissedItems, setDismissedItems] = useState(new Set());
@@ -83,7 +92,7 @@ export default function AsinReviewModal({
   useEffect(() => {
     if (showAmazonPreview && amazonWindowRef && !amazonWindowRef.closed && currentItem?.asin) {
       const asin = currentItem.asin;
-      const amazonUrl = `https://www.amazon.com/dp/${asin}`;
+      const amazonUrl = `https://${amazonDomain}/dp/${asin}`;
       try {
         amazonWindowRef.location.href = amazonUrl;
       } catch (error) {
@@ -248,7 +257,7 @@ export default function AsinReviewModal({
     if (!currentItem?.asin) return;
     
     const asin = currentItem.asin;
-    const amazonUrl = `https://www.amazon.com/dp/${asin}`;
+    const amazonUrl = `https://${amazonDomain}/dp/${asin}`;
     
     const halfWidth = Math.floor(window.screen.width / 2);
     const screenHeight = window.screen.height;

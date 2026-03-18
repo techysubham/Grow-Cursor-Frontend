@@ -84,7 +84,7 @@ export default function TemplateListingsPage() {
   const [autoFilledFields, setAutoFilledFields] = useState(new Set());
 
   // Bulk mode state
-  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkMode, setBulkMode] = useState(true);
   const [bulkResults, setBulkResults] = useState([]);
   const [loadingBulk, setLoadingBulk] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
@@ -916,7 +916,7 @@ export default function TemplateListingsPage() {
       await fetchListings(pagination.page);
 
       // Reset bulk mode
-      setBulkMode(false);
+      setBulkMode(true);
       setBulkResults([]);
       setAsinInput('');
       setAddEditDialog(false);
@@ -2118,7 +2118,7 @@ export default function TemplateListingsPage() {
             <Button 
               onClick={() => {
                 setAddEditDialog(false);
-                setBulkMode(false);
+                setBulkMode(true);
                 setBulkResults([]);
                 setAsinInput('');
                 setProcessingLog([]);
@@ -2131,7 +2131,7 @@ export default function TemplateListingsPage() {
             <>
               <Button onClick={() => {
                 setAddEditDialog(false);
-                setBulkMode(false);
+                setBulkMode(true);
                 setBulkResults([]);
                 setAsinInput('');
               }}>
@@ -2377,6 +2377,7 @@ export default function TemplateListingsPage() {
 
       <AsinReviewModal
         open={reviewModal}
+        marketplace={region}
         onClose={() => {
           // Clean up EventSource if still active
           if (window._currentEventSource) {
