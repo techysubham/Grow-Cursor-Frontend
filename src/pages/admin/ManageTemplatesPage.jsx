@@ -3,7 +3,7 @@ import {
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, 
   DialogContent, DialogActions, Alert, Chip, FormControl, InputLabel, Select, MenuItem,
-  Tabs, Tab, Switch, FormControlLabel, Divider
+  Tabs, Tab, Switch, FormControlLabel, Divider, CircularProgress, InputAdornment
 } from '@mui/material';
 import { 
   Delete as DeleteIcon, 
@@ -11,7 +11,8 @@ import {
   Add as AddIcon,
   Visibility as VisibilityIcon,
   ContentCopy as CopyIcon,
-  Publish as PublishIcon
+  Publish as PublishIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
@@ -658,7 +659,14 @@ export default function ManageTemplatesPage() {
             placeholder="Search by name…"
             value={templateSearch}
             onChange={(e) => setTemplateSearch(e.target.value)}
-            sx={{ width: 240 }}
+            sx={{ width: 320, bgcolor: 'background.paper', borderRadius: 1 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" color="action" />
+                </InputAdornment>
+              ),
+            }}
           />
         </Stack>
 
@@ -756,7 +764,13 @@ export default function ManageTemplatesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {templates.length === 0 ? (
+              {loading && templates.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                    <CircularProgress size={28} />
+                  </TableCell>
+                </TableRow>
+              ) : templates.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                     No templates found. Create one above!
