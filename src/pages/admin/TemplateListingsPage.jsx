@@ -2055,11 +2055,11 @@ export default function TemplateListingsPage() {
                   onChange={(e) => setListingFormData({ ...listingFormData, relationshipDetails: e.target.value })}
                 />
                 <TextField
-                  label="Schedule time"
-                  type="datetime-local"
+                  label="Schedule time (YYYY-MM-DD HH:MM:SS)"
                   fullWidth
                   value={listingFormData.scheduleTime}
                   onChange={(e) => setListingFormData({ ...listingFormData, scheduleTime: e.target.value })}
+                  placeholder="e.g. 2026-03-18 15:00:00"
                   InputLabelProps={{ shrink: true }}
                 />
                 <TextField
