@@ -752,6 +752,26 @@ function getOrderEarnings(order) {
   return base - adFee;
 }
 
+function formatFullShippingAddress(order, options = {}) {
+  const { includePhone = true } = options;
+  if (!order) return '';
+
+  const lines = [
+    order.shippingFullName,
+    order.shippingAddressLine1,
+    order.shippingAddressLine2,
+    [order.shippingCity, order.shippingState, order.shippingPostalCode].filter(Boolean).join(', ').replace(', ,', ',')
+      .replace(/,\s*$/, ''),
+    order.shippingCountry
+  ].filter((line) => Boolean(line && String(line).trim()));
+
+  if (includePhone) {
+    lines.push(`Phone: ${order.shippingPhone || '0000000000'}`);
+  }
+
+  return lines.join('\n');
+}
+
 // --- MOBILE ORDER CARD COMPONENT ---
 function MobileOrderCard({ order, index, onCopy, onMessage, onViewImages, formatCurrency, thumbnailImages }) {
   const [expanded, setExpanded] = useState(false);
@@ -926,9 +946,19 @@ function MobileOrderCard({ order, index, onCopy, onMessage, onViewImages, format
             {/* Shipping Address */}
             {order.shippingFullName && (
               <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ fontSize: '0.7rem' }}>
-                  SHIPPING ADDRESS
-                </Typography>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ fontSize: '0.7rem' }}>
+                    SHIPPING ADDRESS
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => onCopy(formatFullShippingAddress(order))}
+                    startIcon={<ContentCopyIcon sx={{ fontSize: 14 }} />}
+                    sx={{ minWidth: 'auto', px: 0.75, fontSize: '0.65rem', textTransform: 'none' }}
+                  >
+                    Copy All
+                  </Button>
+                </Stack>
                 <Stack spacing={0.25} sx={{ mt: 0.5 }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Typography variant="body2" fontWeight="medium" sx={{ fontSize: '0.8rem' }}>
@@ -3817,6 +3847,14 @@ function FulfillmentDashboard() {
                                   </IconButton>
                                 </Box>
                                 {/* Collapse Button */}
+                                <Button
+                                  size="small"
+                                  onClick={() => handleCopy(formatFullShippingAddress(order))}
+                                  startIcon={<ContentCopyIcon fontSize="small" />}
+                                  sx={{ mt: 0.5, textTransform: 'none' }}
+                                >
+                                  Copy Full Address
+                                </Button>
                                 <Button
                                   size="small"
                                   onClick={() => toggleShippingExpanded(order._id)}
