@@ -516,6 +516,43 @@ export default function SellerAnalyticsPage() {
                   </TableCell>
                 </TableRow>
               ))}
+              {/* Totals Row */}
+              {analytics.length > 0 && (() => {
+                const totals = analytics.reduce((acc, row) => ({
+                  totalOrders: acc.totalOrders + (row.totalOrders || 0),
+                  totalSubtotal: acc.totalSubtotal + (row.totalSubtotal || 0),
+                  totalShipping: acc.totalShipping + (row.totalShipping || 0),
+                  totalSalesTax: acc.totalSalesTax + (row.totalSalesTax || 0),
+                  totalTransactionFees: acc.totalTransactionFees + (row.totalTransactionFees || 0),
+                  totalAdFees: acc.totalAdFees + (row.totalAdFees || 0),
+                  totalEarnings: acc.totalEarnings + (row.totalEarnings || 0),
+                  totalPBalanceINR: acc.totalPBalanceINR + (row.totalPBalanceINR || 0),
+                  totalAmazonCosts: acc.totalAmazonCosts + (row.totalAmazonCosts || 0),
+                  totalCreditCardFees: acc.totalCreditCardFees + (row.totalCreditCardFees || 0),
+                  totalProfit: acc.totalProfit + (row.totalProfit || 0),
+                }), {
+                  totalOrders: 0, totalSubtotal: 0, totalShipping: 0, totalSalesTax: 0,
+                  totalTransactionFees: 0, totalAdFees: 0, totalEarnings: 0,
+                  totalPBalanceINR: 0, totalAmazonCosts: 0, totalCreditCardFees: 0, totalProfit: 0,
+                });
+                const cellSx = { fontWeight: 'bold', bgcolor: '#f5f5f5', borderTop: '2px solid #bdbdbd' };
+                return (
+                  <TableRow>
+                    <TableCell sx={{ ...cellSx, color: 'text.secondary' }}>TOTAL</TableCell>
+                    <TableCell align="right" sx={cellSx}>{totals.totalOrders}</TableCell>
+                    <TableCell align="right" sx={cellSx}>{formatCurrency(parseFloat(totals.totalSubtotal.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={cellSx}>{formatCurrency(parseFloat(totals.totalShipping.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={cellSx}>{formatCurrency(parseFloat(totals.totalSalesTax.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={cellSx}>{formatCurrency(parseFloat(totals.totalTransactionFees.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={cellSx}>{formatCurrency(parseFloat(totals.totalAdFees.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={{ ...cellSx, color: 'success.main' }}>{formatCurrency(parseFloat(totals.totalEarnings.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={{ ...cellSx, color: 'info.main' }}>{formatINR(parseFloat(totals.totalPBalanceINR.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={cellSx}>{formatINR(parseFloat(totals.totalAmazonCosts.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={cellSx}>{formatINR(parseFloat(totals.totalCreditCardFees.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={{ ...cellSx, color: totals.totalProfit >= 0 ? 'success.main' : 'error.main' }}>{formatINR(parseFloat(totals.totalProfit.toFixed(2)))}</TableCell>
+                  </TableRow>
+                );
+              })()}
             </TableBody>
           </Table>
         </TableContainer>

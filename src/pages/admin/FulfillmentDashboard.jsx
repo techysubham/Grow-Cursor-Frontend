@@ -1212,6 +1212,7 @@ function FulfillmentDashboard() {
   const [backfillResults, setBackfillResults] = useState(null);
   // Recalculate Earnings state
   const [recalcEarningsLoading, setRecalcEarningsLoading] = useState(false);
+  const [recalcAmazonLoading, setRecalcAmazonLoading] = useState(false);
 
   // Auto-message state
   const [autoMessageLoading, setAutoMessageLoading] = useState(false);
@@ -2185,6 +2186,41 @@ function FulfillmentDashboard() {
     }
   };
 
+  const recalculateAmazonFinancials = async () => {
+    const SINCE_DATE = '2026-02-28';
+    const scopeMsg = selectedSeller
+      ? `seller "${sellers.find(s => s._id === selectedSeller)?.user?.username || selectedSeller}"`
+      : 'ALL sellers';
+
+    const confirmed = window.confirm(
+      `This will recalculate Amazon financials for ${scopeMsg}, orders on/after ${SINCE_DATE}.\n\n` +
+      'Recalculates: amazonTotal, amazonTotalINR, marketplaceFee, igst, totalCC, profit\n' +
+      'Formula: amazonTotal = beforeTax + estimatedTax\n\n' +
+      'Continue?'
+    );
+    if (!confirmed) return;
+
+    setRecalcAmazonLoading(true);
+    try {
+      const payload = selectedSeller
+        ? { sellerId: selectedSeller, sinceDate: SINCE_DATE }
+        : { allSellers: true, sinceDate: SINCE_DATE };
+
+      const res = await api.post('/ebay/backfill-amazon-financials', payload);
+      await fetchOrders();
+      setSnackbarMsg(res.data.message);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (e) {
+      console.error('Recalculate Amazon financials error:', e);
+      setSnackbarMsg(e?.response?.data?.error || 'Failed to recalculate Amazon financials');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setRecalcAmazonLoading(false);
+    }
+  };
+
   // Backfill Ad Fees for selected seller
   const backfillAdFees = async () => {
     if (!selectedSeller) {
@@ -3084,6 +3120,22 @@ function FulfillmentDashboard() {
                   </Button>
                 </span>
               </Tooltip>
+              <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
+                <span style={{ flex: 1 }}>
+                  <Button
+                    variant="outlined"
+                    color="warning"
+                    size="small"
+                    fullWidth
+                    startIcon={recalcAmazonLoading ? <CircularProgress size={14} color="inherit" /> : <SyncIcon />}
+                    onClick={recalculateAmazonFinancials}
+                    disabled={recalcAmazonLoading}
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
+                  </Button>
+                </span>
+              </Tooltip>
               <Tooltip title="Select Columns">
                 <IconButton
                   color="primary"
@@ -3190,6 +3242,21 @@ function FulfillmentDashboard() {
                   sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
                 >
                   {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
+                </Button>
+              </span>
+            </Tooltip>
+
+            <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
+              <span>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={recalcAmazonLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                  onClick={recalculateAmazonFinancials}
+                  disabled={recalcAmazonLoading}
+                  sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                >
+                  {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
                 </Button>
               </span>
             </Tooltip>
