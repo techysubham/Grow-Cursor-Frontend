@@ -1207,10 +1207,6 @@ function FulfillmentDashboard() {
   // Editing messaging status
   const [editingMessagingStatus, setEditingMessagingStatus] = useState({});
 
-  // Backfill Ad Fees state
-  const [backfillLoading, setBackfillLoading] = useState(false);
-  const [backfillResults, setBackfillResults] = useState(null);
-  const [backfillSinceDate, setBackfillSinceDate] = useState('2026-03-01');
   // Recalculate Earnings state
   const [recalcEarningsLoading, setRecalcEarningsLoading] = useState(false);
   const [recalcAmazonLoading, setRecalcAmazonLoading] = useState(false);
@@ -2166,87 +2162,6 @@ function FulfillmentDashboard() {
     }
   };
 
-  // Backfill Ad Fees for all sellers (or selected seller) since chosen date
-  const backfillAdFees = async () => {
-    if (!backfillSinceDate) {
-      setSnackbarMsg('Please select a date first');
-      setSnackbarSeverity('warning');
-      setSnackbarOpen(true);
-      return;
-    }
-
-    const scopeMsg = selectedSeller
-      ? `seller "${sellers.find(s => s._id === selectedSeller)?.user?.username || selectedSeller}"`
-      : 'ALL sellers';
-    const confirmed = window.confirm(
-      `This will backfill ad fees for ${scopeMsg}, orders on/after ${backfillSinceDate}.\n\n` +
-      'For orders where adFeeGeneral is found, orderEarnings will be recalculated as:\n' +
-      'orderEarnings = totalDueSeller − adFeeGeneral\n\n' +
-      'All downstream fields (TDS, NET, P.Balance, Profit) will also be recalculated.\n\n' +
-      'Continue?'
-    );
-    if (!confirmed) return;
-
-    setBackfillLoading(true);
-    setBackfillResults(null);
-    setError('');
-
-    try {
-      // First get count to show in snackbar
-      const countParams = { sinceDate: new Date(backfillSinceDate).toISOString() };
-      if (selectedSeller) {
-        countParams.sellerId = selectedSeller;
-      } else {
-        countParams.allSellers = 'true';
-      }
-      const countRes = await api.get('/ebay/backfill-ad-fees/count', { params: countParams });
-
-      const { needsBackfill, totalOrders: total } = countRes.data;
-
-      if (needsBackfill === 0) {
-        setSnackbarMsg(`All ${total} orders already have ad fees!`);
-        setSnackbarSeverity('info');
-        setSnackbarOpen(true);
-        setBackfillLoading(false);
-        return;
-      }
-
-      setSnackbarMsg(`Starting backfill for ${needsBackfill} orders (out of ${total}) across ${scopeMsg}...`);
-      setSnackbarSeverity('info');
-      setSnackbarOpen(true);
-
-      // Now run the backfill
-      const payload = {
-        sinceDate: new Date(backfillSinceDate).toISOString(),
-        skipAlreadySet: true
-      };
-      if (selectedSeller) {
-        payload.sellerId = selectedSeller;
-      } else {
-        payload.allSellers = true;
-      }
-      const res = await api.post('/ebay/backfill-ad-fees', payload);
-
-      setBackfillResults(res.data.results);
-
-      // Refresh orders to show updated ad fees
-      await fetchOrders();
-
-      setSnackbarMsg(res.data.message);
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-
-    } catch (e) {
-      console.error('Backfill error:', e);
-      setError(e?.response?.data?.error || 'Failed to backfill ad fees');
-      setSnackbarMsg('Failed to backfill ad fees');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-    } finally {
-      setBackfillLoading(false);
-    }
-  };
-
   // Update messaging status in database
   const updateMessagingStatus = async (orderId, status) => {
     try {
@@ -2932,7 +2847,7 @@ function FulfillmentDashboard() {
                 color="primary"
                 startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />)}
                 onClick={pollNewOrders}
-                disabled={loading || backfillLoading}
+                disabled={loading}
                 size="small"
                 fullWidth
                 sx={{
@@ -2948,7 +2863,7 @@ function FulfillmentDashboard() {
                 color="secondary"
                 startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />)}
                 onClick={pollOrderUpdates}
-                disabled={loading || backfillLoading}
+                disabled={loading}
                 size="small"
                 fullWidth
                 sx={{
@@ -2982,7 +2897,7 @@ function FulfillmentDashboard() {
                 color="warning"
                 startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />)}
                 onClick={resyncRecent}
-                disabled={loading || backfillLoading}
+                disabled={loading}
                 size="small"
                 fullWidth
                 sx={{
@@ -3049,33 +2964,8 @@ function FulfillmentDashboard() {
               sx={{ mx: 1 }}
             />
 
-            {/* Row 4: Backfill & Column Selector */}
+            {/* Row 4: Recalc & Column Selector */}
             <Stack direction="row" spacing={1} alignItems="center">
-              <TextField
-                type="date"
-                size="small"
-                label="Ad Fee Since"
-                value={backfillSinceDate}
-                onChange={(e) => setBackfillSinceDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                sx={{ minWidth: 130, '& input': { fontSize: '0.75rem', py: 0.5 } }}
-              />
-              <Tooltip title={selectedSeller ? "Backfill Ad Fees (selected seller)" : "Backfill Ad Fees (ALL sellers)"}>
-                <span style={{ flex: 1 }}>
-                  <Button
-                    variant="outlined"
-                    color="warning"
-                    size="small"
-                    fullWidth
-                    startIcon={backfillLoading ? <CircularProgress size={14} color="inherit" /> : <LocalShippingIcon />}
-                    onClick={backfillAdFees}
-                    disabled={backfillLoading || loading}
-                    sx={{ fontSize: '0.7rem' }}
-                  >
-                    {backfillLoading ? 'Fetching...' : 'Backfill Ad Fees'}
-                  </Button>
-                </span>
-              </Tooltip>
               <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
                 <span style={{ flex: 1 }}>
                   <Button
@@ -3146,7 +3036,7 @@ function FulfillmentDashboard() {
               color="primary"
               startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
               onClick={pollNewOrders}
-              disabled={loading || backfillLoading}
+              disabled={loading}
               sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
             >
               {loading ? 'Polling...' : 'Poll New Orders'}
@@ -3157,7 +3047,7 @@ function FulfillmentDashboard() {
               color="secondary"
               startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
               onClick={pollOrderUpdates}
-              disabled={loading || backfillLoading}
+              disabled={loading}
               sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
             >
               {loading ? 'Updating...' : 'Poll Order Updates'}
@@ -3182,36 +3072,11 @@ function FulfillmentDashboard() {
               color="warning"
               startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
               onClick={resyncRecent}
-              disabled={loading || backfillLoading}
+              disabled={loading}
               sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
             >
               {loading ? 'Syncing...' : `Resync ${resyncDays} Days`}
             </Button>
-
-            <TextField
-              type="date"
-              size="small"
-              label="Ad Fee Since"
-              value={backfillSinceDate}
-              onChange={(e) => setBackfillSinceDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              sx={{ minWidth: 150, '& input': { fontSize: '0.8rem', py: 0.5 } }}
-            />
-
-            <Tooltip title={selectedSeller ? "Backfill Ad Fees (selected seller)" : "Backfill Ad Fees (ALL sellers)"}>
-              <span>
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  startIcon={backfillLoading ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
-                  onClick={backfillAdFees}
-                  disabled={backfillLoading || loading}
-                  sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
-                >
-                  {backfillLoading ? 'Fetching Fees...' : 'Backfill Fees'}
-                </Button>
-              </span>
-            </Tooltip>
 
             <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
               <span>
@@ -3310,26 +3175,6 @@ function FulfillmentDashboard() {
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
-          </Alert>
-        )}
-
-        {/* Backfill Results Display */}
-        {backfillResults && (
-          <Alert
-            severity="info"
-            sx={{ mt: 2 }}
-            onClose={() => setBackfillResults(null)}
-          >
-            <Typography variant="subtitle2" fontWeight="bold">Ad Fee Backfill Results:</Typography>
-            <Typography variant="body2">
-              • Total processed: {backfillResults.total} orders<br />
-              • ✅ Updated with ad fees: {backfillResults.success}<br />
-              • ⏭️ No ad fee found: {backfillResults.skipped}<br />
-              • ❌ Failed: {backfillResults.failed}
-              {backfillResults.errors?.length > 0 && (
-                <><br />• First errors: {backfillResults.errors.slice(0, 3).map(e => e.orderId).join(', ')}</>
-              )}
-            </Typography>
           </Alert>
         )}
 
