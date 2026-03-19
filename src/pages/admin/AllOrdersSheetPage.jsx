@@ -25,7 +25,9 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -77,6 +79,7 @@ export default function AllOrdersSheetPage() {
   const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
+  const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(() => getInitialState('currentPage', 1));
@@ -112,14 +115,15 @@ export default function AllOrdersSheetPage() {
       searchMarketplace,
       filtersExpanded,
       currentPage,
-      dateFilter
+      dateFilter,
+      excludeLowValue
     };
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, excludeLowValue]);
 
   // Initial load
   useEffect(() => {
@@ -156,6 +160,7 @@ export default function AllOrdersSheetPage() {
       prevFilters.current.searchOrderId !== searchOrderId ||
       prevFilters.current.searchBuyerName !== searchBuyerName ||
       prevFilters.current.searchMarketplace !== searchMarketplace ||
+      prevFilters.current.excludeLowValue !== excludeLowValue ||
       JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter);
     
     prevFilters.current = {
@@ -163,6 +168,7 @@ export default function AllOrdersSheetPage() {
       searchOrderId,
       searchBuyerName,
       searchMarketplace,
+      excludeLowValue,
       dateFilter
     };
 
@@ -175,7 +181,7 @@ export default function AllOrdersSheetPage() {
         setCurrentPage(1);
       }
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, excludeLowValue, dateFilter]);
 
   async function fetchSellers() {
     setError('');
@@ -312,12 +318,12 @@ export default function AllOrdersSheetPage() {
         const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
         const showZero = isCancelled || isPartiallyRefunded;
         
-        const subtotal = showZero ? 0 : (parseFloat(order.subtotalUSD) || 0);
-        const salesTax = showZero ? 0 : (parseFloat(order.salesTaxUSD) || 0);
-        const transactionFees = showZero ? 0 : (parseFloat(order.transactionFeesUSD) || 0);
+        const subtotal = showZero ? 0 : (parseFloat(order.subtotal) || 0);
+        const salesTax = showZero ? 0 : (parseFloat(order.salesTax) || 0);
+        const transactionFees = showZero ? 0 : (parseFloat(order.transactionFees) || 0);
         const adFeeGeneral = showZero ? 0 : (parseFloat(order.adFeeGeneral) || 0);
-        const discount = showZero ? 0 : (parseFloat(order.discountUSD) || 0);
-        const shipping = showZero ? 0 : (parseFloat(order.shippingUSD) || 0);
+        const discount = showZero ? 0 : (parseFloat(order.discount) || 0);
+        const shipping = showZero ? 0 : (parseFloat(order.shipping) || 0);
         
         // Use DB fields for financial calculations
         const earnings = parseFloat(order.orderEarnings) || 0;
@@ -426,6 +432,7 @@ export default function AllOrdersSheetPage() {
       if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
+      if (excludeLowValue) params.excludeLowValue = true;
 
       if (dateFilter.mode === 'single' && dateFilter.single) {
         params.startDate = dateFilter.single;
@@ -601,6 +608,18 @@ export default function AllOrdersSheetPage() {
               <MenuItem value="EBAY_GB">eBay UK</MenuItem>
             </Select>
           </FormControl>
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={excludeLowValue}
+                onChange={(e) => setExcludeLowValue(e.target.checked)}
+                size="small"
+                color="warning"
+              />
+            }
+            label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Hide &lt;$3</Typography>}
+          />
         </Stack>
       </Paper>
 
@@ -841,15 +860,15 @@ export default function AllOrdersSheetPage() {
       ) : orders.length === 0 ? (
         <Alert severity="info">No orders found</Alert>
       ) : (
-        <TableContainer component={Paper}>
-          <Table size="small" stickyHeader>
+        <TableContainer component={Paper} sx={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
+          <Table size="small" stickyHeader sx={{ '& thead tr:nth-of-type(2) th': { top: 37, zIndex: 3 } }}>
             <TableHead>
               {/* First row: Section headers */}
               <TableRow>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Seller</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Date Sold</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Product Name</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Marketplace</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 0, zIndex: 4, minWidth: 100 }}>Seller</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 100, zIndex: 4, minWidth: 110 }}>Date Sold</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 210, zIndex: 4, minWidth: 250 }}>Product Name</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 460, zIndex: 4, minWidth: 120, boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}>Marketplace</TableCell>
                 <TableCell colSpan={12} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderBottom: '2px solid #ffb74d', borderRight: '2px solid #90caf9' }}>eBay Side</TableCell>
                 <TableCell colSpan={5} align="center" sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', borderBottom: '2px solid #81c784', borderRight: '2px solid #90caf9' }}>Amazon Side</TableCell>
                 <TableCell colSpan={3} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fce4ec', borderBottom: '2px solid #f48fb1', borderRight: '2px solid #90caf9' }}>Credit Card</TableCell>
@@ -926,13 +945,13 @@ export default function AllOrdersSheetPage() {
             <TableBody>
               {orders.map((order) => (
                 <TableRow key={order._id} hover>
-                  <TableCell>{order.seller?.user?.username || '-'}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ position: 'sticky', left: 0, zIndex: 1, bgcolor: 'background.paper' }}>{order.seller?.user?.username || '-'}</TableCell>
+                  <TableCell sx={{ position: 'sticky', left: 100, zIndex: 1, bgcolor: 'background.paper' }}>
                     <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.4, fontSize: '0.8rem' }}>
                       {formatDate(order.dateSold, order.purchaseMarketplaceId)}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={{ minWidth: 250, maxWidth: 350 }}>
+                  <TableCell sx={{ minWidth: 250, maxWidth: 350, position: 'sticky', left: 210, zIndex: 1, bgcolor: 'background.paper' }}>
                     <Stack spacing={0.5}>
                       {order.lineItems && order.lineItems.length > 0 ? (
                         order.lineItems.map((item, i) => (
@@ -982,7 +1001,7 @@ export default function AllOrdersSheetPage() {
                       )}
                     </Stack>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ position: 'sticky', left: 460, zIndex: 1, bgcolor: 'background.paper', boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}>
                     <Chip 
                       label={order.purchaseMarketplaceId?.replace('EBAY_', '') || '-'} 
                       size="small"
@@ -1000,11 +1019,11 @@ export default function AllOrdersSheetPage() {
                     
                     return (
                       <>
-                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.subtotalUSD)}</TableCell>
-                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.shippingUSD)}</TableCell>
-                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.salesTaxUSD)}</TableCell>
-                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.discountUSD)}</TableCell>
-                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.transactionFeesUSD)}</TableCell>
+                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.subtotal)}</TableCell>
+                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.shipping)}</TableCell>
+                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.salesTax)}</TableCell>
+                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.discount)}</TableCell>
+                        <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.transactionFees)}</TableCell>
                         <TableCell align="right">{showZero ? '$0.00' : formatCurrency(order.adFeeGeneral)}</TableCell>
                       </>
                     );

@@ -744,12 +744,10 @@ function ChatDialog({ open, onClose, order }) {
 }
 
 // --- EARNINGS HELPER ---
+// Returns the stored orderEarnings value directly (calculated backend-side as totalDueSeller.value - adFeeGeneral)
 function getOrderEarnings(order) {
-  const base = parseFloat(order.paymentSummary?.totalDueSeller?.value);
-  if (isNaN(base)) return null;
-  if (order.orderPaymentStatus === 'FULLY_REFUNDED') return base;
-  const adFee = parseFloat(order.adFeeGeneral) || 0;
-  return base - adFee;
+  if (order.orderEarnings === null || order.orderEarnings === undefined) return null;
+  return order.orderEarnings;
 }
 
 // --- MOBILE ORDER CARD COMPONENT ---
@@ -901,16 +899,16 @@ function MobileOrderCard({ order, index, onCopy, onMessage, onViewImages, format
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Subtotal</Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.subtotalUSD)}</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.subtotal)}</Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Shipping</Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.shippingUSD)}</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{formatCurrency(order.shipping)}</Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Transaction Fees</Typography>
                 <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'error.main' }}>
-                  {formatCurrency(order.transactionFeesUSD)}
+                  {formatCurrency(order.transactionFees)}
                 </Typography>
               </Box>
               {order.adFeeGeneral > 0 && (
@@ -1209,9 +1207,9 @@ function FulfillmentDashboard() {
   // Editing messaging status
   const [editingMessagingStatus, setEditingMessagingStatus] = useState({});
 
-  // Backfill Ad Fees state
-  const [backfillLoading, setBackfillLoading] = useState(false);
-  const [backfillResults, setBackfillResults] = useState(null);
+  // Recalculate Earnings state
+  const [recalcEarningsLoading, setRecalcEarningsLoading] = useState(false);
+  const [recalcAmazonLoading, setRecalcAmazonLoading] = useState(false);
 
   // Auto-message state
   const [autoMessageLoading, setAutoMessageLoading] = useState(false);
@@ -1249,8 +1247,8 @@ function FulfillmentDashboard() {
   const [snackbarOrderIds, setSnackbarOrderIds] = useState([]); // Store order IDs for copying
   const [updatedOrderDetails, setUpdatedOrderDetails] = useState([]); // Store { orderId, changedFields }
 
-  // Editing order earnings for PARTIALLY_REFUNDED orders
-  const [editingOrderEarnings, setEditingOrderEarnings] = useState({}); // { orderId: value }
+  // Editing order earnings
+  // (orderEarnings is now read-only, calculated server-side as totalDueSeller - adFeeGeneral)
 
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [selectedOrderForMessage, setSelectedOrderForMessage] = useState(null);
@@ -1638,64 +1636,8 @@ function FulfillmentDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, dateFilter]);
 
-  // Handle order earnings change (update local state)
-  const handleOrderEarningsChange = (orderId, orderIdStr, value) => {
-    setEditingOrderEarnings(prev => ({
-      ...prev,
-      [orderId]: value
-    }));
-
-    // Update orders state immediately for UI feedback
-    setOrders(prev => prev.map(order =>
-      order._id === orderId
-        ? { ...order, orderEarnings: parseFloat(value) || 0 }
-        : order
-    ));
-  };
-
-  // Handle order earnings save (persist to backend)
-  const handleOrderEarningsSave = async (orderId, orderIdStr) => {
-    const newValue = editingOrderEarnings[orderId];
-    if (newValue === undefined) return;
-
-    try {
-      const { data } = await api.post(`/ebay/orders/${orderIdStr}/update-earnings`, {
-        orderEarnings: parseFloat(newValue)
-      });
-
-      // Update orders state with recalculated financial fields
-      setOrders(prev => prev.map(order =>
-        order._id === orderId
-          ? {
-            ...order,
-            orderEarnings: data.orderEarnings,
-            tds: data.tds,
-            tid: data.tid,
-            net: data.net,
-            pBalanceINR: data.pBalanceINR,
-            ebayExchangeRate: data.ebayExchangeRate
-          }
-          : order
-      ));
-
-      // Clear editing state
-      setEditingOrderEarnings(prev => {
-        const newState = { ...prev };
-        delete newState[orderId];
-        return newState;
-      });
-
-      // Show success message
-      setSnackbarMsg(`Order earnings updated for ${orderIdStr}`);
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-    } catch (err) {
-      console.error('Error updating order earnings:', err);
-      setSnackbarMsg(`Failed to update order earnings: ${err.response?.data?.error || err.message}`);
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-    }
-  };
+  // orderEarnings is now read-only (auto-calculated server-side)
+  // No manual editing handlers needed
 
   async function fetchSellers() {
     setError('');
@@ -2147,66 +2089,76 @@ function FulfillmentDashboard() {
     }
   };
 
-  // Backfill Ad Fees for selected seller
-  const backfillAdFees = async () => {
-    if (!selectedSeller) {
-      setSnackbarMsg('Please select a seller first');
-      setSnackbarSeverity('warning');
-      setSnackbarOpen(true);
-      return;
-    }
+  // Recalculate Earnings for all orders of selected seller
+  const recalculateEarnings = async () => {
+    const SINCE_DATE = '2026-02-28';
+    const scopeMsg = selectedSeller
+      ? `seller "${sellers.find(s => s._id === selectedSeller)?.user?.username || selectedSeller}"`
+      : 'ALL sellers';
 
-    setBackfillLoading(true);
-    setBackfillResults(null);
-    setError('');
+    const confirmed = window.confirm(
+      `This will recalculate orderEarnings for ${scopeMsg}, orders on/after ${SINCE_DATE}, across ALL marketplaces.\n\n` +
+      'Formula: totalDueSeller.value − adFeeGeneral\n\n' +
+      '• FULLY_REFUNDED → $0\n' +
+      '• PARTIALLY_REFUNDED → skipped (enter manually)\n' +
+      '• All other statuses → recalculated\n\n' +
+      'Continue?'
+    );
+    if (!confirmed) return;
 
+    setRecalcEarningsLoading(true);
     try {
-      // First get count to show in snackbar
-      const countRes = await api.get('/ebay/backfill-ad-fees/count', {
-        params: {
-          sellerId: selectedSeller,
-          sinceDate: '2025-11-01T00:00:00.000Z'
-        }
-      });
+      const payload = selectedSeller
+        ? { sellerId: selectedSeller, sinceDate: SINCE_DATE }
+        : { allSellers: true, sinceDate: SINCE_DATE };
 
-      const { needsBackfill, totalOrders: total } = countRes.data;
-
-      if (needsBackfill === 0) {
-        setSnackbarMsg(`All ${total} orders already have ad fees!`);
-        setSnackbarSeverity('info');
-        setSnackbarOpen(true);
-        setBackfillLoading(false);
-        return;
-      }
-
-      setSnackbarMsg(`Starting backfill for ${needsBackfill} orders (out of ${total})...`);
-      setSnackbarSeverity('info');
-      setSnackbarOpen(true);
-
-      // Now run the backfill
-      const res = await api.post('/ebay/backfill-ad-fees', {
-        sellerId: selectedSeller,
-        sinceDate: '2025-11-01T00:00:00.000Z',
-        skipAlreadySet: true
-      });
-
-      setBackfillResults(res.data.results);
-
-      // Refresh orders to show updated ad fees
+      const res = await api.post('/ebay/backfill-earnings', payload);
       await fetchOrders();
-
       setSnackbarMsg(res.data.message);
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
-
     } catch (e) {
-      console.error('Backfill error:', e);
-      setError(e?.response?.data?.error || 'Failed to backfill ad fees');
-      setSnackbarMsg('Failed to backfill ad fees');
+      console.error('Recalculate earnings error:', e);
+      setSnackbarMsg(e?.response?.data?.error || 'Failed to recalculate earnings');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     } finally {
-      setBackfillLoading(false);
+      setRecalcEarningsLoading(false);
+    }
+  };
+
+  const recalculateAmazonFinancials = async () => {
+    const SINCE_DATE = '2026-02-28';
+    const scopeMsg = selectedSeller
+      ? `seller "${sellers.find(s => s._id === selectedSeller)?.user?.username || selectedSeller}"`
+      : 'ALL sellers';
+
+    const confirmed = window.confirm(
+      `This will recalculate Amazon financials for ${scopeMsg}, orders on/after ${SINCE_DATE}.\n\n` +
+      'Recalculates: amazonTotal, amazonTotalINR, marketplaceFee, igst, totalCC, profit\n' +
+      'Formula: amazonTotal = beforeTax + estimatedTax\n\n' +
+      'Continue?'
+    );
+    if (!confirmed) return;
+
+    setRecalcAmazonLoading(true);
+    try {
+      const payload = selectedSeller
+        ? { sellerId: selectedSeller, sinceDate: SINCE_DATE }
+        : { allSellers: true, sinceDate: SINCE_DATE };
+
+      const res = await api.post('/ebay/backfill-amazon-financials', payload);
+      await fetchOrders();
+      setSnackbarMsg(res.data.message);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (e) {
+      console.error('Recalculate Amazon financials error:', e);
+      setSnackbarMsg(e?.response?.data?.error || 'Failed to recalculate Amazon financials');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setRecalcAmazonLoading(false);
     }
   };
 
@@ -2408,19 +2360,19 @@ function FulfillmentDashboard() {
           <Stack spacing={1} sx={{ mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography>Subtotal</Typography>
-              <Typography fontWeight="medium">{formatCurrency(order.subtotalUSD || order.subtotal)}</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.subtotal)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography>Shipping</Typography>
-              <Typography fontWeight="medium">{formatCurrency(order.shippingUSD || order.shipping)}</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.shipping)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography>Sales tax*</Typography>
-              <Typography fontWeight="medium">{formatCurrency(order.salesTaxUSD || order.salesTax)}</Typography>
+              <Typography fontWeight="medium">{formatCurrency(order.salesTax)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography>Discount</Typography>
-              <Typography fontWeight="medium" color="success.main">{formatCurrency(order.discountUSD || order.discount)}</Typography>
+              <Typography fontWeight="medium" color="success.main">{formatCurrency(order.discount)}</Typography>
             </Box>
             {order.refundTotalToBuyerUSD > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -2456,7 +2408,7 @@ function FulfillmentDashboard() {
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 4 }}>
               <Typography variant="body2">Sales tax</Typography>
-              <Typography variant="body2" color="error.main">-{formatCurrency(order.salesTaxUSD || order.salesTax)}</Typography>
+              <Typography variant="body2" color="error.main">-{formatCurrency(order.salesTax)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 2 }}>
               <Typography variant="body2" color="text.secondary">Selling costs</Typography>
@@ -2464,12 +2416,12 @@ function FulfillmentDashboard() {
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 4 }}>
               <Typography variant="body2">Transaction fees</Typography>
-              <Typography variant="body2" color="error.main">-{formatCurrency(order.transactionFeesUSD || order.transactionFees)}</Typography>
+              <Typography variant="body2" color="error.main">-{formatCurrency(order.transactionFees)}</Typography>
             </Box>
-            {order.adFeeGeneralUSD > 0 && (
+            {order.adFeeGeneral > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between', pl: 4 }}>
                 <Typography variant="body2">Ad Fee General</Typography>
-                <Typography variant="body2" color="error.main">-{formatCurrency(order.adFeeGeneralUSD || order.adFeeGeneral)}</Typography>
+                <Typography variant="body2" color="error.main">-{formatCurrency(order.adFeeGeneral)}</Typography>
               </Box>
             )}
             <Divider sx={{ my: 1 }} />
@@ -2580,11 +2532,11 @@ function FulfillmentDashboard() {
         'Buyer Name': 'shippingFullName',
         'Buyer Username': (o) => o.buyer?.username || '',
         'Marketplace': 'purchaseMarketplaceId',
-        'Subtotal (USD)': 'subtotalUSD',
-        'Shipping (USD)': 'shippingUSD',
-        'Sales Tax (USD)': 'salesTaxUSD',
-        'Discount (USD)': 'discountUSD',
-        'Transaction Fees (USD)': 'transactionFeesUSD',
+        'Subtotal': 'subtotal',
+        'Shipping': 'shipping',
+        'Sales Tax': 'salesTax',
+        'Discount': 'discount',
+        'Transaction Fees': 'transactionFees',
         'Ad Fees': 'adFeeGeneral',
         'Cancel Status': 'cancelState',
         'Refunds': (o) => o.refunds?.map(r => `${r.orderPaymentStatus === 'FULLY_REFUNDED' ? 'Full' : 'Partial'}: $${(Number(r.amount?.value || r.refundAmount?.value || 0) * (o.conversionRate || 1)).toFixed(2)}`).join('; ') || '',
@@ -3012,21 +2964,37 @@ function FulfillmentDashboard() {
               sx={{ mx: 1 }}
             />
 
-            {/* Row 4: Backfill & Column Selector */}
+            {/* Row 4: Recalc & Column Selector */}
             <Stack direction="row" spacing={1} alignItems="center">
-              <Tooltip title={selectedSeller ? "Backfill Ad Fees" : "Select a seller first"}>
+              <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
+                <span style={{ flex: 1 }}>
+                  <Button
+                    variant="outlined"
+                    color="info"
+                    size="small"
+                    fullWidth
+                    startIcon={recalcEarningsLoading ? <CircularProgress size={14} color="inherit" /> : <SyncIcon />}
+                    onClick={recalculateEarnings}
+                    disabled={recalcEarningsLoading}
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
                 <span style={{ flex: 1 }}>
                   <Button
                     variant="outlined"
                     color="warning"
                     size="small"
                     fullWidth
-                    startIcon={backfillLoading ? <CircularProgress size={14} color="inherit" /> : <LocalShippingIcon />}
-                    onClick={backfillAdFees}
-                    disabled={backfillLoading || !selectedSeller}
+                    startIcon={recalcAmazonLoading ? <CircularProgress size={14} color="inherit" /> : <SyncIcon />}
+                    onClick={recalculateAmazonFinancials}
+                    disabled={recalcAmazonLoading}
                     sx={{ fontSize: '0.7rem' }}
                   >
-                    {backfillLoading ? 'Fetching...' : 'Backfill Ad Fees'}
+                    {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
                   </Button>
                 </span>
               </Tooltip>
@@ -3110,17 +3078,32 @@ function FulfillmentDashboard() {
               {loading ? 'Syncing...' : `Resync ${resyncDays} Days`}
             </Button>
 
-            <Tooltip title={selectedSeller ? "Fetch ad fees from eBay for all orders" : "Select a seller first"}>
+            <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
+              <span>
+                <Button
+                  variant="outlined"
+                  color="info"
+                  startIcon={recalcEarningsLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                  onClick={recalculateEarnings}
+                  disabled={recalcEarningsLoading}
+                  sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                >
+                  {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
+                </Button>
+              </span>
+            </Tooltip>
+
+            <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
               <span>
                 <Button
                   variant="outlined"
                   color="warning"
-                  startIcon={backfillLoading ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
-                  onClick={backfillAdFees}
-                  disabled={backfillLoading || !selectedSeller}
-                  sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
+                  startIcon={recalcAmazonLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                  onClick={recalculateAmazonFinancials}
+                  disabled={recalcAmazonLoading}
+                  sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
                 >
-                  {backfillLoading ? 'Fetching Fees...' : 'Backfill Fees'}
+                  {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
                 </Button>
               </span>
             </Tooltip>
@@ -3192,26 +3175,6 @@ function FulfillmentDashboard() {
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
-          </Alert>
-        )}
-
-        {/* Backfill Results Display */}
-        {backfillResults && (
-          <Alert
-            severity="info"
-            sx={{ mt: 2 }}
-            onClose={() => setBackfillResults(null)}
-          >
-            <Typography variant="subtitle2" fontWeight="bold">Ad Fee Backfill Results:</Typography>
-            <Typography variant="body2">
-              • Total processed: {backfillResults.total} orders<br />
-              • ✅ Updated with ad fees: {backfillResults.success}<br />
-              • ⏭️ No ad fee found: {backfillResults.skipped}<br />
-              • ❌ Failed: {backfillResults.failed}
-              {backfillResults.errors?.length > 0 && (
-                <><br />• First errors: {backfillResults.errors.slice(0, 3).map(e => e.orderId).join(', ')}</>
-              )}
-            </Typography>
           </Alert>
         )}
 
@@ -3850,33 +3813,33 @@ function FulfillmentDashboard() {
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">
                               <Typography variant="body2" fontWeight="medium">
-                                {formatCurrency(order.subtotalUSD)}
+                                {formatCurrency(order.subtotal)}
                               </Typography>
                             </TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('shipping') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                            <TableCell align="right">{formatCurrency(order.shippingUSD)}</TableCell>
+                            <TableCell align="right">{formatCurrency(order.shipping)}</TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('salesTax') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                            <TableCell align="right">{formatCurrency(order.salesTaxUSD)}</TableCell>
+                            <TableCell align="right">{formatCurrency(order.salesTax)}</TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('discount') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">
                               <Typography variant="body2">
-                                {formatCurrency(order.discountUSD)}
+                                {formatCurrency(order.discount)}
                               </Typography>
                             </TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('transactionFees') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
-                            <TableCell align="right">{formatCurrency(order.transactionFeesUSD)}</TableCell>
+                            <TableCell align="right">{formatCurrency(order.transactionFees)}</TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
                         {visibleColumns.includes('adFeeGeneral') && (
@@ -4006,37 +3969,21 @@ function FulfillmentDashboard() {
                         )}
                         {visibleColumns.includes('orderEarnings') && (
                           <TableCell align="right">
-                            {order.orderPaymentStatus === 'PARTIALLY_REFUNDED' ? (
-                              <TextField
-                                size="small"
-                                type="number"
-                                value={order.orderEarnings || ''}
-                                onChange={(e) => handleOrderEarningsChange(order._id, order.orderId, e.target.value)}
-                                onBlur={() => handleOrderEarningsSave(order._id, order.orderId)}
-                                sx={{
-                                  width: 100,
-                                  '& .MuiInputBase-input': {
-                                    textAlign: 'right',
-                                    fontSize: '0.875rem',
-                                    color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
-                                    fontWeight: 'bold'
-                                  }
-                                }}
-                                inputProps={{ step: '0.01' }}
-                              />
-                            ) : getOrderEarnings(order) != null ? (
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  color: getOrderEarnings(order) >= 0 ? 'success.main' : 'error.main',
-                                  fontWeight: 'bold'
-                                }}
-                              >
-                                {formatCurrency(getOrderEarnings(order))}
-                              </Typography>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">-</Typography>
-                            )}
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 'bold',
+                                color: order.orderPaymentStatus === 'FULLY_REFUNDED'
+                                  ? 'text.secondary'
+                                  : (order.orderEarnings ?? 0) >= 0 ? 'success.main' : 'error.main'
+                              }}
+                            >
+                              {order.orderPaymentStatus === 'FULLY_REFUNDED'
+                                ? '$0.00'
+                                : order.orderEarnings != null
+                                  ? `$${parseFloat(order.orderEarnings).toFixed(2)}`
+                                  : '-'}
+                            </Typography>
                           </TableCell>
                         )}
                         {visibleColumns.includes('trackingNumber') && (
