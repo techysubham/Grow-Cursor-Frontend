@@ -25,7 +25,8 @@ import {
   Select,
   MenuItem,
   Divider,
-  Chip
+  Chip,
+  Autocomplete
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -338,21 +339,28 @@ export default function AsinListPage() {
             </FormControl>
 
             {/* Range */}
-            <FormControl size="small" sx={{ minWidth: 150 }} disabled={!categoryId}>
-              <InputLabel>Range</InputLabel>
-              <Select
-                value={rangeId}
-                label="Range"
-                onChange={e => { setRangeId(e.target.value); setPage(0); }}
-                disabled={!categoryId || loadingRanges}
-                endAdornment={loadingRanges ? <CircularProgress size={14} sx={{ mr: 2 }} /> : null}
-              >
-                <MenuItem value=""><em>All</em></MenuItem>
-                {ranges.map(r => (
-                  <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              size="small"
+              sx={{ minWidth: 200 }}
+              disabled={!categoryId || loadingRanges}
+              options={[{ _id: '', name: 'All' }, ...ranges]}
+              getOptionLabel={opt => opt.name}
+              value={ranges.find(r => r._id === rangeId) || { _id: '', name: 'All' }}
+              onChange={(_, newVal) => { setRangeId(newVal?._id || ''); setPage(0); }}
+              isOptionEqualToValue={(opt, val) => opt._id === val._id}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Range"
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: loadingRanges
+                      ? <CircularProgress size={14} />
+                      : params.InputProps.endAdornment
+                  }}
+                />
+              )}
+            />
 
             {/* Product */}
             <FormControl size="small" sx={{ minWidth: 150 }} disabled={!rangeId}>
