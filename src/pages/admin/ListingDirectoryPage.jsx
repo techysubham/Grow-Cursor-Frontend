@@ -66,6 +66,8 @@ function renderCellValue(col, listing) {
   return v || '-';
 }
 
+const SELLER_DISPLAY_NAMES = { testing: 'Grow Mentality' };
+
 export default function ListingDirectoryPage() {
   // ── Seller (fixed: "Testing") ────────────────────────────────────────────
   const [seller, setSeller] = useState(null);
@@ -589,7 +591,7 @@ export default function ListingDirectoryPage() {
           )}
           {seller && (
             <Chip
-              label={`Seller: ${seller.user?.username || 'Testing'}`}
+              label={`Seller: ${SELLER_DISPLAY_NAMES[seller.user?.username?.toLowerCase()] || seller.user?.username || 'Testing'}`}
               size="small"
               color="default"
               variant="outlined"

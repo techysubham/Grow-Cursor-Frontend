@@ -25,7 +25,8 @@ import {
   Select,
   MenuItem,
   Divider,
-  Chip
+  Chip,
+  Autocomplete
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -70,6 +71,8 @@ export default function AsinListPage() {
   // placeholder — no logic wired yet
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
+  const [priceMinActive, setPriceMinActive] = useState('');
+  const [priceMaxActive, setPriceMaxActive] = useState('');
   const [ordersComparator, setOrdersComparator] = useState('more than');
   const [ordersValue, setOrdersValue] = useState('');
 
@@ -141,15 +144,18 @@ export default function AsinListPage() {
 
   // ── Table fetch ─────────────────────────────────────────────────────────────
   const fetchAsins = useCallback(async () => {
-    if (!productId) return;
+    if (!rangeId) return;
     try {
       setLoading(true);
       const { data } = await api.get('/asin-directory', {
         params: {
-          listProductId: productId,
+          listProductId: productId || undefined,
+          rangeId: !productId && rangeId ? rangeId : undefined,
           page: page + 1,
           limit: rowsPerPage,
-          search: searchActive || undefined
+          search: searchActive || undefined,
+          priceMin: priceMinActive || undefined,
+          priceMax: priceMaxActive || undefined,
         }
       });
       setAsins(data.asins || []);
@@ -160,17 +166,17 @@ export default function AsinListPage() {
     } finally {
       setLoading(false);
     }
-  }, [productId, page, rowsPerPage, searchActive]);
+  }, [productId, rangeId, page, rowsPerPage, searchActive, priceMinActive, priceMaxActive]);
 
   useEffect(() => {
-    if (productId) {
+    if (rangeId) {
       fetchAsins();
     } else {
       setAsins([]);
       setTotal(0);
       setSelected([]);
     }
-  }, [fetchAsins, productId]);
+  }, [fetchAsins, rangeId]);
 
   // ── Selection helpers ───────────────────────────────────────────────────────
   const isAllSelected = asins.length > 0 && selected.length === asins.length;
@@ -220,7 +226,13 @@ export default function AsinListPage() {
     setPage(0);
     setSearchActive(keyword);
   };
-
+  // ── Price filter (apply on Enter or blur) ───────────────────────────────
+  const commitPriceFilter = (e) => {
+    if (e.key && e.key !== 'Enter') return;
+    setPage(0);
+    setPriceMinActive(priceMin);
+    setPriceMaxActive(priceMax);
+  };
   // ── Create Listing handlers ──────────────────────────────────────────────────
   const handleCreateConfirmed = ({ sellerId, templateId, template }) => {
     setActiveSellerId(sellerId);
@@ -327,21 +339,28 @@ export default function AsinListPage() {
             </FormControl>
 
             {/* Range */}
-            <FormControl size="small" sx={{ minWidth: 150 }} disabled={!categoryId}>
-              <InputLabel>Range</InputLabel>
-              <Select
-                value={rangeId}
-                label="Range"
-                onChange={e => { setRangeId(e.target.value); setPage(0); }}
-                disabled={!categoryId || loadingRanges}
-                endAdornment={loadingRanges ? <CircularProgress size={14} sx={{ mr: 2 }} /> : null}
-              >
-                <MenuItem value=""><em>All</em></MenuItem>
-                {ranges.map(r => (
-                  <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              size="small"
+              sx={{ minWidth: 200 }}
+              disabled={!categoryId || loadingRanges}
+              options={[{ _id: '', name: 'All' }, ...ranges]}
+              getOptionLabel={opt => opt.name}
+              value={ranges.find(r => r._id === rangeId) || { _id: '', name: 'All' }}
+              onChange={(_, newVal) => { setRangeId(newVal?._id || ''); setPage(0); }}
+              isOptionEqualToValue={(opt, val) => opt._id === val._id}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Range"
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: loadingRanges
+                      ? <CircularProgress size={14} />
+                      : params.InputProps.endAdornment
+                  }}
+                />
+              )}
+            />
 
             {/* Product */}
             <FormControl size="small" sx={{ minWidth: 150 }} disabled={!rangeId}>
@@ -385,7 +404,7 @@ export default function AsinListPage() {
             <Button
               variant="contained"
               startIcon={<AddCircleIcon />}
-              disabled={selected.length === 0 || !productId}
+              disabled={selected.length === 0 || !rangeId}
               onClick={() => setCreateDialog(true)}
               sx={{ whiteSpace: 'nowrap' }}
             >
@@ -405,6 +424,8 @@ export default function AsinListPage() {
               label="Min"
               value={priceMin}
               onChange={e => setPriceMin(e.target.value)}
+              onKeyDown={commitPriceFilter}
+              onBlur={commitPriceFilter}
               sx={{ width: 90 }}
               type="number"
             />
@@ -414,6 +435,8 @@ export default function AsinListPage() {
               label="Max"
               value={priceMax}
               onChange={e => setPriceMax(e.target.value)}
+              onKeyDown={commitPriceFilter}
+              onBlur={commitPriceFilter}
               sx={{ width: 90 }}
               type="number"
             />
@@ -448,10 +471,10 @@ export default function AsinListPage() {
 
       {/* ── Table ────────────────────────────────────────────────────────────── */}
       <Paper>
-        {!productId ? (
+        {!rangeId ? (
           <Box sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
             <Typography variant="body1">
-              Select a Category, Range, and Product to view ASINs
+              Select a Category and Range to view ASINs
             </Typography>
           </Box>
         ) : (
@@ -639,7 +662,7 @@ export default function AsinListPage() {
         )}
 
         {/* Pagination */}
-        {productId && (
+        {rangeId && (
           <TablePagination
             component="div"
             count={total}
