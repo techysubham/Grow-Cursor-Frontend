@@ -141,12 +141,13 @@ export default function AsinListPage() {
 
   // ── Table fetch ─────────────────────────────────────────────────────────────
   const fetchAsins = useCallback(async () => {
-    if (!productId) return;
+    if (!rangeId) return;
     try {
       setLoading(true);
       const { data } = await api.get('/asin-directory', {
         params: {
-          listProductId: productId,
+          listProductId: productId || undefined,
+          rangeId: !productId && rangeId ? rangeId : undefined,
           page: page + 1,
           limit: rowsPerPage,
           search: searchActive || undefined
@@ -160,17 +161,17 @@ export default function AsinListPage() {
     } finally {
       setLoading(false);
     }
-  }, [productId, page, rowsPerPage, searchActive]);
+  }, [productId, rangeId, page, rowsPerPage, searchActive]);
 
   useEffect(() => {
-    if (productId) {
+    if (rangeId) {
       fetchAsins();
     } else {
       setAsins([]);
       setTotal(0);
       setSelected([]);
     }
-  }, [fetchAsins, productId]);
+  }, [fetchAsins, rangeId]);
 
   // ── Selection helpers ───────────────────────────────────────────────────────
   const isAllSelected = asins.length > 0 && selected.length === asins.length;
@@ -385,7 +386,7 @@ export default function AsinListPage() {
             <Button
               variant="contained"
               startIcon={<AddCircleIcon />}
-              disabled={selected.length === 0 || !productId}
+              disabled={selected.length === 0 || !rangeId}
               onClick={() => setCreateDialog(true)}
               sx={{ whiteSpace: 'nowrap' }}
             >
@@ -448,10 +449,10 @@ export default function AsinListPage() {
 
       {/* ── Table ────────────────────────────────────────────────────────────── */}
       <Paper>
-        {!productId ? (
+        {!rangeId ? (
           <Box sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
             <Typography variant="body1">
-              Select a Category, Range, and Product to view ASINs
+              Select a Category and Range to view ASINs
             </Typography>
           </Box>
         ) : (
@@ -639,7 +640,7 @@ export default function AsinListPage() {
         )}
 
         {/* Pagination */}
-        {productId && (
+        {rangeId && (
           <TablePagination
             component="div"
             count={total}
