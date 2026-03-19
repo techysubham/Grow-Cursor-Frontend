@@ -860,8 +860,8 @@ export default function AllOrdersSheetPage() {
       ) : orders.length === 0 ? (
         <Alert severity="info">No orders found</Alert>
       ) : (
-        <TableContainer component={Paper}>
-          <Table size="small" stickyHeader>
+        <TableContainer component={Paper} sx={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
+          <Table size="small" stickyHeader sx={{ '& thead tr:nth-of-type(2) th': { top: 37, zIndex: 3 } }}>
             <TableHead>
               {/* First row: Section headers */}
               <TableRow>
