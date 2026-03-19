@@ -1250,8 +1250,9 @@ function FulfillmentDashboard() {
   const [snackbarOrderIds, setSnackbarOrderIds] = useState([]); // Store order IDs for copying
   const [updatedOrderDetails, setUpdatedOrderDetails] = useState([]); // Store { orderId, changedFields }
 
-  // Editing order earnings for PARTIALLY_REFUNDED orders
+  // Editing order earnings
   const [editingOrderEarnings, setEditingOrderEarnings] = useState({}); // { orderId: value }
+  const [confirmedEarningsEdit, setConfirmedEarningsEdit] = useState({}); // { orderId: true } - tracks which orders user has confirmed to edit
 
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [selectedOrderForMessage, setSelectedOrderForMessage] = useState(null);
@@ -1654,9 +1655,25 @@ function FulfillmentDashboard() {
     ));
   };
 
+  // Handle order earnings focus - show confirmation before allowing edit
+  const handleOrderEarningsFocus = (e, orderId, orderIdStr) => {
+    if (confirmedEarningsEdit[orderId]) return; // Already confirmed
+    e.target.blur(); // Immediately remove focus
+    const confirmed = window.confirm(
+      `Are you sure you want to edit the earnings for order ${orderIdStr}?\n\nThis will recalculate TDS, NET, P.Balance and Profit.`
+    );
+    if (confirmed) {
+      setConfirmedEarningsEdit(prev => ({ ...prev, [orderId]: true }));
+      // Re-focus the input after confirmation
+      setTimeout(() => e.target.focus(), 0);
+    }
+  };
+
   // Handle order earnings save (persist to backend)
   const handleOrderEarningsSave = async (orderId, orderIdStr) => {
     const newValue = editingOrderEarnings[orderId];
+    // Clear confirmation state on blur regardless
+    setConfirmedEarningsEdit(prev => { const s = { ...prev }; delete s[orderId]; return s; });
     if (newValue === undefined) return;
 
     try {
@@ -1664,7 +1681,7 @@ function FulfillmentDashboard() {
         orderEarnings: parseFloat(newValue)
       });
 
-      // Update orders state with recalculated financial fields
+      // Update orders state with all recalculated financial fields (including profit)
       setOrders(prev => prev.map(order =>
         order._id === orderId
           ? {
@@ -1674,7 +1691,8 @@ function FulfillmentDashboard() {
             tid: data.tid,
             net: data.net,
             pBalanceINR: data.pBalanceINR,
-            ebayExchangeRate: data.ebayExchangeRate
+            ebayExchangeRate: data.ebayExchangeRate,
+            profit: data.profit
           }
           : order
       ));
@@ -4142,36 +4160,44 @@ function FulfillmentDashboard() {
                         )}
                         {visibleColumns.includes('orderEarnings') && (
                           <TableCell align="right">
-                            {order.orderPaymentStatus === 'PARTIALLY_REFUNDED' ? (
+                            {order.orderPaymentStatus === 'FULLY_REFUNDED' ? (
+                              // FULLY_REFUNDED orders always have $0 earnings (set automatically by server)
+                              <Typography
+                                variant="body2"
+                                sx={{ color: 'text.secondary', fontWeight: 'bold' }}
+                              >
+                                $0.00
+                              </Typography>
+                            ) : (
+                              // All other orders: user can manually enter earnings (requires confirmation)
                               <TextField
                                 size="small"
                                 type="number"
-                                value={order.orderEarnings || ''}
-                                onChange={(e) => handleOrderEarningsChange(order._id, order.orderId, e.target.value)}
+                                value={
+                                  editingOrderEarnings[order._id] !== undefined
+                                    ? editingOrderEarnings[order._id]
+                                    : (order.orderEarnings ?? '')
+                                }
+                                onChange={(e) => {
+                                  if (!confirmedEarningsEdit[order._id]) return;
+                                  handleOrderEarningsChange(order._id, order.orderId, e.target.value);
+                                }}
+                                onFocus={(e) => handleOrderEarningsFocus(e, order._id, order.orderId)}
                                 onBlur={() => handleOrderEarningsSave(order._id, order.orderId)}
+                                placeholder="Click to edit"
+                                title="Click to edit earnings"
                                 sx={{
-                                  width: 100,
+                                  width: 110,
                                   '& .MuiInputBase-input': {
                                     textAlign: 'right',
                                     fontSize: '0.875rem',
-                                    color: order.orderEarnings >= 0 ? 'success.main' : 'error.main',
-                                    fontWeight: 'bold'
+                                    color: (order.orderEarnings ?? 0) >= 0 ? 'success.main' : 'error.main',
+                                    fontWeight: 'bold',
+                                    cursor: confirmedEarningsEdit[order._id] ? 'text' : 'pointer'
                                   }
                                 }}
-                                inputProps={{ step: '0.01' }}
+                                inputProps={{ step: '0.01', readOnly: !confirmedEarningsEdit[order._id] }}
                               />
-                            ) : getOrderEarnings(order) != null ? (
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  color: getOrderEarnings(order) >= 0 ? 'success.main' : 'error.main',
-                                  fontWeight: 'bold'
-                                }}
-                              >
-                                {formatCurrency(getOrderEarnings(order))}
-                              </Typography>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">-</Typography>
                             )}
                           </TableCell>
                         )}
