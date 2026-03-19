@@ -1210,6 +1210,7 @@ function FulfillmentDashboard() {
   // Backfill Ad Fees state
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillResults, setBackfillResults] = useState(null);
+  const [backfillSinceDate, setBackfillSinceDate] = useState('2026-03-01');
   // Recalculate Earnings state
   const [recalcEarningsLoading, setRecalcEarningsLoading] = useState(false);
   const [recalcAmazonLoading, setRecalcAmazonLoading] = useState(false);
@@ -1251,8 +1252,7 @@ function FulfillmentDashboard() {
   const [updatedOrderDetails, setUpdatedOrderDetails] = useState([]); // Store { orderId, changedFields }
 
   // Editing order earnings
-  const [editingOrderEarnings, setEditingOrderEarnings] = useState({}); // { orderId: value }
-  const [confirmedEarningsEdit, setConfirmedEarningsEdit] = useState({}); // { orderId: true } - tracks which orders user has confirmed to edit
+  // (orderEarnings is now read-only, calculated server-side as totalDueSeller - adFeeGeneral)
 
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [selectedOrderForMessage, setSelectedOrderForMessage] = useState(null);
@@ -1640,74 +1640,8 @@ function FulfillmentDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, dateFilter]);
 
-  // Handle order earnings change (update local state only - no full list re-render)
-  const handleOrderEarningsChange = (orderId, orderIdStr, value) => {
-    setEditingOrderEarnings(prev => ({
-      ...prev,
-      [orderId]: value
-    }));
-  };
-
-  // Handle order earnings focus - show confirmation before allowing edit
-  const handleOrderEarningsFocus = (e, orderId, orderIdStr) => {
-    if (confirmedEarningsEdit[orderId]) return; // Already confirmed
-    e.target.blur(); // Immediately remove focus
-    const confirmed = window.confirm(
-      `Are you sure you want to edit the earnings for order ${orderIdStr}?\n\nThis will recalculate TDS, NET, P.Balance and Profit.`
-    );
-    if (confirmed) {
-      setConfirmedEarningsEdit(prev => ({ ...prev, [orderId]: true }));
-      // Re-focus the input after confirmation
-      setTimeout(() => e.target.focus(), 0);
-    }
-  };
-
-  // Handle order earnings save (persist to backend)
-  const handleOrderEarningsSave = async (orderId, orderIdStr) => {
-    const newValue = editingOrderEarnings[orderId];
-    // Clear confirmation state on blur regardless
-    setConfirmedEarningsEdit(prev => { const s = { ...prev }; delete s[orderId]; return s; });
-    if (newValue === undefined) return;
-
-    try {
-      const { data } = await api.post(`/ebay/orders/${orderIdStr}/update-earnings`, {
-        orderEarnings: parseFloat(newValue)
-      });
-
-      // Update orders state with all recalculated financial fields (including profit)
-      setOrders(prev => prev.map(order =>
-        order._id === orderId
-          ? {
-            ...order,
-            orderEarnings: data.orderEarnings,
-            tds: data.tds,
-            tid: data.tid,
-            net: data.net,
-            pBalanceINR: data.pBalanceINR,
-            ebayExchangeRate: data.ebayExchangeRate,
-            profit: data.profit
-          }
-          : order
-      ));
-
-      // Clear editing state
-      setEditingOrderEarnings(prev => {
-        const newState = { ...prev };
-        delete newState[orderId];
-        return newState;
-      });
-
-      // Show success message
-      setSnackbarMsg(`Order earnings updated for ${orderIdStr}`);
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-    } catch (err) {
-      console.error('Error updating order earnings:', err);
-      setSnackbarMsg(`Failed to update order earnings: ${err.response?.data?.error || err.message}`);
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-    }
-  };
+  // orderEarnings is now read-only (auto-calculated server-side)
+  // No manual editing handlers needed
 
   async function fetchSellers() {
     setError('');
@@ -2232,14 +2166,26 @@ function FulfillmentDashboard() {
     }
   };
 
-  // Backfill Ad Fees for selected seller
+  // Backfill Ad Fees for all sellers (or selected seller) since chosen date
   const backfillAdFees = async () => {
-    if (!selectedSeller) {
-      setSnackbarMsg('Please select a seller first');
+    if (!backfillSinceDate) {
+      setSnackbarMsg('Please select a date first');
       setSnackbarSeverity('warning');
       setSnackbarOpen(true);
       return;
     }
+
+    const scopeMsg = selectedSeller
+      ? `seller "${sellers.find(s => s._id === selectedSeller)?.user?.username || selectedSeller}"`
+      : 'ALL sellers';
+    const confirmed = window.confirm(
+      `This will backfill ad fees for ${scopeMsg}, orders on/after ${backfillSinceDate}.\n\n` +
+      'For orders where adFeeGeneral is found, orderEarnings will be recalculated as:\n' +
+      'orderEarnings = totalDueSeller − adFeeGeneral\n\n' +
+      'All downstream fields (TDS, NET, P.Balance, Profit) will also be recalculated.\n\n' +
+      'Continue?'
+    );
+    if (!confirmed) return;
 
     setBackfillLoading(true);
     setBackfillResults(null);
@@ -2247,12 +2193,13 @@ function FulfillmentDashboard() {
 
     try {
       // First get count to show in snackbar
-      const countRes = await api.get('/ebay/backfill-ad-fees/count', {
-        params: {
-          sellerId: selectedSeller,
-          sinceDate: '2025-11-01T00:00:00.000Z'
-        }
-      });
+      const countParams = { sinceDate: new Date(backfillSinceDate).toISOString() };
+      if (selectedSeller) {
+        countParams.sellerId = selectedSeller;
+      } else {
+        countParams.allSellers = 'true';
+      }
+      const countRes = await api.get('/ebay/backfill-ad-fees/count', { params: countParams });
 
       const { needsBackfill, totalOrders: total } = countRes.data;
 
@@ -2264,16 +2211,21 @@ function FulfillmentDashboard() {
         return;
       }
 
-      setSnackbarMsg(`Starting backfill for ${needsBackfill} orders (out of ${total})...`);
+      setSnackbarMsg(`Starting backfill for ${needsBackfill} orders (out of ${total}) across ${scopeMsg}...`);
       setSnackbarSeverity('info');
       setSnackbarOpen(true);
 
       // Now run the backfill
-      const res = await api.post('/ebay/backfill-ad-fees', {
-        sellerId: selectedSeller,
-        sinceDate: '2025-11-01T00:00:00.000Z',
+      const payload = {
+        sinceDate: new Date(backfillSinceDate).toISOString(),
         skipAlreadySet: true
-      });
+      };
+      if (selectedSeller) {
+        payload.sellerId = selectedSeller;
+      } else {
+        payload.allSellers = true;
+      }
+      const res = await api.post('/ebay/backfill-ad-fees', payload);
 
       setBackfillResults(res.data.results);
 
@@ -2980,7 +2932,7 @@ function FulfillmentDashboard() {
                 color="primary"
                 startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />)}
                 onClick={pollNewOrders}
-                disabled={loading}
+                disabled={loading || backfillLoading}
                 size="small"
                 fullWidth
                 sx={{
@@ -2996,7 +2948,7 @@ function FulfillmentDashboard() {
                 color="secondary"
                 startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />)}
                 onClick={pollOrderUpdates}
-                disabled={loading}
+                disabled={loading || backfillLoading}
                 size="small"
                 fullWidth
                 sx={{
@@ -3030,7 +2982,7 @@ function FulfillmentDashboard() {
                 color="warning"
                 startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />)}
                 onClick={resyncRecent}
-                disabled={loading}
+                disabled={loading || backfillLoading}
                 size="small"
                 fullWidth
                 sx={{
@@ -3099,7 +3051,16 @@ function FulfillmentDashboard() {
 
             {/* Row 4: Backfill & Column Selector */}
             <Stack direction="row" spacing={1} alignItems="center">
-              <Tooltip title={selectedSeller ? "Backfill Ad Fees" : "Select a seller first"}>
+              <TextField
+                type="date"
+                size="small"
+                label="Ad Fee Since"
+                value={backfillSinceDate}
+                onChange={(e) => setBackfillSinceDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ minWidth: 130, '& input': { fontSize: '0.75rem', py: 0.5 } }}
+              />
+              <Tooltip title={selectedSeller ? "Backfill Ad Fees (selected seller)" : "Backfill Ad Fees (ALL sellers)"}>
                 <span style={{ flex: 1 }}>
                   <Button
                     variant="outlined"
@@ -3108,7 +3069,7 @@ function FulfillmentDashboard() {
                     fullWidth
                     startIcon={backfillLoading ? <CircularProgress size={14} color="inherit" /> : <LocalShippingIcon />}
                     onClick={backfillAdFees}
-                    disabled={backfillLoading || !selectedSeller}
+                    disabled={backfillLoading || loading}
                     sx={{ fontSize: '0.7rem' }}
                   >
                     {backfillLoading ? 'Fetching...' : 'Backfill Ad Fees'}
@@ -3185,7 +3146,7 @@ function FulfillmentDashboard() {
               color="primary"
               startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
               onClick={pollNewOrders}
-              disabled={loading}
+              disabled={loading || backfillLoading}
               sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
             >
               {loading ? 'Polling...' : 'Poll New Orders'}
@@ -3196,7 +3157,7 @@ function FulfillmentDashboard() {
               color="secondary"
               startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
               onClick={pollOrderUpdates}
-              disabled={loading}
+              disabled={loading || backfillLoading}
               sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
             >
               {loading ? 'Updating...' : 'Poll Order Updates'}
@@ -3221,20 +3182,30 @@ function FulfillmentDashboard() {
               color="warning"
               startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
               onClick={resyncRecent}
-              disabled={loading}
+              disabled={loading || backfillLoading}
               sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
             >
               {loading ? 'Syncing...' : `Resync ${resyncDays} Days`}
             </Button>
 
-            <Tooltip title={selectedSeller ? "Fetch ad fees from eBay for all orders" : "Select a seller first"}>
+            <TextField
+              type="date"
+              size="small"
+              label="Ad Fee Since"
+              value={backfillSinceDate}
+              onChange={(e) => setBackfillSinceDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 150, '& input': { fontSize: '0.8rem', py: 0.5 } }}
+            />
+
+            <Tooltip title={selectedSeller ? "Backfill Ad Fees (selected seller)" : "Backfill Ad Fees (ALL sellers)"}>
               <span>
                 <Button
                   variant="outlined"
                   color="warning"
                   startIcon={backfillLoading ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
                   onClick={backfillAdFees}
-                  disabled={backfillLoading || !selectedSeller}
+                  disabled={backfillLoading || loading}
                   sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
                 >
                   {backfillLoading ? 'Fetching Fees...' : 'Backfill Fees'}
@@ -4152,52 +4123,22 @@ function FulfillmentDashboard() {
                           </TableCell>
                         )}
                         {visibleColumns.includes('orderEarnings') && (
-                          <TableCell
-                            align="right"
-                            sx={{
-                              transition: 'background-color 0.2s ease',
-                              backgroundColor: confirmedEarningsEdit[order._id] ? 'rgba(255, 182, 193, 0.35)' : 'transparent'
-                            }}
-                          >
-                            {order.orderPaymentStatus === 'FULLY_REFUNDED' ? (
-                              // FULLY_REFUNDED orders always have $0 earnings (set automatically by server)
-                              <Typography
-                                variant="body2"
-                                sx={{ color: 'text.secondary', fontWeight: 'bold' }}
-                              >
-                                $0.00
-                              </Typography>
-                            ) : (
-                              // All other orders: user can manually enter earnings (requires confirmation)
-                              <TextField
-                                size="small"
-                                type="number"
-                                value={
-                                  editingOrderEarnings[order._id] !== undefined
-                                    ? editingOrderEarnings[order._id]
-                                    : (order.orderEarnings ?? '')
-                                }
-                                onChange={(e) => {
-                                  if (!confirmedEarningsEdit[order._id]) return;
-                                  handleOrderEarningsChange(order._id, order.orderId, e.target.value);
-                                }}
-                                onFocus={(e) => handleOrderEarningsFocus(e, order._id, order.orderId)}
-                                onBlur={() => handleOrderEarningsSave(order._id, order.orderId)}
-                                placeholder="Click to edit"
-                                title="Click to edit earnings"
-                                sx={{
-                                  width: 110,
-                                  '& .MuiInputBase-input': {
-                                    textAlign: 'right',
-                                    fontSize: '0.875rem',
-                                    color: (order.orderEarnings ?? 0) >= 0 ? 'success.main' : 'error.main',
-                                    fontWeight: 'bold',
-                                    cursor: confirmedEarningsEdit[order._id] ? 'text' : 'pointer'
-                                  }
-                                }}
-                                inputProps={{ step: '0.01', readOnly: !confirmedEarningsEdit[order._id] }}
-                              />
-                            )}
+                          <TableCell align="right">
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 'bold',
+                                color: order.orderPaymentStatus === 'FULLY_REFUNDED'
+                                  ? 'text.secondary'
+                                  : (order.orderEarnings ?? 0) >= 0 ? 'success.main' : 'error.main'
+                              }}
+                            >
+                              {order.orderPaymentStatus === 'FULLY_REFUNDED'
+                                ? '$0.00'
+                                : order.orderEarnings != null
+                                  ? `$${parseFloat(order.orderEarnings).toFixed(2)}`
+                                  : '-'}
+                            </Typography>
                           </TableCell>
                         )}
                         {visibleColumns.includes('trackingNumber') && (
