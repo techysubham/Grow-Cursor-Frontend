@@ -70,6 +70,8 @@ export default function AsinListPage() {
   // placeholder — no logic wired yet
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
+  const [priceMinActive, setPriceMinActive] = useState('');
+  const [priceMaxActive, setPriceMaxActive] = useState('');
   const [ordersComparator, setOrdersComparator] = useState('more than');
   const [ordersValue, setOrdersValue] = useState('');
 
@@ -150,7 +152,9 @@ export default function AsinListPage() {
           rangeId: !productId && rangeId ? rangeId : undefined,
           page: page + 1,
           limit: rowsPerPage,
-          search: searchActive || undefined
+          search: searchActive || undefined,
+          priceMin: priceMinActive || undefined,
+          priceMax: priceMaxActive || undefined,
         }
       });
       setAsins(data.asins || []);
@@ -161,7 +165,7 @@ export default function AsinListPage() {
     } finally {
       setLoading(false);
     }
-  }, [productId, rangeId, page, rowsPerPage, searchActive]);
+  }, [productId, rangeId, page, rowsPerPage, searchActive, priceMinActive, priceMaxActive]);
 
   useEffect(() => {
     if (rangeId) {
@@ -221,7 +225,13 @@ export default function AsinListPage() {
     setPage(0);
     setSearchActive(keyword);
   };
-
+  // ── Price filter (apply on Enter or blur) ───────────────────────────────
+  const commitPriceFilter = (e) => {
+    if (e.key && e.key !== 'Enter') return;
+    setPage(0);
+    setPriceMinActive(priceMin);
+    setPriceMaxActive(priceMax);
+  };
   // ── Create Listing handlers ──────────────────────────────────────────────────
   const handleCreateConfirmed = ({ sellerId, templateId, template }) => {
     setActiveSellerId(sellerId);
@@ -406,6 +416,8 @@ export default function AsinListPage() {
               label="Min"
               value={priceMin}
               onChange={e => setPriceMin(e.target.value)}
+              onKeyDown={commitPriceFilter}
+              onBlur={commitPriceFilter}
               sx={{ width: 90 }}
               type="number"
             />
@@ -415,6 +427,8 @@ export default function AsinListPage() {
               label="Max"
               value={priceMax}
               onChange={e => setPriceMax(e.target.value)}
+              onKeyDown={commitPriceFilter}
+              onBlur={commitPriceFilter}
               sx={{ width: 90 }}
               type="number"
             />
