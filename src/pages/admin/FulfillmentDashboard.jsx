@@ -1640,19 +1640,12 @@ function FulfillmentDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, dateFilter]);
 
-  // Handle order earnings change (update local state)
+  // Handle order earnings change (update local state only - no full list re-render)
   const handleOrderEarningsChange = (orderId, orderIdStr, value) => {
     setEditingOrderEarnings(prev => ({
       ...prev,
       [orderId]: value
     }));
-
-    // Update orders state immediately for UI feedback
-    setOrders(prev => prev.map(order =>
-      order._id === orderId
-        ? { ...order, orderEarnings: parseFloat(value) || 0 }
-        : order
-    ));
   };
 
   // Handle order earnings focus - show confirmation before allowing edit
@@ -4159,7 +4152,13 @@ function FulfillmentDashboard() {
                           </TableCell>
                         )}
                         {visibleColumns.includes('orderEarnings') && (
-                          <TableCell align="right">
+                          <TableCell
+                            align="right"
+                            sx={{
+                              transition: 'background-color 0.2s ease',
+                              backgroundColor: confirmedEarningsEdit[order._id] ? 'rgba(255, 182, 193, 0.35)' : 'transparent'
+                            }}
+                          >
                             {order.orderPaymentStatus === 'FULLY_REFUNDED' ? (
                               // FULLY_REFUNDED orders always have $0 earnings (set automatically by server)
                               <Typography
