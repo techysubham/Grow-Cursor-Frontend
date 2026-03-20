@@ -439,8 +439,9 @@ export default function CsvStoragePage() {
                                     disabled={records.length === 0}
                                 />
                             </TableCell>
-                            <TableCell>Name</TableCell>
-                            <TableCell>Store</TableCell>
+                            <TableCell sx={{ width: 200, maxWidth: 200 }}>Name</TableCell>
+                            <TableCell sx={{ width: 130, whiteSpace: 'nowrap' }}>Source</TableCell>
+                            <TableCell sx={{ width: 120, whiteSpace: 'nowrap' }}>Store</TableCell>
                             <TableCell>Date</TableCell>
                             <TableCell align="center">Listings</TableCell>
                             <TableCell>Category › Range › Product</TableCell>
@@ -452,13 +453,13 @@ export default function CsvStoragePage() {
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                                     <CircularProgress size={28} />
                                 </TableCell>
                             </TableRow>
                         ) : records.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={9} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                                <TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                                     No CSV records found.
                                 </TableCell>
                             </TableRow>
@@ -482,11 +483,22 @@ export default function CsvStoragePage() {
                                                 onChange={() => handleToggleOne(record._id)}
                                             />
                                         </TableCell>
-                                        <TableCell sx={{ fontWeight: 500, maxWidth: 200 }}>
-                                            {record.name}
+                                        <TableCell sx={{ fontWeight: 500, width: 200, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <Tooltip title={record.name} placement="top-start" arrow>
+                                                <span>{record.name}</span>
+                                            </Tooltip>
                                         </TableCell>
                                         <TableCell>
-                                            {record.seller?.storeName || '—'}
+                                            {record.source === 'manual' ? (
+                                                <Chip label="Manual Upload" size="small" color="primary" variant="outlined" />
+                                            ) : record.source === 'asin_list' ? (
+                                                <Chip label="ASIN List" size="small" color="secondary" variant="outlined" />
+                                            ) : (
+                                                <Typography variant="caption" color="text.disabled">—</Typography>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {record.seller?.storeName || record.seller?.user?.username || '—'}
                                         </TableCell>
                                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
                                             {record.createdAt
