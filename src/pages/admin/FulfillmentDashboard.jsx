@@ -758,8 +758,10 @@ function formatFullShippingAddress(order, options = {}) {
     order.shippingFullName,
     order.shippingAddressLine1,
     order.shippingAddressLine2,
-    [order.shippingCity, order.shippingState, order.shippingPostalCode].filter(Boolean).join(', ').replace(', ,', ',')
-      .replace(/,\s*$/, ''),
+    [
+      [order.shippingCity, order.shippingState].filter(Boolean).join(', '),
+      order.shippingPostalCode
+    ].filter(Boolean).join(' '),
     order.shippingCountry
   ].filter((line) => Boolean(line && String(line).trim()));
 
