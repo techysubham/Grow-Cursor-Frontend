@@ -965,6 +965,7 @@ export default function AffiliateOrdersPage() {
     const [date, setDate] = useState(getTodayStr());
     const [tab, setTab] = useState(0);
     const [excludeLowValue, setExcludeLowValue] = useState(false);
+    const [showDoneEntries, setShowDoneEntries] = useState(false);
     const [showNotYetFirst, setShowNotYetFirst] = useState(true);
     const [exportDialogOpen, setExportDialogOpen] = useState(false);
     const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -1037,14 +1038,20 @@ export default function AffiliateOrdersPage() {
         setOrdersLoading(true);
         setOrdersError('');
         try {
-            const { data } = await api.get('/affiliate-orders/daily', { params: { date, excludeLowValue: excludeLowValue ? 'true' : 'false' } });
+            const { data } = await api.get('/affiliate-orders/daily', {
+                params: {
+                    date,
+                    excludeLowValue: excludeLowValue ? 'true' : 'false',
+                    includeDone: showDoneEntries ? 'true' : 'false',
+                }
+            });
             setOrders((data || []).map(normalizeAffiliateOrder));
         } catch (err) {
             setOrdersError(err?.response?.data?.error || 'Failed to load orders');
         } finally {
             setOrdersLoading(false);
         }
-    }, [date, excludeLowValue]);
+    }, [date, excludeLowValue, showDoneEntries]);
 
     const fetchAmazonAccounts = useCallback(async () => {
         try {
@@ -1098,7 +1105,7 @@ export default function AffiliateOrdersPage() {
         fetchBalances();
         fetchSummary();
         fetchSpendOrders();
-    }, [date, excludeLowValue, fetchOrders, fetchAmazonAccounts, fetchBalances, fetchSummary, fetchSpendOrders]);
+    }, [date, excludeLowValue, showDoneEntries, fetchOrders, fetchAmazonAccounts, fetchBalances, fetchSummary, fetchSpendOrders]);
 
     // ── Order field patch ──────────────────────────────────────────────────────
 
@@ -1106,7 +1113,9 @@ export default function AffiliateOrdersPage() {
         const { refreshAfter = true } = options;
         try {
             const { data } = await api.patch(`/affiliate-orders/${orderId}/sourcing`, { [field]: value });
-            setOrders((prev) => prev.map((o) => (o._id === orderId ? normalizeAffiliateOrder({ ...o, ...data }) : o)));
+            setOrders((prev) => prev
+                .map((o) => (o._id === orderId ? normalizeAffiliateOrder({ ...o, ...data }) : o))
+                .filter((o) => showDoneEntries || o.sourcingStatus !== 'Done'));
             if (refreshAfter) {
                 // Refresh balances and summary when order values change.
                 fetchBalances();
@@ -1117,7 +1126,7 @@ export default function AffiliateOrdersPage() {
             notify('error', err?.response?.data?.error || `Failed to update ${field}`);
             return false;
         }
-    }, [fetchBalances, fetchSummary]);
+    }, [fetchBalances, fetchSummary, showDoneEntries]);
 
     // ── Balance field patch ────────────────────────────────────────────────────
 
@@ -1432,11 +1441,24 @@ export default function AffiliateOrdersPage() {
                             label={`${notYetCount} not yet`}
                         />
                     )}
+                    {!ordersLoading && summary?.ordersDone > 0 && (
+                        <Chip
+                            size="small"
+                            variant="outlined"
+                            color={showDoneEntries ? 'success' : 'default'}
+                            label={showDoneEntries ? `${summary.ordersDone} done shown` : `${summary.ordersDone} done hidden`}
+                        />
+                    )}
                 </Stack>
                 <Stack direction="row" spacing={0.5} alignItems="center">
                     <FormControlLabel
                         control={<Switch size="small" checked={showNotYetFirst} onChange={(e) => setShowNotYetFirst(e.target.checked)} />}
                         label="Not Yet first"
+                        sx={{ mr: 0.5, '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
+                    />
+                    <FormControlLabel
+                        control={<Switch size="small" checked={showDoneEntries} onChange={(e) => setShowDoneEntries(e.target.checked)} />}
+                        label="Show Done"
                         sx={{ mr: 0.5, '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
                     />
                     <Button size="small" variant="outlined" color="success" startIcon={<DownloadIcon />} onClick={handleOpenExportDialog}>
