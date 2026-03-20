@@ -114,6 +114,8 @@ export default function TemplateListingsPage() {
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTimeFrom, setScheduleTimeFrom] = useState('');
   const [scheduleStep, setScheduleStep] = useState(3);
+  const [scheduleFromRow, setScheduleFromRow] = useState('');
+  const [scheduleToRow, setScheduleToRow] = useState('');
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
 
   // List Directly dialog state
@@ -1351,6 +1353,34 @@ export default function TemplateListingsPage() {
                 sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
               />
             </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+                From row
+              </Typography>
+              <OutlinedInput
+                size="small"
+                type="number"
+                placeholder="1"
+                value={scheduleFromRow}
+                onChange={e => setScheduleFromRow(e.target.value)}
+                inputProps={{ min: 1 }}
+                sx={{ width: 80, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+              />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+                To row
+              </Typography>
+              <OutlinedInput
+                size="small"
+                type="number"
+                placeholder="all"
+                value={scheduleToRow}
+                onChange={e => setScheduleToRow(e.target.value)}
+                inputProps={{ min: 1 }}
+                sx={{ width: 80, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+              />
+            </Box>
             <Tooltip title={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) ? 'Fill in date, start time, and interval first' : `Apply schedule to all ${pagination.total} listings`}>
               <span>
                 <Button
@@ -2404,7 +2434,12 @@ export default function TemplateListingsPage() {
         <DialogTitle>Apply Schedule Times</DialogTitle>
         <DialogContent>
           <Typography variant="body2" gutterBottom>
-            Schedule times will be assigned to <strong>{pagination.total} listings</strong> in <strong>{template?.name}</strong>:
+            Schedule times will be assigned to{' '}
+            <strong>
+              {scheduleFromRow || scheduleToRow
+                ? `rows ${scheduleFromRow || 1} – ${scheduleToRow || pagination.total}`
+                : `all ${pagination.total} listings`}
+            </strong>{' '}in <strong>{template?.name}</strong>:
           </Typography>
           <Typography variant="body2" gutterBottom>
             • Starting: <strong>{scheduleDate} {scheduleTimeFrom}:00</strong>
@@ -2432,6 +2467,8 @@ export default function TemplateListingsPage() {
                   stepMinutes: scheduleStep,
                   batchFilter: batchFilter === 'active' || batchFilter === 'all' ? batchFilter : undefined,
                   batchId: batchFilter !== 'active' && batchFilter !== 'all' ? batchFilter : undefined,
+                  fromRow: scheduleFromRow ? parseInt(scheduleFromRow) : undefined,
+                  toRow:   scheduleToRow   ? parseInt(scheduleToRow)   : undefined,
                 });
                 if (data.updated === 0) {
                   setSuccess('No listings found for this template and seller.');
