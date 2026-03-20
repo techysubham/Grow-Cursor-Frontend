@@ -181,6 +181,7 @@ export default function ListDirectlyDialog({ open, onClose, selectedListings, te
         storageForm.append('rangeName', ranges.find(r => r._id === selectedRangeId)?.name || '');
         if (selectedProductId) storageForm.append('productId', selectedProductId);
         storageForm.append('productName', products.find(p => p._id === selectedProductId)?.name || '');
+        storageForm.append('source', 'asin_list');
         const saveRes = await api.post('/csv-storage', storageForm, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -246,6 +247,7 @@ export default function ListDirectlyDialog({ open, onClose, selectedListings, te
       storageForm.append('rangeName', ranges.find(r => r._id === selectedRangeId)?.name || '');
       if (selectedProductId) storageForm.append('productId', selectedProductId);
       storageForm.append('productName', products.find(p => p._id === selectedProductId)?.name || '');
+      storageForm.append('source', 'asin_list');
 
       const saveRes = await api.post('/csv-storage', storageForm, {
         headers: { 'Content-Type': 'multipart/form-data' },
