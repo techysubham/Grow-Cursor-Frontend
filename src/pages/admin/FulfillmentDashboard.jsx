@@ -2552,137 +2552,89 @@ function FulfillmentDashboard() {
         return;
       }
 
-      // Define ALL possible column definitions
-      const allColumnDefs = {
-        'Order ID': 'orderId',
-        'Legacy Order ID': 'legacyOrderId',
-        'Seller': (o) => o.seller?.user?.username || '',
-        'Date Sold': (o) => o.dateSold ? new Date(o.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
-        'Product Name': 'productName',
-        'Buyer Note': 'buyerCheckoutNotes',
-        'Item Number': 'itemNumber',
-        'Buyer Name': 'shippingFullName',
-        'Buyer Username': (o) => o.buyer?.username || '',
-        'Marketplace': 'purchaseMarketplaceId',
-        'Subtotal': 'subtotal',
-        'Shipping': 'shipping',
-        'Sales Tax': 'salesTax',
-        'Discount': 'discount',
-        'Transaction Fees': 'transactionFees',
-        'Ad Fees': 'adFeeGeneral',
-        'Cancel Status': 'cancelState',
-        'Refunds': (o) => o.refunds?.map(r => `${r.orderPaymentStatus === 'FULLY_REFUNDED' ? 'Full' : 'Partial'}: $${(Number(r.amount?.value || r.refundAmount?.value || 0) * (o.conversionRate || 1)).toFixed(2)}`).join('; ') || '',
-        'Refund Item': 'refundItemAmount',
-        'Refund Tax': 'refundTaxAmount',
-        'Refund Total': 'refundTotalToBuyer',
-        'Order Total (After Refund)': 'orderTotalAfterRefund',
-        'Order Earnings': 'orderEarnings',
-        'Payment Status': 'orderPaymentStatus',
-        'Fulfillment Status': 'orderFulfillmentStatus',
-        'Tracking Number': 'trackingNumber',
-        'Shipping Address': (o) => [o.shippingAddressLine1, o.shippingAddressLine2, o.shippingCity, o.shippingState, o.shippingPostalCode, o.shippingCountry].filter(Boolean).join(', '),
-        'Amazon Acc': 'amazonAccount',
-        'Arriving': 'arrivingDate',
-        'Before Tax': 'beforeTax',
-        'Estimated Tax': 'estimatedTax',
-        'Az OrderID': 'azOrderId',
-        'Amazon Refund': 'amazonRefund',
-        'Card Name': 'cardName',
-        'Resolutions': 'resolution',
-        'Notes': 'fulfillmentNotes',
-        'Messaging': 'messagingStatus',
-        'Remark': 'remark'
+      const exportColumnDefs = {
+        seller: { header: 'Seller', accessor: (o) => o.seller?.user?.username || '' },
+        orderId: { header: 'Order ID', accessor: 'orderId' },
+        dateSold: {
+          header: 'Date Sold',
+          accessor: (o) => o.dateSold ? new Date(o.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : ''
+        },
+        shipBy: {
+          header: 'Ship By',
+          accessor: (o) => o.shipByDate ? new Date(o.shipByDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : ''
+        },
+        deliveryDate: {
+          header: 'Delivery Date',
+          accessor: (o) => formatDeliveryDate(o)
+        },
+        productName: { header: 'Product Name', accessor: 'productName' },
+        buyerNote: { header: 'Buyer Note', accessor: 'buyerCheckoutNotes' },
+        buyerName: { header: 'Buyer Name', accessor: 'shippingFullName' },
+        shippingAddress: {
+          header: 'Shipping Address',
+          accessor: (o) => [
+            o.shippingFullName,
+            o.shippingAddressLine1,
+            o.shippingAddressLine2,
+            [o.shippingCity, o.shippingState].filter(Boolean).join(', '),
+            o.shippingPostalCode,
+            o.shippingCountry,
+          ].filter(Boolean).join(', ')
+        },
+        marketplace: { header: 'Marketplace', accessor: 'purchaseMarketplaceId' },
+        subtotal: { header: 'Subtotal', accessor: 'subtotal' },
+        shipping: { header: 'Shipping', accessor: 'shipping' },
+        salesTax: { header: 'Sales Tax', accessor: 'salesTax' },
+        discount: { header: 'Discount', accessor: 'discount' },
+        transactionFees: { header: 'Transaction Fees', accessor: 'transactionFees' },
+        adFeeGeneral: { header: 'Ad Fee General', accessor: 'adFeeGeneral' },
+        cancelStatus: { header: 'Cancel Status', accessor: 'cancelState' },
+        refunds: {
+          header: 'Refunds',
+          accessor: (o) => o.refunds?.map((refund) => `${refund.orderPaymentStatus === 'FULLY_REFUNDED' ? 'Full' : 'Partial'}: $${(Number(refund.amount?.value || refund.refundAmount?.value || 0) * (o.conversionRate || 1)).toFixed(2)}`).join('; ') || ''
+        },
+        refundItemAmount: { header: 'Refund Item', accessor: 'refundItemAmount' },
+        refundTaxAmount: { header: 'Refund Tax', accessor: 'refundTaxAmount' },
+        refundTotalToBuyer: { header: 'Refund Total', accessor: 'refundTotalToBuyer' },
+        orderTotalAfterRefund: { header: 'Order Total (After Refund)', accessor: 'orderTotalAfterRefund' },
+        orderEarnings: { header: 'Order Earnings', accessor: 'orderEarnings' },
+        trackingNumber: { header: 'Tracking Number', accessor: 'trackingNumber' },
+        amazonAccount: { header: 'Amazon Acc', accessor: 'amazonAccount' },
+        arriving: { header: 'Arriving', accessor: 'arrivingDate' },
+        beforeTax: { header: 'Before Tax', accessor: 'beforeTax' },
+        estimatedTax: { header: 'Estimated Tax', accessor: 'estimatedTax' },
+        azOrderId: { header: 'Az OrderID', accessor: 'azOrderId' },
+        amazonRefund: { header: 'Amazon Refund', accessor: 'amazonRefund' },
+        cardName: { header: 'Card Name', accessor: 'cardName' },
+        resolution: { header: 'Resolutions', accessor: 'resolution' },
+        notes: { header: 'Notes', accessor: 'fulfillmentNotes' },
+        messagingStatus: { header: 'Messaging', accessor: 'messagingStatus' },
+        remark: { header: 'Remark', accessor: 'remark' },
+        issueFlags: {
+          header: 'Issues',
+          accessor: (o) => {
+            const issues = issuesIndex[o.orderId] || issuesIndex[o.legacyOrderId] || [];
+            const seen = new Set();
+            return issues
+              .filter((issue) => {
+                if (seen.has(issue.type)) return false;
+                seen.add(issue.type);
+                return true;
+              })
+              .map((issue) => issue.type)
+              .join(', ');
+          }
+        },
       };
-
-      // Filter Column Defs based on selectedExportColumns
-      // We need to map our internal IDs (from ALL_COLUMNS) to the keys in allColumnDefs or construct a new object
-      // Let's assume a mapping or just look up by ID.
-      // Wait, ALL_COLUMNS has `id` and `label`. `allColumnDefs` keys are Labels (mostly).
-      // Let's create a direct mapping object for cleaner lookups.
-
-      const columnIdToCsvKey = {
-        'seller': 'Seller',
-        'orderId': 'Order ID',
-        'dateSold': 'Date Sold',
-        // 'shipBy': 'Ship By', // Not in prev CSV but we can add if needed
-        // 'deliveryDate': 'Delivery Date', // Not in prev CSV
-        'productName': 'Product Name',
-        'buyerNote': 'Buyer Note',
-        'buyerName': 'Buyer Name',
-        'shippingAddress': 'Shipping Address',
-        'marketplace': 'Marketplace',
-        'subtotal': 'Subtotal (USD)',
-        'shipping': 'Shipping (USD)',
-        'salesTax': 'Sales Tax (USD)',
-        'discount': 'Discount (USD)',
-        'transactionFees': 'Transaction Fees (USD)',
-        'adFeeGeneral': 'Ad Fees',
-        'cancelStatus': 'Cancel Status',
-        'refunds': 'Refunds',
-        'refundItemAmount': 'Refund Item',
-        'refundTaxAmount': 'Refund Tax',
-        'refundTotalToBuyer': 'Refund Total',
-        'orderTotalAfterRefund': 'Order Total (After Refund)',
-        'orderEarnings': 'Order Earnings',
-        'trackingNumber': 'Tracking Number',
-        'amazonAccount': 'Amazon Acc',
-        'arriving': 'Arriving',
-        'beforeTax': 'Before Tax',
-        'estimatedTax': 'Estimated Tax',
-        'azOrderId': 'Az OrderID',
-        'amazonRefund': 'Amazon Refund',
-        'cardName': 'Card Name',
-        'resolution': 'Resolutions',
-        'notes': 'Notes',
-        'messagingStatus': 'Messaging',
-        'remark': 'Remark'
-      };
-
-      // Also there are some columns in CSV that were not in ALL_COLUMNS list like 'Legacy Order ID', 'Buyer Username', 'Item Number', 'Payment Status', 'Fulfillment Status'
-      // We should probably allow exporting them too. 
-      // For now, let's stick to the ones visible in the UI + the standard ones requested. 
-      // Actually, let's just use the selected columns from the UI list as the primary driver.
 
       const dynamicCsvColumns = {};
 
-      // Always include some basics if they are not in the list? Or strictly follow selection?
-      // Strict selection is better for "customizable".
-
-      selectedExportColumns.forEach(colId => {
-        const csvKey = columnIdToCsvKey[colId];
-        if (csvKey && allColumnDefs[csvKey]) {
-          dynamicCsvColumns[csvKey] = allColumnDefs[csvKey];
-        }
+      ALL_COLUMNS.forEach((column) => {
+        if (!selectedExportColumns.includes(column.id)) return;
+        const exportDef = exportColumnDefs[column.id];
+        if (!exportDef) return;
+        dynamicCsvColumns[exportDef.header] = exportDef.accessor;
       });
-
-      // Add extra always-useful columns if the user selected the main "Order ID" or similar?
-      // Or just add them to the selection list? 
-      // Let's just stick to the map.
-      // But wait, what about 'Legacy Order ID', 'Buyer Username', 'Item Number', 'Payment Status'?
-      // I should add them to ALL_COLUMNS if I want them selectable, or just bundle them?
-      // The user said "option to choose the columns and not just everything".
-      // I'll add the missing significant ones to the logic:
-
-      // If 'orderId' is selected, maybe include 'Legacy Order ID'? 
-      // If 'productName' is selected, include 'Item Number'?
-      // If 'buyerName' is selected, include 'Buyer Username'?
-
-      if (selectedExportColumns.includes('orderId')) {
-        dynamicCsvColumns['Legacy Order ID'] = allColumnDefs['Legacy Order ID'];
-      }
-      if (selectedExportColumns.includes('productName')) {
-        dynamicCsvColumns['Item Number'] = allColumnDefs['Item Number'];
-      }
-      if (selectedExportColumns.includes('buyerName')) {
-        dynamicCsvColumns['Buyer Username'] = allColumnDefs['Buyer Username'];
-      }
-
-      // Payment Status and Fulfillment Status are useful context, maybe add if 'marketplace' or 'orderId' is present?
-      // Let's just add them if 'orderId' is there, usually that implies a full record export.
-      if (selectedExportColumns.includes('orderId')) {
-        dynamicCsvColumns['Payment Status'] = allColumnDefs['Payment Status'];
-        dynamicCsvColumns['Fulfillment Status'] = allColumnDefs['Fulfillment Status'];
-      }
 
 
       const csvData = prepareCSVData(allOrders, dynamicCsvColumns);
