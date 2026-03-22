@@ -170,7 +170,7 @@ function normalizeAffiliateOrder(order) {
 }
 
 function getOrderSpendAmount(order) {
-    return Number(order?.beforeTaxUSD ?? order?.beforeTax) || 0;
+    return Number(order?.affiliatePrice) || 0;
 }
 
 function getOrderCreditCardBaseAmount(order) {
@@ -964,6 +964,7 @@ export default function AffiliateOrdersPage() {
     const COLUMN_STORAGE_KEY = 'affiliate_orders_visible_columns';
     const [date, setDate] = useState(getTodayStr());
     const [tab, setTab] = useState(0);
+    const [selectedSeller, setSelectedSeller] = useState('');
     const [excludeLowValue, setExcludeLowValue] = useState(false);
     const [showDoneEntries, setShowDoneEntries] = useState(false);
     const [showNotYetFirst, setShowNotYetFirst] = useState(true);
@@ -1031,6 +1032,26 @@ export default function AffiliateOrdersPage() {
     useEffect(() => {
         sessionStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns));
     }, [visibleColumns]);
+
+    const sellerOptions = useMemo(() => (
+        Array.from(new Set(orders.map((order) => order.sellerGroupName || 'Unknown Seller')))
+            .sort((left, right) => left.localeCompare(right))
+    ), [orders]);
+
+    const activeSeller = selectedSeller || sellerOptions[0] || '';
+
+    useEffect(() => {
+        if (sellerOptions.length === 0) {
+            if (selectedSeller) {
+                setSelectedSeller('');
+            }
+            return;
+        }
+
+        if (!selectedSeller || !sellerOptions.includes(selectedSeller)) {
+            setSelectedSeller(sellerOptions[0]);
+        }
+    }, [selectedSeller, sellerOptions]);
 
     // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -1293,7 +1314,13 @@ export default function AffiliateOrdersPage() {
 
     const isColVisible = (id) => visibleColumns.includes(id);
     const visibleColumnCount = DAILY_ORDER_ALL_COLUMNS.filter((c) => visibleColumns.includes(c.id)).length;
-    const displayedOrders = sortAffiliateOrders(orders);
+    const displayedOrders = useMemo(() => {
+        const filteredOrders = activeSeller
+            ? orders.filter((order) => (order.sellerGroupName || 'Unknown Seller') === activeSeller)
+            : orders;
+
+        return sortAffiliateOrders(filteredOrders);
+    }, [activeSeller, orders]);
     const orderSections = buildOrderSections(displayedOrders, showNotYetFirst);
     const exportOrders = orderSections.flatMap((section) => section.orders);
     const notYetCount = displayedOrders.filter((order) => order.sourcingStatus === 'Not Yet').length;
@@ -1377,7 +1404,7 @@ export default function AffiliateOrdersPage() {
             seller: (order) => order.sellerGroupName || '',
             supplierLink: 'affiliateLink',
             affiliateLinks: 'affiliateLinks',
-            priceUsd: (order) => order.beforeTaxUSD ?? '',
+            priceUsd: (order) => order.affiliatePrice ?? '',
             amazonAccount: 'amazonAccount',
             arriving: 'arrivingDate',
             beforeTax: 'beforeTax',
@@ -1451,6 +1478,19 @@ export default function AffiliateOrdersPage() {
                     )}
                 </Stack>
                 <Stack direction="row" spacing={0.5} alignItems="center">
+                    <FormControl size="small" sx={{ minWidth: 220 }}>
+                        <InputLabel id="affiliate-seller-filter-label">Seller</InputLabel>
+                        <Select
+                            labelId="affiliate-seller-filter-label"
+                            value={activeSeller}
+                            label="Seller"
+                            onChange={(e) => setSelectedSeller(e.target.value)}
+                        >
+                            {sellerOptions.map((sellerName) => (
+                                <MenuItem key={sellerName} value={sellerName}>{sellerName}</MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
                     <FormControlLabel
                         control={<Switch size="small" checked={showNotYetFirst} onChange={(e) => setShowNotYetFirst(e.target.checked)} />}
                         label="Not Yet first"
@@ -1726,8 +1766,8 @@ export default function AffiliateOrdersPage() {
                                                 {/* Price — editable */}
                                                 {isColVisible('priceUsd') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
                                                     <BalanceNumberCell
-                                                        value={order.beforeTaxUSD ?? null}
-                                                        onSave={(v) => patchOrder(order._id, 'beforeTaxUSD', v)}
+                                                        value={order.affiliatePrice ?? null}
+                                                        onSave={(v) => patchOrder(order._id, 'affiliatePrice', v)}
                                                     />
                                                 </TableCell>}
 
