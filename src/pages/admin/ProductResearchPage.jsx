@@ -3,7 +3,7 @@ import {
   Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Select,
   Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Paper, Alert,
   Checkbox, ListItemText, OutlinedInput, Chip, InputAdornment,
-  Typography, useMediaQuery, useTheme
+  Typography, useMediaQuery, useTheme, CircularProgress
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import api from '../../lib/api.js';
@@ -14,6 +14,7 @@ export default function ProductResearchPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -53,14 +54,19 @@ export default function ProductResearchPage() {
   ];
 
   const load = async () => {
-    const [{ data: tasks }, { data: sp }, { data: c }] = await Promise.all([
-      api.get('/tasks'),
-      api.get('/platforms', { params: { type: 'source' } }),
-      api.get('/categories')
-    ]);
-    setRows(tasks.tasks || tasks);
-    setSourcePlatforms(sp);
-    setCategories(c);
+    setLoading(true);
+    try {
+      const [{ data: tasks }, { data: sp }, { data: c }] = await Promise.all([
+        api.get('/tasks'),
+        api.get('/platforms', { params: { type: 'source' } }),
+        api.get('/categories')
+      ]);
+      setRows(tasks.tasks || tasks);
+      setSourcePlatforms(sp);
+      setCategories(c);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -130,6 +136,12 @@ export default function ProductResearchPage() {
         <Button variant="contained" onClick={() => setOpen(true)} fullWidth={isMobile}>Create</Button>
       </Box>
 
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+      <>
       {/* Filter Section */}
       <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
         <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} alignItems={{ xs: 'stretch', lg: 'center' }}>
@@ -342,6 +354,8 @@ export default function ProductResearchPage() {
           <Button variant="contained" color="error" onClick={handleDelete}>Delete</Button>
         </DialogActions>
       </Dialog>
+      </>
+      )}
     </Box>
   );
 }
