@@ -80,6 +80,7 @@ export default function AllOrdersSheetPage() {
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
   const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
+  const [excludeNoAmazonAccount, setExcludeNoAmazonAccount] = useState(() => getInitialState('excludeNoAmazonAccount', false));
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(() => getInitialState('currentPage', 1));
@@ -116,14 +117,15 @@ export default function AllOrdersSheetPage() {
       filtersExpanded,
       currentPage,
       dateFilter,
-      excludeLowValue
+      excludeLowValue,
+      excludeNoAmazonAccount
     };
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, excludeLowValue]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, excludeLowValue, excludeNoAmazonAccount]);
 
   // Initial load
   useEffect(() => {
@@ -161,6 +163,7 @@ export default function AllOrdersSheetPage() {
       prevFilters.current.searchBuyerName !== searchBuyerName ||
       prevFilters.current.searchMarketplace !== searchMarketplace ||
       prevFilters.current.excludeLowValue !== excludeLowValue ||
+      prevFilters.current.excludeNoAmazonAccount !== excludeNoAmazonAccount ||
       JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter);
     
     prevFilters.current = {
@@ -169,6 +172,7 @@ export default function AllOrdersSheetPage() {
       searchBuyerName,
       searchMarketplace,
       excludeLowValue,
+      excludeNoAmazonAccount,
       dateFilter
     };
 
@@ -181,7 +185,7 @@ export default function AllOrdersSheetPage() {
         setCurrentPage(1);
       }
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, excludeLowValue, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, excludeLowValue, excludeNoAmazonAccount, dateFilter]);
 
   async function fetchSellers() {
     setError('');
@@ -422,9 +426,12 @@ export default function AllOrdersSheetPage() {
     setError('');
     
     try {
+      // For single date, fetch all orders without pagination
+      const isSingleDate = dateFilter.mode === 'single' && dateFilter.single;
+      
       const params = {
-        page: currentPage,
-        limit: ordersPerPage,
+        page: isSingleDate ? 1 : currentPage,
+        limit: isSingleDate ? 10000 : ordersPerPage, // High limit for single date to get all
         excludeCancelled: true // Exclude cancelled orders
       };
       
@@ -433,6 +440,7 @@ export default function AllOrdersSheetPage() {
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (excludeLowValue) params.excludeLowValue = true;
+      if (excludeNoAmazonAccount) params.excludeNoAmazonAccount = true;
 
       if (dateFilter.mode === 'single' && dateFilter.single) {
         params.startDate = dateFilter.single;
@@ -619,6 +627,17 @@ export default function AllOrdersSheetPage() {
               />
             }
             label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Hide &lt;$3</Typography>}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={excludeNoAmazonAccount}
+                onChange={(e) => setExcludeNoAmazonAccount(e.target.checked)}
+                size="small"
+                color="info"
+              />
+            }
+            label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Hide No Amazon Account</Typography>}
           />
         </Stack>
       </Paper>
@@ -837,18 +856,20 @@ export default function AllOrdersSheetPage() {
         </Stack>
       </Paper>
 
-      {/* Orders Count & Pagination */}
+      {/* Orders Count & Pagination - Hide pagination for single date mode */}
       {!loading && orders.length > 0 && (
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
           <Typography variant="body2" color="text.secondary">
-            Showing {orders.length} of {totalOrders} orders
+            Showing {orders.length} {dateFilter.mode === 'single' ? 'order(s)' : `of ${totalOrders} orders`}
           </Typography>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(e, page) => setCurrentPage(page)}
-            color="primary"
-          />
+          {dateFilter.mode !== 'single' && (
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={(e, page) => setCurrentPage(page)}
+              color="primary"
+            />
+          )}
         </Stack>
       )}
 
@@ -1235,13 +1256,98 @@ export default function AllOrdersSheetPage() {
                   <TableCell>{order.arrivingDate || '-'}</TableCell>
                 </TableRow>
               ))}
+              
+              {/* Totals Row */}
+              {orders.length > 0 && (() => {
+                const totals = orders.reduce((acc, order) => {
+                  const isCancelled = order.cancelState === 'CANCELED' || 
+                                     order.cancelState === 'CANCELLED' || 
+                                     order.cancelStatus?.cancelState === 'CANCELED' ||
+                                     order.cancelStatus?.cancelState === 'CANCELLED';
+                  const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
+                  const showZero = isCancelled || isPartiallyRefunded;
+                  
+                  if (!showZero) {
+                    acc.subtotal += parseFloat(order.subtotal) || 0;
+                    acc.shipping += parseFloat(order.shipping) || 0;
+                    acc.salesTax += parseFloat(order.salesTax) || 0;
+                    acc.discount += parseFloat(order.discount) || 0;
+                    acc.transactionFees += parseFloat(order.transactionFees) || 0;
+                    acc.adFeeGeneral += parseFloat(order.adFeeGeneral) || 0;
+                  }
+                  
+                  acc.orderEarnings += parseFloat(order.orderEarnings) || 0;
+                  acc.tds += parseFloat(order.tds) || 0;
+                  acc.tid += parseFloat(order.tid) || 0;
+                  acc.net += parseFloat(order.net) || 0;
+                  acc.pBalanceINR += parseFloat(order.pBalanceINR) || 0;
+                  
+                  if (!isCancelled) {
+                    acc.beforeTaxUSD += parseFloat(order.beforeTaxUSD) || 0;
+                    acc.estimatedTaxUSD += parseFloat(order.estimatedTaxUSD) || 0;
+                    acc.amazonTotal += parseFloat(order.amazonTotal) || 0;
+                    acc.amazonTotalINR += parseFloat(order.amazonTotalINR) || 0;
+                    acc.marketplaceFee += parseFloat(order.marketplaceFee) || 0;
+                    acc.igst += parseFloat(order.igst) || 0;
+                    acc.totalCC += parseFloat(order.totalCC) || 0;
+                    
+                    const pBalance = parseFloat(order.pBalanceINR) || 0;
+                    const aTotalInr = parseFloat(order.amazonTotalINR) || 0;
+                    const totalCC = parseFloat(order.totalCC) || 0;
+                    acc.profit += pBalance - aTotalInr - totalCC;
+                  }
+                  
+                  return acc;
+                }, {
+                  subtotal: 0, shipping: 0, salesTax: 0, discount: 0, transactionFees: 0,
+                  adFeeGeneral: 0, orderEarnings: 0, tds: 0, tid: 0, net: 0,
+                  pBalanceINR: 0, beforeTaxUSD: 0, estimatedTaxUSD: 0, amazonTotal: 0,
+                  amazonTotalINR: 0, marketplaceFee: 0, igst: 0, totalCC: 0, profit: 0
+                });
+                
+                return (
+                  <TableRow sx={{ bgcolor: '#f5f5f5', '& td': { fontWeight: 'bold', borderTop: '2px solid #000' } }}>
+                    <TableCell sx={{ position: 'sticky', left: 0, zIndex: 1, bgcolor: '#f5f5f5' }}>TOTALS</TableCell>
+                    <TableCell sx={{ position: 'sticky', left: 100, zIndex: 1, bgcolor: '#f5f5f5' }}></TableCell>
+                    <TableCell sx={{ position: 'sticky', left: 210, zIndex: 1, bgcolor: '#f5f5f5' }}></TableCell>
+                    <TableCell sx={{ position: 'sticky', left: 460, zIndex: 1, bgcolor: '#f5f5f5', boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}></TableCell>
+                    <TableCell align="right">${totals.subtotal.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.shipping.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.salesTax.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.discount.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.transactionFees.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.adFeeGeneral.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.orderEarnings.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.tds.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.tid.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.net.toFixed(2)}</TableCell>
+                    <TableCell align="right">-</TableCell>
+                    <TableCell align="right">₹{totals.pBalanceINR.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.beforeTaxUSD.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.estimatedTaxUSD.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.amazonTotal.toFixed(2)}</TableCell>
+                    <TableCell align="right">-</TableCell>
+                    <TableCell align="right">₹{totals.amazonTotalINR.toFixed(2)}</TableCell>
+                    <TableCell align="right">₹{totals.marketplaceFee.toFixed(2)}</TableCell>
+                    <TableCell align="right">₹{totals.igst.toFixed(2)}</TableCell>
+                    <TableCell align="right">₹{totals.totalCC.toFixed(2)}</TableCell>
+                    <TableCell align="right" sx={{ color: totals.profit < 0 ? 'error.main' : 'success.main' }}>
+                      ₹{totals.profit.toFixed(2)}
+                    </TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                );
+              })()}
             </TableBody>
           </Table>
         </TableContainer>
       )}
 
-      {/* Bottom Pagination */}
-      {!loading && orders.length > 0 && (
+      {/* Bottom Pagination - Hide for single date mode */}
+      {!loading && orders.length > 0 && dateFilter.mode !== 'single' && (
         <Box display="flex" justifyContent="center" sx={{ mt: 3 }}>
           <Pagination
             count={totalPages}
