@@ -766,7 +766,7 @@ function formatFullShippingAddress(order, options = {}) {
   ].filter((line) => Boolean(line && String(line).trim()));
 
   if (includePhone) {
-    lines.push(`Phone: ${order.shippingPhone || '0000000000'}`);
+    lines.push(`Phone: 0000000000`);
   }
 
   return lines.join('\n');
