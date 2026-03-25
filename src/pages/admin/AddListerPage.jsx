@@ -90,13 +90,11 @@ export default function AddListerPage() {
       };
       setMsg(`${roleNames[newRole]} created`);
 
-      // store credentials for superadmin convenience
-      if (res.data.credentials) {
-        const saved = localStorage.getItem('userCredentials');
-        const list = saved ? JSON.parse(saved) : [];
-        list.push(res.data.credentials);
-        localStorage.setItem('userCredentials', JSON.stringify(list));
-      }
+      // Save credentials to localStorage for superadmin record-keeping (UserCredentialsPage)
+      const saved = localStorage.getItem('userCredentials');
+      const list = saved ? JSON.parse(saved) : [];
+      list.push({ username, password, role: newRole, department: newDepartment, createdAt: new Date() });
+      localStorage.setItem('userCredentials', JSON.stringify(list));
 
       setCreds({ username, password, role: newRole, department: newDepartment });
       setShowCreds(true);
