@@ -1217,6 +1217,7 @@ function FulfillmentDashboard() {
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [searchPaymentStatus, setSearchPaymentStatus] = useState(() => getInitialState('searchPaymentStatus', ''));
   const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
+  const [missingAmazonAccount, setMissingAmazonAccount] = useState(() => getInitialState('missingAmazonAccount', false));
   const [dateFilter, setDateFilter] = useState(() => getInitialState('dateFilter', ''));
   const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
 
@@ -1588,6 +1589,7 @@ function FulfillmentDashboard() {
     searchMarketplace,
     searchPaymentStatus,
     excludeLowValue,
+    missingAmazonAccount,
     dateFilter
   });
 
@@ -1636,6 +1638,7 @@ function FulfillmentDashboard() {
       prevFilters.current.searchMarketplace !== searchMarketplace ||
       prevFilters.current.searchPaymentStatus !== searchPaymentStatus ||
       prevFilters.current.excludeLowValue !== excludeLowValue ||
+      prevFilters.current.missingAmazonAccount !== missingAmazonAccount ||
       JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter);
 
     // Update prev filters
@@ -1649,6 +1652,7 @@ function FulfillmentDashboard() {
       searchMarketplace,
       searchPaymentStatus,
       excludeLowValue,
+      missingAmazonAccount,
       dateFilter
     };
 
@@ -1666,7 +1670,7 @@ function FulfillmentDashboard() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, missingAmazonAccount, dateFilter]);
 
   // orderEarnings is now read-only (auto-calculated server-side)
   // No manual editing handlers needed
@@ -1700,6 +1704,7 @@ function FulfillmentDashboard() {
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
       params.excludeLowValue = excludeLowValue;
+      params.missingAmazonAccount = missingAmazonAccount;
 
       // --- NEW DATE LOGIC START ---
       if (dateFilter.mode === 'single' && dateFilter.single) {
@@ -2529,6 +2534,7 @@ function FulfillmentDashboard() {
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
       params.excludeLowValue = excludeLowValue;
+      params.missingAmazonAccount = missingAmazonAccount;
 
       // Apply date filters
       if (dateFilter.mode === 'single' && dateFilter.single) {
@@ -2930,23 +2936,42 @@ function FulfillmentDashboard() {
               </FormControl>
             </Stack>
 
-            {/* Row 3.5: Exclude Low Value Toggle */}
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={excludeLowValue}
-                  onChange={(e) => setExcludeLowValue(e.target.checked)}
-                  color="primary"
-                  size="small"
-                />
-              }
-              label={
-                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
-                  Exclude &lt; $3 Orders
-                </Typography>
-              }
-              sx={{ mx: 1 }}
-            />
+            {/* Row 3.5: Exclude Low Value & Missing Amazon Account Toggles */}
+            <Stack direction="row" spacing={1} sx={{ mt: 1, mb: 1, flexWrap: 'wrap' }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={excludeLowValue}
+                    onChange={(e) => setExcludeLowValue(e.target.checked)}
+                    color="primary"
+                    size="small"
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                    Exclude &lt; $3 Orders
+                  </Typography>
+                }
+                sx={{ mx: 1 }}
+              />
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={missingAmazonAccount}
+                    onChange={(e) => setMissingAmazonAccount(e.target.checked)}
+                    color="primary"
+                    size="small"
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                    Missing Amazon Acc
+                  </Typography>
+                }
+                sx={{ mx: 1 }}
+              />
+            </Stack>
 
             {/* Row 4: Recalc & Column Selector */}
             <Stack direction="row" spacing={1} alignItems="center">
@@ -3140,6 +3165,23 @@ function FulfillmentDashboard() {
               label={
                 <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
                   Exclude &lt; $3 Orders
+                </Typography>
+              }
+              sx={{ mx: 1 }}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={missingAmazonAccount}
+                  onChange={(e) => setMissingAmazonAccount(e.target.checked)}
+                  color="primary"
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                  Missing Amazon Acc
                 </Typography>
               }
               sx={{ mx: 1 }}
