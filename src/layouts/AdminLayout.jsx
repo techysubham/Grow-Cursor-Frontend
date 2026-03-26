@@ -189,29 +189,35 @@ export default function AdminLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Flyout menu anchor states
-  const [listingAnchorEl, setListingAnchorEl] = useState(null);
-  const [monitoringAnchorEl, setMonitoringAnchorEl] = useState(null);
-  const [compatAnchorEl, setCompatAnchorEl] = useState(null);
-  const [ordersAnchorEl, setOrdersAnchorEl] = useState(null);
-  const [manageAnchorEl, setManageAnchorEl] = useState(null);
+  // Flyout menu anchor states - reorganized menu structure
+  const [orderFulfilmentAnchorEl, setOrderFulfilmentAnchorEl] = useState(null);
+  const [compatibilityAnchorEl, setCompatibilityAnchorEl] = useState(null);
+  const [listingResearchAnchorEl, setListingResearchAnchorEl] = useState(null);
   const [financeAnchorEl, setFinanceAnchorEl] = useState(null);
-  const [asinImporterAnchorEl, setAsinImporterAnchorEl] = useState(null);
+  const [complianceAnchorEl, setComplianceAnchorEl] = useState(null);
+  const [ebayParamsAnchorEl, setEbayParamsAnchorEl] = useState(null);
+  const [hrManagementAnchorEl, setHrManagementAnchorEl] = useState(null);
+  const [othersAnchorEl, setOthersAnchorEl] = useState(null);
+  
+  // Submenu anchors
   const [templateListingAnchorEl, setTemplateListingAnchorEl] = useState(null);
+  const [asinImporterAnchorEl, setAsinImporterAnchorEl] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
 
   // Close all flyout menus + mobile drawer in one call
   const closeAllMenus = () => {
-    setListingAnchorEl(null);
-    setMonitoringAnchorEl(null);
-    setCompatAnchorEl(null);
-    setOrdersAnchorEl(null);
-    setManageAnchorEl(null);
+    setOrderFulfilmentAnchorEl(null);
+    setCompatibilityAnchorEl(null);
+    setListingResearchAnchorEl(null);
     setFinanceAnchorEl(null);
-    setAsinImporterAnchorEl(null);
+    setComplianceAnchorEl(null);
+    setEbayParamsAnchorEl(null);
+    setHrManagementAnchorEl(null);
+    setOthersAnchorEl(null);
     setTemplateListingAnchorEl(null);
+    setAsinImporterAnchorEl(null);
     setMobileOpen(false);
   };
 
@@ -261,22 +267,6 @@ export default function AdminLayout({ user, onLogout }) {
         {/* Divider after lister dashboard link */}
         {isAnyLister && <Divider sx={{ my: 1 }} />}
 
-        {/* Ideas & Issues - visible to ALL users */}
-        <ListItem disablePadding>
-          <ListItemButton
-            component={Link}
-            to="/admin/ideas"
-            onClick={() => setMobileOpen(false)}
-            selected={location.pathname === '/admin/ideas'}
-            sx={selectedMenuItemStyle}
-          >
-            <ListItemIcon>
-              <NavIcon icon={LightbulbIcon} label="Ideas & Issues Board" sidebarOpen={sidebarOpen} />
-            </ListItemIcon>
-            {sidebarOpen && <ListItemText primary="Ideas & Issues" />}
-          </ListItemButton>
-        </ListItem>
-
         {/* About Me - visible to all users except superadmin */}
         {!isSuper && (
           <ListItem disablePadding>
@@ -295,600 +285,6 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
-        {/* Internal Messages - visible to ALL users */}
-        <ListItem disablePadding>
-          <ListItemButton
-            component={Link}
-            to="/admin/internal-messages"
-            onClick={() => setMobileOpen(false)}
-            selected={location.pathname === '/admin/internal-messages'}
-            sx={selectedMenuItemStyle}
-          >
-            <ListItemIcon>
-              <NavIcon icon={ChatIcon} label="Team Chat & Messaging" sidebarOpen={sidebarOpen} />
-            </ListItemIcon>
-            {sidebarOpen && <ListItemText primary="Team Chat" />}
-          </ListItemButton>
-        </ListItem>
-
-        {/* Finance Dropdown - visible to superadmin only */}
-        {isSuper && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setFinanceAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={AttachMoneyIcon} label="Finance" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Finance" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
-              </ListItemButton>
-            </ListItem>
-
-            {/* Sideways flyout menu */}
-            <Menu
-              anchorEl={financeAnchorEl}
-              open={Boolean(financeAnchorEl)}
-              onClose={() => setFinanceAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
-            >
-              <MenuItem component={Link} to="/admin/payoneer" onClick={closeAllMenus}>Payoneer Sheet</MenuItem>
-              <MenuItem component={Link} to="/admin/bank-accounts" onClick={closeAllMenus}>Bank Accounts</MenuItem>
-              <MenuItem component={Link} to="/admin/transactions" onClick={closeAllMenus}>Transactions</MenuItem>
-              <MenuItem component={Link} to="/admin/extra-expenses" onClick={closeAllMenus}>Extra Expenses</MenuItem>
-              <MenuItem component={Link} to="/admin/credit-card-names" onClick={closeAllMenus}>Credit Card Names</MenuItem>
-              <MenuItem component={Link} to="/admin/salary" onClick={closeAllMenus}>Salary Page</MenuItem>
-            </Menu>
-
-            {/* View All Messages - standalone */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/internal-messages-admin"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/internal-messages-admin'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={AdminPanelSettingsIcon} label="Admin Panel - View All Messages" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="View All Messages" />}
-              </ListItemButton>
-            </ListItem>
-
-            {/* Working Hours Tracking - superadmin only */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/attendance"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/attendance'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={AccessTimeIcon} label="Working Hours Tracking" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Working Hours Tracking" />}
-              </ListItemButton>
-            </ListItem>
-          </>
-        )}
-
-        {/* Product Research - visible to ProductAdmin or Superadmin */}
-        {isProductAdmin || isSuper ? (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/research"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/research'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={Inventory2Icon} label="Product Research & Analysis" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Product Research" />}
-              </ListItemButton>
-            </ListItem>
-
-          </>
-        ) : null}
-
-        {/* Template Listing flyout (Superadmin + Listers) */}
-        {(isSuper || isAnyLister) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setTemplateListingAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={LayersIcon} label="Template Listing" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Template Listing" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
-              </ListItemButton>
-            </ListItem>
-
-            <Menu
-              anchorEl={templateListingAnchorEl}
-              open={Boolean(templateListingAnchorEl)}
-              onClose={() => setTemplateListingAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
-            >
-              {isSuper && <MenuItem component={Link} to="/admin/manage-templates" onClick={closeAllMenus}>Manage Templates</MenuItem>}
-              {isSuper && <MenuItem component={Link} to="/admin/listings-database" onClick={closeAllMenus}>Listings Database</MenuItem>}
-              <MenuItem component={Link} to="/admin/select-seller" onClick={closeAllMenus}>Add Template Listings</MenuItem>
-              <MenuItem component={Link} to="/admin/listing-directory" onClick={closeAllMenus}>Listing Directory</MenuItem>
-              <MenuItem component={Link} to="/admin/template-directory" onClick={closeAllMenus}>Template Directory</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* Continue with Product Features (Superadmin only) */}
-        {isSuper ? (
-          <>
-
-            {/* ASIN Importer */}
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setAsinImporterAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={ImportExportIcon} label="ASIN Importer" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="ASIN Importer" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
-              </ListItemButton>
-            </ListItem>
-
-            <Menu
-              anchorEl={asinImporterAnchorEl}
-              open={Boolean(asinImporterAnchorEl)}
-              onClose={() => setAsinImporterAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
-            >
-              <MenuItem component={Link} to="/admin/asin-directory" onClick={closeAllMenus}>ASIN Directory</MenuItem>
-              <MenuItem component={Link} to="/admin/asin-lists" onClick={closeAllMenus}>ASIN Lists</MenuItem>
-            </Menu>
-
-          </>
-        ) : null}
-
-        {/* Feed Upload - accessible to listers, listingadmins, and superadmins */}
-        {(isListingAdmin || isSuper || isLister) && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/feed-upload"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/feed-upload'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon>
-                <NavIcon icon={CloudUploadIcon} label="Feed Upload" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Feed Upload (CSV)" />}
-            </ListItemButton>
-          </ListItem>
-        )}
-
-        {/* CSV Storage - accessible to listers, listingadmins, and superadmins */}
-        {(isListingAdmin || isSuper || isLister) && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/csv-storage"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/csv-storage'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon>
-                <NavIcon icon={StorageIcon} label="CSV Storage" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="CSV Storage" />}
-            </ListItemButton>
-          </ListItem>
-        )}
-
-        {/* Listing Dropdown with Monitoring Subdropdown */}
-        {(isListingAdmin || isSuper) && (
-          <>
-
-            {/* Selling Privileges */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/selling-privileges"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/selling-privileges'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={InsightsIcon} label="Selling Privileges" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Selling Privileges" />}
-              </ListItemButton>
-            </ListItem>
-
-            {/* eBay API Usage */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/ebay-api-usage"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/ebay-api-usage'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={BarChartIcon} label="eBay API Usage" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="eBay API Usage" />}
-              </ListItemButton>
-            </ListItem>
-
-            {/* Seller Funds */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/seller-funds"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/seller-funds'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={AccountBalanceIcon} label="Seller Funds" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Seller Funds" />}
-              </ListItemButton>
-            </ListItem>
-
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setListingAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={ListAltIcon} label="Listing Management" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Listing" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
-              </ListItemButton>
-            </ListItem>
-
-            {/* Sideways flyout menu */}
-            <Menu
-              anchorEl={listingAnchorEl}
-              open={Boolean(listingAnchorEl)}
-              onClose={() => { setListingAnchorEl(null); setMonitoringAnchorEl(null); }}
-              {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
-            >
-              <MenuItem component={Link} to="/admin/listing" onClick={closeAllMenus}>Product Table</MenuItem>
-              <MenuItem component={Link} to="/admin/feed-upload" onClick={closeAllMenus}>Feed Upload (CSV)</MenuItem>
-              <MenuItem component={Link} to="/admin/feed-upload-stats" onClick={closeAllMenus}>Feed Upload Stats</MenuItem>
-              <MenuItem
-                onMouseEnter={(e) => setMonitoringAnchorEl(e.currentTarget)}
-                onMouseLeave={() => setMonitoringAnchorEl(null)}
-                sx={{ display: 'flex', justifyContent: 'space-between' }}
-              >
-                Monitoring <ExpandMore sx={{ transform: 'rotate(-90deg)', ml: 1 }} />
-              </MenuItem>
-            </Menu>
-
-            {/* Nested Monitoring flyout menu */}
-            <Menu
-              anchorEl={monitoringAnchorEl}
-              open={Boolean(monitoringAnchorEl)}
-              onClose={() => setMonitoringAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              MenuListProps={{
-                onMouseEnter: () => monitoringAnchorEl && setMonitoringAnchorEl(monitoringAnchorEl),
-                onMouseLeave: () => setMonitoringAnchorEl(null),
-              }}
-              sx={{ pointerEvents: 'none', '& .MuiPaper-root': { pointerEvents: 'auto', minWidth: '220px', maxHeight: '80vh' } }}
-            >
-              <MenuItem component={Link} to="/admin/task-list" onClick={closeAllMenus}>Task List</MenuItem>
-              <MenuItem component={Link} to="/admin/assignments" onClick={closeAllMenus}>Assignments</MenuItem>
-              <MenuItem component={Link} to="/admin/listings-summary" onClick={closeAllMenus}>Listings Summary</MenuItem>
-              <MenuItem component={Link} to="/admin/listing-sheet" onClick={closeAllMenus}>Listing Sheet</MenuItem>
-              <MenuItem component={Link} to="/admin/store-wise-tasks" onClick={closeAllMenus}>Store-Wise Tasks</MenuItem>
-              <MenuItem component={Link} to="/admin/store-daily-tasks" onClick={closeAllMenus}>Store Daily Tasks</MenuItem>
-              <MenuItem component={Link} to="/admin/lister-info" onClick={closeAllMenus}>Lister Info</MenuItem>
-              <MenuItem component={Link} to="/admin/range-analyzer" onClick={closeAllMenus}>Range Analyzer</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* Compatibility Dropdown */}
-        {isSuper && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setCompatAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={TaskIcon} label="Compatibility Management" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Compatibility" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
-              </ListItemButton>
-            </ListItem>
-
-            {/* Sideways flyout menu */}
-            <Menu
-              anchorEl={compatAnchorEl}
-              open={Boolean(compatAnchorEl)}
-              onClose={() => setCompatAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
-            >
-              <MenuItem component={Link} to="/admin/compatibility-tasks" onClick={closeAllMenus}>Compatibility Tasks</MenuItem>
-              <MenuItem component={Link} to="/admin/compatibility-progress" onClick={closeAllMenus}>Progress Tracking</MenuItem>
-              <MenuItem component={Link} to="/admin/ai-fitment-usage" onClick={closeAllMenus}>AI Fitment Usage</MenuItem>
-              <MenuItem component={Link} to="/admin/listing-stats" onClick={closeAllMenus}>Listing Statistics</MenuItem>
-              <MenuItem component={Link} to="/admin/compatibility-batch-history" onClick={closeAllMenus}>Batch History</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/compatibility-dashboard"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/compatibility-dashboard'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={DashboardIcon} label="Compatibility Dashboard" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Compat. Dashboard" />}
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/edit-listings"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/edit-listings'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={EditIcon} label="Edit Listings" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Edit Listings" />}
-              </ListItemButton>
-            </ListItem>
-          </>
-        )}
-
-        {/* Orders Dept Dropdown - UPDATED FOR HOC & COMPLIANCE MANAGER */}
-        {(isSuper || isFulfillmentAdmin || isHOC || isComplianceManager) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setOrdersAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={LocalShippingIcon} label="Orders & Fulfillment" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Orders Dept" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
-              </ListItemButton>
-            </ListItem>
-
-            {/* Sideways flyout menu */}
-            <Menu
-              anchorEl={ordersAnchorEl}
-              open={Boolean(ordersAnchorEl)}
-              onClose={() => setOrdersAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px', maxHeight: '80vh' } }}
-            >
-              <MenuItem component={Link} to="/admin/orders-dashboard" onClick={closeAllMenus}>Orders Dashboard</MenuItem>
-              <MenuItem component={Link} to="/admin/order-analytics" onClick={closeAllMenus}>Order Analytics</MenuItem>
-              <MenuItem component={Link} to="/admin/seller-analytics" onClick={closeAllMenus}>Seller Analytics</MenuItem>
-              <MenuItem component={Link} to="/admin/fulfillment" onClick={closeAllMenus}>All Orders</MenuItem>
-              <MenuItem component={Link} to="/admin/all-orders-sheet" onClick={closeAllMenus}>All Orders Sheet (USD)</MenuItem>
-              <MenuItem component={Link} to="/admin/awaiting-shipment" onClick={closeAllMenus}>Awaiting Shipment</MenuItem>
-              <MenuItem component={Link} to="/admin/awaiting-sheet" onClick={closeAllMenus}>Awaiting Sheet</MenuItem>
-              <MenuItem component={Link} to="/admin/amazon-arrivals" onClick={closeAllMenus}>Amazon Arrivals</MenuItem>
-              <MenuItem component={Link} to="/admin/fulfillment-notes" onClick={closeAllMenus}>Fulfillment Notes</MenuItem>
-              <MenuItem component={Link} to="/admin/disputes" onClick={closeAllMenus}>Issues and Resolutions</MenuItem>
-              <MenuItem component={Link} to="/admin/account-health" onClick={closeAllMenus}>Account Health Report</MenuItem>
-              <MenuItem component={Link} to="/admin/message-received" onClick={closeAllMenus}>Buyer Messages</MenuItem>
-              <MenuItem component={Link} to="/admin/conversation-management" onClick={closeAllMenus}>Conversation Mgmt</MenuItem>
-              <MenuItem component={Link} to="/admin/amazon-accounts" onClick={closeAllMenus}>Manage Amazon Accts</MenuItem>
-              <MenuItem component={Link} to="/admin/credit-cards" onClick={closeAllMenus}>Manage Credit Cards</MenuItem>
-              <Divider />
-              <MenuItem component={Link} to="/admin/affiliate-orders" onClick={closeAllMenus}>Affiliate Orders</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* Manage Components Dropdown */}
-        {isSuper && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setManageAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
-              >
-                <ListItemIcon><CategoryIcon /></ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Manage Components" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
-              </ListItemButton>
-            </ListItem>
-
-            {/* Sideways flyout menu */}
-            <Menu
-              anchorEl={manageAnchorEl}
-              open={Boolean(manageAnchorEl)}
-              onClose={() => setManageAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
-            >
-              <MenuItem component={Link} to="/admin/categories" onClick={closeAllMenus}>Manage Categories</MenuItem>
-              <MenuItem component={Link} to="/admin/platforms" onClick={closeAllMenus}>Manage Platforms</MenuItem>
-              <MenuItem component={Link} to="/admin/stores" onClick={closeAllMenus}>Manage Stores</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {isProductAdmin ? (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/categories"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/categories'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon><CategoryIcon /></ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Manage Categories" />}
-              </ListItemButton>
-            </ListItem>
-          </>
-        ) : null}
-
-        {isSuper || isListingAdmin || isHRAdmin || isOperationHead ? (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/add-user"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/add-user'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon><AddCircleIcon /></ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Add User" />}
-            </ListItemButton>
-          </ListItem>
-        ) : null}
-
-        {(isCompatibilityAdmin) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/add-compatibility-editor"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/add-compatibility-editor'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon><AddCircleIcon /></ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Add Compatibility Editor" />}
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/compatibility-tasks"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/compatibility-tasks'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon><TaskIcon /></ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Available Tasks" />}
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/compatibility-progress"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/compatibility-progress'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon><InsightsIcon /></ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Progress Tracking" />}
-              </ListItemButton>
-            </ListItem>
-          </>
-        )}
-
-        {(isCompatibilityEditor) && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/compatibility-editor"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/compatibility-editor'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon><TaskIcon /></ListItemIcon>
-              {sidebarOpen && <ListItemText primary="My Assignments" />}
-            </ListItemButton>
-          </ListItem>
-        )}
-
-
-        {/* Employee Management - visible to superadmin and hradmin only */}
-        {(isSuper || isHRAdmin) && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/employee-management"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/employee-management'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon>
-                <NavIcon icon={AdminPanelSettingsIcon} label="Employee Management" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Employee Management" />}
-            </ListItemButton>
-          </ListItem>
-        )}
-
-
-        {/* User-Seller Assignments - superadmin, hradmin, hr */}
-        {(isSuper || isHRAdmin || user?.role === 'hr') && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/user-seller-assignments"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/user-seller-assignments'}
-              sx={selectedMenuItemStyle}
-            >
-              <ListItemIcon>
-                <NavIcon icon={AssignmentIcon} label="User-Seller Assignments" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="User-Seller Assignments" />}
-            </ListItemButton>
-          </ListItem>
-        )}
-
-        {/* User Performance - visible to ALL users */}
-        <ListItem disablePadding>
-          <ListItemButton
-            component={Link}
-            to="/admin/user-performance"
-            onClick={() => setMobileOpen(false)}
-            selected={location.pathname === '/admin/user-performance'}
-            sx={selectedMenuItemStyle}
-          >
-            <ListItemIcon>
-              <NavIcon icon={TrendingUpIcon} label={isSuper || isHRAdmin || user?.role === 'hr' ? "User Performance Log" : "My Performance"} sidebarOpen={sidebarOpen} />
-            </ListItemIcon>
-            {sidebarOpen && <ListItemText primary={isSuper || isHRAdmin || user?.role === 'hr' ? "User Performance Log" : "My Performance"} />}
-          </ListItemButton>
-        </ListItem>
-
         {/* Leave Management - visible to ALL users for applying leaves */}
         {(!isSuper) && (<ListItem disablePadding>
           <ListItemButton
@@ -905,42 +301,457 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItemButton>
         </ListItem>)}
 
-        {/* Leave Admin - visible to superadmin and hradmin only */}
-        {(isSuper || isHRAdmin) && (
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/admin/leave-admin"
-              onClick={() => setMobileOpen(false)}
-              selected={location.pathname === '/admin/leave-admin'}
-              sx={selectedMenuItemStyle}
+        <Divider sx={{ my: 1 }} />
+
+        {/* ====== ORDER FULFILMENT AND TRACKING ====== */}
+        {(isSuper || isFulfillmentAdmin || isHOC || isComplianceManager) && (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={(e) => setOrderFulfilmentAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={LocalShippingIcon} label="Order Fulfilment and Tracking" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Order Fulfilment" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+              </ListItemButton>
+            </ListItem>
+
+            <Menu
+              anchorEl={orderFulfilmentAnchorEl}
+              open={Boolean(orderFulfilmentAnchorEl)}
+              onClose={() => setOrderFulfilmentAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px', maxHeight: '80vh' } }}
             >
-              <ListItemIcon>
-                <NavIcon icon={AdminPanelSettingsIcon} label="Leave Management (Admin)" sidebarOpen={sidebarOpen} />
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="Leave Admin" />}
-            </ListItemButton>
-          </ListItem>
+              <MenuItem component={Link} to="/admin/orders-dashboard" onClick={closeAllMenus}>Orders Dashboard</MenuItem>
+              <MenuItem component={Link} to="/admin/order-analytics" onClick={closeAllMenus}>Order Analytics</MenuItem>
+              <MenuItem component={Link} to="/admin/fulfillment" onClick={closeAllMenus}>All Orders (Fulfilment)</MenuItem>
+              <MenuItem component={Link} to="/admin/awaiting-shipment" onClick={closeAllMenus}>Awaiting Shipment</MenuItem>
+              <MenuItem component={Link} to="/admin/awaiting-sheet" onClick={closeAllMenus}>Awaiting Sheet</MenuItem>
+              <MenuItem component={Link} to="/admin/amazon-arrivals" onClick={closeAllMenus}>Amazon Arrivals</MenuItem>
+              <MenuItem component={Link} to="/admin/fulfillment-notes" onClick={closeAllMenus}>Fulfillment Notes</MenuItem>
+            </Menu>
+          </>
         )}
 
-        {/* [Testing]Employee Details - visible to superadmin, hradmin, and operation head */}
-        {(isSuper || isHRAdmin || isOperationHead) && (
+        {/* ====== COMPATIBILITY ====== */}
+        {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={(e) => setCompatibilityAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={TaskIcon} label="Compatibility Management" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Compatibility" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+              </ListItemButton>
+            </ListItem>
+
+            <Menu
+              anchorEl={compatibilityAnchorEl}
+              open={Boolean(compatibilityAnchorEl)}
+              onClose={() => setCompatibilityAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+            >
+              {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
+                <MenuItem component={Link} to="/admin/compatibility-dashboard" onClick={closeAllMenus}>Compatibility Dashboard</MenuItem>
+              )}
+              {(isSuper || isCompatibilityAdmin) && (
+                <>
+                  <MenuItem component={Link} to="/admin/compatibility-tasks" onClick={closeAllMenus}>Compatibility Tasks</MenuItem>
+                  <MenuItem component={Link} to="/admin/compatibility-progress" onClick={closeAllMenus}>Progress Tracking</MenuItem>
+                  <MenuItem component={Link} to="/admin/ai-fitment-usage" onClick={closeAllMenus}>AI Fitment Usage</MenuItem>
+                  <MenuItem component={Link} to="/admin/listing-stats" onClick={closeAllMenus}>Listing Statistics</MenuItem>
+                  <MenuItem component={Link} to="/admin/compatibility-batch-history" onClick={closeAllMenus}>Batch History</MenuItem>
+                </>
+              )}
+              {isCompatibilityEditor && (
+                <MenuItem component={Link} to="/admin/compatibility-editor" onClick={closeAllMenus}>My Assignments</MenuItem>
+              )}
+              {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
+                <MenuItem component={Link} to="/admin/edit-listings" onClick={closeAllMenus}>Edit Listings</MenuItem>
+              )}
+            </Menu>
+          </>
+        )}
+
+        {/* ====== LISTING AND RESEARCH ====== */}
+        {(isSuper || isListingAdmin || isAnyLister) && (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={(e) => setListingResearchAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={ListAltIcon} label="Listing and Research" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Listing & Research" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+              </ListItemButton>
+            </ListItem>
+
+            <Menu
+              anchorEl={listingResearchAnchorEl}
+              open={Boolean(listingResearchAnchorEl)}
+              onClose={() => setListingResearchAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px', maxHeight: '80vh' } }}
+            >
+              {/* Template Listing Submenu */}
+              {(isSuper || isAnyLister) && (
+                <>
+                  <MenuItem
+                    onClick={(e) => setTemplateListingAnchorEl(e.currentTarget)}
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
+                    Template Listing <ChevronRightIcon fontSize="small" />
+                  </MenuItem>
+                </>
+              )}
+              
+              {/* ASIN Importer Submenu */}
+              {isSuper && (
+                <MenuItem
+                  onClick={(e) => setAsinImporterAnchorEl(e.currentTarget)}
+                  sx={{ display: 'flex', justifyContent: 'space-between' }}
+                >
+                  ASIN Importer <ChevronRightIcon fontSize="small" />
+                </MenuItem>
+              )}
+              
+              {/* Feed Upload */}
+              {(isListingAdmin || isSuper || isLister) && (
+                <>
+                  <MenuItem component={Link} to="/admin/feed-upload" onClick={closeAllMenus}>Feed Upload (CSV)</MenuItem>
+                  <MenuItem component={Link} to="/admin/feed-upload-stats" onClick={closeAllMenus}>Feed Upload Stats</MenuItem>
+                  <MenuItem component={Link} to="/admin/csv-storage" onClick={closeAllMenus}>CSV Storage</MenuItem>
+                </>
+              )}
+              
+              {/* Product Research */}
+              {(isProductAdmin || isSuper) && (
+                <MenuItem component={Link} to="/admin/research" onClick={closeAllMenus}>Product Research</MenuItem>
+              )}
+            </Menu>
+
+            {/* Template Listing Submenu */}
+            <Menu
+              anchorEl={templateListingAnchorEl}
+              open={Boolean(templateListingAnchorEl)}
+              onClose={() => setTemplateListingAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+            >
+              {isSuper && <MenuItem component={Link} to="/admin/manage-templates" onClick={closeAllMenus}>Manage Templates</MenuItem>}
+              {isSuper && <MenuItem component={Link} to="/admin/listings-database" onClick={closeAllMenus}>Listings Database</MenuItem>}
+              <MenuItem component={Link} to="/admin/select-seller" onClick={closeAllMenus}>Add Template Listings</MenuItem>
+              <MenuItem component={Link} to="/admin/listing-directory" onClick={closeAllMenus}>Listing Directory</MenuItem>
+              <MenuItem component={Link} to="/admin/template-directory" onClick={closeAllMenus}>Template Directory</MenuItem>
+            </Menu>
+
+            {/* ASIN Importer Submenu */}
+            <Menu
+              anchorEl={asinImporterAnchorEl}
+              open={Boolean(asinImporterAnchorEl)}
+              onClose={() => setAsinImporterAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+            >
+              <MenuItem component={Link} to="/admin/asin-directory" onClick={closeAllMenus}>ASIN Directory</MenuItem>
+              <MenuItem component={Link} to="/admin/asin-lists" onClick={closeAllMenus}>ASIN Lists</MenuItem>
+            </Menu>
+          </>
+        )}
+
+        {/* ====== FINANCE AND CASH FLOW ====== */}
+        {isSuper && (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={(e) => setFinanceAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={AttachMoneyIcon} label="Finance and Cash Flow" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Finance & Cash Flow" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+              </ListItemButton>
+            </ListItem>
+
+            <Menu
+              anchorEl={financeAnchorEl}
+              open={Boolean(financeAnchorEl)}
+              onClose={() => setFinanceAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+            >
+              <MenuItem component={Link} to="/admin/payoneer" onClick={closeAllMenus}>Payoneer Sheet</MenuItem>
+              <MenuItem component={Link} to="/admin/bank-accounts" onClick={closeAllMenus}>Bank Accounts</MenuItem>
+              <MenuItem component={Link} to="/admin/transactions" onClick={closeAllMenus}>Transactions</MenuItem>
+              <MenuItem component={Link} to="/admin/extra-expenses" onClick={closeAllMenus}>Extra Expenses</MenuItem>
+              <MenuItem component={Link} to="/admin/credit-card-names" onClick={closeAllMenus}>Credit Card Names</MenuItem>
+              <MenuItem component={Link} to="/admin/salary" onClick={closeAllMenus}>Salary Page</MenuItem>
+              <Divider />
+              <MenuItem component={Link} to="/admin/all-orders-sheet" onClick={closeAllMenus}>All Orders USD</MenuItem>
+              <MenuItem component={Link} to="/admin/seller-analytics" onClick={closeAllMenus}>Seller Analytics</MenuItem>
+            </Menu>
+          </>
+        )}
+
+        {/* ====== COMPLIANCE AND SUPPORT ====== */}
+        {(isSuper || isFulfillmentAdmin || isHOC || isComplianceManager) && (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={(e) => setComplianceAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={AdminPanelSettingsIcon} label="Compliance and Support" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Compliance & Support" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+              </ListItemButton>
+            </ListItem>
+
+            <Menu
+              anchorEl={complianceAnchorEl}
+              open={Boolean(complianceAnchorEl)}
+              onClose={() => setComplianceAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+            >
+              <MenuItem component={Link} to="/admin/disputes" onClick={closeAllMenus}>Issues and Resolutions</MenuItem>
+              <MenuItem component={Link} to="/admin/account-health" onClick={closeAllMenus}>Account Health Report</MenuItem>
+              <MenuItem component={Link} to="/admin/message-received" onClick={closeAllMenus}>Buyer Messages</MenuItem>
+              <MenuItem component={Link} to="/admin/conversation-management" onClick={closeAllMenus}>Conversation Mgmt</MenuItem>
+              <MenuItem component={Link} to="/admin/amazon-accounts" onClick={closeAllMenus}>Manage Amazon Accounts</MenuItem>
+              <MenuItem component={Link} to="/admin/credit-cards" onClick={closeAllMenus}>Manage Credit Cards</MenuItem>
+              <MenuItem component={Link} to="/admin/affiliate-orders" onClick={closeAllMenus}>Affiliate Orders</MenuItem>
+            </Menu>
+          </>
+        )}
+
+        {/* ====== EBAY PARAMETERS ====== */}
+        {(isListingAdmin || isSuper) && (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={(e) => setEbayParamsAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={StoreIcon} label="eBay Parameters" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="eBay Parameters" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+              </ListItemButton>
+            </ListItem>
+
+            <Menu
+              anchorEl={ebayParamsAnchorEl}
+              open={Boolean(ebayParamsAnchorEl)}
+              onClose={() => setEbayParamsAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+            >
+              <MenuItem component={Link} to="/admin/selling-privileges" onClick={closeAllMenus}>Seller Privileges</MenuItem>
+              <MenuItem component={Link} to="/admin/ebay-api-usage" onClick={closeAllMenus}>eBay API Usage</MenuItem>
+              <MenuItem component={Link} to="/admin/seller-funds" onClick={closeAllMenus}>Seller Funds</MenuItem>
+            </Menu>
+          </>
+        )}
+
+        {/* ====== HR AND MANAGEMENT ====== */}
+        {(isSuper || isHRAdmin || isOperationHead || isListingAdmin) && (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={(e) => setHrManagementAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={SupervisorAccountIcon} label="HR and Management" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="HR & Management" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+              </ListItemButton>
+            </ListItem>
+
+            <Menu
+              anchorEl={hrManagementAnchorEl}
+              open={Boolean(hrManagementAnchorEl)}
+              onClose={() => setHrManagementAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+            >
+              <MenuItem component={Link} to="/admin/ideas" onClick={closeAllMenus}>Ideas and Issues</MenuItem>
+              <MenuItem component={Link} to="/admin/internal-messages" onClick={closeAllMenus}>Team Chat</MenuItem>
+              {(isSuper || isHRAdmin) && (
+                <>
+                  <MenuItem component={Link} to="/admin/leave-admin" onClick={closeAllMenus}>Leave Admin</MenuItem>
+                  <MenuItem component={Link} to="/admin/employee-management" onClick={closeAllMenus}>Employee Management</MenuItem>
+                </>
+              )}
+              {(isSuper || isListingAdmin || isHRAdmin || isOperationHead) && (
+                <MenuItem component={Link} to="/admin/add-user" onClick={closeAllMenus}>Add User</MenuItem>
+              )}
+              {(isSuper || isHRAdmin || user?.role === 'hr') && (
+                <MenuItem component={Link} to="/admin/user-seller-assignments" onClick={closeAllMenus}>User-Seller Assignments</MenuItem>
+              )}
+              {isSuper && (
+                <>
+                  <MenuItem component={Link} to="/admin/internal-messages-admin" onClick={closeAllMenus}>View All Messages</MenuItem>
+                  <MenuItem component={Link} to="/admin/attendance" onClick={closeAllMenus}>Working Hours Tracking</MenuItem>
+                </>
+              )}
+            </Menu>
+          </>
+        )}
+
+        {/* ====== OTHERS ====== */}
+        {isSuper && (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={(e) => setOthersAnchorEl(e.currentTarget)}
+                sx={{ justifyContent: 'space-between' }}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={AppsIcon} label="Others" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Others" />}
+                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+              </ListItemButton>
+            </ListItem>
+
+            <Menu
+              anchorEl={othersAnchorEl}
+              open={Boolean(othersAnchorEl)}
+              onClose={() => setOthersAnchorEl(null)}
+              {...flyoutMenuPositionProps}
+              sx={{ '& .MuiPaper-root': { minWidth: '220px', maxHeight: '80vh' } }}
+            >
+              <MenuItem component={Link} to="/admin/categories" onClick={closeAllMenus}>Manage Categories</MenuItem>
+              <MenuItem component={Link} to="/admin/platforms" onClick={closeAllMenus}>Manage Platforms</MenuItem>
+              <MenuItem component={Link} to="/admin/stores" onClick={closeAllMenus}>Manage Stores</MenuItem>
+              <Divider />
+              <MenuItem component={Link} to="/admin/listing" onClick={closeAllMenus}>Product Table</MenuItem>
+              <MenuItem component={Link} to="/admin/task-list" onClick={closeAllMenus}>Task List</MenuItem>
+              <MenuItem component={Link} to="/admin/assignments" onClick={closeAllMenus}>Assignments</MenuItem>
+              <MenuItem component={Link} to="/admin/listings-summary" onClick={closeAllMenus}>Listings Summary</MenuItem>
+              <MenuItem component={Link} to="/admin/listing-sheet" onClick={closeAllMenus}>Listing Sheet</MenuItem>
+              <MenuItem component={Link} to="/admin/store-wise-tasks" onClick={closeAllMenus}>Store-Wise Tasks</MenuItem>
+              <MenuItem component={Link} to="/admin/store-daily-tasks" onClick={closeAllMenus}>Store Daily Tasks</MenuItem>
+              <MenuItem component={Link} to="/admin/lister-info" onClick={closeAllMenus}>Lister Info</MenuItem>
+              <MenuItem component={Link} to="/admin/range-analyzer" onClick={closeAllMenus}>Range Analyzer</MenuItem>
+              <Divider />
+              <MenuItem component={Link} to="/admin/amazon-lookup" onClick={closeAllMenus}>Amazon Lookup</MenuItem>
+              <MenuItem component={Link} to="/admin/product-umbrellas" onClick={closeAllMenus}>Product Umbrellas</MenuItem>
+              <MenuItem component={Link} to="/admin/asin-storage" onClick={closeAllMenus}>ASIN Storage</MenuItem>
+              <MenuItem component={Link} to="/admin/column-creator" onClick={closeAllMenus}>Column Creator</MenuItem>
+              <MenuItem component={Link} to="/admin/ranges" onClick={closeAllMenus}>Manage Ranges</MenuItem>
+              <MenuItem component={Link} to="/admin/user-credentials" onClick={closeAllMenus}>User Credentials</MenuItem>
+              <Divider />
+              <MenuItem component={Link} to="/admin/user-performance" onClick={closeAllMenus}>User Performance Logs</MenuItem>
+              <MenuItem component={Link} to="/admin/employee-details" onClick={closeAllMenus}>[Testing] Employee Details</MenuItem>
+            </Menu>
+          </>
+        )}
+
+        {/* Compatibility specific menu items for non-super users */}
+        {isCompatibilityAdmin && !isSuper && (
           <>
             <ListItem disablePadding>
               <ListItemButton
                 component={Link}
-                to="/admin/employee-details"
+                to="/admin/add-compatibility-editor"
                 onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/employee-details'}
+                selected={location.pathname === '/admin/add-compatibility-editor'}
                 sx={selectedMenuItemStyle}
               >
-                <ListItemIcon>
-                  <NavIcon icon={SupervisorAccountIcon} label="[Testing] Employee Details" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="[Testing] Employee Details" />}
+                <ListItemIcon><AddCircleIcon /></ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Add Compatibility Editor" />}
               </ListItemButton>
             </ListItem>
           </>
+        )}
+
+        {/* Product Admin specific items */}
+        {isProductAdmin && !isSuper && (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/admin/research"
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/research'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon>
+                  <NavIcon icon={Inventory2Icon} label="Product Research & Analysis" sidebarOpen={sidebarOpen} />
+                </ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Product Research" />}
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/admin/categories"
+                onClick={() => setMobileOpen(false)}
+                selected={location.pathname === '/admin/categories'}
+                sx={selectedMenuItemStyle}
+              >
+                <ListItemIcon><CategoryIcon /></ListItemIcon>
+                {sidebarOpen && <ListItemText primary="Manage Categories" />}
+              </ListItemButton>
+            </ListItem>
+          </>
+        )}
+
+        {/* Ideas & Issues - standalone for non-HR users */}
+        {!isSuper && !isHRAdmin && !isOperationHead && !isListingAdmin && (
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/admin/ideas"
+              onClick={() => setMobileOpen(false)}
+              selected={location.pathname === '/admin/ideas'}
+              sx={selectedMenuItemStyle}
+            >
+              <ListItemIcon>
+                <NavIcon icon={LightbulbIcon} label="Ideas & Issues Board" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
+              {sidebarOpen && <ListItemText primary="Ideas & Issues" />}
+            </ListItemButton>
+          </ListItem>
+        )}
+
+        {/* Team Chat - standalone for non-HR users */}
+        {!isSuper && !isHRAdmin && !isOperationHead && !isListingAdmin && (
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/admin/internal-messages"
+              onClick={() => setMobileOpen(false)}
+              selected={location.pathname === '/admin/internal-messages'}
+              sx={selectedMenuItemStyle}
+            >
+              <ListItemIcon>
+                <NavIcon icon={ChatIcon} label="Team Chat & Messaging" sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
+              {sidebarOpen && <ListItemText primary="Team Chat" />}
+            </ListItemButton>
+          </ListItem>
         )}
 
       </List>
