@@ -9,9 +9,13 @@ import {
     TableCell,
     TableContainer,
     TableHead,
+    TablePagination,
     TableRow,
     Dialog,
     DialogTitle,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
     DialogContent,
     DialogActions,
     TextField,
@@ -33,6 +37,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import api from '../../lib/api';
 
 // Mobile Transaction Card Component
@@ -134,6 +139,19 @@ const TransactionPage = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Pagination and Filter State
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(50);
+    const [totalTransactions, setTotalTransactions] = useState(0);
+    const [summary, setSummary] = useState({ totalCredit: 0, totalDebit: 0 });
+
+    const [dateMode, setDateMode] = useState('range'); // 'single' or 'range'
+    const [filterSingleDate, setFilterSingleDate] = useState('');
+    const [filterStartDate, setFilterStartDate] = useState('');
+    const [filterEndDate, setFilterEndDate] = useState('');
+    const [filterBankAccount, setFilterBankAccount] = useState('');
+    const [filterType, setFilterType] = useState('');
+
     // Editing state
     const [editingId, setEditingId] = useState(null);
 
@@ -147,12 +165,15 @@ const TransactionPage = () => {
     });
 
     useEffect(() => {
-        fetchTransactions();
         fetchBankAccounts();
         fetchCreditCards();
         fetchBalanceSummary();
         fetchCreditCardSummary(); // NEW
     }, []);
+
+    useEffect(() => {
+        fetchTransactions();
+    }, [page, rowsPerPage, dateMode, filterSingleDate, filterStartDate, filterEndDate, filterBankAccount, filterType]);
 
     const fetchCreditCards = async () => {
         try {
@@ -174,11 +195,44 @@ const TransactionPage = () => {
 
     const fetchTransactions = async () => {
         try {
-            const { data } = await api.get('/transactions');
-            setTransactions(data);
+            const params = {
+                page: page + 1,
+                limit: rowsPerPage,
+                ...(dateMode === 'range' && filterStartDate && { startDate: filterStartDate }),
+                ...(dateMode === 'range' && filterEndDate && { endDate: filterEndDate }),
+                ...(dateMode === 'single' && filterSingleDate && { startDate: filterSingleDate, endDate: filterSingleDate }),
+                ...(filterBankAccount && { bankAccount: filterBankAccount }),
+                ...(filterType && { transactionType: filterType })
+            };
+            const { data } = await api.get('/transactions', { params });
+            setTransactions(data.transactions || []);
+            setTotalTransactions(data.totalTransactions || 0);
+            if (data.summary) {
+                setSummary(data.summary);
+            }
         } catch (error) {
             console.error('Error fetching transactions:', error);
         }
+    };
+
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    const clearFilters = () => {
+        setFilterSingleDate('');
+        setFilterStartDate('');
+        setFilterEndDate('');
+        setFilterBankAccount('');
+        setFilterType('');
+        setDateMode('range');
+        setRowsPerPage(50);
+        setPage(0);
     };
 
     const fetchBankAccounts = async () => {
@@ -278,8 +332,119 @@ const TransactionPage = () => {
                 </Button>
             </Stack>
 
-            {/* Balance Summary Cards */}
-            <Typography variant="h6" gutterBottom>Bank Accounts</Typography>
+            {/* Filters Section */}
+            <Paper sx={{ p: 2, mb: 3 }}>
+                <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} sm={6} md={2}>
+                        <TextField
+                            select
+                            label="Date Mode"
+                            fullWidth
+                            value={dateMode}
+                            onChange={(e) => {
+                                setDateMode(e.target.value);
+                                setPage(0);
+                            }}
+                        >
+                            <MenuItem value="single">Single Date</MenuItem>
+                            <MenuItem value="range">Date Range</MenuItem>
+                        </TextField>
+                    </Grid>
+                    {dateMode === 'single' ? (
+                        <Grid item xs={12} sm={6} md={2}>
+                            <TextField
+                                label="Date"
+                                type="date"
+                                fullWidth
+                                InputLabelProps={{ shrink: true }}
+                                value={filterSingleDate}
+                                onChange={(e) => { setFilterSingleDate(e.target.value); setPage(0); }}
+                            />
+                        </Grid>
+                    ) : (
+                        <>
+                            <Grid item xs={12} sm={6} md={2}>
+                                <TextField
+                                    label="Start Date"
+                                    type="date"
+                                    fullWidth
+                                    InputLabelProps={{ shrink: true }}
+                                    value={filterStartDate}
+                                    onChange={(e) => { setFilterStartDate(e.target.value); setPage(0); }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={2}>
+                                <TextField
+                                    label="End Date"
+                                    type="date"
+                                    fullWidth
+                                    InputLabelProps={{ shrink: true }}
+                                    value={filterEndDate}
+                                    onChange={(e) => { setFilterEndDate(e.target.value); setPage(0); }}
+                                />
+                            </Grid>
+                        </>
+                    )}
+                    <Grid item xs={12} sm={6} md={2}>
+                        <TextField
+                            select
+                            label="Bank Account"
+                            fullWidth
+                            value={filterBankAccount}
+                            onChange={(e) => { setFilterBankAccount(e.target.value); setPage(0); }}
+                        >
+                            <MenuItem value="">All Accounts</MenuItem>
+                            {bankAccounts.map((acc) => (
+                                <MenuItem key={acc._id} value={acc._id}>{acc.name}</MenuItem>
+                            ))}
+                        </TextField>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={2}>
+                        <TextField
+                            select
+                            label="Type"
+                            fullWidth
+                            value={filterType}
+                            onChange={(e) => { setFilterType(e.target.value); setPage(0); }}
+                        >
+                            <MenuItem value="">All Types</MenuItem>
+                            <MenuItem value="Credit">Credit</MenuItem>
+                            <MenuItem value="Debit">Debit</MenuItem>
+                        </TextField>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={2}>
+                        <TextField
+                            label="Rows Per Page"
+                            type="number"
+                            fullWidth
+                            inputProps={{ min: 1 }}
+                            value={rowsPerPage === -1 ? '' : rowsPerPage}
+                            onChange={(e) => { 
+                                const val = parseInt(e.target.value, 10);
+                                if (!isNaN(val) && val > 0) {
+                                    setRowsPerPage(val);
+                                } else if (e.target.value === '') {
+                                    setRowsPerPage(50);
+                                }
+                                setPage(0);
+                            }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={12} md={12} display="flex" justifyContent="flex-end">
+                         <Button variant="outlined" onClick={clearFilters} color="secondary" fullWidth={isMobile}>
+                             Clear Filters
+                         </Button>
+                    </Grid>
+                </Grid>
+            </Paper>
+
+            <Accordion sx={{ mb: 3 }} defaultExpanded={false}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="h6">Bank Accounts & Credit Card Balance Summary</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                    {/* Balance Summary Cards */}
+                    <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>Bank Accounts</Typography>
             <Grid container spacing={2} sx={{ mb: 3 }}>
                 {balanceSummary.map((item) => (
                     <Grid item xs={12} sm={6} md={3} key={item._id}>
@@ -390,6 +555,8 @@ const TransactionPage = () => {
                     </Grid>
                 </>
             )}
+            </AccordionDetails>
+        </Accordion>
 
             {/* MOBILE CARD VIEW */}
             <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 3 }}>
@@ -473,6 +640,29 @@ const TransactionPage = () => {
                                 </TableCell>
                             </TableRow>
                         ))}
+                        {transactions.length > 0 && (
+                            <TableRow sx={{ backgroundColor: '#fafafa' }}>
+                                <TableCell colSpan={5} align="right">
+                                    <strong>Page Total:</strong>
+                                </TableCell>
+                                <TableCell align="right">
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main', display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+                                        <span>+</span> <span>₹{transactions.reduce((acc, curr) => curr.transactionType === 'Credit' ? acc + (curr.amount || 0) : acc, 0).toFixed(2)}</span>
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main', display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+                                        <span>-</span> <span>₹{transactions.reduce((acc, curr) => curr.transactionType === 'Debit' ? acc + (curr.amount || 0) : acc, 0).toFixed(2)}</span>
+                                    </Typography>
+                                    <Divider sx={{ my: 0.5 }} />
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold', display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+                                        <span>=</span> <span>₹{(
+                                            transactions.reduce((acc, curr) => curr.transactionType === 'Credit' ? acc + (curr.amount || 0) : acc, 0) -
+                                            transactions.reduce((acc, curr) => curr.transactionType === 'Debit' ? acc + (curr.amount || 0) : acc, 0)
+                                        ).toFixed(2)}</span>
+                                    </Typography>
+                                </TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                        )}
                         {transactions.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={7} align="center">No transactions found.</TableCell>
@@ -481,6 +671,29 @@ const TransactionPage = () => {
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            <TablePagination
+                component="div"
+                count={totalTransactions}
+                page={page}
+                onPageChange={handleChangePage}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                rowsPerPageOptions={[]}
+                sx={{ display: { xs: 'none', md: 'block' } }}
+            />
+            {/* Simple pagination for mobile */}
+            <TablePagination
+                component="div"
+                count={totalTransactions}
+                page={page}
+                onPageChange={handleChangePage}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                rowsPerPageOptions={[]}
+                sx={{ display: { xs: 'block', md: 'none' }, '.MuiTablePagination-actions': { ml: 0 } }}
+                labelRowsPerPage=""
+            />
 
             <Dialog
                 open={openDialog}
