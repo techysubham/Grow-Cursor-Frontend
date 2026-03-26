@@ -179,6 +179,32 @@ const selectedMenuItemStyle = {
   }
 };
 
+// Styling for expandable main menu categories (with hover and active states)
+const getMainCategoryStyle = (isActive) => ({
+  ...selectedMenuItemStyle,
+  minHeight: 44,
+  justifyContent: 'space-between',
+  ...(isActive && {
+    backgroundColor: 'rgba(25, 118, 210, 0.08)',
+    borderLeft: '3px solid',
+    borderLeftColor: 'primary.main',
+    '& .MuiListItemIcon-root': {
+      color: 'primary.main',
+    },
+    '& .MuiListItemText-primary': {
+      color: 'primary.main',
+      fontWeight: 600,
+    }
+  }),
+  '&:hover': {
+    backgroundColor: isActive ? 'rgba(25, 118, 210, 0.15)' : 'rgba(25, 118, 210, 0.08)',
+    transform: 'translateX(4px)',
+    '& .MuiListItemIcon-root': {
+      color: 'primary.main',
+    },
+  }
+});
+
 // Helper component for sidebar icons with tooltips when collapsed
 const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
   sidebarOpen ? (
@@ -248,6 +274,21 @@ export default function AdminLayout({ user, onLogout }) {
   // New Roles
   const isHOC = user?.role === 'hoc';
   const isComplianceManager = user?.role === 'compliancemanager';
+
+  // Helper function to check if current route belongs to a category
+  const isCategoryActive = (categoryRoutes) => {
+    return categoryRoutes.some(route => location.pathname.includes(route));
+  };
+
+  // Define routes for each main category - matching actual menu structure
+  const orderFulfilmentRoutes = ['/admin/orders-dashboard', '/admin/order-analytics', '/admin/fulfillment', '/admin/awaiting-shipment', '/admin/awaiting-sheet', '/admin/amazon-arrivals', '/admin/fulfillment-notes'];
+  const compatibilityRoutes = ['/admin/compatibility-dashboard', '/admin/compatibility-tasks', '/admin/compatibility-progress', '/admin/ai-fitment-usage', '/admin/listing-stats', '/admin/compatibility-batch-history', '/admin/edit-listings', '/admin/compatibility-editor', '/admin/add-compatibility-editor'];
+  const listingResearchRoutes = ['/admin/manage-templates', '/admin/listings-database', '/admin/select-seller', '/admin/listing-directory', '/admin/template-directory', '/admin/asin-directory', '/admin/asin-lists', '/admin/feed-upload', '/admin/feed-upload-stats', '/admin/csv-storage', '/admin/research'];
+  const financeRoutes = ['/admin/payoneer', '/admin/bank-accounts', '/admin/transactions', '/admin/extra-expenses', '/admin/credit-card-names', '/admin/salary', '/admin/all-orders-sheet', '/admin/seller-analytics'];
+  const complianceRoutes = ['/admin/disputes', '/admin/account-health', '/admin/message-received', '/admin/conversation-management', '/admin/amazon-accounts', '/admin/credit-cards', '/admin/affiliate-orders'];
+  const ebayParamsRoutes = ['/admin/selling-privileges', '/admin/ebay-api-usage', '/admin/seller-funds'];
+  const hrManagementRoutes = ['/admin/ideas', '/admin/internal-messages', '/admin/leave-admin', '/admin/employee-management', '/admin/add-user', '/admin/user-seller-assignments', '/admin/internal-messages-admin', '/admin/attendance'];
+  const othersRoutes = ['/admin/categories', '/admin/platforms', '/admin/stores', '/admin/listing', '/admin/task-list', '/admin/assignments', '/admin/listings-summary', '/admin/listing-sheet', '/admin/store-wise-tasks', '/admin/store-daily-tasks', '/admin/lister-info', '/admin/range-analyzer', '/admin/amazon-lookup', '/admin/product-umbrellas', '/admin/asin-storage', '/admin/column-creator', '/admin/ranges', '/admin/user-credentials', '/admin/user-performance', '/admin/employee-details'];
 
   // Lister Roles
   const isLister = user?.role === 'lister';
@@ -331,11 +372,7 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setOrderFulfilmentAnchorEl(e.currentTarget)}
-                sx={{
-                  ...selectedMenuItemStyle,
-                  minHeight: 44,
-                  justifyContent: 'space-between'
-                }}
+                sx={getMainCategoryStyle(isCategoryActive(orderFulfilmentRoutes))}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <ListItemIcon sx={{ minWidth: 40 }}>
@@ -393,11 +430,7 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setCompatibilityAnchorEl(e.currentTarget)}
-                sx={{
-                  ...selectedMenuItemStyle,
-                  minHeight: 44,
-                  justifyContent: 'space-between'
-                }}
+                sx={getMainCategoryStyle(isCategoryActive(compatibilityRoutes))}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <ListItemIcon sx={{ minWidth: 40 }}>
@@ -465,11 +498,7 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setListingResearchAnchorEl(e.currentTarget)}
-                sx={{
-                  ...selectedMenuItemStyle,
-                  minHeight: 44,
-                  justifyContent: 'space-between'
-                }}
+                sx={getMainCategoryStyle(isCategoryActive(listingResearchRoutes))}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <ListItemIcon sx={{ minWidth: 40 }}>
@@ -624,11 +653,7 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setFinanceAnchorEl(e.currentTarget)}
-                sx={{
-                  ...selectedMenuItemStyle,
-                  minHeight: 44,
-                  justifyContent: 'space-between'
-                }}
+                sx={getMainCategoryStyle(isCategoryActive(financeRoutes))}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <ListItemIcon sx={{ minWidth: 40 }}>
@@ -687,11 +712,7 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setComplianceAnchorEl(e.currentTarget)}
-                sx={{
-                  ...selectedMenuItemStyle,
-                  minHeight: 44,
-                  justifyContent: 'space-between'
-                }}
+                sx={getMainCategoryStyle(isCategoryActive(complianceRoutes))}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <ListItemIcon sx={{ minWidth: 40 }}>
@@ -748,11 +769,7 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setEbayParamsAnchorEl(e.currentTarget)}
-                sx={{
-                  ...selectedMenuItemStyle,
-                  minHeight: 44,
-                  justifyContent: 'space-between'
-                }}
+                sx={getMainCategoryStyle(isCategoryActive(ebayParamsRoutes))}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <ListItemIcon sx={{ minWidth: 40 }}>
@@ -805,11 +822,7 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setHrManagementAnchorEl(e.currentTarget)}
-                sx={{
-                  ...selectedMenuItemStyle,
-                  minHeight: 44,
-                  justifyContent: 'space-between'
-                }}
+                sx={getMainCategoryStyle(isCategoryActive(hrManagementRoutes))}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <ListItemIcon sx={{ minWidth: 40 }}>
@@ -879,11 +892,7 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setOthersAnchorEl(e.currentTarget)}
-                sx={{
-                  ...selectedMenuItemStyle,
-                  minHeight: 44,
-                  justifyContent: 'space-between'
-                }}
+                sx={getMainCategoryStyle(isCategoryActive(othersRoutes))}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <ListItemIcon sx={{ minWidth: 40 }}>
