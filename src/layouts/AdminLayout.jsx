@@ -148,7 +148,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
 
-const drawerWidth = 230;
+const drawerWidth = 260;
 
 // Shared flyout menu positioning — all flyouts open to the right of their anchor
 const flyoutMenuPositionProps = {
@@ -158,11 +158,24 @@ const flyoutMenuPositionProps = {
 
 // Custom styling for selected sidebar items
 const selectedMenuItemStyle = {
+  borderRadius: '8px',
+  mx: 1,
+  my: 0.3,
+  transition: 'all 0.2s ease-in-out',
   '&.Mui-selected': {
-    backgroundColor: 'rgba(25, 118, 210, 0.25)',
+    backgroundColor: 'primary.main',
+    color: 'white',
+    '& .MuiListItemIcon-root': {
+      color: 'white',
+    },
     '&:hover': {
-      backgroundColor: 'rgba(25, 118, 210, 0.35)',
+      backgroundColor: 'primary.dark',
+      transform: 'translateX(4px)',
     }
+  },
+  '&:hover': {
+    backgroundColor: 'action.hover',
+    transform: 'translateX(4px)',
   }
 };
 
@@ -243,10 +256,10 @@ export default function AdminLayout({ user, onLogout }) {
   const isAnyLister = isLister || isAdvanceLister || isTrainee;
 
   const drawer = (
-    <div>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)' }}>
       <Toolbar />
-      <Divider />
-      <List>
+      <Divider sx={{ borderColor: 'rgba(0, 0, 0, 0.08)' }} />
+      <List sx={{ px: 0.5, py: 1, overflowY: 'auto', flexGrow: 1 }}>
         {/* Back to Lister Dashboard - visible only to listers */}
         {isAnyLister && (
           <ListItem disablePadding>
@@ -254,18 +267,21 @@ export default function AdminLayout({ user, onLogout }) {
               component={Link}
               to="/lister"
               onClick={() => setMobileOpen(false)}
-              sx={selectedMenuItemStyle}
+              sx={{
+                ...selectedMenuItemStyle,
+                minHeight: 44,
+              }}
             >
-              <ListItemIcon>
+              <ListItemIcon sx={{ minWidth: 40 }}>
                 <NavIcon icon={HomeIcon} label="Back to My Dashboard" sidebarOpen={sidebarOpen} />
               </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="My Dashboard" />}
+              {sidebarOpen && <ListItemText primary="My Dashboard" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
             </ListItemButton>
           </ListItem>
         )}
 
         {/* Divider after lister dashboard link */}
-        {isAnyLister && <Divider sx={{ my: 1 }} />}
+        {isAnyLister && <Divider sx={{ my: 1.5, mx: 2, borderColor: 'rgba(0, 0, 0, 0.08)' }} />}
 
         {/* About Me - visible to all users except superadmin */}
         {!isSuper && (
@@ -275,12 +291,15 @@ export default function AdminLayout({ user, onLogout }) {
               to="/admin/about-me"
               onClick={() => setMobileOpen(false)}
               selected={location.pathname === '/admin/about-me'}
-              sx={selectedMenuItemStyle}
+              sx={{
+                ...selectedMenuItemStyle,
+                minHeight: 44,
+              }}
             >
-              <ListItemIcon>
+              <ListItemIcon sx={{ minWidth: 40 }}>
                 <NavIcon icon={SupervisorAccountIcon} label="View Your Profile" sidebarOpen={sidebarOpen} />
               </ListItemIcon>
-              {sidebarOpen && <ListItemText primary="About Me" />}
+              {sidebarOpen && <ListItemText primary="About Me" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
             </ListItemButton>
           </ListItem>
         )}
@@ -292,16 +311,19 @@ export default function AdminLayout({ user, onLogout }) {
             to="/admin/my-leaves"
             onClick={() => setMobileOpen(false)}
             selected={location.pathname === '/admin/my-leaves'}
-            sx={selectedMenuItemStyle}
+            sx={{
+              ...selectedMenuItemStyle,
+              minHeight: 44,
+            }}
           >
-            <ListItemIcon>
+            <ListItemIcon sx={{ minWidth: 40 }}>
               <NavIcon icon={EventAvailableIcon} label="My Leave Requests" sidebarOpen={sidebarOpen} />
             </ListItemIcon>
-            {sidebarOpen && <ListItemText primary="My Leaves" />}
+            {sidebarOpen && <ListItemText primary="My Leaves" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
           </ListItemButton>
         </ListItem>)}
 
-        <Divider sx={{ my: 1 }} />
+        <Divider sx={{ my: 1.5, mx: 2, borderColor: 'rgba(0, 0, 0, 0.08)' }} />
 
         {/* ====== ORDER FULFILMENT AND TRACKING ====== */}
         {(isSuper || isFulfillmentAdmin || isHOC || isComplianceManager) && (
@@ -309,13 +331,19 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setOrderFulfilmentAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
+                sx={{
+                  ...selectedMenuItemStyle,
+                  minHeight: 44,
+                  justifyContent: 'space-between'
+                }}
               >
-                <ListItemIcon>
-                  <NavIcon icon={LocalShippingIcon} label="Order Fulfilment and Tracking" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Order Fulfilment" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <NavIcon icon={LocalShippingIcon} label="Order Fulfilment and Tracking" sidebarOpen={sidebarOpen} />
+</ListItemIcon>
+                  {sidebarOpen && <ListItemText primary="Order Fulfilment" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+                </Box>
+                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
               </ListItemButton>
             </ListItem>
 
@@ -324,7 +352,29 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(orderFulfilmentAnchorEl)}
               onClose={() => setOrderFulfilmentAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px', maxHeight: '80vh' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px', 
+                  maxHeight: '80vh',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               <MenuItem component={Link} to="/admin/orders-dashboard" onClick={closeAllMenus}>Orders Dashboard</MenuItem>
               <MenuItem component={Link} to="/admin/order-analytics" onClick={closeAllMenus}>Order Analytics</MenuItem>
@@ -343,13 +393,19 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setCompatibilityAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
+                sx={{
+                  ...selectedMenuItemStyle,
+                  minHeight: 44,
+                  justifyContent: 'space-between'
+                }}
               >
-                <ListItemIcon>
-                  <NavIcon icon={TaskIcon} label="Compatibility Management" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Compatibility" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <NavIcon icon={TaskIcon} label="Compatibility Management" sidebarOpen={sidebarOpen} />
+                  </ListItemIcon>
+                  {sidebarOpen && <ListItemText primary="Compatibility" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+                </Box>
+                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
               </ListItemButton>
             </ListItem>
 
@@ -358,7 +414,28 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(compatibilityAnchorEl)}
               onClose={() => setCompatibilityAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
                 <MenuItem component={Link} to="/admin/compatibility-dashboard" onClick={closeAllMenus}>Compatibility Dashboard</MenuItem>
@@ -388,13 +465,19 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setListingResearchAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
+                sx={{
+                  ...selectedMenuItemStyle,
+                  minHeight: 44,
+                  justifyContent: 'space-between'
+                }}
               >
-                <ListItemIcon>
-                  <NavIcon icon={ListAltIcon} label="Listing and Research" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Listing & Research" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <NavIcon icon={ListAltIcon} label="Listing and Research" sidebarOpen={sidebarOpen} />
+                  </ListItemIcon>
+                  {sidebarOpen && <ListItemText primary="Listing & Research" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+                </Box>
+                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
               </ListItemButton>
             </ListItem>
 
@@ -403,7 +486,29 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(listingResearchAnchorEl)}
               onClose={() => setListingResearchAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px', maxHeight: '80vh' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px', 
+                  maxHeight: '80vh',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               {/* Template Listing Submenu */}
               {(isSuper || isAnyLister) && (
@@ -448,7 +553,28 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(templateListingAnchorEl)}
               onClose={() => setTemplateListingAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               {isSuper && <MenuItem component={Link} to="/admin/manage-templates" onClick={closeAllMenus}>Manage Templates</MenuItem>}
               {isSuper && <MenuItem component={Link} to="/admin/listings-database" onClick={closeAllMenus}>Listings Database</MenuItem>}
@@ -463,7 +589,28 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(asinImporterAnchorEl)}
               onClose={() => setAsinImporterAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               <MenuItem component={Link} to="/admin/asin-directory" onClick={closeAllMenus}>ASIN Directory</MenuItem>
               <MenuItem component={Link} to="/admin/asin-lists" onClick={closeAllMenus}>ASIN Lists</MenuItem>
@@ -477,13 +624,19 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setFinanceAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
+                sx={{
+                  ...selectedMenuItemStyle,
+                  minHeight: 44,
+                  justifyContent: 'space-between'
+                }}
               >
-                <ListItemIcon>
-                  <NavIcon icon={AttachMoneyIcon} label="Finance and Cash Flow" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Finance & Cash Flow" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <NavIcon icon={AttachMoneyIcon} label="Finance and Cash Flow" sidebarOpen={sidebarOpen} />
+                  </ListItemIcon>
+                  {sidebarOpen && <ListItemText primary="Finance & Cash Flow" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+                </Box>
+                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
               </ListItemButton>
             </ListItem>
 
@@ -492,7 +645,28 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(financeAnchorEl)}
               onClose={() => setFinanceAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               <MenuItem component={Link} to="/admin/payoneer" onClick={closeAllMenus}>Payoneer Sheet</MenuItem>
               <MenuItem component={Link} to="/admin/bank-accounts" onClick={closeAllMenus}>Bank Accounts</MenuItem>
@@ -513,13 +687,19 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setComplianceAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
+                sx={{
+                  ...selectedMenuItemStyle,
+                  minHeight: 44,
+                  justifyContent: 'space-between'
+                }}
               >
-                <ListItemIcon>
-                  <NavIcon icon={AdminPanelSettingsIcon} label="Compliance and Support" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Compliance & Support" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <NavIcon icon={AdminPanelSettingsIcon} label="Compliance and Support" sidebarOpen={sidebarOpen} />
+                  </ListItemIcon>
+                  {sidebarOpen && <ListItemText primary="Compliance & Support" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+                </Box>
+                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
               </ListItemButton>
             </ListItem>
 
@@ -528,7 +708,28 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(complianceAnchorEl)}
               onClose={() => setComplianceAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               <MenuItem component={Link} to="/admin/disputes" onClick={closeAllMenus}>Issues and Resolutions</MenuItem>
               <MenuItem component={Link} to="/admin/account-health" onClick={closeAllMenus}>Account Health Report</MenuItem>
@@ -547,13 +748,19 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setEbayParamsAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
+                sx={{
+                  ...selectedMenuItemStyle,
+                  minHeight: 44,
+                  justifyContent: 'space-between'
+                }}
               >
-                <ListItemIcon>
-                  <NavIcon icon={StoreIcon} label="eBay Parameters" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="eBay Parameters" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <NavIcon icon={StoreIcon} label="eBay Parameters" sidebarOpen={sidebarOpen} />
+                  </ListItemIcon>
+                  {sidebarOpen && <ListItemText primary="eBay Parameters" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+                </Box>
+                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
               </ListItemButton>
             </ListItem>
 
@@ -562,7 +769,28 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(ebayParamsAnchorEl)}
               onClose={() => setEbayParamsAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               <MenuItem component={Link} to="/admin/selling-privileges" onClick={closeAllMenus}>Seller Privileges</MenuItem>
               <MenuItem component={Link} to="/admin/ebay-api-usage" onClick={closeAllMenus}>eBay API Usage</MenuItem>
@@ -577,13 +805,19 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setHrManagementAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
+                sx={{
+                  ...selectedMenuItemStyle,
+                  minHeight: 44,
+                  justifyContent: 'space-between'
+                }}
               >
-                <ListItemIcon>
-                  <NavIcon icon={SupervisorAccountIcon} label="HR and Management" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="HR & Management" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <NavIcon icon={SupervisorAccountIcon} label="HR and Management" sidebarOpen={sidebarOpen} />
+                  </ListItemIcon>
+                  {sidebarOpen && <ListItemText primary="HR & Management" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+                </Box>
+                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
               </ListItemButton>
             </ListItem>
 
@@ -592,7 +826,28 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(hrManagementAnchorEl)}
               onClose={() => setHrManagementAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               <MenuItem component={Link} to="/admin/ideas" onClick={closeAllMenus}>Ideas and Issues</MenuItem>
               <MenuItem component={Link} to="/admin/internal-messages" onClick={closeAllMenus}>Team Chat</MenuItem>
@@ -624,13 +879,19 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setOthersAnchorEl(e.currentTarget)}
-                sx={{ justifyContent: 'space-between' }}
+                sx={{
+                  ...selectedMenuItemStyle,
+                  minHeight: 44,
+                  justifyContent: 'space-between'
+                }}
               >
-                <ListItemIcon>
-                  <NavIcon icon={AppsIcon} label="Others" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Others" />}
-                {sidebarOpen && <ChevronRightIcon fontSize="small" />}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <NavIcon icon={AppsIcon} label="Others" sidebarOpen={sidebarOpen} />
+                  </ListItemIcon>
+                  {sidebarOpen && <ListItemText primary="Others" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+                </Box>
+                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
               </ListItemButton>
             </ListItem>
 
@@ -639,7 +900,29 @@ export default function AdminLayout({ user, onLogout }) {
               open={Boolean(othersAnchorEl)}
               onClose={() => setOthersAnchorEl(null)}
               {...flyoutMenuPositionProps}
-              sx={{ '& .MuiPaper-root': { minWidth: '220px', maxHeight: '80vh' } }}
+              sx={{ 
+                '& .MuiPaper-root': { 
+                  minWidth: '240px', 
+                  maxHeight: '80vh',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  mt: 0.5
+                },
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.875rem',
+                  py: 1.2,
+                  px: 2,
+                  borderRadius: '6px',
+                  mx: 1,
+                  my: 0.3,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                    color: 'primary.contrastText',
+                    transform: 'translateX(4px)'
+                  }
+                }
+              }}
             >
               <MenuItem component={Link} to="/admin/categories" onClick={closeAllMenus}>Manage Categories</MenuItem>
               <MenuItem component={Link} to="/admin/platforms" onClick={closeAllMenus}>Manage Platforms</MenuItem>
@@ -788,17 +1071,19 @@ export default function AdminLayout({ user, onLogout }) {
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: drawerWidth,
+              background: 'linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)',
+              borderRight: '1px solid rgba(0,0,0,0.08)',
               '&::-webkit-scrollbar': {
-                width: '6px',
+                width: '8px',
               },
               '&::-webkit-scrollbar-track': {
                 background: 'transparent',
               },
               '&::-webkit-scrollbar-thumb': {
-                background: 'rgba(0, 0, 0, 0.2)',
-                borderRadius: '3px',
+                background: 'rgba(0, 0, 0, 0.15)',
+                borderRadius: '10px',
                 '&:hover': {
-                  background: 'rgba(0, 0, 0, 0.3)',
+                  background: 'rgba(0, 0, 0, 0.25)',
                 },
               },
             }
@@ -813,18 +1098,21 @@ export default function AdminLayout({ user, onLogout }) {
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: sidebarOpen ? drawerWidth : 56,
-              transition: 'width 0.2s',
+              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              background: 'linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)',
+              borderRight: '1px solid rgba(0,0,0,0.08)',
+              boxShadow: '2px 0 8px rgba(0,0,0,0.04)',
               '&::-webkit-scrollbar': {
-                width: '6px',
+                width: '8px',
               },
               '&::-webkit-scrollbar-track': {
                 background: 'transparent',
               },
               '&::-webkit-scrollbar-thumb': {
-                background: 'rgba(0, 0, 0, 0.2)',
-                borderRadius: '3px',
+                background: 'rgba(0, 0, 0, 0.15)',
+                borderRadius: '10px',
                 '&:hover': {
-                  background: 'rgba(0, 0, 0, 0.3)',
+                  background: 'rgba(0, 0, 0, 0.25)',
                 },
               },
             }
