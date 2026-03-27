@@ -20,7 +20,9 @@ import {
     MenuItem,
     Alert,
     IconButton,
-    Grid
+    Grid,
+    Box,
+    CircularProgress
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -40,6 +42,7 @@ const UserSellerAssignmentPage = () => {
     const [selectedSeller, setSelectedSeller] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [pageLoading, setPageLoading] = useState(true);
 
     const [dailyTarget, setDailyTarget] = useState(0);
 
@@ -59,6 +62,8 @@ const UserSellerAssignmentPage = () => {
         } catch (err) {
             console.error('Failed to fetch assignments:', err);
             setError('Failed to load assignments');
+        } finally {
+            setPageLoading(false);
         }
     };
 
@@ -134,6 +139,12 @@ const UserSellerAssignmentPage = () => {
     };
 
     const canManage = ['superadmin', 'hr', 'hradmin'].includes(userRole);
+
+    if (pageLoading) return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+            <CircularProgress />
+        </Box>
+    );
 
     if (!canManage) {
         return (
