@@ -3,18 +3,19 @@ import { useEffect, useState } from 'react';
 import {
     Box, Button, Paper, Stack, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, TextField, Typography,
-    IconButton, Alert
+    IconButton, Alert, CircularProgress
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../../lib/api.js';
 
 export default function ManageCreditCardNamesPage() {
     const [cards, setCards] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [name, setName] = useState('');
     const [error, setError] = useState('');
 
     const fetchCards = () => {
-        api.get('/credit-card-names').then(({ data }) => setCards(data)).catch(console.error);
+        api.get('/credit-card-names').then(({ data }) => setCards(data)).catch(console.error).finally(() => setLoading(false));
     };
 
     useEffect(() => {
@@ -42,6 +43,12 @@ export default function ManageCreditCardNamesPage() {
             alert("Failed to delete");
         }
     };
+
+    if (loading) return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+            <CircularProgress />
+        </Box>
+    );
 
     return (
         <Box>

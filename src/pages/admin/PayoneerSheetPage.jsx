@@ -22,7 +22,8 @@ import {
     Divider,
     useTheme,
     useMediaQuery,
-    Pagination
+    Pagination,
+    CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -175,6 +176,7 @@ const PayoneerSheetPage = () => {
     const [bankAccounts, setBankAccounts] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [pageLoading, setPageLoading] = useState(true);
 
     // Advanced Filter State
     const [filters, setFilters] = useState({
@@ -263,6 +265,7 @@ const PayoneerSheetPage = () => {
             console.error('Failed to fetch records:', error);
         } finally {
             setLoading(false);
+            setPageLoading(false);
         }
     };
 
@@ -432,6 +435,12 @@ const PayoneerSheetPage = () => {
             />
         );
     };
+
+    if (pageLoading) return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+            <CircularProgress />
+        </Box>
+    );
 
     return (
         <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
