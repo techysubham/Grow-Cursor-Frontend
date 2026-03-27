@@ -410,6 +410,7 @@ export default function TemplateListingsPage() {
 
   const handleEditListing = (listing) => {
     setEditingListing(listing);
+    setBulkMode(false);
     setListingFormData({
       action: listing.action || 'Add',
       customLabel: listing.customLabel || '',
