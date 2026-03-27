@@ -156,55 +156,6 @@ const flyoutMenuPositionProps = {
   transformOrigin: { vertical: 'top', horizontal: 'left' },
 };
 
-// Custom styling for selected sidebar items
-const selectedMenuItemStyle = {
-  borderRadius: '8px',
-  mx: 1,
-  my: 0.3,
-  transition: 'all 0.2s ease-in-out',
-  '&.Mui-selected': {
-    backgroundColor: 'primary.main',
-    color: 'white',
-    '& .MuiListItemIcon-root': {
-      color: 'white',
-    },
-    '&:hover': {
-      backgroundColor: 'primary.dark',
-      transform: 'translateX(4px)',
-    }
-  },
-  '&:hover': {
-    backgroundColor: 'action.hover',
-    transform: 'translateX(4px)',
-  }
-};
-
-// Styling for expandable main menu categories (with hover and active states)
-const getMainCategoryStyle = (isActive) => ({
-  ...selectedMenuItemStyle,
-  minHeight: 44,
-  justifyContent: 'space-between',
-  ...(isActive && {
-    backgroundColor: 'rgba(25, 118, 210, 0.08)',
-    borderLeft: '3px solid',
-    borderLeftColor: 'primary.main',
-    '& .MuiListItemIcon-root': {
-      color: 'primary.main',
-    },
-    '& .MuiListItemText-primary': {
-      color: 'primary.main',
-      fontWeight: 600,
-    }
-  }),
-  '&:hover': {
-    backgroundColor: isActive ? 'rgba(25, 118, 210, 0.15)' : 'rgba(25, 118, 210, 0.08)',
-    transform: 'translateX(4px)',
-    '& .MuiListItemIcon-root': {
-      color: 'primary.main',
-    },
-  }
-});
-
 // Helper component for sidebar icons with tooltips when collapsed
 const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
   sidebarOpen ? (
@@ -295,6 +246,69 @@ export default function AdminLayout({ user, onLogout }) {
   const isAdvanceLister = user?.role === 'advancelister';
   const isTrainee = user?.role === 'trainee';
   const isAnyLister = isLister || isAdvanceLister || isTrainee;
+
+  // Collapsed-mode icon centering — shared across all sidebar items
+  const collapsedIconStyles = !sidebarOpen ? {
+    justifyContent: 'center',
+    '& .MuiListItemIcon-root': {
+      minWidth: 0,
+      justifyContent: 'center',
+    },
+  } : {};
+
+  // Sidebar item styles — reactive to sidebarOpen so collapsed mode centers icons correctly
+  const selectedMenuItemStyle = {
+    borderRadius: '8px',
+    mx: sidebarOpen ? 1 : 0.5,
+    px: sidebarOpen ? undefined : 0,
+    my: 0.3,
+    transition: 'all 0.2s ease-in-out',
+    ...collapsedIconStyles,
+    '&.Mui-selected': {
+      backgroundColor: 'primary.main',
+      color: 'white',
+      '& .MuiListItemIcon-root': {
+        color: 'white',
+        ...(!sidebarOpen && { minWidth: 0, justifyContent: 'center' }),
+      },
+      '&:hover': {
+        backgroundColor: 'primary.dark',
+        ...(sidebarOpen && { transform: 'translateX(4px)' }),
+      }
+    },
+    '&:hover': {
+      backgroundColor: 'action.hover',
+      ...(sidebarOpen && { transform: 'translateX(4px)' }),
+    }
+  };
+
+  const getMainCategoryStyle = (isActive) => ({
+    ...selectedMenuItemStyle,
+    minHeight: 44,
+    justifyContent: sidebarOpen ? 'space-between' : 'center',
+    ...(isActive && {
+      backgroundColor: 'rgba(25, 118, 210, 0.08)',
+      ...(sidebarOpen && {
+        borderLeft: '3px solid',
+        borderLeftColor: 'primary.main',
+      }),
+      '& .MuiListItemIcon-root': {
+        color: 'primary.main',
+        ...(!sidebarOpen && { minWidth: 0, justifyContent: 'center' }),
+      },
+      '& .MuiListItemText-primary': {
+        color: 'primary.main',
+        fontWeight: 600,
+      }
+    }),
+    '&:hover': {
+      backgroundColor: isActive ? 'rgba(25, 118, 210, 0.15)' : 'rgba(25, 118, 210, 0.08)',
+      ...(sidebarOpen && { transform: 'translateX(4px)' }),
+      '& .MuiListItemIcon-root': {
+        color: 'primary.main',
+      },
+    }
+  });
 
   const drawer = (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)' }}>
