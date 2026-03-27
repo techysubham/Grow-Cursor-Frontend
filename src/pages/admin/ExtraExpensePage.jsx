@@ -18,7 +18,8 @@ import {
     IconButton,
     Stack,
     useMediaQuery,
-    useTheme
+    useTheme,
+    CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -93,6 +94,7 @@ const ExtraExpensePage = () => {
     const [expenses, setExpenses] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [pageLoading, setPageLoading] = useState(true);
     const [editingId, setEditingId] = useState(null);
 
     const [formData, setFormData] = useState({
@@ -112,6 +114,8 @@ const ExtraExpensePage = () => {
             setExpenses(data);
         } catch (error) {
             console.error('Error fetching expenses:', error);
+        } finally {
+            setPageLoading(false);
         }
     };
 
@@ -163,6 +167,12 @@ const ExtraExpensePage = () => {
             paidBy: ''
         });
     };
+
+    if (pageLoading) return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+            <CircularProgress />
+        </Box>
+    );
 
     return (
         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>

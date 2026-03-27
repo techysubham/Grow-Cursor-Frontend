@@ -31,7 +31,8 @@ import {
     ToggleButtonGroup,
     Divider,
     useMediaQuery,
-    useTheme
+    useTheme,
+    CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -138,6 +139,7 @@ const TransactionPage = () => {
     const [creditCardSummary, setCreditCardSummary] = useState([]); // NEW
     const [openDialog, setOpenDialog] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [pageLoading, setPageLoading] = useState(true);
 
     // Pagination and Filter State
     const [page, setPage] = useState(0);
@@ -212,6 +214,8 @@ const TransactionPage = () => {
             }
         } catch (error) {
             console.error('Error fetching transactions:', error);
+        } finally {
+            setPageLoading(false);
         }
     };
 
@@ -311,6 +315,12 @@ const TransactionPage = () => {
             creditCardName: ''
         });
     };
+
+    if (pageLoading) return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+            <CircularProgress />
+        </Box>
+    );
 
     return (
         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>

@@ -17,7 +17,8 @@ import {
     TextField,
     IconButton,
     useMediaQuery,
-    useTheme
+    useTheme,
+    CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -29,6 +30,7 @@ const BankAccountsPage = () => {
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     
     const [accounts, setAccounts] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({ name: '', accountNumber: '', ifscCode: '' });
@@ -43,6 +45,8 @@ const BankAccountsPage = () => {
             setAccounts(data);
         } catch (error) {
             console.error('Error fetching accounts:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -85,6 +89,12 @@ const BankAccountsPage = () => {
         setEditingId(null);
         setFormData({ name: '', accountNumber: '', ifscCode: '' });
     };
+
+    if (loading) return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+            <CircularProgress />
+        </Box>
+    );
 
     return (
         <Box sx={{ p: { xs: 2, sm: 3 } }}>
