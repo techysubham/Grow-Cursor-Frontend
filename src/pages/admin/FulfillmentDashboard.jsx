@@ -3019,8 +3019,10 @@ function FulfillmentDashboard() {
             </Stack>
           </Stack>
         ) : (
-          /* DESKTOP LAYOUT - Original Horizontal Layout */
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+          /* DESKTOP LAYOUT - Two-row layout for better spacing */
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {/* Row 1: Seller, Poll/Sync Actions, Recalc */}
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <InputLabel id="seller-select-label">Select Seller</InputLabel>
               <Select
@@ -3116,42 +3118,37 @@ function FulfillmentDashboard() {
                 </Button>
               </span>
             </Tooltip>
+            </Stack>
 
-            <FormControl size="small" sx={{ minWidth: 110 }}>
-              <InputLabel id="marketplace-filter-label" sx={{ fontSize: '0.75rem' }}>Marketplace</InputLabel>
-              <Select
-                labelId="marketplace-filter-label"
-                value={searchMarketplace}
-                label="Marketplace"
-                onChange={(e) => setSearchMarketplace(e.target.value)}
-                sx={{ fontSize: '0.8rem', height: 32, '& .MuiSelect-select': { py: 0.5, px: 0.8 } }}
-              >
-                <MenuItem value="">
-                  <em>All</em>
-                </MenuItem>
-                <MenuItem value="EBAY_US">EBAY_US</MenuItem>
-                <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
-                <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
-                <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
-              </Select>
-            </FormControl>
+            {/* Row 2: Filters, Toggles, Column Selector */}
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+            <Select
+              value={searchMarketplace}
+              onChange={(e) => setSearchMarketplace(e.target.value)}
+              displayEmpty
+              size="small"
+              renderValue={(val) => val ? val : 'Marketplace'}
+              sx={{ minWidth: 145, fontSize: '0.85rem', color: searchMarketplace ? 'inherit' : 'text.secondary' }}
+            >
+              <MenuItem value=""><em>All</em></MenuItem>
+              <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+              <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+              <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+              <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
+            </Select>
 
-            <FormControl size="small" sx={{ minWidth: 125 }}>
-              <InputLabel id="payment-status-filter-label" sx={{ fontSize: '0.75rem' }}>Payment Status</InputLabel>
-              <Select
-                labelId="payment-status-filter-label"
-                value={searchPaymentStatus}
-                label="Payment Status"
-                onChange={(e) => setSearchPaymentStatus(e.target.value)}
-                sx={{ fontSize: '0.8rem', height: 32, '& .MuiSelect-select': { py: 0.5, px: 0.8 } }}
-              >
-                <MenuItem value="">
-                  <em>All</em>
-                </MenuItem>
-                <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
-                <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
-              </Select>
-            </FormControl>
+            <Select
+              value={searchPaymentStatus}
+              onChange={(e) => setSearchPaymentStatus(e.target.value)}
+              displayEmpty
+              size="small"
+              renderValue={(val) => val ? val : 'Payment Status'}
+              sx={{ minWidth: 165, fontSize: '0.85rem', color: searchPaymentStatus ? 'inherit' : 'text.secondary' }}
+            >
+              <MenuItem value=""><em>All</em></MenuItem>
+              <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
+              <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
+            </Select>
 
             <FormControlLabel
               control={
@@ -3163,11 +3160,11 @@ function FulfillmentDashboard() {
                 />
               }
               label={
-                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
                   Exclude &lt; $3 Orders
                 </Typography>
               }
-              sx={{ mx: 1 }}
+              sx={{ ml: 0 }}
             />
 
             <FormControlLabel
@@ -3180,11 +3177,11 @@ function FulfillmentDashboard() {
                 />
               }
               label={
-                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
                   Missing Amazon Acc
                 </Typography>
               }
-              sx={{ mx: 1 }}
+              sx={{ ml: 0 }}
             />
 
             {/* Column Selector Button */}
@@ -3195,7 +3192,8 @@ function FulfillmentDashboard() {
               onReset={() => setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)}
               page="dashboard"
             />
-          </Stack>
+            </Stack>
+          </Box>
         )}
 
         {error && (
