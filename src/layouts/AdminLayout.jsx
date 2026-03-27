@@ -239,7 +239,11 @@ export default function AdminLayout({ user, onLogout }) {
   const complianceRoutes = ['/admin/disputes', '/admin/account-health', '/admin/message-received', '/admin/conversation-management', '/admin/amazon-accounts', '/admin/credit-cards', '/admin/affiliate-orders'];
   const ebayParamsRoutes = ['/admin/selling-privileges', '/admin/ebay-api-usage', '/admin/seller-funds'];
   const hrManagementRoutes = ['/admin/ideas', '/admin/internal-messages', '/admin/leave-admin', '/admin/employee-management', '/admin/add-user', '/admin/user-seller-assignments', '/admin/internal-messages-admin', '/admin/attendance'];
-  const othersRoutes = ['/admin/categories', '/admin/platforms', '/admin/stores', '/admin/listing', '/admin/task-list', '/admin/assignments', '/admin/listings-summary', '/admin/listing-sheet', '/admin/store-wise-tasks', '/admin/store-daily-tasks', '/admin/lister-info', '/admin/range-analyzer', '/admin/amazon-lookup', '/admin/product-umbrellas', '/admin/asin-storage', '/admin/column-creator', '/admin/ranges', '/admin/user-credentials', '/admin/user-performance', '/admin/employee-details'];
+  const othersRoutes = ['/admin/categories', '/admin/platforms', '/admin/stores', '/admin/listing-management', '/admin/task-list', '/admin/assignments', '/admin/listings-summary', '/admin/listing-sheet', '/admin/store-wise-tasks', '/admin/store-daily-tasks', '/admin/lister-info', '/admin/range-analyzer', '/admin/amazon-lookup', '/admin/product-umbrellas', '/admin/asin-storage', '/admin/column-creator', '/admin/ranges', '/admin/user-credentials', '/admin/user-performance', '/admin/employee-details'];
+
+  // isCategoryActive uses .includes() so we need an exact-path helper for ambiguous routes
+  const isOthersActive = othersRoutes.some(route => location.pathname.includes(route))
+    || location.pathname === '/admin/listing';
 
   // Lister Roles
   const isLister = user?.role === 'lister';
@@ -906,7 +910,7 @@ export default function AdminLayout({ user, onLogout }) {
             <ListItem disablePadding>
               <ListItemButton
                 onClick={(e) => setOthersAnchorEl(e.currentTarget)}
-                sx={getMainCategoryStyle(isCategoryActive(othersRoutes))}
+                sx={getMainCategoryStyle(isOthersActive)}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <ListItemIcon sx={{ minWidth: 40 }}>
