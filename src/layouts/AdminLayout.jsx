@@ -150,6 +150,7 @@ import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import SecurityIcon from '@mui/icons-material/Security';
 
 import PageAccessManagementPage from '../pages/admin/PageAccessManagementPage.jsx';
+import UserPasswordManagementPage from '../pages/admin/UserPasswordManagementPage.jsx';
 
 import usePageAccess from '../hooks/usePageAccess';
 import { PAGE_REGISTRY, PAGE_CATEGORIES, SUBMENUS } from '../constants/pages';
@@ -274,6 +275,7 @@ const COMPONENT_MAP = {
   'ViewAllMessages': InternalMessagesAdminPage,
   'Attendance': AttendanceAdminPage,
   'PageAccessManagement': PageAccessManagementPage,
+  'UserPasswordManagement': UserPasswordManagementPage,
   'ManageCategories': ManageCategoriesPage,
   'ManagePlatforms': ManagePlatformsPage,
   'ManageStores': ManageStoresPage,
