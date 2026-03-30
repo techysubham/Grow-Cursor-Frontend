@@ -147,6 +147,13 @@ import ListingStatsPage from '../pages/admin/ListingStatsPage.jsx';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
+import SecurityIcon from '@mui/icons-material/Security';
+
+import PageAccessManagementPage from '../pages/admin/PageAccessManagementPage.jsx';
+import UserPasswordManagementPage from '../pages/admin/UserPasswordManagementPage.jsx';
+
+import usePageAccess from '../hooks/usePageAccess';
+import { PAGE_REGISTRY, PAGE_CATEGORIES, SUBMENUS } from '../constants/pages';
 
 const drawerWidth = 260;
 
@@ -175,83 +182,171 @@ const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
   )
 );
 
+// Map category IDs to their icons
+const categoryIcons = {
+  orderFulfilment: LocalShippingIcon,
+  compatibility: TaskIcon,
+  listingResearch: ListAltIcon,
+  finance: AttachMoneyIcon,
+  compliance: AdminPanelSettingsIcon,
+  ebayParams: StoreIcon,
+  hrManagement: SupervisorAccountIcon,
+  others: AppsIcon,
+};
+
+// Flyout menu styles (shared across all categories)
+const flyoutMenuSx = {
+  '& .MuiPaper-root': {
+    minWidth: '240px',
+    maxHeight: '80vh',
+    borderRadius: '12px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+    mt: 0.5
+  },
+  '& .MuiMenuItem-root': {
+    fontSize: '0.875rem',
+    py: 1.2,
+    px: 2,
+    borderRadius: '6px',
+    mx: 1,
+    my: 0.3,
+    transition: 'all 0.2s',
+    '&:hover': {
+      backgroundColor: 'primary.light',
+      color: 'primary.contrastText',
+      transform: 'translateX(4px)'
+    }
+  }
+};
+
+// Component map for routing
+const COMPONENT_MAP = {
+  'OrdersDashboard': OrdersDepartmentDashboardPage,
+  'OrderAnalytics': OrderAnalyticsPage,
+  'Fulfillment': FulfillmentDashboard,
+  'AwaitingShipment': AwaitingShipmentPage,
+  'AwaitingSheet': AwaitingSheetPage,
+  'AmazonArrivals': AmazonArrivalsPage,
+  'FulfillmentNotes': FulfillmentNotesPage,
+  'CompatibilityDashboard': CompatibilityDashboard,
+  'CompatibilityTasks': AdminTaskList,
+  'CompatibilityProgress': ProgressTrackingPage,
+  'AiFitmentUsage': AiFitmentUsagePage,
+  'ListingStats': ListingStatsPage,
+  'CompatibilityBatchHistory': CompatibilityBatchHistoryPage,
+  'EditListings': EditListingsDashboard,
+  'CompatibilityEditor': EditorDashboard,
+  'AddCompatibilityEditor': AddListerPage,
+  'ManageTemplates': ManageTemplatesPage,
+  'ListingsDatabase': TemplateDatabasePage,
+  'SelectSeller': SelectSellerPage,
+  'ListingDirectory': ListingDirectoryPage,
+  'TemplateDirectory': TemplateDirectoryPage,
+  'AsinDirectory': AsinDirectoryPage,
+  'AsinLists': AsinListPage,
+  'FeedUpload': FeedUploadPage,
+  'FeedUploadStats': FeedUploadStatsPage,
+  'CsvStorage': CsvStoragePage,
+  'ProductResearch': ProductResearchPage,
+  'Payoneer': PayoneerSheetPage,
+  'BankAccounts': BankAccountsPage,
+  'Transactions': TransactionPage,
+  'ExtraExpenses': ExtraExpensePage,
+  'CreditCardNames': ManageCreditCardNamesPage,
+  'Salary': SalaryPage,
+  'AllOrdersSheet': AllOrdersSheetPage,
+  'SellerAnalytics': SellerAnalyticsPage,
+  'Disputes': DisputesPage,
+  'AccountHealth': AccountHealthReportPage,
+  'BuyerMessages': BuyerChatPage,
+  'ConversationManagement': ConversationManagementPage,
+  'AmazonAccounts': ManageAmazonAccountsPage,
+  'CreditCards': ManageCreditCardsPage,
+  'AffiliateOrders': AffiliateOrdersPage,
+  'SellingPrivileges': SellingPrivilegesPage,
+  'EbayApiUsage': EbayApiUsagePage,
+  'SellerFunds': SellerFundsPage,
+  'IdeasAndIssues': IdeasPage,
+  'TeamChat': InternalMessagesPage,
+  'LeaveAdmin': LeaveAdminPage,
+  'EmployeeManagement': EmployeeManagementPage,
+  'AddUser': AddListerPage,
+  'UserSellerAssignments': UserSellerAssignmentPage,
+  'ViewAllMessages': InternalMessagesAdminPage,
+  'Attendance': AttendanceAdminPage,
+  'PageAccessManagement': PageAccessManagementPage,
+  'UserPasswordManagement': UserPasswordManagementPage,
+  'ManageCategories': ManageCategoriesPage,
+  'ManagePlatforms': ManagePlatformsPage,
+  'ManageStores': ManageStoresPage,
+  'ProductTable': ListingManagementPage,
+  'TaskList': TaskListPage,
+  'Assignments': AdminAssignmentsPage,
+  'ListingsSummary': ListingsSummaryPage,
+  'ListingSheet': ListingSheetPage,
+  'StoreWiseTasks': StoreWiseTaskListPage,
+  'StoreDailyTasks': StoreDailyTasksPage,
+  'ListerInfo': ListerInfoPage,
+  'RangeAnalyzer': RangeAnalyzerPage,
+  'AmazonLookup': AmazonLookupPage,
+  'ProductUmbrellas': ManageProductUmbrellasPage,
+  'AsinStorage': ASINStoragePage,
+  'ColumnCreator': ColumnCreatorPage,
+  'ManageRanges': ManageRangesPage,
+  'UserCredentials': UserCredentialsPage,
+  'UserPerformance': UserPerformancePage,
+  'EmployeeDetails': EmployeeDetailsPage,
+};
+
 export default function AdminLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Flyout menu anchor states - reorganized menu structure
-  const [orderFulfilmentAnchorEl, setOrderFulfilmentAnchorEl] = useState(null);
-  const [compatibilityAnchorEl, setCompatibilityAnchorEl] = useState(null);
-  const [listingResearchAnchorEl, setListingResearchAnchorEl] = useState(null);
-  const [financeAnchorEl, setFinanceAnchorEl] = useState(null);
-  const [complianceAnchorEl, setComplianceAnchorEl] = useState(null);
-  const [ebayParamsAnchorEl, setEbayParamsAnchorEl] = useState(null);
-  const [hrManagementAnchorEl, setHrManagementAnchorEl] = useState(null);
-  const [othersAnchorEl, setOthersAnchorEl] = useState(null);
+  // Flyout menu anchor states
+  const [menuAnchors, setMenuAnchors] = useState({});
   
   // Submenu anchors
-  const [templateListingAnchorEl, setTemplateListingAnchorEl] = useState(null);
-  const [asinImporterAnchorEl, setAsinImporterAnchorEl] = useState(null);
+  const [submenuAnchors, setSubmenuAnchors] = useState({});
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Close all flyout menus + mobile drawer in one call
+  // Use the page access hook
+  const { hasAccess, hasCategoryAccess, accessibleCategories, getAccessiblePages, getSubmenuPages, hasSubmenuAccess, isSuper } = usePageAccess(user);
+
+  // --- ROLE DEFINITIONS (kept for special non-page logic like lister dashboard link) ---
+  const isAnyLister = ['lister', 'advancelister', 'trainee'].includes(user?.role);
+
+  // Close all flyout menus + mobile drawer
   const closeAllMenus = () => {
-    setOrderFulfilmentAnchorEl(null);
-    setCompatibilityAnchorEl(null);
-    setListingResearchAnchorEl(null);
-    setFinanceAnchorEl(null);
-    setComplianceAnchorEl(null);
-    setEbayParamsAnchorEl(null);
-    setHrManagementAnchorEl(null);
-    setOthersAnchorEl(null);
-    setTemplateListingAnchorEl(null);
-    setAsinImporterAnchorEl(null);
+    setMenuAnchors({});
+    setSubmenuAnchors({});
     setMobileOpen(false);
   };
 
-  // --- ROLE DEFINITIONS ---
-  const isSuper = user?.role === 'superadmin';
-  const isProductAdmin = user?.role === 'productadmin';
-  const isListingAdmin = user?.role === 'listingadmin';
-  const isCompatibilityAdmin = user?.role === 'compatibilityadmin';
-  const isCompatibilityEditor = user?.role === 'compatibilityeditor';
-  const isFulfillmentAdmin = user?.role === 'fulfillmentadmin';
-  const isHRAdmin = user?.role === 'hradmin';
-  const isOperationHead = user?.role === 'operationhead';
-  const isSeller = user?.role === 'seller';
-
-  // New Roles
-  const isHOC = user?.role === 'hoc';
-  const isComplianceManager = user?.role === 'compliancemanager';
-
-  // Helper function to check if current route belongs to a category
-  const isCategoryActive = (categoryRoutes) => {
-    return categoryRoutes.some(route => location.pathname.includes(route));
+  const openMenu = (key, event) => {
+    setMenuAnchors(prev => ({ ...prev, [key]: event.currentTarget }));
   };
 
-  // Define routes for each main category - matching actual menu structure
-  const orderFulfilmentRoutes = ['/admin/orders-dashboard', '/admin/order-analytics', '/admin/fulfillment', '/admin/awaiting-shipment', '/admin/awaiting-sheet', '/admin/amazon-arrivals', '/admin/fulfillment-notes'];
-  const compatibilityRoutes = ['/admin/compatibility-dashboard', '/admin/compatibility-tasks', '/admin/compatibility-progress', '/admin/ai-fitment-usage', '/admin/listing-stats', '/admin/compatibility-batch-history', '/admin/edit-listings', '/admin/compatibility-editor', '/admin/add-compatibility-editor'];
-  const listingResearchRoutes = ['/admin/manage-templates', '/admin/listings-database', '/admin/select-seller', '/admin/listing-directory', '/admin/template-directory', '/admin/asin-directory', '/admin/asin-lists', '/admin/feed-upload', '/admin/feed-upload-stats', '/admin/csv-storage', '/admin/research'];
-  const financeRoutes = ['/admin/payoneer', '/admin/bank-accounts', '/admin/transactions', '/admin/extra-expenses', '/admin/credit-card-names', '/admin/salary', '/admin/all-orders-sheet', '/admin/seller-analytics'];
-  const complianceRoutes = ['/admin/disputes', '/admin/account-health', '/admin/message-received', '/admin/conversation-management', '/admin/amazon-accounts', '/admin/credit-cards', '/admin/affiliate-orders'];
-  const ebayParamsRoutes = ['/admin/selling-privileges', '/admin/ebay-api-usage', '/admin/seller-funds'];
-  const hrManagementRoutes = ['/admin/ideas', '/admin/internal-messages', '/admin/leave-admin', '/admin/employee-management', '/admin/add-user', '/admin/user-seller-assignments', '/admin/internal-messages-admin', '/admin/attendance'];
-  const othersRoutes = ['/admin/categories', '/admin/platforms', '/admin/stores', '/admin/listing-management', '/admin/task-list', '/admin/assignments', '/admin/listings-summary', '/admin/listing-sheet', '/admin/store-wise-tasks', '/admin/store-daily-tasks', '/admin/lister-info', '/admin/range-analyzer', '/admin/amazon-lookup', '/admin/product-umbrellas', '/admin/asin-storage', '/admin/column-creator', '/admin/ranges', '/admin/user-credentials', '/admin/user-performance', '/admin/employee-details'];
+  const closeMenu = (key) => {
+    setMenuAnchors(prev => ({ ...prev, [key]: null }));
+  };
 
-  // isCategoryActive uses .includes() so we need an exact-path helper for ambiguous routes
-  const isOthersActive = othersRoutes.some(route => location.pathname.includes(route))
-    || location.pathname === '/admin/listing';
+  const openSubmenu = (key, event) => {
+    setSubmenuAnchors(prev => ({ ...prev, [key]: event.currentTarget }));
+  };
 
-  // Lister Roles
-  const isLister = user?.role === 'lister';
-  const isAdvanceLister = user?.role === 'advancelister';
-  const isTrainee = user?.role === 'trainee';
-  const isAnyLister = isLister || isAdvanceLister || isTrainee;
+  const closeSubmenu = (key) => {
+    setSubmenuAnchors(prev => ({ ...prev, [key]: null }));
+  };
 
-  // Collapsed-mode icon centering — shared across all sidebar items
+  // Helper function to check if current route belongs to a category
+  const isCategoryActive = (categoryId) => {
+    const pages = PAGE_REGISTRY.filter(p => p.category === categoryId);
+    return pages.some(page => location.pathname.includes(page.path));
+  };
+
+  // Collapsed-mode icon centering
   const collapsedIconStyles = !sidebarOpen ? {
     justifyContent: 'center',
     '& .MuiListItemIcon-root': {
@@ -260,7 +355,7 @@ export default function AdminLayout({ user, onLogout }) {
     },
   } : {};
 
-  // Sidebar item styles — reactive to sidebarOpen so collapsed mode centers icons correctly
+  // Sidebar item styles
   const selectedMenuItemStyle = {
     borderRadius: '8px',
     mx: sidebarOpen ? 1 : 0.5,
@@ -313,6 +408,100 @@ export default function AdminLayout({ user, onLogout }) {
       },
     }
   });
+
+  // Render a flyout category menu
+  const renderCategoryMenu = (categoryId) => {
+    if (!hasCategoryAccess(categoryId)) return null;
+
+    const category = PAGE_CATEGORIES[categoryId];
+    const IconComponent = categoryIcons[categoryId];
+    const isActive = isCategoryActive(categoryId);
+    const pages = getAccessiblePages(categoryId);
+
+    // Find which submenus belong to this category
+    const categorySubmenus = Object.entries(SUBMENUS)
+      .filter(([_, sm]) => sm.category === categoryId)
+      .filter(([smId]) => hasSubmenuAccess(smId));
+
+    // Pages that are NOT in any submenu
+    const directPages = pages.filter(p => !p.submenu);
+
+    return (
+      <span key={categoryId}>
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={(e) => openMenu(categoryId, e)}
+            sx={getMainCategoryStyle(isActive)}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <NavIcon icon={IconComponent} label={category.name} sidebarOpen={sidebarOpen} />
+              </ListItemIcon>
+              {sidebarOpen && <ListItemText primary={category.name} primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+            </Box>
+            {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
+          </ListItemButton>
+        </ListItem>
+
+        <Menu
+          anchorEl={menuAnchors[categoryId]}
+          open={Boolean(menuAnchors[categoryId])}
+          onClose={() => closeMenu(categoryId)}
+          {...flyoutMenuPositionProps}
+          sx={flyoutMenuSx}
+        >
+          {/* Render submenus first */}
+          {categorySubmenus.map(([smId, sm]) => (
+            <MenuItem
+              key={smId}
+              onClick={(e) => openSubmenu(smId, e)}
+              sx={{ display: 'flex', justifyContent: 'space-between' }}
+            >
+              {sm.name} <ChevronRightIcon fontSize="small" />
+            </MenuItem>
+          ))}
+
+          {/* Render direct pages */}
+          {directPages.map(page => (
+            <MenuItem
+              key={page.id}
+              component={Link}
+              to={`/admin${page.path}`}
+              onClick={closeAllMenus}
+            >
+              {page.name}
+            </MenuItem>
+          ))}
+        </Menu>
+
+        {/* Render submenu flyouts */}
+        {categorySubmenus.map(([smId]) => {
+          const smPages = getSubmenuPages(smId);
+          return (
+            <Menu
+              key={`submenu-${smId}`}
+              anchorEl={submenuAnchors[smId]}
+              open={Boolean(submenuAnchors[smId])}
+              onClose={() => closeSubmenu(smId)}
+              {...flyoutMenuPositionProps}
+              sx={flyoutMenuSx}
+            >
+              {smPages.map(page => (
+                <MenuItem
+                  key={page.id}
+                  component={Link}
+                  to={`/admin${page.path}`}
+                  onClick={closeAllMenus}
+                >
+                  {page.name}
+                </MenuItem>
+              ))}
+            </Menu>
+          );
+        })}
+      </span>
+    );
+  };
 
   const drawer = (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)' }}>
@@ -384,652 +573,18 @@ export default function AdminLayout({ user, onLogout }) {
 
         <Divider sx={{ my: 1.5, mx: 2, borderColor: 'rgba(0, 0, 0, 0.08)' }} />
 
-        {/* ====== ORDER FULFILMENT AND TRACKING ====== */}
-        {(isSuper || isFulfillmentAdmin || isHOC || isComplianceManager) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setOrderFulfilmentAnchorEl(e.currentTarget)}
-                sx={getMainCategoryStyle(isCategoryActive(orderFulfilmentRoutes))}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <NavIcon icon={LocalShippingIcon} label="Order Fulfilment and Tracking" sidebarOpen={sidebarOpen} />
-</ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="Order Fulfilment" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
-                </Box>
-                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
-              </ListItemButton>
-            </ListItem>
+        {/* ====== DYNAMIC CATEGORY MENUS ====== */}
+        {renderCategoryMenu('orderFulfilment')}
+        {renderCategoryMenu('compatibility')}
+        {renderCategoryMenu('listingResearch')}
+        {renderCategoryMenu('finance')}
+        {renderCategoryMenu('compliance')}
+        {renderCategoryMenu('ebayParams')}
+        {renderCategoryMenu('hrManagement')}
+        {renderCategoryMenu('others')}
 
-            <Menu
-              anchorEl={orderFulfilmentAnchorEl}
-              open={Boolean(orderFulfilmentAnchorEl)}
-              onClose={() => setOrderFulfilmentAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px', 
-                  maxHeight: '80vh',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              <MenuItem component={Link} to="/admin/orders-dashboard" onClick={closeAllMenus}>Orders Dashboard</MenuItem>
-              <MenuItem component={Link} to="/admin/order-analytics" onClick={closeAllMenus}>Order Analytics</MenuItem>
-              <MenuItem component={Link} to="/admin/fulfillment" onClick={closeAllMenus}>All Orders (Fulfilment)</MenuItem>
-              <MenuItem component={Link} to="/admin/awaiting-shipment" onClick={closeAllMenus}>Awaiting Shipment</MenuItem>
-              <MenuItem component={Link} to="/admin/awaiting-sheet" onClick={closeAllMenus}>Awaiting Sheet</MenuItem>
-              <MenuItem component={Link} to="/admin/amazon-arrivals" onClick={closeAllMenus}>Amazon Arrivals</MenuItem>
-              <MenuItem component={Link} to="/admin/fulfillment-notes" onClick={closeAllMenus}>Fulfillment Notes</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* ====== COMPATIBILITY ====== */}
-        {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setCompatibilityAnchorEl(e.currentTarget)}
-                sx={getMainCategoryStyle(isCategoryActive(compatibilityRoutes))}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <NavIcon icon={TaskIcon} label="Compatibility Management" sidebarOpen={sidebarOpen} />
-                  </ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="Compatibility" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
-                </Box>
-                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
-              </ListItemButton>
-            </ListItem>
-
-            <Menu
-              anchorEl={compatibilityAnchorEl}
-              open={Boolean(compatibilityAnchorEl)}
-              onClose={() => setCompatibilityAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
-                <MenuItem component={Link} to="/admin/compatibility-dashboard" onClick={closeAllMenus}>Compatibility Dashboard</MenuItem>
-              )}
-              {(isSuper || isCompatibilityAdmin) && (
-                <>
-                  <MenuItem component={Link} to="/admin/compatibility-tasks" onClick={closeAllMenus}>Compatibility Tasks</MenuItem>
-                  <MenuItem component={Link} to="/admin/compatibility-progress" onClick={closeAllMenus}>Progress Tracking</MenuItem>
-                  <MenuItem component={Link} to="/admin/ai-fitment-usage" onClick={closeAllMenus}>AI Fitment Usage</MenuItem>
-                  <MenuItem component={Link} to="/admin/listing-stats" onClick={closeAllMenus}>Listing Statistics</MenuItem>
-                  <MenuItem component={Link} to="/admin/compatibility-batch-history" onClick={closeAllMenus}>Batch History</MenuItem>
-                </>
-              )}
-              {isCompatibilityEditor && (
-                <MenuItem component={Link} to="/admin/compatibility-editor" onClick={closeAllMenus}>My Assignments</MenuItem>
-              )}
-              {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
-                <MenuItem component={Link} to="/admin/edit-listings" onClick={closeAllMenus}>Edit Listings</MenuItem>
-              )}
-            </Menu>
-          </>
-        )}
-
-        {/* ====== LISTING AND RESEARCH ====== */}
-        {(isSuper || isListingAdmin || isAnyLister) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setListingResearchAnchorEl(e.currentTarget)}
-                sx={getMainCategoryStyle(isCategoryActive(listingResearchRoutes))}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <NavIcon icon={ListAltIcon} label="Listing and Research" sidebarOpen={sidebarOpen} />
-                  </ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="Listing & Research" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
-                </Box>
-                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
-              </ListItemButton>
-            </ListItem>
-
-            <Menu
-              anchorEl={listingResearchAnchorEl}
-              open={Boolean(listingResearchAnchorEl)}
-              onClose={() => setListingResearchAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px', 
-                  maxHeight: '80vh',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              {/* Template Listing Submenu */}
-              {(isSuper || isAnyLister) && (
-                <>
-                  <MenuItem
-                    onClick={(e) => setTemplateListingAnchorEl(e.currentTarget)}
-                    sx={{ display: 'flex', justifyContent: 'space-between' }}
-                  >
-                    Template Listing <ChevronRightIcon fontSize="small" />
-                  </MenuItem>
-                </>
-              )}
-              
-              {/* ASIN Importer Submenu */}
-              {isSuper && (
-                <MenuItem
-                  onClick={(e) => setAsinImporterAnchorEl(e.currentTarget)}
-                  sx={{ display: 'flex', justifyContent: 'space-between' }}
-                >
-                  ASIN Importer <ChevronRightIcon fontSize="small" />
-                </MenuItem>
-              )}
-              
-              {/* Feed Upload */}
-              {(isListingAdmin || isSuper || isLister) && (
-                <>
-                  <MenuItem component={Link} to="/admin/feed-upload" onClick={closeAllMenus}>Feed Upload (CSV)</MenuItem>
-                  <MenuItem component={Link} to="/admin/feed-upload-stats" onClick={closeAllMenus}>Feed Upload Stats</MenuItem>
-                  <MenuItem component={Link} to="/admin/csv-storage" onClick={closeAllMenus}>CSV Storage</MenuItem>
-                </>
-              )}
-              
-              {/* Product Research */}
-              {(isProductAdmin || isSuper) && (
-                <MenuItem component={Link} to="/admin/research" onClick={closeAllMenus}>Product Research</MenuItem>
-              )}
-            </Menu>
-
-            {/* Template Listing Submenu */}
-            <Menu
-              anchorEl={templateListingAnchorEl}
-              open={Boolean(templateListingAnchorEl)}
-              onClose={() => setTemplateListingAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              {isSuper && <MenuItem component={Link} to="/admin/manage-templates" onClick={closeAllMenus}>Manage Templates</MenuItem>}
-              {isSuper && <MenuItem component={Link} to="/admin/listings-database" onClick={closeAllMenus}>Listings Database</MenuItem>}
-              <MenuItem component={Link} to="/admin/select-seller" onClick={closeAllMenus}>Add Template Listings</MenuItem>
-              <MenuItem component={Link} to="/admin/listing-directory" onClick={closeAllMenus}>Listing Directory</MenuItem>
-              <MenuItem component={Link} to="/admin/template-directory" onClick={closeAllMenus}>Template Directory</MenuItem>
-            </Menu>
-
-            {/* ASIN Importer Submenu */}
-            <Menu
-              anchorEl={asinImporterAnchorEl}
-              open={Boolean(asinImporterAnchorEl)}
-              onClose={() => setAsinImporterAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              <MenuItem component={Link} to="/admin/asin-directory" onClick={closeAllMenus}>ASIN Directory</MenuItem>
-              <MenuItem component={Link} to="/admin/asin-lists" onClick={closeAllMenus}>ASIN Lists</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* ====== FINANCE AND CASH FLOW ====== */}
-        {isSuper && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setFinanceAnchorEl(e.currentTarget)}
-                sx={getMainCategoryStyle(isCategoryActive(financeRoutes))}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <NavIcon icon={AttachMoneyIcon} label="Finance and Cash Flow" sidebarOpen={sidebarOpen} />
-                  </ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="Finance & Cash Flow" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
-                </Box>
-                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
-              </ListItemButton>
-            </ListItem>
-
-            <Menu
-              anchorEl={financeAnchorEl}
-              open={Boolean(financeAnchorEl)}
-              onClose={() => setFinanceAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              <MenuItem component={Link} to="/admin/payoneer" onClick={closeAllMenus}>Payoneer Sheet</MenuItem>
-              <MenuItem component={Link} to="/admin/bank-accounts" onClick={closeAllMenus}>Bank Accounts</MenuItem>
-              <MenuItem component={Link} to="/admin/transactions" onClick={closeAllMenus}>Transactions</MenuItem>
-              <MenuItem component={Link} to="/admin/extra-expenses" onClick={closeAllMenus}>Extra Expenses</MenuItem>
-              <MenuItem component={Link} to="/admin/credit-card-names" onClick={closeAllMenus}>Credit Card Names</MenuItem>
-              <MenuItem component={Link} to="/admin/salary" onClick={closeAllMenus}>Salary Page</MenuItem>
-              <Divider />
-              <MenuItem component={Link} to="/admin/all-orders-sheet" onClick={closeAllMenus}>All Orders USD</MenuItem>
-              <MenuItem component={Link} to="/admin/seller-analytics" onClick={closeAllMenus}>Seller Analytics</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* ====== COMPLIANCE AND SUPPORT ====== */}
-        {(isSuper || isFulfillmentAdmin || isHOC || isComplianceManager) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setComplianceAnchorEl(e.currentTarget)}
-                sx={getMainCategoryStyle(isCategoryActive(complianceRoutes))}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <NavIcon icon={AdminPanelSettingsIcon} label="Compliance and Support" sidebarOpen={sidebarOpen} />
-                  </ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="Compliance & Support" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
-                </Box>
-                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
-              </ListItemButton>
-            </ListItem>
-
-            <Menu
-              anchorEl={complianceAnchorEl}
-              open={Boolean(complianceAnchorEl)}
-              onClose={() => setComplianceAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              <MenuItem component={Link} to="/admin/disputes" onClick={closeAllMenus}>Issues and Resolutions</MenuItem>
-              <MenuItem component={Link} to="/admin/account-health" onClick={closeAllMenus}>Account Health Report</MenuItem>
-              <MenuItem component={Link} to="/admin/message-received" onClick={closeAllMenus}>Buyer Messages</MenuItem>
-              <MenuItem component={Link} to="/admin/conversation-management" onClick={closeAllMenus}>Conversation Mgmt</MenuItem>
-              <MenuItem component={Link} to="/admin/amazon-accounts" onClick={closeAllMenus}>Manage Amazon Accounts</MenuItem>
-              <MenuItem component={Link} to="/admin/credit-cards" onClick={closeAllMenus}>Manage Credit Cards</MenuItem>
-              <MenuItem component={Link} to="/admin/affiliate-orders" onClick={closeAllMenus}>Affiliate Orders</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* ====== EBAY PARAMETERS ====== */}
-        {(isListingAdmin || isSuper) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setEbayParamsAnchorEl(e.currentTarget)}
-                sx={getMainCategoryStyle(isCategoryActive(ebayParamsRoutes))}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <NavIcon icon={StoreIcon} label="eBay Parameters" sidebarOpen={sidebarOpen} />
-                  </ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="eBay Parameters" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
-                </Box>
-                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
-              </ListItemButton>
-            </ListItem>
-
-            <Menu
-              anchorEl={ebayParamsAnchorEl}
-              open={Boolean(ebayParamsAnchorEl)}
-              onClose={() => setEbayParamsAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              <MenuItem component={Link} to="/admin/selling-privileges" onClick={closeAllMenus}>Seller Privileges</MenuItem>
-              <MenuItem component={Link} to="/admin/ebay-api-usage" onClick={closeAllMenus}>eBay API Usage</MenuItem>
-              <MenuItem component={Link} to="/admin/seller-funds" onClick={closeAllMenus}>Seller Funds</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* ====== HR AND MANAGEMENT ====== */}
-        {(isSuper || isHRAdmin || isOperationHead || isListingAdmin) && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setHrManagementAnchorEl(e.currentTarget)}
-                sx={getMainCategoryStyle(isCategoryActive(hrManagementRoutes))}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <NavIcon icon={SupervisorAccountIcon} label="HR and Management" sidebarOpen={sidebarOpen} />
-                  </ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="HR & Management" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
-                </Box>
-                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
-              </ListItemButton>
-            </ListItem>
-
-            <Menu
-              anchorEl={hrManagementAnchorEl}
-              open={Boolean(hrManagementAnchorEl)}
-              onClose={() => setHrManagementAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              <MenuItem component={Link} to="/admin/ideas" onClick={closeAllMenus}>Ideas and Issues</MenuItem>
-              <MenuItem component={Link} to="/admin/internal-messages" onClick={closeAllMenus}>Team Chat</MenuItem>
-              {(isSuper || isHRAdmin) && (
-                <>
-                  <MenuItem component={Link} to="/admin/leave-admin" onClick={closeAllMenus}>Leave Admin</MenuItem>
-                  <MenuItem component={Link} to="/admin/employee-management" onClick={closeAllMenus}>Employee Management</MenuItem>
-                </>
-              )}
-              {(isSuper || isListingAdmin || isHRAdmin || isOperationHead) && (
-                <MenuItem component={Link} to="/admin/add-user" onClick={closeAllMenus}>Add User</MenuItem>
-              )}
-              {(isSuper || isHRAdmin || user?.role === 'hr') && (
-                <MenuItem component={Link} to="/admin/user-seller-assignments" onClick={closeAllMenus}>User-Seller Assignments</MenuItem>
-              )}
-              {isSuper && (
-                <>
-                  <MenuItem component={Link} to="/admin/internal-messages-admin" onClick={closeAllMenus}>View All Messages</MenuItem>
-                  <MenuItem component={Link} to="/admin/attendance" onClick={closeAllMenus}>Working Hours Tracking</MenuItem>
-                </>
-              )}
-            </Menu>
-          </>
-        )}
-
-        {/* ====== OTHERS ====== */}
-        {isSuper && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={(e) => setOthersAnchorEl(e.currentTarget)}
-                sx={getMainCategoryStyle(isOthersActive)}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <NavIcon icon={AppsIcon} label="Others" sidebarOpen={sidebarOpen} />
-                  </ListItemIcon>
-                  {sidebarOpen && <ListItemText primary="Others" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
-                </Box>
-                {sidebarOpen && <ChevronRightIcon fontSize="small" sx={{ opacity: 0.6 }} />}
-              </ListItemButton>
-            </ListItem>
-
-            <Menu
-              anchorEl={othersAnchorEl}
-              open={Boolean(othersAnchorEl)}
-              onClose={() => setOthersAnchorEl(null)}
-              {...flyoutMenuPositionProps}
-              sx={{ 
-                '& .MuiPaper-root': { 
-                  minWidth: '240px', 
-                  maxHeight: '80vh',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  mt: 0.5
-                },
-                '& .MuiMenuItem-root': {
-                  fontSize: '0.875rem',
-                  py: 1.2,
-                  px: 2,
-                  borderRadius: '6px',
-                  mx: 1,
-                  my: 0.3,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.contrastText',
-                    transform: 'translateX(4px)'
-                  }
-                }
-              }}
-            >
-              <MenuItem component={Link} to="/admin/categories" onClick={closeAllMenus}>Manage Categories</MenuItem>
-              <MenuItem component={Link} to="/admin/platforms" onClick={closeAllMenus}>Manage Platforms</MenuItem>
-              <MenuItem component={Link} to="/admin/stores" onClick={closeAllMenus}>Manage Stores</MenuItem>
-              <Divider />
-              <MenuItem component={Link} to="/admin/listing" onClick={closeAllMenus}>Product Table</MenuItem>
-              <MenuItem component={Link} to="/admin/task-list" onClick={closeAllMenus}>Task List</MenuItem>
-              <MenuItem component={Link} to="/admin/assignments" onClick={closeAllMenus}>Assignments</MenuItem>
-              <MenuItem component={Link} to="/admin/listings-summary" onClick={closeAllMenus}>Listings Summary</MenuItem>
-              <MenuItem component={Link} to="/admin/listing-sheet" onClick={closeAllMenus}>Listing Sheet</MenuItem>
-              <MenuItem component={Link} to="/admin/store-wise-tasks" onClick={closeAllMenus}>Store-Wise Tasks</MenuItem>
-              <MenuItem component={Link} to="/admin/store-daily-tasks" onClick={closeAllMenus}>Store Daily Tasks</MenuItem>
-              <MenuItem component={Link} to="/admin/lister-info" onClick={closeAllMenus}>Lister Info</MenuItem>
-              <MenuItem component={Link} to="/admin/range-analyzer" onClick={closeAllMenus}>Range Analyzer</MenuItem>
-              <Divider />
-              <MenuItem component={Link} to="/admin/amazon-lookup" onClick={closeAllMenus}>Amazon Lookup</MenuItem>
-              <MenuItem component={Link} to="/admin/product-umbrellas" onClick={closeAllMenus}>Product Umbrellas</MenuItem>
-              <MenuItem component={Link} to="/admin/asin-storage" onClick={closeAllMenus}>ASIN Storage</MenuItem>
-              <MenuItem component={Link} to="/admin/column-creator" onClick={closeAllMenus}>Column Creator</MenuItem>
-              <MenuItem component={Link} to="/admin/ranges" onClick={closeAllMenus}>Manage Ranges</MenuItem>
-              <MenuItem component={Link} to="/admin/user-credentials" onClick={closeAllMenus}>User Credentials</MenuItem>
-              <Divider />
-              <MenuItem component={Link} to="/admin/user-performance" onClick={closeAllMenus}>User Performance Logs</MenuItem>
-              <MenuItem component={Link} to="/admin/employee-details" onClick={closeAllMenus}>[Testing] Employee Details</MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* Compatibility specific menu items for non-super users */}
-        {isCompatibilityAdmin && !isSuper && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/add-compatibility-editor"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/add-compatibility-editor'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon><AddCircleIcon /></ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Add Compatibility Editor" />}
-              </ListItemButton>
-            </ListItem>
-          </>
-        )}
-
-        {/* Product Admin specific items */}
-        {isProductAdmin && !isSuper && (
-          <>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/research"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/research'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon>
-                  <NavIcon icon={Inventory2Icon} label="Product Research & Analysis" sidebarOpen={sidebarOpen} />
-                </ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Product Research" />}
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/categories"
-                onClick={() => setMobileOpen(false)}
-                selected={location.pathname === '/admin/categories'}
-                sx={selectedMenuItemStyle}
-              >
-                <ListItemIcon><CategoryIcon /></ListItemIcon>
-                {sidebarOpen && <ListItemText primary="Manage Categories" />}
-              </ListItemButton>
-            </ListItem>
-          </>
-        )}
-
-        {/* Ideas & Issues - standalone for non-HR users */}
-        {!isSuper && !isHRAdmin && !isOperationHead && !isListingAdmin && (
+        {/* Ideas & Issues - standalone for users who don't see it in HR category */}
+        {!hasAccess('IdeasAndIssues') && (
           <ListItem disablePadding>
             <ListItemButton
               component={Link}
@@ -1046,8 +601,8 @@ export default function AdminLayout({ user, onLogout }) {
           </ListItem>
         )}
 
-        {/* Team Chat - standalone for non-HR users */}
-        {!isSuper && !isHRAdmin && !isOperationHead && !isListingAdmin && (
+        {/* Team Chat - standalone for users who don't see it in HR category */}
+        {!hasAccess('TeamChat') && (
           <ListItem disablePadding>
             <ListItemButton
               component={Link}
@@ -1067,6 +622,23 @@ export default function AdminLayout({ user, onLogout }) {
       </List>
     </div>
   );
+
+  // Determine default redirect page
+  const getDefaultRedirect = () => {
+    if (isSuper) return '/admin/research';
+    // Check categories in priority order
+    const priorityPages = [
+      'ProductResearch', 'ProductTable', 'CompatibilityTasks', 'CompatibilityEditor',
+      'Fulfillment', 'EmployeeDetails', 'OrdersDashboard'
+    ];
+    for (const pageId of priorityPages) {
+      if (hasAccess(pageId)) {
+        const page = PAGE_REGISTRY.find(p => p.id === pageId);
+        if (page) return `/admin${page.path}`;
+      }
+    }
+    return '/admin/about-me';
+  };
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -1100,18 +672,12 @@ export default function AdminLayout({ user, onLogout }) {
               width: drawerWidth,
               background: 'linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)',
               borderRight: '1px solid rgba(0,0,0,0.08)',
-              '&::-webkit-scrollbar': {
-                width: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                background: 'transparent',
-              },
+              '&::-webkit-scrollbar': { width: '8px' },
+              '&::-webkit-scrollbar-track': { background: 'transparent' },
               '&::-webkit-scrollbar-thumb': {
                 background: 'rgba(0, 0, 0, 0.15)',
                 borderRadius: '10px',
-                '&:hover': {
-                  background: 'rgba(0, 0, 0, 0.25)',
-                },
+                '&:hover': { background: 'rgba(0, 0, 0, 0.25)' },
               },
             }
           }}
@@ -1129,18 +695,12 @@ export default function AdminLayout({ user, onLogout }) {
               background: 'linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)',
               borderRight: '1px solid rgba(0,0,0,0.08)',
               boxShadow: '2px 0 8px rgba(0,0,0,0.04)',
-              '&::-webkit-scrollbar': {
-                width: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                background: 'transparent',
-              },
+              '&::-webkit-scrollbar': { width: '8px' },
+              '&::-webkit-scrollbar-track': { background: 'transparent' },
               '&::-webkit-scrollbar-thumb': {
                 background: 'rgba(0, 0, 0, 0.15)',
                 borderRadius: '10px',
-                '&:hover': {
-                  background: 'rgba(0, 0, 0, 0.25)',
-                },
+                '&:hover': { background: 'rgba(0, 0, 0, 0.25)' },
               },
             }
           }}
@@ -1155,175 +715,54 @@ export default function AdminLayout({ user, onLogout }) {
           {/* Ideas & Issues - accessible to ALL roles */}
           <Route path="/ideas" element={<IdeasPage />} />
 
+          {/* About Me */}
           {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
-          {isProductAdmin || isSuper ? (
-            <>
-              <Route path="/research" element={<ProductResearchPage />} />
-              <Route path="/ranges" element={<ManageRangesPage />} />
-              <Route path="/categories" element={<ManageCategoriesPage />} />
-              <Route path="/amazon-lookup" element={<AmazonLookupPage />} />
-              <Route path="/product-umbrellas" element={<ManageProductUmbrellasPage />} />
-              <Route path="/asin-storage" element={<ASINStoragePage />} />
-              <Route path="/asin-directory" element={<AsinDirectoryPage />} />
-              <Route path="/asin-lists" element={<AsinListPage />} />
-              <Route path="/column-creator" element={<ColumnCreatorPage />} />
-            </>
-          ) : null}
-          {isListingAdmin || isSuper ? (
-            <>
-              <Route path="/listing" element={<ListingManagementPage />} />
-              <Route path="/assignments" element={<AdminAssignmentsPage />} />
-              <Route path="/task-list" element={<TaskListPage />} />
-              <Route path="/listing-sheet" element={<ListingSheetPage />} />
-              <Route path="/store-wise-tasks" element={<StoreWiseTaskListPage />} />
-              <Route path="/store-wise-tasks/details" element={<StoreTaskDetailPage />} />
-              <Route path="/store-daily-tasks" element={<StoreDailyTasksPage />} />
-              <Route path="/lister-info" element={<ListerInfoPage />} />
-              <Route path="/lister-info/details" element={<ListerInfoDetailPage />} />
-              <Route path="/range-analyzer" element={<RangeAnalyzerPage />} />
-            </>
-          ) : null}
-          {isSuper || isListingAdmin || isHRAdmin || isOperationHead ? (
-            <Route path="/add-user" element={<AddListerPage />} />
-          ) : null}
-          {isSuper || isListingAdmin || isLister ? (
-            <Route path="/feed-upload" element={<FeedUploadPage />} />
-          ) : null}
-          {isSuper || isListingAdmin || isLister ? (
-            <Route path="/csv-storage" element={<CsvStoragePage />} />
-          ) : null}
-          {isSuper || isListingAdmin ? (
-            <>
-              <Route path="/platforms" element={<ManagePlatformsPage />} />
-              <Route path="/stores" element={<ManageStoresPage />} />
-              <Route path="/listings-summary" element={<ListingsSummaryPage />} />
-              <Route path="/selling-privileges" element={<SellingPrivilegesPage />} />
-              <Route path="/ebay-api-usage" element={<EbayApiUsagePage />} />
-              <Route path="/seller-funds" element={<SellerFundsPage />} />
-              <Route path="/feed-upload-stats" element={<FeedUploadStatsPage />} />
-            </>
-          ) : null}
-          {isSuper && (
-            <>
-              <>
-                <Route path="/user-credentials" element={<UserCredentialsPage />} />
-                <Route path="/payoneer" element={<PayoneerSheetPage />} />
-                <Route path="/bank-accounts" element={<BankAccountsPage />} />
-                <Route path="/transactions" element={<TransactionPage />} />
-                <Route path="/extra-expenses" element={<ExtraExpensePage />} />
-                <Route path="/manage-templates" element={<ManageTemplatesPage />} />
-                <Route path="/listings-database" element={<TemplateDatabasePage />} />
-                <Route path="/salary" element={<SalaryPage />} />
-              </>
-            </>
-          )}
-          {(isSuper || isAnyLister) && (
-            <>
-              <Route path="/template-listings" element={<TemplateListingsPage />} />
-              <Route path="/listing-directory" element={<ListingDirectoryPage />} />
-              <Route path="/template-directory" element={<TemplateDirectoryPage />} />
-              <Route path="/template-listing-analytics" element={<TemplateListingAnalyticsPage />} />
-              <Route path="/select-seller" element={<SelectSellerPage />} />
-              <Route path="/seller-templates" element={<SellerTemplatesPage />} />
-            </>
-          )}
-          {(isSuper || isHRAdmin || isOperationHead) && (
-            <Route path="/employee-details" element={<EmployeeDetailsPage />} />
-          )}
-          {(isSuper || isHRAdmin) && (
-            <Route path="/employee-management" element={<EmployeeManagementPage />} />
-          )}
 
           {/* Leave Management - accessible to ALL authenticated users */}
           <Route path="/my-leaves" element={<LeaveManagementPage />} />
 
-          {/* Leave Admin - accessible to superadmin and hradmin only */}
-          {(isSuper || isHRAdmin) && (
-            <Route path="/leave-admin" element={<LeaveAdminPage />} />
-          )}
-
-          {isCompatibilityAdmin && (
-            <>
-              <Route path="/add-compatibility-editor" element={<AddListerPage />} />
-              <Route path="/compatibility-tasks" element={<AdminTaskList />} />
-              <Route path="/compatibility-progress" element={<ProgressTrackingPage />} />
-            </>
-          )}
-          {(isSuper || isCompatibilityAdmin) && (
-            <>
-              <Route path="/add-compatibility-editor" element={<AddListerPage />} />
-              <Route path="/compatibility-tasks" element={<AdminTaskList />} />
-              <Route path="/compatibility-progress" element={<ProgressTrackingPage />} />
-              <Route path="/ai-fitment-usage" element={<AiFitmentUsagePage />} />
-              <Route path="/listing-stats" element={<ListingStatsPage />} />
-            </>
-          )}
-          {isCompatibilityEditor && (
-            <Route path="/compatibility-editor" element={<EditorDashboard />} />
-          )}
-
-          {(isSuper || isCompatibilityAdmin || isCompatibilityEditor) && (
-            <>
-              <Route path="/compatibility-dashboard" element={<CompatibilityDashboard />} />
-              <Route path="/compatibility-batch-history" element={<CompatibilityBatchHistoryPage />} />
-              <Route path="/edit-listings" element={<EditListingsDashboard />} />
-            </>
-          )}
-
-          {/* UPDATED ROUTES FOR ORDERS DEPT */}
-          {(isFulfillmentAdmin || isSuper || isHOC || isComplianceManager) && (
-            <>
-              <Route path="/orders-dashboard" element={<OrdersDepartmentDashboardPage />} />
-              <Route path="/order-analytics" element={<OrderAnalyticsPage />} />
-              <Route path="/worksheet" element={<DisputesPage initialTab={4} />} />
-              <Route path="/seller-analytics" element={<SellerAnalyticsPage />} />
-              <Route path="/fulfillment" element={<FulfillmentDashboard />} />
-              <Route path="/all-orders-sheet" element={<AllOrdersSheetPage />} />
-              <Route path="/awaiting-shipment" element={<AwaitingShipmentPage />} />
-              <Route path="/awaiting-sheet" element={<AwaitingSheetPage />} />
-              <Route path="/amazon-arrivals" element={<AmazonArrivalsPage />} />
-              <Route path="/fulfillment-notes" element={<FulfillmentNotesPage />} />
-              <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
-              <Route path="/cancelled-status" element={<DisputesPage initialTab={3} />} />
-              <Route path="/return-requested" element={<DisputesPage initialTab={2} />} />
-              <Route path="/disputes" element={<DisputesPage />} />
-              <Route path="/account-health" element={<AccountHealthReportPage />} />
-              <Route path="/message-received" element={<BuyerChatPage />} />
-              <Route path="/conversation-management" element={<ConversationManagementPage />} />
-              <Route path="/amazon-accounts" element={<ManageAmazonAccountsPage />} />
-              <Route path="/credit-cards" element={<ManageCreditCardsPage />} />
-              <Route path="/credit-card-names" element={<ManageCreditCardNamesPage />} />
-              <Route path="/affiliate-orders" element={<AffiliateOrdersPage />} />
-            </>
-          )}
-
           {/* Internal Messages - accessible to ALL authenticated users */}
           <Route path="/internal-messages" element={<InternalMessagesPage />} />
 
-          {/* Internal Messages Admin - accessible to superadmin only */}
-          {isSuper && (
+          {/* User Performance - accessible to all */}
+          <Route path="/user-performance" element={<UserPerformancePage />} />
+
+          {/* Dynamic page routes based on access */}
+          {PAGE_REGISTRY.map(page => {
+            if (!hasAccess(page.id)) return null;
+            const Component = COMPONENT_MAP[page.id];
+            if (!Component) return null;
+            return <Route key={page.id} path={page.path} element={<Component />} />;
+          })}
+
+          {/* Additional routes that don't map 1:1 to pages but need to exist */}
+          {hasAccess('Fulfillment') && (
             <>
-              <Route path="/internal-messages-admin" element={<InternalMessagesAdminPage />} />
-              <Route path="/attendance" element={<AttendanceAdminPage />} />
+              <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
+              <Route path="/cancelled-status" element={<DisputesPage initialTab={3} />} />
+              <Route path="/return-requested" element={<DisputesPage initialTab={2} />} />
+              <Route path="/worksheet" element={<DisputesPage initialTab={4} />} />
             </>
           )}
 
-          {/* User Performance and Assignments */}
-          <Route path="/user-performance" element={<UserPerformancePage />} />
-          {(isSuper || isHRAdmin || user?.role === 'hr') && (
-            <Route path="/user-seller-assignments" element={<UserSellerAssignmentPage />} />
+          {hasAccess('SelectSeller') && (
+            <>
+              <Route path="/template-listings" element={<TemplateListingsPage />} />
+              <Route path="/seller-templates" element={<SellerTemplatesPage />} />
+              <Route path="/template-listing-analytics" element={<TemplateListingAnalyticsPage />} />
+            </>
           )}
 
-          {/* UPDATED DEFAULT REDIRECT */}
-          <Route path="*" element={<Navigate to={
-            isProductAdmin || isSuper ? "/admin/research" :
-              isListingAdmin ? "/admin/listing" :
-                isCompatibilityAdmin ? "/admin/compatibility-tasks" :
-                  isCompatibilityEditor ? "/admin/compatibility-editor" :
-                    (isFulfillmentAdmin || isHOC || isComplianceManager) ? "/admin/fulfillment" :
-                      isHRAdmin || isOperationHead ? "/admin/employee-details" :
-                        "/admin/about-me"
-          } replace />} />
+          {hasAccess('StoreWiseTasks') && (
+            <Route path="/store-wise-tasks/details" element={<StoreTaskDetailPage />} />
+          )}
+
+          {hasAccess('ListerInfo') && (
+            <Route path="/lister-info/details" element={<ListerInfoDetailPage />} />
+          )}
+
+          {/* Default redirect */}
+          <Route path="*" element={<Navigate to={getDefaultRedirect()} replace />} />
         </Routes>
       </Box>
     </Box>
