@@ -3,7 +3,7 @@ import {
   Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Button, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, Chip, TextField, FormControl, InputLabel, Select, MenuItem,
-  Pagination
+  Pagination, Autocomplete
 } from '@mui/material';
 import api from '../../lib/api';
 
@@ -63,7 +63,9 @@ export default function CompatibilityBatchHistoryPage() {
       // Load users
       try {
         const { data } = await api.get('/users');
-        setUsers(data);
+        // Filter out users with role 'seller'
+        const filteredUsers = data.filter(u => u.role !== 'seller');
+        setUsers(filteredUsers);
       } catch (e) { console.error('Failed to load users:', e); }
     };
     loadFilters();
@@ -125,24 +127,26 @@ export default function CompatibilityBatchHistoryPage() {
           onChange={(e) => { setSelectedDate(e.target.value); setPage(1); }}
           sx={{ minWidth: 160 }}
         />
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>User</InputLabel>
-          <Select value={selectedUserId} label="User" onChange={(e) => { setSelectedUserId(e.target.value); setPage(1); }}>
-            <MenuItem value="">All Users</MenuItem>
-            {users.map((u) => (
-              <MenuItem key={u._id} value={u._id}>{u.username || u.email}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Seller</InputLabel>
-          <Select value={selectedSellerId} label="Seller" onChange={(e) => { setSelectedSellerId(e.target.value); setPage(1); }}>
-            <MenuItem value="">All Sellers</MenuItem>
-            {sellers.map((s) => (
-              <MenuItem key={s._id} value={s._id}>{s.user?.username || s.user?.email}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Autocomplete
+          size="small"
+          sx={{ minWidth: 180 }}
+          options={users}
+          getOptionLabel={(option) => option.username || option.email}
+          value={users.find(u => u._id === selectedUserId) || null}
+          onChange={(event, newValue) => { setSelectedUserId(newValue?._id || ''); setPage(1); }}
+          renderInput={(params) => <TextField {...params} label="User" />}
+          isOptionEqualToValue={(option, value) => option._id === value._id}
+        />
+        <Autocomplete
+          size="small"
+          sx={{ minWidth: 200 }}
+          options={sellers}
+          getOptionLabel={(option) => option.user?.username || option.user?.email}
+          value={sellers.find(s => s._id === selectedSellerId) || null}
+          onChange={(event, newValue) => { setSelectedSellerId(newValue?._id || ''); setPage(1); }}
+          renderInput={(params) => <TextField {...params} label="Seller" />}
+          isOptionEqualToValue={(option, value) => option._id === value._id}
+        />
       </Box>
 
       {/* Date Header */}
