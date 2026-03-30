@@ -22,7 +22,9 @@ import {
     IconButton,
     Grid,
     Box,
-    CircularProgress
+    CircularProgress,
+    Autocomplete,
+    TextField
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -73,7 +75,9 @@ const UserSellerAssignmentPage = () => {
                 api.get('/users'),
                 api.get('/sellers/all')
             ]);
-            setUsers(usersRes.data);
+            // Filter out users with role 'seller'
+            const filteredUsers = usersRes.data.filter(u => u.role !== 'seller');
+            setUsers(filteredUsers);
             setSellers(sellersRes.data);
         } catch (err) {
             console.error('Failed to fetch users and sellers:', err);
@@ -235,34 +239,26 @@ const UserSellerAssignmentPage = () => {
                 <DialogTitle>Assign Seller to User</DialogTitle>
                 <DialogContent>
                     {error && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{error}</Alert>}
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>Select User</InputLabel>
-                        <Select
-                            value={selectedUser}
-                            label="Select User"
-                            onChange={(e) => setSelectedUser(e.target.value)}
-                        >
-                            {users.map((u) => (
-                                <MenuItem key={u._id} value={u._id}>
-                                    {u.username} ({u.role})
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    <FormControl fullWidth sx={{ mt: 3, mb: 2 }}>
-                        <InputLabel>Select Seller</InputLabel>
-                        <Select
-                            value={selectedSeller}
-                            label="Select Seller"
-                            onChange={(e) => setSelectedSeller(e.target.value)}
-                        >
-                            {sellers.map((s) => (
-                                <MenuItem key={s._id} value={s._id}>
-                                    {s.user?.username || s.storeName || s._id}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
+                    <Autocomplete
+                        fullWidth
+                        sx={{ mt: 2 }}
+                        options={users}
+                        getOptionLabel={(option) => `${option.username} (${option.role})`}
+                        value={users.find(u => u._id === selectedUser) || null}
+                        onChange={(event, newValue) => setSelectedUser(newValue?._id || '')}
+                        renderInput={(params) => <TextField {...params} label="Select User" />}
+                        isOptionEqualToValue={(option, value) => option._id === value._id}
+                    />
+                    <Autocomplete
+                        fullWidth
+                        sx={{ mt: 3, mb: 2 }}
+                        options={sellers}
+                        getOptionLabel={(option) => option.user?.username || option.storeName || option._id}
+                        value={sellers.find(s => s._id === selectedSeller) || null}
+                        onChange={(event, newValue) => setSelectedSeller(newValue?._id || '')}
+                        renderInput={(params) => <TextField {...params} label="Select Seller" />}
+                        isOptionEqualToValue={(option, value) => option._id === value._id}
+                    />
                     <FormControl fullWidth sx={{ mt: 2 }}>
                         <label style={{ fontSize: '0.8rem', color: 'rgba(0, 0, 0, 0.6)', marginBottom: '8px' }}>Daily Target</label>
                         <input
