@@ -88,6 +88,7 @@ import {
   remarkOptionsFromTemplates,
   saveRemarkTemplates
 } from '../../constants/remarkTemplates';
+import ItemCategoryAssignDialog from '../../components/ItemCategoryAssignDialog.jsx';
 
 
 // --- IMAGE VIEWER DIALOG ---
@@ -1300,10 +1301,9 @@ function FulfillmentDashboard() {
   // Issues index: maps orderId -> [{type, status}] for INR/Return/Dispute chips
   const [issuesIndex, setIssuesIndex] = useState({});
 
-  // CRP (Category/Range/Product) classification state
-  const [crpCategories, setCrpCategories] = useState([]);
-  const [crpRanges, setCrpRanges] = useState([]);
-  const [crpProducts, setCrpProducts] = useState([]);
+  // CRP (Category/Range/Product) assignment dialog state
+  const [crpDialogOpen, setCrpDialogOpen] = useState(false);
+  const [crpDialogOrder, setCrpDialogOrder] = useState(null);
 
   // Column visibility state - persisted in sessionStorage
   const DEFAULT_VISIBLE_COLUMNS = [
@@ -1658,9 +1658,7 @@ function FulfillmentDashboard() {
     if (!hasFetchedInitialData.current) {
       api.get('/amazon-accounts').then(({ data }) => setAmazonAccounts(data || [])).catch(console.error);
       api.get('/credit-cards').then(({ data }) => setCreditCards(data || [])).catch(console.error);
-      api.get('/asin-list-categories').then(({ data }) => setCrpCategories(data || [])).catch(console.error);
-      api.get('/asin-list-ranges', { params: { all: 'true' } }).then(({ data }) => setCrpRanges(data || [])).catch(console.error);
-      api.get('/asin-list-products', { params: { all: 'true' } }).then(({ data }) => setCrpProducts(data || [])).catch(console.error);
+
       loadResolutionOptions();
     }
     // Issues index is always fetched fresh (independent of hasFetchedInitialData)
@@ -3741,14 +3739,22 @@ function FulfillmentDashboard() {
                         )}
                         {visibleColumns.includes('itemCategory') && (
                           <TableCell>
-                            <ItemCategoryCell
-                              order={order}
-                              categories={crpCategories}
-                              ranges={crpRanges}
-                              products={crpProducts}
-                              onSave={updateItemCategory}
-                              onClear={clearItemCategory}
-                            />
+                            {(() => {
+                              const cat = order.orderCategoryId?.name;
+                              const rng = order.orderRangeId?.name;
+                              const prod = order.orderProductId?.name;
+                              const label = cat ? [cat, rng, prod].filter(Boolean).join(' > ') : null;
+                              return (
+                                <Chip
+                                  label={label || '- Assign -'}
+                                  size="small"
+                                  variant={label ? 'filled' : 'outlined'}
+                                  color={label ? 'primary' : 'default'}
+                                  onClick={() => { setCrpDialogOrder(order); setCrpDialogOpen(true); }}
+                                  sx={{ cursor: 'pointer', maxWidth: 220, fontSize: '0.78rem' }}
+                                />
+                              );
+                            })()}
                           </TableCell>
                         )}
                         {visibleColumns.includes('buyerNote') && (
@@ -4542,6 +4548,26 @@ function FulfillmentDashboard() {
         onReload={loadResolutionOptions}
       />
 
+      <ItemCategoryAssignDialog
+        open={crpDialogOpen}
+        onClose={() => { setCrpDialogOpen(false); setCrpDialogOrder(null); }}
+        itemNumber={crpDialogOrder?.lineItems?.[0]?.legacyItemId || crpDialogOrder?.itemNumber}
+        productTitle={crpDialogOrder?.lineItems?.[0]?.title || crpDialogOrder?.productName}
+        currentCategoryId={crpDialogOrder?.orderCategoryId?._id || ''}
+        currentRangeId={crpDialogOrder?.orderRangeId?._id || ''}
+        currentProductId={crpDialogOrder?.orderProductId?._id || ''}
+        onAssign={(itemNumber, catId, rangeId, prodId) => {
+          updateItemCategory(itemNumber, catId, rangeId, prodId);
+          setCrpDialogOpen(false);
+          setCrpDialogOrder(null);
+        }}
+        onClear={(itemNumber) => {
+          clearItemCategory(itemNumber);
+          setCrpDialogOpen(false);
+          setCrpDialogOrder(null);
+        }}
+      />
+
 
       {/* CSV Export Column Selection Dialog */}
       <Dialog
@@ -4834,83 +4860,6 @@ function AutoSaveDatePicker({ value, onSave, sx = {} }) {
         }}
       />
     </LocalizationProvider>
-  );
-}
-
-function ItemCategoryCell({ order, categories, ranges, products, onSave, onClear }) {
-  const itemNumber = order.lineItems?.[0]?.legacyItemId || order.itemNumber;
-  const currentCatId = order.orderCategoryId?._id || '';
-  const currentRangeId = order.orderRangeId?._id || '';
-  const currentProductId = order.orderProductId?._id || '';
-
-  const [catId, setCatId] = useState(currentCatId);
-  const [rangeId, setRangeId] = useState(currentRangeId);
-  const [productId, setProductId] = useState(currentProductId);
-
-  useEffect(() => {
-    setCatId(order.orderCategoryId?._id || '');
-    setRangeId(order.orderRangeId?._id || '');
-    setProductId(order.orderProductId?._id || '');
-  }, [order.orderCategoryId, order.orderRangeId, order.orderProductId]);
-
-  const filteredRanges = catId ? ranges.filter(r => r.categoryId === catId || r.categoryId?._id === catId) : [];
-  const filteredProducts = rangeId ? products.filter(p => p.rangeId === rangeId || p.rangeId?._id === rangeId) : [];
-
-  if (!itemNumber) return <Typography variant="body2" color="text.disabled">-</Typography>;
-
-  const handleCatChange = (e) => {
-    const newCatId = e.target.value;
-    setCatId(newCatId);
-    setRangeId('');
-    setProductId('');
-    if (newCatId) {
-      onSave(itemNumber, newCatId, null, null);
-    } else {
-      onClear(itemNumber);
-    }
-  };
-
-  const handleRangeChange = (e) => {
-    const newRangeId = e.target.value;
-    setRangeId(newRangeId);
-    setProductId('');
-    onSave(itemNumber, catId, newRangeId || null, null);
-  };
-
-  const handleProductChange = (e) => {
-    const newProductId = e.target.value;
-    setProductId(newProductId);
-    onSave(itemNumber, catId, rangeId || null, newProductId || null);
-  };
-
-  const selectSx = {
-    backgroundColor: '#fff',
-    borderRadius: 1,
-    minWidth: 120,
-    height: 28,
-    fontSize: '0.8rem',
-    '& .MuiSelect-select': { py: 0.3, px: 1 }
-  };
-
-  return (
-    <Stack spacing={0.5} sx={{ minWidth: 140 }}>
-      <Select value={catId} onChange={handleCatChange} displayEmpty size="small" sx={selectSx}>
-        <MenuItem value=""><em style={{ color: '#aaa' }}>Category</em></MenuItem>
-        {categories.map(c => <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>)}
-      </Select>
-      {catId && filteredRanges.length > 0 && (
-        <Select value={rangeId} onChange={handleRangeChange} displayEmpty size="small" sx={selectSx}>
-          <MenuItem value=""><em style={{ color: '#aaa' }}>Range</em></MenuItem>
-          {filteredRanges.map(r => <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>)}
-        </Select>
-      )}
-      {rangeId && filteredProducts.length > 0 && (
-        <Select value={productId} onChange={handleProductChange} displayEmpty size="small" sx={selectSx}>
-          <MenuItem value=""><em style={{ color: '#aaa' }}>Product</em></MenuItem>
-          {filteredProducts.map(p => <MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>)}
-        </Select>
-      )}
-    </Stack>
   );
 }
 
