@@ -1300,9 +1300,14 @@ function FulfillmentDashboard() {
   // Issues index: maps orderId -> [{type, status}] for INR/Return/Dispute chips
   const [issuesIndex, setIssuesIndex] = useState({});
 
+  // CRP (Category/Range/Product) classification state
+  const [crpCategories, setCrpCategories] = useState([]);
+  const [crpRanges, setCrpRanges] = useState([]);
+  const [crpProducts, setCrpProducts] = useState([]);
+
   // Column visibility state - persisted in sessionStorage
   const DEFAULT_VISIBLE_COLUMNS = [
-    'seller', 'orderId', 'dateSold', 'shipBy', 'deliveryDate', 'productName', 'buyerNote',
+    'seller', 'orderId', 'dateSold', 'shipBy', 'deliveryDate', 'productName', 'itemCategory', 'buyerNote',
     'buyerName', 'shippingAddress', 'marketplace', 'subtotal',
     'shipping', 'salesTax', 'discount', 'transactionFees',
     'adFeeGeneral', 'cancelStatus', 'refunds', 'orderEarnings', 'trackingNumber',
@@ -1317,6 +1322,7 @@ function FulfillmentDashboard() {
     { id: 'shipBy', label: 'Ship By' },
     { id: 'deliveryDate', label: 'Delivery Date' },
     { id: 'productName', label: 'Product Name' },
+    { id: 'itemCategory', label: 'Category' },
     { id: 'buyerNote', label: 'Buyer Note' },
     { id: 'buyerName', label: 'Buyer Name' },
     { id: 'shippingAddress', label: 'Shipping Address' },
@@ -1574,6 +1580,60 @@ function FulfillmentDashboard() {
     }
   };
 
+  // Update item category classification (CRP)
+  const updateItemCategory = async (itemNumber, categoryId, rangeId, productId) => {
+    try {
+      const { data } = await api.put(`/item-category-map/${encodeURIComponent(itemNumber)}`, {
+        categoryId,
+        rangeId: rangeId || null,
+        productId: productId || null
+      });
+      // Update local orders that share this itemNumber with the populated CRP values from the response
+      setOrders(prev => prev.map(o => {
+        const orderItemNumbers = o.lineItems?.map(li => li.legacyItemId) || [o.itemNumber];
+        if (orderItemNumbers.includes(itemNumber)) {
+          return {
+            ...o,
+            orderCategoryId: data.mapping.categoryId || null,
+            orderRangeId: data.mapping.rangeId || null,
+            orderProductId: data.mapping.productId || null
+          };
+        }
+        return o;
+      }));
+      setSnackbarMsg('Category updated');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (e) {
+      console.error(e);
+      setSnackbarMsg('Failed to update category');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
+  // Clear item category classification
+  const clearItemCategory = async (itemNumber) => {
+    try {
+      await api.delete(`/item-category-map/${encodeURIComponent(itemNumber)}`);
+      setOrders(prev => prev.map(o => {
+        const orderItemNumbers = o.lineItems?.map(li => li.legacyItemId) || [o.itemNumber];
+        if (orderItemNumbers.includes(itemNumber)) {
+          return { ...o, orderCategoryId: null, orderRangeId: null, orderProductId: null };
+        }
+        return o;
+      }));
+      setSnackbarMsg('Category cleared');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (e) {
+      console.error(e);
+      setSnackbarMsg('Failed to clear category');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
   // Track if this is the initial mount
   const isInitialMount = useRef(true);
   const hasFetchedInitialData = useRef(false);
@@ -1593,11 +1653,14 @@ function FulfillmentDashboard() {
     dateFilter
   });
 
-  // Fetch amazon accounts and issues index once on mount
+  // Fetch amazon accounts, CRP data, and issues index once on mount
   useEffect(() => {
     if (!hasFetchedInitialData.current) {
       api.get('/amazon-accounts').then(({ data }) => setAmazonAccounts(data || [])).catch(console.error);
       api.get('/credit-cards').then(({ data }) => setCreditCards(data || [])).catch(console.error);
+      api.get('/asin-list-categories').then(({ data }) => setCrpCategories(data || [])).catch(console.error);
+      api.get('/asin-list-ranges', { params: { all: 'true' } }).then(({ data }) => setCrpRanges(data || [])).catch(console.error);
+      api.get('/asin-list-products', { params: { all: 'true' } }).then(({ data }) => setCrpProducts(data || [])).catch(console.error);
       loadResolutionOptions();
     }
     // Issues index is always fetched fresh (independent of hasFetchedInitialData)
@@ -3426,6 +3489,7 @@ function FulfillmentDashboard() {
                     {visibleColumns.includes('shipBy') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>}
                     {visibleColumns.includes('deliveryDate') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Delivery Date</TableCell>}
                     {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>}
+                    {visibleColumns.includes('itemCategory') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Category</TableCell>}
                     {visibleColumns.includes('buyerNote') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Note</TableCell>}
                     {visibleColumns.includes('buyerName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>}
                     {visibleColumns.includes('shippingAddress') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>}
@@ -3673,6 +3737,18 @@ function FulfillmentDashboard() {
                                 </Box>
                               )}
                             </Stack>
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('itemCategory') && (
+                          <TableCell>
+                            <ItemCategoryCell
+                              order={order}
+                              categories={crpCategories}
+                              ranges={crpRanges}
+                              products={crpProducts}
+                              onSave={updateItemCategory}
+                              onClear={clearItemCategory}
+                            />
                           </TableCell>
                         )}
                         {visibleColumns.includes('buyerNote') && (
@@ -4758,6 +4834,83 @@ function AutoSaveDatePicker({ value, onSave, sx = {} }) {
         }}
       />
     </LocalizationProvider>
+  );
+}
+
+function ItemCategoryCell({ order, categories, ranges, products, onSave, onClear }) {
+  const itemNumber = order.lineItems?.[0]?.legacyItemId || order.itemNumber;
+  const currentCatId = order.orderCategoryId?._id || '';
+  const currentRangeId = order.orderRangeId?._id || '';
+  const currentProductId = order.orderProductId?._id || '';
+
+  const [catId, setCatId] = useState(currentCatId);
+  const [rangeId, setRangeId] = useState(currentRangeId);
+  const [productId, setProductId] = useState(currentProductId);
+
+  useEffect(() => {
+    setCatId(order.orderCategoryId?._id || '');
+    setRangeId(order.orderRangeId?._id || '');
+    setProductId(order.orderProductId?._id || '');
+  }, [order.orderCategoryId, order.orderRangeId, order.orderProductId]);
+
+  const filteredRanges = catId ? ranges.filter(r => r.categoryId === catId || r.categoryId?._id === catId) : [];
+  const filteredProducts = rangeId ? products.filter(p => p.rangeId === rangeId || p.rangeId?._id === rangeId) : [];
+
+  if (!itemNumber) return <Typography variant="body2" color="text.disabled">-</Typography>;
+
+  const handleCatChange = (e) => {
+    const newCatId = e.target.value;
+    setCatId(newCatId);
+    setRangeId('');
+    setProductId('');
+    if (newCatId) {
+      onSave(itemNumber, newCatId, null, null);
+    } else {
+      onClear(itemNumber);
+    }
+  };
+
+  const handleRangeChange = (e) => {
+    const newRangeId = e.target.value;
+    setRangeId(newRangeId);
+    setProductId('');
+    onSave(itemNumber, catId, newRangeId || null, null);
+  };
+
+  const handleProductChange = (e) => {
+    const newProductId = e.target.value;
+    setProductId(newProductId);
+    onSave(itemNumber, catId, rangeId || null, newProductId || null);
+  };
+
+  const selectSx = {
+    backgroundColor: '#fff',
+    borderRadius: 1,
+    minWidth: 120,
+    height: 28,
+    fontSize: '0.8rem',
+    '& .MuiSelect-select': { py: 0.3, px: 1 }
+  };
+
+  return (
+    <Stack spacing={0.5} sx={{ minWidth: 140 }}>
+      <Select value={catId} onChange={handleCatChange} displayEmpty size="small" sx={selectSx}>
+        <MenuItem value=""><em style={{ color: '#aaa' }}>Category</em></MenuItem>
+        {categories.map(c => <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>)}
+      </Select>
+      {catId && filteredRanges.length > 0 && (
+        <Select value={rangeId} onChange={handleRangeChange} displayEmpty size="small" sx={selectSx}>
+          <MenuItem value=""><em style={{ color: '#aaa' }}>Range</em></MenuItem>
+          {filteredRanges.map(r => <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>)}
+        </Select>
+      )}
+      {rangeId && filteredProducts.length > 0 && (
+        <Select value={productId} onChange={handleProductChange} displayEmpty size="small" sx={selectSx}>
+          <MenuItem value=""><em style={{ color: '#aaa' }}>Product</em></MenuItem>
+          {filteredProducts.map(p => <MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>)}
+        </Select>
+      )}
+    </Stack>
   );
 }
 
