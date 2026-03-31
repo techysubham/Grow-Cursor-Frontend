@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, memo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, memo, useCallback, useMemo } from 'react';
 import Snackbar from '@mui/material/Snackbar';
 import MuiAlert from '@mui/material/Alert';
 import {
@@ -88,7 +88,7 @@ import {
   remarkOptionsFromTemplates,
   saveRemarkTemplates
 } from '../../constants/remarkTemplates';
-import ItemCategoryAssignDialog from '../../components/ItemCategoryAssignDialog.jsx';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            import ItemCategoryAssignDialog from '../../components/ItemCategoryAssignDialog.jsx';
 
 
 // --- IMAGE VIEWER DIALOG ---
@@ -1030,7 +1030,7 @@ function MobileOrderCard({ order, index, onCopy, onMessage, onViewImages, format
   );
 }
 
-function NotesCell({ order, onSave, onNotify }) {
+const NotesCell = memo(function NotesCell({ order, onSave, onNotify }) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [tempValue, setTempValue] = React.useState(order.fulfillmentNotes || '');
   const [isSaving, setIsSaving] = React.useState(false);
@@ -1125,9 +1125,9 @@ function NotesCell({ order, onSave, onNotify }) {
       )}
     </Box>
   );
-}
+});
 
-function EditableCell({ value, type = 'text', onSave }) {
+const EditableCell = memo(function EditableCell({ value, type = 'text', onSave }) {
   const [editing, setEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value || '');
 
@@ -1161,7 +1161,11 @@ function EditableCell({ value, type = 'text', onSave }) {
       <Typography variant="body2" color={!display ? 'text.disabled' : 'text.primary'}>{display || '-'}</Typography>
     </Box>
   );
-}
+});
+
+// Sticky header cell style — extracted to avoid re-creating per render
+const HEADER_CELL_SX = { backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 };
+const HEADER_CELL_RIGHT_SX = { ...HEADER_CELL_SX, textAlign: 'right' };
 
 function FulfillmentDashboard() {
   // Mobile responsiveness
@@ -1365,6 +1369,9 @@ function FulfillmentDashboard() {
     return missing.length > 0 ? [...stored, ...missing] : stored;
   });
 
+  // Convert to Set for O(1) lookups instead of O(n) .includes() per column per row
+  const visibleColumnsSet = useMemo(() => new Set(visibleColumns), [visibleColumns]);
+
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -1552,7 +1559,7 @@ function FulfillmentDashboard() {
   };
 
 
-  const updateManualField = async (orderId, field, value, extraFields = {}) => {
+  const updateManualField = useCallback(async (orderId, field, value, extraFields = {}) => {
     const valueToSave = field === 'remark' ? normalizeRemarkValue(value) : value;
     try {
       const { data } = await api.patch(`/ebay/orders/${orderId}/manual-fields`, { [field]: valueToSave, ...extraFields });
@@ -1578,10 +1585,10 @@ function FulfillmentDashboard() {
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
-  };
+  }, [normalizeRemarkValue]);
 
   // Update item category classification (CRP)
-  const updateItemCategory = async (itemNumber, categoryId, rangeId, productId) => {
+  const updateItemCategory = useCallback(async (itemNumber, categoryId, rangeId, productId) => {
     try {
       const { data } = await api.put(`/item-category-map/${encodeURIComponent(itemNumber)}`, {
         categoryId,
@@ -1610,10 +1617,10 @@ function FulfillmentDashboard() {
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
-  };
+  }, []);
 
   // Clear item category classification
-  const clearItemCategory = async (itemNumber) => {
+  const clearItemCategory = useCallback(async (itemNumber) => {
     try {
       await api.delete(`/item-category-map/${encodeURIComponent(itemNumber)}`);
       setOrders(prev => prev.map(o => {
@@ -1632,7 +1639,7 @@ function FulfillmentDashboard() {
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
-  };
+  }, []);
 
   // Track if this is the initial mount
   const isInitialMount = useRef(true);
@@ -1687,20 +1694,28 @@ function FulfillmentDashboard() {
   }, [currentPage]);
 
   // When filters change, reset to page 1 and reload
+  // Text inputs are debounced (400ms) so we don't fire an API call on every keystroke
+  const filterDebounceRef = useRef(null);
   useEffect(() => {
     // Check if any filter actually changed
-    const filtersChanged =
-      prevFilters.current.selectedSeller !== selectedSeller ||
-      prevFilters.current.searchOrderId !== searchOrderId ||
-      prevFilters.current.searchAzOrderId !== searchAzOrderId ||
-      prevFilters.current.searchBuyerName !== searchBuyerName ||
-      prevFilters.current.searchItemId !== searchItemId ||
-      prevFilters.current.searchProductName !== searchProductName ||
-      prevFilters.current.searchMarketplace !== searchMarketplace ||
-      prevFilters.current.searchPaymentStatus !== searchPaymentStatus ||
-      prevFilters.current.excludeLowValue !== excludeLowValue ||
-      prevFilters.current.missingAmazonAccount !== missingAmazonAccount ||
-      JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter);
+    const prev = prevFilters.current;
+
+    const textChanged =
+      prev.searchOrderId !== searchOrderId ||
+      prev.searchAzOrderId !== searchAzOrderId ||
+      prev.searchBuyerName !== searchBuyerName ||
+      prev.searchItemId !== searchItemId ||
+      prev.searchProductName !== searchProductName;
+
+    const immediateChanged =
+      prev.selectedSeller !== selectedSeller ||
+      prev.searchMarketplace !== searchMarketplace ||
+      prev.searchPaymentStatus !== searchPaymentStatus ||
+      prev.excludeLowValue !== excludeLowValue ||
+      prev.missingAmazonAccount !== missingAmazonAccount ||
+      JSON.stringify(prev.dateFilter) !== JSON.stringify(dateFilter);
+
+    const filtersChanged = textChanged || immediateChanged;
 
     // Update prev filters
     prevFilters.current = {
@@ -1720,16 +1735,35 @@ function FulfillmentDashboard() {
     // Skip on initial mount
     if (!hasFetchedInitialData.current) return;
 
-    if (filtersChanged) {
-      // Reset to page 1 when filters change
+    if (!filtersChanged) return;
+
+    const doReload = () => {
       if (currentPage === 1) {
-        // Already on page 1, just reload
         loadStoredOrders();
       } else {
-        // This will trigger the currentPage useEffect above
         setCurrentPage(1);
       }
+    };
+
+    // Clear any pending debounce
+    if (filterDebounceRef.current) {
+      clearTimeout(filterDebounceRef.current);
+      filterDebounceRef.current = null;
     }
+
+    if (immediateChanged) {
+      // Dropdowns/checkboxes: fire immediately
+      doReload();
+    } else {
+      // Text inputs only: debounce 400ms
+      filterDebounceRef.current = setTimeout(doReload, 400);
+    }
+
+    return () => {
+      if (filterDebounceRef.current) {
+        clearTimeout(filterDebounceRef.current);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, missingAmazonAccount, dateFilter]);
 
@@ -1917,11 +1951,11 @@ function FulfillmentDashboard() {
     }
   };
 
-  const handleOpenMessageDialog = (order) => {
+  const handleOpenMessageDialog = useCallback((order) => {
     setSelectedOrderForMessage(order);
     setMessageBody('');
     setMessageModalOpen(true);
-  };
+  }, []);
 
   const handleCloseMessageDialog = () => {
     setMessageModalOpen(false);
@@ -1988,18 +2022,18 @@ function FulfillmentDashboard() {
 
 
   //  HELPER for the NotesCell
-  const handleSaveNote = async (orderId, noteValue) => {
+  const handleSaveNote = useCallback(async (orderId, noteValue) => {
     await api.patch(`/ebay/orders/${orderId}/fulfillment-notes`, { fulfillmentNotes: noteValue });
     // Update local state
     setOrders(prev => prev.map(o => o._id === orderId ? { ...o, fulfillmentNotes: noteValue } : o));
-  };
+  }, []);
 
   //  HELPER for Notifications
-  const showNotification = (severity, message) => {
+  const showNotification = useCallback((severity, message) => {
     setSnackbarMsg(message);
     setSnackbarSeverity(severity);
     setSnackbarOpen(true);
-  };
+  }, []);
 
   // Poll for NEW orders only
   async function pollNewOrders() {
@@ -2412,12 +2446,12 @@ function FulfillmentDashboard() {
   };
 
 
-  const formatCurrency = (value) => {
+  const formatCurrency = useCallback((value) => {
     if (value === null || value === undefined || value === '') return '-';
     const num = Number(value);
     if (Number.isNaN(num)) return '-';
     return `$${num.toFixed(2)}`;
-  };
+  }, []);
 
   const formatFieldName = (fieldName) => {
     // Convert camelCase to readable format
@@ -2741,7 +2775,7 @@ function FulfillmentDashboard() {
     }
   };
 
-  const handleToggleAutoMessage = async (orderId, disabled) => {
+  const handleToggleAutoMessage = useCallback(async (orderId, disabled) => {
     try {
       await api.patch(`/ebay/orders/${orderId}/auto-message-toggle`, { disabled });
       // Update local state
@@ -2759,7 +2793,7 @@ function FulfillmentDashboard() {
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
-  };
+  }, []);
 
   return (
     <Box sx={{
@@ -3480,45 +3514,45 @@ function FulfillmentDashboard() {
               >
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>SL No</TableCell>
-                    {visibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>}
-                    {visibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>}
-                    {visibleColumns.includes('dateSold') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Date Sold</TableCell>}
-                    {visibleColumns.includes('shipBy') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Ship By</TableCell>}
-                    {visibleColumns.includes('deliveryDate') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Delivery Date</TableCell>}
-                    {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>}
-                    {visibleColumns.includes('itemCategory') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Category</TableCell>}
-                    {visibleColumns.includes('buyerNote') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Note</TableCell>}
-                    {visibleColumns.includes('buyerName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>}
-                    {visibleColumns.includes('shippingAddress') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Shipping Address</TableCell>}
-                    {visibleColumns.includes('marketplace') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>}
-                    {visibleColumns.includes('subtotal') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Subtotal</TableCell>}
-                    {visibleColumns.includes('shipping') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Shipping</TableCell>}
-                    {visibleColumns.includes('salesTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Sales Tax</TableCell>}
-                    {visibleColumns.includes('discount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Discount</TableCell>}
-                    {visibleColumns.includes('transactionFees') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Transaction Fees</TableCell>}
-                    {visibleColumns.includes('adFeeGeneral') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Ad Fee General</TableCell>}
-                    {visibleColumns.includes('cancelStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Cancel Status</TableCell>}
-                    {visibleColumns.includes('refunds') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Refunds</TableCell>}
-                    {visibleColumns.includes('refundItemAmount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Item</TableCell>}
-                    {visibleColumns.includes('refundTaxAmount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Tax</TableCell>}
-                    {visibleColumns.includes('refundTotalToBuyer') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Refund Total</TableCell>}
-                    {visibleColumns.includes('orderTotalAfterRefund') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Order Total</TableCell>}
-                    {visibleColumns.includes('orderEarnings') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }} align="right">Earnings</TableCell>}
-                    {visibleColumns.includes('trackingNumber') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Tracking Number</TableCell>}
-                    {visibleColumns.includes('amazonAccount') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Acc</TableCell>}
-                    {visibleColumns.includes('arriving') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Arriving</TableCell>}
-                    {visibleColumns.includes('beforeTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Before Tax</TableCell>}
-                    {visibleColumns.includes('estimatedTax') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Estimated Tax</TableCell>}
-                    {visibleColumns.includes('azOrderId') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Az OrderID</TableCell>}
-                    {visibleColumns.includes('amazonRefund') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Refund</TableCell>}
-                    {visibleColumns.includes('cardName') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Card Name</TableCell>}
-                    {visibleColumns.includes('resolution') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Resolutions</TableCell>}
-                    {visibleColumns.includes('notes') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>}
-                    {visibleColumns.includes('messagingStatus') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Messaging</TableCell>}
-                    {visibleColumns.includes('remark') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>}
-                    {visibleColumns.includes('issueFlags') && <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Issues</TableCell>}
-                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}></TableCell>
+                    <TableCell sx={HEADER_CELL_SX}>SL No</TableCell>
+                    {visibleColumnsSet.has('seller') && <TableCell sx={HEADER_CELL_SX}>Seller</TableCell>}
+                    {visibleColumnsSet.has('orderId') && <TableCell sx={HEADER_CELL_SX}>Order ID</TableCell>}
+                    {visibleColumnsSet.has('dateSold') && <TableCell sx={HEADER_CELL_SX}>Date Sold</TableCell>}
+                    {visibleColumnsSet.has('shipBy') && <TableCell sx={HEADER_CELL_SX}>Ship By</TableCell>}
+                    {visibleColumnsSet.has('deliveryDate') && <TableCell sx={HEADER_CELL_SX}>Delivery Date</TableCell>}
+                    {visibleColumnsSet.has('productName') && <TableCell sx={HEADER_CELL_SX}>Product Name</TableCell>}
+                    {visibleColumnsSet.has('itemCategory') && <TableCell sx={HEADER_CELL_SX}>Category</TableCell>}
+                    {visibleColumnsSet.has('buyerNote') && <TableCell sx={HEADER_CELL_SX}>Buyer Note</TableCell>}
+                    {visibleColumnsSet.has('buyerName') && <TableCell sx={HEADER_CELL_SX}>Buyer Name</TableCell>}
+                    {visibleColumnsSet.has('shippingAddress') && <TableCell sx={HEADER_CELL_SX}>Shipping Address</TableCell>}
+                    {visibleColumnsSet.has('marketplace') && <TableCell sx={HEADER_CELL_SX}>Marketplace</TableCell>}
+                    {visibleColumnsSet.has('subtotal') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Subtotal</TableCell>}
+                    {visibleColumnsSet.has('shipping') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Shipping</TableCell>}
+                    {visibleColumnsSet.has('salesTax') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Sales Tax</TableCell>}
+                    {visibleColumnsSet.has('discount') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Discount</TableCell>}
+                    {visibleColumnsSet.has('transactionFees') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Transaction Fees</TableCell>}
+                    {visibleColumnsSet.has('adFeeGeneral') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Ad Fee General</TableCell>}
+                    {visibleColumnsSet.has('cancelStatus') && <TableCell sx={HEADER_CELL_SX}>Cancel Status</TableCell>}
+                    {visibleColumnsSet.has('refunds') && <TableCell sx={HEADER_CELL_SX}>Refunds</TableCell>}
+                    {visibleColumnsSet.has('refundItemAmount') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Refund Item</TableCell>}
+                    {visibleColumnsSet.has('refundTaxAmount') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Refund Tax</TableCell>}
+                    {visibleColumnsSet.has('refundTotalToBuyer') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Refund Total</TableCell>}
+                    {visibleColumnsSet.has('orderTotalAfterRefund') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Order Total</TableCell>}
+                    {visibleColumnsSet.has('orderEarnings') && <TableCell sx={HEADER_CELL_RIGHT_SX}>Earnings</TableCell>}
+                    {visibleColumnsSet.has('trackingNumber') && <TableCell sx={HEADER_CELL_SX}>Tracking Number</TableCell>}
+                    {visibleColumnsSet.has('amazonAccount') && <TableCell sx={HEADER_CELL_SX}>Amazon Acc</TableCell>}
+                    {visibleColumnsSet.has('arriving') && <TableCell sx={HEADER_CELL_SX}>Arriving</TableCell>}
+                    {visibleColumnsSet.has('beforeTax') && <TableCell sx={HEADER_CELL_SX}>Before Tax</TableCell>}
+                    {visibleColumnsSet.has('estimatedTax') && <TableCell sx={HEADER_CELL_SX}>Estimated Tax</TableCell>}
+                    {visibleColumnsSet.has('azOrderId') && <TableCell sx={HEADER_CELL_SX}>Az OrderID</TableCell>}
+                    {visibleColumnsSet.has('amazonRefund') && <TableCell sx={HEADER_CELL_SX}>Amazon Refund</TableCell>}
+                    {visibleColumnsSet.has('cardName') && <TableCell sx={HEADER_CELL_SX}>Card Name</TableCell>}
+                    {visibleColumnsSet.has('resolution') && <TableCell sx={HEADER_CELL_SX}>Resolutions</TableCell>}
+                    {visibleColumnsSet.has('notes') && <TableCell sx={HEADER_CELL_SX}>Notes</TableCell>}
+                    {visibleColumnsSet.has('messagingStatus') && <TableCell sx={HEADER_CELL_SX}>Messaging</TableCell>}
+                    {visibleColumnsSet.has('remark') && <TableCell sx={HEADER_CELL_SX}>Remark</TableCell>}
+                    {visibleColumnsSet.has('issueFlags') && <TableCell sx={HEADER_CELL_SX}>Issues</TableCell>}
+                    <TableCell sx={{ ...HEADER_CELL_SX, textAlign: 'center' }}></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -3533,7 +3567,7 @@ function FulfillmentDashboard() {
                         }}
                       >
                         <TableCell>{(currentPage - 1) * ordersPerPage + idx + 1}</TableCell>
-                        {visibleColumns.includes('seller') && (
+                        {visibleColumnsSet.has('seller') && (
                           <TableCell>
                             <Typography variant="body2" fontWeight="medium">
                               {order.seller?.user?.username ||
@@ -3543,7 +3577,7 @@ function FulfillmentDashboard() {
                             </Typography>
                           </TableCell>
                         )}
-                        {visibleColumns.includes('orderId') && (
+                        {visibleColumnsSet.has('orderId') && (
                           <TableCell>
                             <Stack direction="row" alignItems="center" spacing={1}>
                               <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
@@ -3576,10 +3610,10 @@ function FulfillmentDashboard() {
                             </Stack>
                           </TableCell>
                         )}
-                        {visibleColumns.includes('dateSold') && <TableCell>{formatDate(order.dateSold, order.purchaseMarketplaceId)}</TableCell>}
-                        {visibleColumns.includes('shipBy') && <TableCell>{formatDate(order.shipByDate, order.purchaseMarketplaceId)}</TableCell>}
-                        {visibleColumns.includes('deliveryDate') && <TableCell>{formatDeliveryDate(order)}</TableCell>}
-                        {visibleColumns.includes('productName') && (
+                        {visibleColumnsSet.has('dateSold') && <TableCell>{formatDate(order.dateSold, order.purchaseMarketplaceId)}</TableCell>}
+                        {visibleColumnsSet.has('shipBy') && <TableCell>{formatDate(order.shipByDate, order.purchaseMarketplaceId)}</TableCell>}
+                        {visibleColumnsSet.has('deliveryDate') && <TableCell>{formatDeliveryDate(order)}</TableCell>}
+                        {visibleColumnsSet.has('productName') && (
                           <TableCell sx={{ minWidth: 300, maxWidth: 400, pr: 1 }}>
                             <Stack spacing={1} sx={{ py: 1 }}>
                               {order.lineItems && order.lineItems.length > 0 ? (
@@ -3737,7 +3771,7 @@ function FulfillmentDashboard() {
                             </Stack>
                           </TableCell>
                         )}
-                        {visibleColumns.includes('itemCategory') && (
+                        {visibleColumnsSet.has('itemCategory') && (
                           <TableCell>
                             {(() => {
                               const cat = order.orderCategoryId?.name;
@@ -3757,7 +3791,7 @@ function FulfillmentDashboard() {
                             })()}
                           </TableCell>
                         )}
-                        {visibleColumns.includes('buyerNote') && (
+                        {visibleColumnsSet.has('buyerNote') && (
                           <TableCell sx={{ maxWidth: 300 }}>
                             {order.buyerCheckoutNotes ? (
                               <Tooltip title={order.buyerCheckoutNotes} arrow placement="top">
@@ -3779,7 +3813,7 @@ function FulfillmentDashboard() {
                             )}
                           </TableCell>
                         )}
-                        {visibleColumns.includes('buyerName') && (
+                        {visibleColumnsSet.has('buyerName') && (
                           <TableCell sx={{ maxWidth: 150, pr: 1 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
                               <Tooltip title={order.buyer?.buyerRegistrationAddress?.fullName || '-'} arrow>
@@ -3793,7 +3827,7 @@ function FulfillmentDashboard() {
                             </Box>
                           </TableCell>
                         )}
-                        {visibleColumns.includes('shippingAddress') && (
+                        {visibleColumnsSet.has('shippingAddress') && (
                           <TableCell sx={{ maxWidth: 300 }}>
                             <Collapse in={expandedShippingId === order._id} timeout="auto">
                               <Stack spacing={0.5}>
@@ -3916,14 +3950,14 @@ function FulfillmentDashboard() {
                             </Collapse>
                           </TableCell>
                         )}
-                        {visibleColumns.includes('marketplace') && (
+                        {visibleColumnsSet.has('marketplace') && (
                           <TableCell>
                             <Typography variant="body2">
                               {order.purchaseMarketplaceId || '-'}
                             </Typography>
                           </TableCell>
                         )}
-                        {visibleColumns.includes('subtotal') && (
+                        {visibleColumnsSet.has('subtotal') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">
                               <Typography variant="body2" fontWeight="medium">
@@ -3932,17 +3966,17 @@ function FulfillmentDashboard() {
                             </TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
-                        {visibleColumns.includes('shipping') && (
+                        {visibleColumnsSet.has('shipping') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">{formatCurrency(order.shipping)}</TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
-                        {visibleColumns.includes('salesTax') && (
+                        {visibleColumnsSet.has('salesTax') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">{formatCurrency(order.salesTax)}</TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
-                        {visibleColumns.includes('discount') && (
+                        {visibleColumnsSet.has('discount') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">
                               <Typography variant="body2">
@@ -3951,12 +3985,12 @@ function FulfillmentDashboard() {
                             </TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
-                        {visibleColumns.includes('transactionFees') && (
+                        {visibleColumnsSet.has('transactionFees') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">{formatCurrency(order.transactionFees)}</TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
-                        {visibleColumns.includes('adFeeGeneral') && (
+                        {visibleColumnsSet.has('adFeeGeneral') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">
                               <Typography
@@ -3971,7 +4005,7 @@ function FulfillmentDashboard() {
                             </TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
-                        {visibleColumns.includes('cancelStatus') && (
+                        {visibleColumnsSet.has('cancelStatus') && (
                           <TableCell>
                             <Chip
                               label={order.cancelState || 'NONE_REQUESTED'}
@@ -3992,7 +4026,7 @@ function FulfillmentDashboard() {
                           </TableCell>
                         )}
                         {/* --- REPLACEMENT FOR REFUNDS CELL --- */}
-                        {visibleColumns.includes('refunds') && (
+                        {visibleColumnsSet.has('refunds') && (
                           <TableCell>
                             {order.refunds && order.refunds.length > 0 ? (
                               <Stack spacing={0.5}>
@@ -4031,7 +4065,7 @@ function FulfillmentDashboard() {
                           </TableCell>
                         )}
                         {/* --- NEW: Refund Breakdown Columns --- */}
-                        {visibleColumns.includes('refundItemAmount') && (
+                        {visibleColumnsSet.has('refundItemAmount') && (
                           <TableCell align="right">
                             {order.refundItemAmount ? (
                               <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 'medium' }}>
@@ -4042,7 +4076,7 @@ function FulfillmentDashboard() {
                             )}
                           </TableCell>
                         )}
-                        {visibleColumns.includes('refundTaxAmount') && (
+                        {visibleColumnsSet.has('refundTaxAmount') && (
                           <TableCell align="right">
                             {order.refundTaxAmount ? (
                               <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 'medium' }}>
@@ -4053,7 +4087,7 @@ function FulfillmentDashboard() {
                             )}
                           </TableCell>
                         )}
-                        {visibleColumns.includes('refundTotalToBuyer') && (
+                        {visibleColumnsSet.has('refundTotalToBuyer') && (
                           <TableCell align="right">
                             {order.refundTotalToBuyer ? (
                               <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 'bold' }}>
@@ -4064,7 +4098,7 @@ function FulfillmentDashboard() {
                             )}
                           </TableCell>
                         )}
-                        {visibleColumns.includes('orderTotalAfterRefund') && (
+                        {visibleColumnsSet.has('orderTotalAfterRefund') && (
                           <TableCell align="right">
                             {order.orderTotalAfterRefund != null ? (
                               <Typography
@@ -4081,7 +4115,7 @@ function FulfillmentDashboard() {
                             )}
                           </TableCell>
                         )}
-                        {visibleColumns.includes('orderEarnings') && (
+                        {visibleColumnsSet.has('orderEarnings') && (
                           <TableCell align="right">
                             <Typography
                               variant="body2"
@@ -4100,7 +4134,7 @@ function FulfillmentDashboard() {
                             </Typography>
                           </TableCell>
                         )}
-                        {visibleColumns.includes('trackingNumber') && (
+                        {visibleColumnsSet.has('trackingNumber') && (
                           <TableCell sx={{ maxWidth: 150, pr: 1 }}>
                             {order.trackingNumber ? (
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
@@ -4120,7 +4154,7 @@ function FulfillmentDashboard() {
                         )}
 
                         {/* 1. Amazon Account */}
-                        {visibleColumns.includes('amazonAccount') && (
+                        {visibleColumnsSet.has('amazonAccount') && (
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <AutoSaveSelect
@@ -4141,7 +4175,7 @@ function FulfillmentDashboard() {
                         )}
 
                         {/* 2. Arriving Date */}
-                        {visibleColumns.includes('arriving') && (
+                        {visibleColumnsSet.has('arriving') && (
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <AutoSaveDatePicker
@@ -4161,7 +4195,7 @@ function FulfillmentDashboard() {
                         )}
 
                         {/* 3. Before Tax */}
-                        {visibleColumns.includes('beforeTax') && (
+                        {visibleColumnsSet.has('beforeTax') && (
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <AutoSaveTextField
@@ -4187,7 +4221,7 @@ function FulfillmentDashboard() {
                         )}
 
                         {/* 4. Estimated Tax */}
-                        {visibleColumns.includes('estimatedTax') && (
+                        {visibleColumnsSet.has('estimatedTax') && (
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <AutoSaveTextField
@@ -4213,7 +4247,7 @@ function FulfillmentDashboard() {
                         )}
 
                         {/* 5. Amazon Order ID */}
-                        {visibleColumns.includes('azOrderId') && (
+                        {visibleColumnsSet.has('azOrderId') && (
                           <TableCell sx={{ minWidth: 200 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <AutoSaveTextField
@@ -4234,7 +4268,7 @@ function FulfillmentDashboard() {
                         )}
 
                         {/* 6. Amazon Refund */}
-                        {visibleColumns.includes('amazonRefund') && (
+                        {visibleColumnsSet.has('amazonRefund') && (
                           <TableCell sx={{ minWidth: 200 }}>
                             <Stack direction="row" spacing={1} alignItems="center">
                               <AutoSaveTextField
@@ -4267,7 +4301,7 @@ function FulfillmentDashboard() {
                         )}
 
                         {/* 7. Card Name */}
-                        {visibleColumns.includes('cardName') && (
+                        {visibleColumnsSet.has('cardName') && (
                           <TableCell sx={{ minWidth: 200 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <AutoSaveSelect
@@ -4287,7 +4321,7 @@ function FulfillmentDashboard() {
                           </TableCell>
                         )}
 
-                        {visibleColumns.includes('resolution') && (
+                        {visibleColumnsSet.has('resolution') && (
                           <TableCell sx={{ minWidth: 220 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <AutoSaveSelect
@@ -4310,7 +4344,7 @@ function FulfillmentDashboard() {
                         )}
 
 
-                        {visibleColumns.includes('notes') && (
+                        {visibleColumnsSet.has('notes') && (
                           <TableCell>
                             <NotesCell
                               order={order}
@@ -4319,7 +4353,7 @@ function FulfillmentDashboard() {
                             />
                           </TableCell>
                         )}
-                        {visibleColumns.includes('messagingStatus') && (
+                        {visibleColumnsSet.has('messagingStatus') && (
                           <TableCell align="center">
                             <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
                               <Tooltip title="Message Buyer">
@@ -4339,7 +4373,7 @@ function FulfillmentDashboard() {
                             </Stack>
                           </TableCell>
                         )}
-                        {visibleColumns.includes('remark') && (
+                        {visibleColumnsSet.has('remark') && (
                           <TableCell>
                             <AutoSaveSelect
                               value={order.remark || ''}
@@ -4350,7 +4384,7 @@ function FulfillmentDashboard() {
                             />
                           </TableCell>
                         )}
-                        {visibleColumns.includes('issueFlags') && (() => {
+                        {visibleColumnsSet.has('issueFlags') && (() => {
                           const issues = issuesIndex[order.orderId] || issuesIndex[order.legacyOrderId] || [];
                           if (issues.length === 0) return <TableCell><Typography variant="body2" color="text.disabled">-</Typography></TableCell>;
                           // Deduplicate by type
@@ -4718,7 +4752,7 @@ function parseCurrencyInput(value) {
   return Number.isNaN(parsedValue) ? null : parsedValue;
 }
 
-function AutoSaveTextField({ value, type = 'text', onSave, sx = {}, textFieldProps = {} }) {
+const AutoSaveTextField = memo(function AutoSaveTextField({ value, type = 'text', onSave, sx = {}, textFieldProps = {} }) {
   // Format initial value for Date inputs (YYYY-MM-DD)
   const formatVal = (val) => {
     if (type === 'date' && val) return val.split('T')[0];
@@ -4765,9 +4799,9 @@ function AutoSaveTextField({ value, type = 'text', onSave, sx = {}, textFieldPro
       }}
     />
   );
-}
+});
 
-function AutoSaveDatePicker({ value, onSave, sx = {} }) {
+const AutoSaveDatePicker = memo(function AutoSaveDatePicker({ value, onSave, sx = {} }) {
   // Helper to check if value is a valid ISO format date
   const parseValue = (val) => {
     if (!val) return null;
@@ -4861,9 +4895,9 @@ function AutoSaveDatePicker({ value, onSave, sx = {} }) {
       />
     </LocalizationProvider>
   );
-}
+});
 
-function AutoSaveSelect({ value, options, onSave, onManage, manageLabel = 'Manage Options' }) {
+const AutoSaveSelect = memo(function AutoSaveSelect({ value, options, onSave, onManage, manageLabel = 'Manage Options' }) {
   const [localValue, setLocalValue] = useState(value || '');
 
   useEffect(() => {
@@ -4910,6 +4944,6 @@ function AutoSaveSelect({ value, options, onSave, onManage, manageLabel = 'Manag
       ) : null}
     </Select>
   );
-}
+});
 
 export default memo(FulfillmentDashboard);

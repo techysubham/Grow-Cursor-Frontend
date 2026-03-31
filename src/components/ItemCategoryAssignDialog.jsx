@@ -206,7 +206,10 @@ export default function ItemCategoryAssignDialog({
     if (!open) return;
     setError('');
     setConfirmDelete(null);
-    fetchCategories();
+    // Skip re-fetching categories if we already have them cached
+    if (categories.length === 0) {
+      fetchCategories();
+    }
   }, [open]);
 
   // Pre-select current values when categories load
