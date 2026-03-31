@@ -930,21 +930,41 @@ export default function AllOrdersSheetPage() {
         </Stack>
       </Paper>
 
-      {/* Orders Count & Pagination - Hide pagination for single date mode */}
-      {!loading && orders.length > 0 && (
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Showing {orders.length} {dateFilter.mode === 'single' ? 'order(s)' : `of ${totalOrders} orders`}
-          </Typography>
-          {dateFilter.mode !== 'single' && (
-            <Pagination
-              count={totalPages}
-              page={currentPage}
-              onChange={(e, page) => setCurrentPage(page)}
-              color="primary"
-            />
-          )}
-        </Stack>
+      {/* Orders Count & Pagination - Enhanced visibility */}
+      {!loading && (
+        <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                {dateFilter.mode === 'single' ? (
+                  <>Total Results: {orders.length} order{orders.length !== 1 ? 's' : ''}</>
+                ) : (
+                  <>
+                    Showing {orders.length > 0 ? `${(currentPage - 1) * ordersPerPage + 1}-${(currentPage - 1) * ordersPerPage + orders.length}` : '0'} of {totalOrders} order{totalOrders !== 1 ? 's' : ''}
+                  </>
+                )}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                {selectedSeller && 'Seller filter active • '}
+                {searchMarketplace && 'Marketplace filter active • '}
+                {(dateFilter.mode !== 'none') && 'Date filter active • '}
+                {(profitFilter.mode !== 'none') && 'Profit filter active • '}
+                {excludeLowValue && 'Hiding <$3 • '}
+                {excludeNoAmazonAccount && 'Hiding no Amazon account • '}
+                {searchOrderId && 'Order ID search active • '}
+                {searchBuyerName && 'Buyer name search active'}
+              </Typography>
+            </Box>
+            {dateFilter.mode !== 'single' && orders.length > 0 && (
+              <Pagination
+                count={totalPages}
+                page={currentPage}
+                onChange={(e, page) => setCurrentPage(page)}
+                color="primary"
+              />
+            )}
+          </Stack>
+        </Paper>
       )}
 
       {/* Orders Table */}
@@ -953,7 +973,7 @@ export default function AllOrdersSheetPage() {
           <CircularProgress />
         </Box>
       ) : orders.length === 0 ? (
-        <Alert severity="info">No orders found</Alert>
+        <Alert severity="info">No orders found{(selectedSeller || searchMarketplace || dateFilter.mode !== 'none' || profitFilter.mode !== 'none' || excludeLowValue || excludeNoAmazonAccount || searchOrderId || searchBuyerName) ? ' with current filters' : ''}</Alert>
       ) : (
         <TableContainer component={Paper} sx={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
           <Table size="small" stickyHeader sx={{ '& thead tr:nth-of-type(2) th': { top: 37, zIndex: 3 } }}>
