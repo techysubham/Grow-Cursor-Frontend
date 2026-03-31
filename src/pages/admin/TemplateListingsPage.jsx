@@ -18,6 +18,7 @@ import {
   Calculate as CalculatorIcon,
   CalendarToday as CalendarIcon,
   PlayArrow as ApplyIcon,
+  ClearAll as ClearAllIcon,
 } from '@mui/icons-material';
 import api from '../../lib/api.js';
 import { getAuthToken } from '../../lib/api.js';
@@ -1395,6 +1396,33 @@ export default function TemplateListingsPage() {
                   Apply
                 </Button>
               </span>
+            </Tooltip>
+            <Tooltip title="Clear schedule time for all listings in the current view">
+              <Button
+                variant="outlined"
+                size="small"
+                color="warning"
+                startIcon={<ClearAllIcon />}
+                disabled={loading}
+                onClick={async () => {
+                  if (!window.confirm('Clear schedule time for all listings in this view?')) return;
+                  try {
+                    const { data } = await api.post('/template-listings/clear-schedule', {
+                      templateId,
+                      sellerId,
+                      batchFilter,
+                      batchId: batchFilter !== 'active' && batchFilter !== 'all' ? batchFilter : undefined,
+                    });
+                    setSuccess(`Cleared schedule time for ${data.cleared} listing(s)`);
+                    fetchListings();
+                  } catch (e) {
+                    setError(e.response?.data?.error || 'Failed to clear schedule times');
+                  }
+                }}
+                sx={{ mb: 0.2 }}
+              >
+                Clear Schedule
+              </Button>
             </Tooltip>
           </Stack>
         </Paper>
