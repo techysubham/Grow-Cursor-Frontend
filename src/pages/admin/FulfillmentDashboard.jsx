@@ -1773,7 +1773,7 @@ function FulfillmentDashboard() {
   async function fetchSellers() {
     setError('');
     try {
-      const { data } = await api.get('/sellers/all');
+      const { data } = await api.get('/sellers/all-unfiltered');
       setSellers(data || []);
     } catch (e) {
       setError('Failed to load sellers');
