@@ -96,6 +96,14 @@ export default function AllOrdersSheetPage() {
     to: ''
   }));
 
+  // Profit filter
+  const [profitFilter, setProfitFilter] = useState(() => getInitialState('profitFilter', {
+    mode: 'none',
+    single: '',
+    from: '',
+    to: ''
+  }));
+
   const isInitialMount = useRef(true);
   const hasFetchedInitialData = useRef(false);
   
@@ -104,7 +112,8 @@ export default function AllOrdersSheetPage() {
     searchOrderId,
     searchBuyerName,
     searchMarketplace,
-    dateFilter
+    dateFilter,
+    profitFilter
   });
 
   // Persist filter state to sessionStorage
@@ -117,6 +126,7 @@ export default function AllOrdersSheetPage() {
       filtersExpanded,
       currentPage,
       dateFilter,
+      profitFilter,
       excludeLowValue,
       excludeNoAmazonAccount
     };
@@ -125,7 +135,7 @@ export default function AllOrdersSheetPage() {
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, excludeLowValue, excludeNoAmazonAccount]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, profitFilter, excludeLowValue, excludeNoAmazonAccount]);
 
   // Initial load
   useEffect(() => {
@@ -164,7 +174,8 @@ export default function AllOrdersSheetPage() {
       prevFilters.current.searchMarketplace !== searchMarketplace ||
       prevFilters.current.excludeLowValue !== excludeLowValue ||
       prevFilters.current.excludeNoAmazonAccount !== excludeNoAmazonAccount ||
-      JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter);
+      JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter) ||
+      JSON.stringify(prevFilters.current.profitFilter) !== JSON.stringify(profitFilter);
     
     prevFilters.current = {
       selectedSeller,
@@ -173,7 +184,8 @@ export default function AllOrdersSheetPage() {
       searchMarketplace,
       excludeLowValue,
       excludeNoAmazonAccount,
-      dateFilter
+      dateFilter,
+      profitFilter
     };
 
     if (!hasFetchedInitialData.current) return;
@@ -185,7 +197,7 @@ export default function AllOrdersSheetPage() {
         setCurrentPage(1);
       }
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, excludeLowValue, excludeNoAmazonAccount, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, excludeLowValue, excludeNoAmazonAccount, dateFilter, profitFilter]);
 
   async function fetchSellers() {
     setError('');
@@ -448,6 +460,14 @@ export default function AllOrdersSheetPage() {
       } else if (dateFilter.mode === 'range') {
         if (dateFilter.from) params.startDate = dateFilter.from;
         if (dateFilter.to) params.endDate = dateFilter.to;
+      }
+
+      // Add profit filter parameters
+      if (profitFilter.mode === 'single' && profitFilter.single !== '') {
+        params.maxProfit = profitFilter.single;
+      } else if (profitFilter.mode === 'range') {
+        if (profitFilter.from !== '') params.minProfit = profitFilter.from;
+        if (profitFilter.to !== '') params.maxProfit = profitFilter.to;
       }
 
       const { data } = await api.get('/ebay/all-orders-usd', { params });
@@ -727,6 +747,59 @@ export default function AllOrdersSheetPage() {
                 </>
               )}
 
+              {/* Profit Filter Mode Selector */}
+              <FormControl size="small" sx={{ minWidth: 130 }}>
+                <InputLabel id="profit-mode-label">Profit Filter</InputLabel>
+                <Select
+                  labelId="profit-mode-label"
+                  value={profitFilter.mode}
+                  label="Profit Filter"
+                  onChange={(e) => setProfitFilter(prev => ({ ...prev, mode: e.target.value }))}
+                >
+                  <MenuItem value="none">None</MenuItem>
+                  <MenuItem value="single">≤ Value</MenuItem>
+                  <MenuItem value="range">Range</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Single Profit Input (less than or equal) */}
+              {profitFilter.mode === 'single' && (
+                <TextField
+                  size="small"
+                  label="Max Profit (INR)"
+                  type="number"
+                  value={profitFilter.single}
+                  onChange={(e) => setProfitFilter(prev => ({ ...prev, single: e.target.value }))}
+                  placeholder="e.g. 100"
+                  sx={{ width: 150 }}
+                  helperText="Show profit ≤ this value"
+                />
+              )}
+
+              {/* Range Inputs for Profit */}
+              {profitFilter.mode === 'range' && (
+                <>
+                  <TextField
+                    size="small"
+                    label="Min Profit (INR)"
+                    type="number"
+                    value={profitFilter.from}
+                    onChange={(e) => setProfitFilter(prev => ({ ...prev, from: e.target.value }))}
+                    placeholder="e.g. 100"
+                    sx={{ width: 150 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Max Profit (INR)"
+                    type="number"
+                    value={profitFilter.to}
+                    onChange={(e) => setProfitFilter(prev => ({ ...prev, to: e.target.value }))}
+                    placeholder="e.g. 500"
+                    sx={{ width: 150 }}
+                  />
+                </>
+              )}
+
               {/* Clear Button */}
               <Button
                 size="small"
@@ -735,6 +808,7 @@ export default function AllOrdersSheetPage() {
                   setSearchOrderId('');
                   setSearchBuyerName('');
                   setDateFilter({ mode: 'none', single: '', from: '', to: '' });
+                  setProfitFilter({ mode: 'none', single: '', from: '', to: '' });
                 }}
                 sx={{ minWidth: 80 }}
               >
@@ -856,21 +930,41 @@ export default function AllOrdersSheetPage() {
         </Stack>
       </Paper>
 
-      {/* Orders Count & Pagination - Hide pagination for single date mode */}
-      {!loading && orders.length > 0 && (
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Showing {orders.length} {dateFilter.mode === 'single' ? 'order(s)' : `of ${totalOrders} orders`}
-          </Typography>
-          {dateFilter.mode !== 'single' && (
-            <Pagination
-              count={totalPages}
-              page={currentPage}
-              onChange={(e, page) => setCurrentPage(page)}
-              color="primary"
-            />
-          )}
-        </Stack>
+      {/* Orders Count & Pagination - Enhanced visibility */}
+      {!loading && (
+        <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                {dateFilter.mode === 'single' ? (
+                  <>Total Results: {orders.length} order{orders.length !== 1 ? 's' : ''}</>
+                ) : (
+                  <>
+                    Showing {orders.length > 0 ? `${(currentPage - 1) * ordersPerPage + 1}-${(currentPage - 1) * ordersPerPage + orders.length}` : '0'} of {totalOrders} order{totalOrders !== 1 ? 's' : ''}
+                  </>
+                )}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                {selectedSeller && 'Seller filter active • '}
+                {searchMarketplace && 'Marketplace filter active • '}
+                {(dateFilter.mode !== 'none') && 'Date filter active • '}
+                {(profitFilter.mode !== 'none') && 'Profit filter active • '}
+                {excludeLowValue && 'Hiding <$3 • '}
+                {excludeNoAmazonAccount && 'Hiding no Amazon account • '}
+                {searchOrderId && 'Order ID search active • '}
+                {searchBuyerName && 'Buyer name search active'}
+              </Typography>
+            </Box>
+            {dateFilter.mode !== 'single' && orders.length > 0 && (
+              <Pagination
+                count={totalPages}
+                page={currentPage}
+                onChange={(e, page) => setCurrentPage(page)}
+                color="primary"
+              />
+            )}
+          </Stack>
+        </Paper>
       )}
 
       {/* Orders Table */}
@@ -879,7 +973,7 @@ export default function AllOrdersSheetPage() {
           <CircularProgress />
         </Box>
       ) : orders.length === 0 ? (
-        <Alert severity="info">No orders found</Alert>
+        <Alert severity="info">No orders found{(selectedSeller || searchMarketplace || dateFilter.mode !== 'none' || profitFilter.mode !== 'none' || excludeLowValue || excludeNoAmazonAccount || searchOrderId || searchBuyerName) ? ' with current filters' : ''}</Alert>
       ) : (
         <TableContainer component={Paper} sx={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
           <Table size="small" stickyHeader sx={{ '& thead tr:nth-of-type(2) th': { top: 37, zIndex: 3 } }}>
