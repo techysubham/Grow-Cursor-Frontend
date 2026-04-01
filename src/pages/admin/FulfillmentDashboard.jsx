@@ -88,7 +88,7 @@ import {
   remarkOptionsFromTemplates,
   saveRemarkTemplates
 } from '../../constants/remarkTemplates';
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            import ItemCategoryAssignDialog from '../../components/ItemCategoryAssignDialog.jsx';
+import ItemCategoryAssignDialog from '../../components/ItemCategoryAssignDialog.jsx';
 
 
 // --- IMAGE VIEWER DIALOG ---
@@ -3118,175 +3118,175 @@ function FulfillmentDashboard() {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {/* Row 1: Seller, Poll/Sync Actions, Recalc */}
             <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="seller-select-label">Select Seller</InputLabel>
-              <Select
-                labelId="seller-select-label"
-                value={selectedSeller}
-                label="Select Seller"
-                onChange={(e) => setSelectedSeller(e.target.value)}
-              >
-                <MenuItem value="">
-                  <em>-- Select Seller --</em>
-                </MenuItem>
-                {sellers.map((s) => (
-                  <MenuItem key={s._id} value={s._id}>
-                    {s.user?.username || s.user?.email || s._id}
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel id="seller-select-label">Select Seller</InputLabel>
+                <Select
+                  labelId="seller-select-label"
+                  value={selectedSeller}
+                  label="Select Seller"
+                  onChange={(e) => setSelectedSeller(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>-- Select Seller --</em>
                   </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                  {sellers.map((s) => (
+                    <MenuItem key={s._id} value={s._id}>
+                      {s.user?.username || s.user?.email || s._id}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
-              onClick={pollNewOrders}
-              disabled={loading}
-              sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
-            >
-              {loading ? 'Polling...' : 'Poll New Orders'}
-            </Button>
-
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-              onClick={pollOrderUpdates}
-              disabled={loading}
-              sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
-            >
-              {loading ? 'Updating...' : 'Poll Order Updates'}
-            </Button>
-
-            <FormControl size="small" sx={{ minWidth: 90 }}>
-              <Select
-                value={resyncDays}
-                onChange={(e) => setResyncDays(e.target.value)}
-                sx={{ height: 36, fontSize: '0.85rem' }}
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
+                onClick={pollNewOrders}
+                disabled={loading}
+                sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
               >
-                <MenuItem value={3}>3 Days</MenuItem>
-                <MenuItem value={7}>7 Days</MenuItem>
-                <MenuItem value={10}>10 Days</MenuItem>
-                <MenuItem value={15}>15 Days</MenuItem>
-                <MenuItem value={30}>30 Days</MenuItem>
-              </Select>
-            </FormControl>
+                {loading ? 'Polling...' : 'Poll New Orders'}
+              </Button>
 
-            <Button
-              variant="outlined"
-              color="warning"
-              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
-              onClick={resyncRecent}
-              disabled={loading}
-              sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
-            >
-              {loading ? 'Syncing...' : `Resync ${resyncDays} Days`}
-            </Button>
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+                onClick={pollOrderUpdates}
+                disabled={loading}
+                sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
+              >
+                {loading ? 'Updating...' : 'Poll Order Updates'}
+              </Button>
 
-            <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
-              <span>
-                <Button
-                  variant="outlined"
-                  color="info"
-                  startIcon={recalcEarningsLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
-                  onClick={recalculateEarnings}
-                  disabled={recalcEarningsLoading}
-                  sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+              <FormControl size="small" sx={{ minWidth: 90 }}>
+                <Select
+                  value={resyncDays}
+                  onChange={(e) => setResyncDays(e.target.value)}
+                  sx={{ height: 36, fontSize: '0.85rem' }}
                 >
-                  {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
-                </Button>
-              </span>
-            </Tooltip>
+                  <MenuItem value={3}>3 Days</MenuItem>
+                  <MenuItem value={7}>7 Days</MenuItem>
+                  <MenuItem value={10}>10 Days</MenuItem>
+                  <MenuItem value={15}>15 Days</MenuItem>
+                  <MenuItem value={30}>30 Days</MenuItem>
+                </Select>
+              </FormControl>
 
-            <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
-              <span>
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  startIcon={recalcAmazonLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
-                  onClick={recalculateAmazonFinancials}
-                  disabled={recalcAmazonLoading}
-                  sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
-                >
-                  {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
-                </Button>
-              </span>
-            </Tooltip>
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                onClick={resyncRecent}
+                disabled={loading}
+                sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
+              >
+                {loading ? 'Syncing...' : `Resync ${resyncDays} Days`}
+              </Button>
+
+              <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="info"
+                    startIcon={recalcEarningsLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                    onClick={recalculateEarnings}
+                    disabled={recalcEarningsLoading}
+                    sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                  >
+                    {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
+                  </Button>
+                </span>
+              </Tooltip>
+
+              <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="warning"
+                    startIcon={recalcAmazonLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                    onClick={recalculateAmazonFinancials}
+                    disabled={recalcAmazonLoading}
+                    sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                  >
+                    {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
+                  </Button>
+                </span>
+              </Tooltip>
             </Stack>
 
             {/* Row 2: Filters, Toggles, Column Selector */}
             <Stack direction="row" spacing={2} alignItems="center" sx={{ flexWrap: 'wrap' }}>
-            <Select
-              value={searchMarketplace}
-              onChange={(e) => setSearchMarketplace(e.target.value)}
-              displayEmpty
-              size="small"
-              renderValue={(val) => val ? val : 'Marketplace'}
-              sx={{ minWidth: 145, fontSize: '0.85rem', color: searchMarketplace ? 'inherit' : 'text.secondary' }}
-            >
-              <MenuItem value=""><em>All</em></MenuItem>
-              <MenuItem value="EBAY_US">EBAY_US</MenuItem>
-              <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
-              <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
-              <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
-            </Select>
+              <Select
+                value={searchMarketplace}
+                onChange={(e) => setSearchMarketplace(e.target.value)}
+                displayEmpty
+                size="small"
+                renderValue={(val) => val ? val : 'Marketplace'}
+                sx={{ minWidth: 145, fontSize: '0.85rem', color: searchMarketplace ? 'inherit' : 'text.secondary' }}
+              >
+                <MenuItem value=""><em>All</em></MenuItem>
+                <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+                <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+                <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+                <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
+              </Select>
 
-            <Select
-              value={searchPaymentStatus}
-              onChange={(e) => setSearchPaymentStatus(e.target.value)}
-              displayEmpty
-              size="small"
-              renderValue={(val) => val ? val : 'Payment Status'}
-              sx={{ minWidth: 165, fontSize: '0.85rem', color: searchPaymentStatus ? 'inherit' : 'text.secondary' }}
-            >
-              <MenuItem value=""><em>All</em></MenuItem>
-              <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
-              <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
-            </Select>
+              <Select
+                value={searchPaymentStatus}
+                onChange={(e) => setSearchPaymentStatus(e.target.value)}
+                displayEmpty
+                size="small"
+                renderValue={(val) => val ? val : 'Payment Status'}
+                sx={{ minWidth: 165, fontSize: '0.85rem', color: searchPaymentStatus ? 'inherit' : 'text.secondary' }}
+              >
+                <MenuItem value=""><em>All</em></MenuItem>
+                <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
+                <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
+              </Select>
 
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={excludeLowValue}
-                  onChange={(e) => setExcludeLowValue(e.target.checked)}
-                  color="primary"
-                  size="small"
-                />
-              }
-              label={
-                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
-                  Exclude &lt; $3 Orders
-                </Typography>
-              }
-              sx={{ ml: 0 }}
-            />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={excludeLowValue}
+                    onChange={(e) => setExcludeLowValue(e.target.checked)}
+                    color="primary"
+                    size="small"
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                    Exclude &lt; $3 Orders
+                  </Typography>
+                }
+                sx={{ ml: 0 }}
+              />
 
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={missingAmazonAccount}
-                  onChange={(e) => setMissingAmazonAccount(e.target.checked)}
-                  color="primary"
-                  size="small"
-                />
-              }
-              label={
-                <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
-                  Missing Amazon Acc
-                </Typography>
-              }
-              sx={{ ml: 0 }}
-            />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={missingAmazonAccount}
+                    onChange={(e) => setMissingAmazonAccount(e.target.checked)}
+                    color="primary"
+                    size="small"
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                    Missing Amazon Acc
+                  </Typography>
+                }
+                sx={{ ml: 0 }}
+              />
 
-            {/* Column Selector Button */}
-            <ColumnSelector
-              allColumns={ALL_COLUMNS}
-              visibleColumns={visibleColumns}
-              onColumnChange={setVisibleColumns}
-              onReset={() => setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)}
-              page="dashboard"
-            />
+              {/* Column Selector Button */}
+              <ColumnSelector
+                allColumns={ALL_COLUMNS}
+                visibleColumns={visibleColumns}
+                onColumnChange={setVisibleColumns}
+                onReset={() => setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)}
+                page="dashboard"
+              />
             </Stack>
           </Box>
         )}
@@ -4394,16 +4394,17 @@ function FulfillmentDashboard() {
                             <TableCell>
                               <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                                 {unique.map((issue, idx) => {
-                                  const colorMap = { INR: 'warning', SNAD: 'error', Return: 'info', Dispute: 'secondary' };
+                                  const chipColor = issue.caseStatus === 'Case Opened' ? 'error' : 'primary';
                                   return (
-                                    <Chip
-                                      key={idx}
-                                      label={issue.type}
-                                      size="small"
-                                      color={colorMap[issue.type] || 'default'}
-                                      variant="outlined"
-                                      sx={{ fontWeight: 'bold', fontSize: '0.7rem', height: 20 }}
-                                    />
+                                    <Tooltip key={idx} title={issue.caseStatus || 'Case Not Opened'}>
+                                      <Chip
+                                        label={issue.type}
+                                        size="small"
+                                        color={chipColor}
+                                        variant="outlined"
+                                        sx={{ fontWeight: 'bold', fontSize: '0.7rem', height: 20 }}
+                                      />
+                                    </Tooltip>
                                   );
                                 })}
                               </Stack>
