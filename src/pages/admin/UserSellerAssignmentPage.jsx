@@ -29,11 +29,15 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import api from '../../lib/api';
+import usePageAccess from '../../hooks/usePageAccess';
 
 const UserSellerAssignmentPage = () => {
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
     const userRole = user?.role || '';
+    
+    // Use the page access hook for proper permission checking
+    const { hasAccess } = usePageAccess(user);
 
     const [assignments, setAssignments] = useState([]);
     const [users, setUsers] = useState([]);
@@ -142,7 +146,8 @@ const UserSellerAssignmentPage = () => {
         }
     };
 
-    const canManage = ['superadmin', 'hr', 'hradmin'].includes(userRole);
+    // Check if user has access to this page (already protected by routing, but double-check)
+    const canManage = hasAccess('UserSellerAssignments');
 
     if (pageLoading) return (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
