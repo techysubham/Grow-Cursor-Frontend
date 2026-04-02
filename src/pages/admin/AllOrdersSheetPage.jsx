@@ -27,7 +27,10 @@ import {
   DialogContent,
   DialogActions,
   Switch,
-  FormControlLabel
+  FormControlLabel,
+  List,
+  ListItem,
+  ListItemText
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -39,6 +42,16 @@ export default function AllOrdersSheetPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Counts for categories, ranges, and products
+  const [counts, setCounts] = useState({
+    uniqueCategories: 0,
+    uniqueRanges: 0,
+    uniqueProducts: 0,
+    categoryData: [],
+    rangeData: [],
+    productData: []
+  });
   
   // Exchange rate management
   const [currentExchangeRate, setCurrentExchangeRate] = useState(null);
@@ -104,6 +117,27 @@ export default function AllOrdersSheetPage() {
     to: ''
   }));
 
+  // Subtotal filter
+  const [subtotalFilter, setSubtotalFilter] = useState(() => getInitialState('subtotalFilter', {
+    mode: 'none',
+    single: '',
+    from: '',
+    to: ''
+  }));
+
+  // Toggle states for card sections
+  const [showProfitCards, setShowProfitCards] = useState(() => getInitialState('showProfitCards', true));
+  const [showSubtotalCards, setShowSubtotalCards] = useState(() => getInitialState('showSubtotalCards', true));
+  const [showExchangeRate, setShowExchangeRate] = useState(() => getInitialState('showExchangeRate', true));
+
+  // Modal state for showing category/range/product names
+  const [namesModal, setNamesModal] = useState({
+    open: false,
+    type: '', // 'categories', 'ranges', or 'products'
+    title: '',
+    items: []
+  });
+
   const isInitialMount = useRef(true);
   const hasFetchedInitialData = useRef(false);
   
@@ -113,7 +147,8 @@ export default function AllOrdersSheetPage() {
     searchBuyerName,
     searchMarketplace,
     dateFilter,
-    profitFilter
+    profitFilter,
+    subtotalFilter
   });
 
   // Persist filter state to sessionStorage
@@ -127,15 +162,19 @@ export default function AllOrdersSheetPage() {
       currentPage,
       dateFilter,
       profitFilter,
+      subtotalFilter,
       excludeLowValue,
-      excludeNoAmazonAccount
+      excludeNoAmazonAccount,
+      showProfitCards,
+      showSubtotalCards,
+      showExchangeRate
     };
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, profitFilter, excludeLowValue, excludeNoAmazonAccount]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, profitFilter, subtotalFilter, excludeLowValue, excludeNoAmazonAccount, showProfitCards, showSubtotalCards, showExchangeRate]);
 
   // Initial load
   useEffect(() => {
@@ -175,7 +214,8 @@ export default function AllOrdersSheetPage() {
       prevFilters.current.excludeLowValue !== excludeLowValue ||
       prevFilters.current.excludeNoAmazonAccount !== excludeNoAmazonAccount ||
       JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter) ||
-      JSON.stringify(prevFilters.current.profitFilter) !== JSON.stringify(profitFilter);
+      JSON.stringify(prevFilters.current.profitFilter) !== JSON.stringify(profitFilter) ||
+      JSON.stringify(prevFilters.current.subtotalFilter) !== JSON.stringify(subtotalFilter);
     
     prevFilters.current = {
       selectedSeller,
@@ -185,7 +225,8 @@ export default function AllOrdersSheetPage() {
       excludeLowValue,
       excludeNoAmazonAccount,
       dateFilter,
-      profitFilter
+      profitFilter,
+      subtotalFilter
     };
 
     if (!hasFetchedInitialData.current) return;
@@ -197,7 +238,7 @@ export default function AllOrdersSheetPage() {
         setCurrentPage(1);
       }
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, excludeLowValue, excludeNoAmazonAccount, dateFilter, profitFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, excludeLowValue, excludeNoAmazonAccount, dateFilter, profitFilter, subtotalFilter]);
 
   async function fetchSellers() {
     setError('');
@@ -470,6 +511,14 @@ export default function AllOrdersSheetPage() {
         if (profitFilter.to !== '') params.maxProfit = profitFilter.to;
       }
 
+      // Add subtotal filter parameters
+      if (subtotalFilter.mode === 'single' && subtotalFilter.single !== '') {
+        params.maxSubtotal = subtotalFilter.single;
+      } else if (subtotalFilter.mode === 'range') {
+        if (subtotalFilter.from !== '') params.minSubtotal = subtotalFilter.from;
+        if (subtotalFilter.to !== '') params.maxSubtotal = subtotalFilter.to;
+      }
+
       const { data } = await api.get('/ebay/all-orders-usd', { params });
       setOrders(data?.orders || []);
       
@@ -477,8 +526,13 @@ export default function AllOrdersSheetPage() {
         setTotalPages(data.pagination.totalPages);
         setTotalOrders(data.pagination.totalOrders);
       }
+
+      if (data?.counts) {
+        setCounts(data.counts);
+      }
     } catch (e) {
       setOrders([]);
+      setCounts({ uniqueCategories: 0, uniqueRanges: 0, uniqueProducts: 0, categoryNames: [], rangeNames: [], productNames: [] });
       setError(e?.response?.data?.error || 'Failed to load orders');
     } finally {
       setLoading(false);
@@ -809,12 +863,315 @@ export default function AllOrdersSheetPage() {
                   setSearchBuyerName('');
                   setDateFilter({ mode: 'none', single: '', from: '', to: '' });
                   setProfitFilter({ mode: 'none', single: '', from: '', to: '' });
+                  setSubtotalFilter({ mode: 'none', single: '', from: '', to: '' });
                 }}
                 sx={{ minWidth: 80 }}
               >
                 CLEAR
               </Button>
             </Stack>
+          )}
+        </Box>
+      </Paper>
+
+      {/* Quick Filter Cards */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Quick Filters</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Filters orders based on <strong>profit</strong> (calculated field) and <strong>subtotal</strong> (order subtotal) from the database
+          </Typography>
+        </Stack>
+        
+        {/* Profit Range Cards */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
+              Filter by Profit (INR)
+            </Typography>
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => setShowProfitCards(!showProfitCards)}
+              endIcon={showProfitCards ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            >
+              {showProfitCards ? 'Hide' : 'Show'}
+            </Button>
+          </Box>
+          {showProfitCards && (
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+            <Paper
+              elevation={profitFilter.mode === 'range' && profitFilter.from === '200' && profitFilter.to === '300' ? 8 : 2}
+              sx={{
+                p: 2,
+                cursor: 'pointer',
+                minWidth: 140,
+                textAlign: 'center',
+                border: profitFilter.mode === 'range' && profitFilter.from === '200' && profitFilter.to === '300' 
+                  ? '2px solid #1976d2' 
+                  : '2px solid transparent',
+                backgroundColor: profitFilter.mode === 'range' && profitFilter.from === '200' && profitFilter.to === '300' 
+                  ? '#e3f2fd' 
+                  : 'background.paper',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: 4
+                }
+              }}
+              onClick={() => {
+                // Toggle: if already selected, deselect
+                if (profitFilter.mode === 'range' && profitFilter.from === '200' && profitFilter.to === '300') {
+                  setProfitFilter({ mode: 'none', single: '', from: '', to: '' });
+                } else {
+                  setProfitFilter({ mode: 'range', single: '', from: '200', to: '300' });
+                }
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                ₹200 - ₹300
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Profit Range
+              </Typography>
+            </Paper>
+
+            <Paper
+              elevation={profitFilter.mode === 'range' && profitFilter.from === '500' && profitFilter.to === '600' ? 8 : 2}
+              sx={{
+                p: 2,
+                cursor: 'pointer',
+                minWidth: 140,
+                textAlign: 'center',
+                border: profitFilter.mode === 'range' && profitFilter.from === '500' && profitFilter.to === '600' 
+                  ? '2px solid #1976d2' 
+                  : '2px solid transparent',
+                backgroundColor: profitFilter.mode === 'range' && profitFilter.from === '500' && profitFilter.to === '600' 
+                  ? '#e3f2fd' 
+                  : 'background.paper',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: 4
+                }
+              }}
+              onClick={() => {
+                // Toggle: if already selected, deselect
+                if (profitFilter.mode === 'range' && profitFilter.from === '500' && profitFilter.to === '600') {
+                  setProfitFilter({ mode: 'none', single: '', from: '', to: '' });
+                } else {
+                  setProfitFilter({ mode: 'range', single: '', from: '500', to: '600' });
+                }
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                ₹500 - ₹600
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Profit Range
+              </Typography>
+            </Paper>
+
+            <Paper
+              elevation={profitFilter.mode === 'range' && profitFilter.from === '900' && profitFilter.to === '' ? 8 : 2}
+              sx={{
+                p: 2,
+                cursor: 'pointer',
+                minWidth: 140,
+                textAlign: 'center',
+                border: profitFilter.mode === 'range' && profitFilter.from === '900' && profitFilter.to === '' 
+                  ? '2px solid #1976d2' 
+                  : '2px solid transparent',
+                backgroundColor: profitFilter.mode === 'range' && profitFilter.from === '900' && profitFilter.to === '' 
+                  ? '#e3f2fd' 
+                  : 'background.paper',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: 4
+                }
+              }}
+              onClick={() => {
+                // Toggle: if already selected, deselect
+                if (profitFilter.mode === 'range' && profitFilter.from === '900' && profitFilter.to === '') {
+                  setProfitFilter({ mode: 'none', single: '', from: '', to: '' });
+                } else {
+                  setProfitFilter({ mode: 'range', single: '', from: '900', to: '' });
+                }
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                ₹900+
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Profit Range
+              </Typography>
+            </Paper>
+          </Stack>
+          )}
+        </Box>
+
+        {/* Subtotal Range Cards */}
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
+              Filter by Subtotal (USD)
+            </Typography>
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => setShowSubtotalCards(!showSubtotalCards)}
+              endIcon={showSubtotalCards ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            >
+              {showSubtotalCards ? 'Hide' : 'Show'}
+            </Button>
+          </Box>
+          {showSubtotalCards && (
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+            <Paper
+              elevation={subtotalFilter.mode === 'range' && subtotalFilter.from === '0' && subtotalFilter.to === '15' ? 8 : 2}
+              sx={{
+                p: 2,
+                cursor: 'pointer',
+                minWidth: 140,
+                textAlign: 'center',
+                border: subtotalFilter.mode === 'range' && subtotalFilter.from === '0' && subtotalFilter.to === '15' 
+                  ? '2px solid #1976d2' 
+                  : '2px solid transparent',
+                backgroundColor: subtotalFilter.mode === 'range' && subtotalFilter.from === '0' && subtotalFilter.to === '15' 
+                  ? '#e3f2fd' 
+                  : 'background.paper',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: 4
+                }
+              }}
+              onClick={() => {
+                // Toggle: if already selected, deselect
+                if (subtotalFilter.mode === 'range' && subtotalFilter.from === '0' && subtotalFilter.to === '15') {
+                  setSubtotalFilter({ mode: 'none', single: '', from: '', to: '' });
+                } else {
+                  setSubtotalFilter({ mode: 'range', single: '', from: '0', to: '15' });
+                }
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                $0 - $15
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Subtotal Range
+              </Typography>
+            </Paper>
+
+            <Paper
+              elevation={subtotalFilter.mode === 'range' && subtotalFilter.from === '15' && subtotalFilter.to === '30' ? 8 : 2}
+              sx={{
+                p: 2,
+                cursor: 'pointer',
+                minWidth: 140,
+                textAlign: 'center',
+                border: subtotalFilter.mode === 'range' && subtotalFilter.from === '15' && subtotalFilter.to === '30' 
+                  ? '2px solid #1976d2' 
+                  : '2px solid transparent',
+                backgroundColor: subtotalFilter.mode === 'range' && subtotalFilter.from === '15' && subtotalFilter.to === '30' 
+                  ? '#e3f2fd' 
+                  : 'background.paper',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: 4
+                }
+              }}
+              onClick={() => {
+                // Toggle: if already selected, deselect
+                if (subtotalFilter.mode === 'range' && subtotalFilter.from === '15' && subtotalFilter.to === '30') {
+                  setSubtotalFilter({ mode: 'none', single: '', from: '', to: '' });
+                } else {
+                  setSubtotalFilter({ mode: 'range', single: '', from: '15', to: '30' });
+                }
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                $15 - $30
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Subtotal Range
+              </Typography>
+            </Paper>
+
+            <Paper
+              elevation={subtotalFilter.mode === 'range' && subtotalFilter.from === '30' && subtotalFilter.to === '90' ? 8 : 2}
+              sx={{
+                p: 2,
+                cursor: 'pointer',
+                minWidth: 140,
+                textAlign: 'center',
+                border: subtotalFilter.mode === 'range' && subtotalFilter.from === '30' && subtotalFilter.to === '90' 
+                  ? '2px solid #1976d2' 
+                  : '2px solid transparent',
+                backgroundColor: subtotalFilter.mode === 'range' && subtotalFilter.from === '30' && subtotalFilter.to === '90' 
+                  ? '#e3f2fd' 
+                  : 'background.paper',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: 4
+                }
+              }}
+              onClick={() => {
+                // Toggle: if already selected, deselect
+                if (subtotalFilter.mode === 'range' && subtotalFilter.from === '30' && subtotalFilter.to === '90') {
+                  setSubtotalFilter({ mode: 'none', single: '', from: '', to: '' });
+                } else {
+                  setSubtotalFilter({ mode: 'range', single: '', from: '30', to: '90' });
+                }
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                $30 - $90
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Subtotal Range
+              </Typography>
+            </Paper>
+
+            <Paper
+              elevation={subtotalFilter.mode === 'range' && subtotalFilter.from === '90' && subtotalFilter.to === '' ? 8 : 2}
+              sx={{
+                p: 2,
+                cursor: 'pointer',
+                minWidth: 140,
+                textAlign: 'center',
+                border: subtotalFilter.mode === 'range' && subtotalFilter.from === '90' && subtotalFilter.to === '' 
+                  ? '2px solid #1976d2' 
+                  : '2px solid transparent',
+                backgroundColor: subtotalFilter.mode === 'range' && subtotalFilter.from === '90' && subtotalFilter.to === '' 
+                  ? '#e3f2fd' 
+                  : 'background.paper',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: 4
+                }
+              }}
+              onClick={() => {
+                // Toggle: if already selected, deselect
+                if (subtotalFilter.mode === 'range' && subtotalFilter.from === '90' && subtotalFilter.to === '') {
+                  setSubtotalFilter({ mode: 'none', single: '', from: '', to: '' });
+                } else {
+                  setSubtotalFilter({ mode: 'range', single: '', from: '90', to: '' });
+                }
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                $90+
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Subtotal Range
+              </Typography>
+            </Paper>
+          </Stack>
           )}
         </Box>
       </Paper>
@@ -829,13 +1186,15 @@ export default function AllOrdersSheetPage() {
             <Button
               size="small"
               variant="text"
-              onClick={() => setShowRateHistory(!showRateHistory)}
-              endIcon={showRateHistory ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              onClick={() => setShowExchangeRate(!showExchangeRate)}
+              endIcon={showExchangeRate ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             >
-              {showRateHistory ? 'Hide' : 'Show'} History
+              {showExchangeRate ? 'Hide' : 'Show'}
             </Button>
           </Stack>
 
+          {showExchangeRate && (
+          <>
           <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap">
             <Box>
               <Typography variant="body2" color="text.secondary">eBay Rate</Typography>
@@ -898,6 +1257,14 @@ export default function AllOrdersSheetPage() {
             >
               Set {selectedMarketplace} Rate
             </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setShowRateHistory(!showRateHistory)}
+              endIcon={showRateHistory ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            >
+              {showRateHistory ? 'Hide' : 'Show'} History
+            </Button>
           </Stack>
 
           {showRateHistory && rateHistory.length > 0 && (
@@ -927,13 +1294,15 @@ export default function AllOrdersSheetPage() {
               </TableContainer>
             </Box>
           )}
+          </>
+          )}
         </Stack>
       </Paper>
 
       {/* Orders Count & Pagination - Enhanced visibility */}
       {!loading && (
         <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" spacing={2}>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
                 {dateFilter.mode === 'single' ? (
@@ -949,12 +1318,96 @@ export default function AllOrdersSheetPage() {
                 {searchMarketplace && 'Marketplace filter active • '}
                 {(dateFilter.mode !== 'none') && 'Date filter active • '}
                 {(profitFilter.mode !== 'none') && 'Profit filter active • '}
+                {(subtotalFilter.mode !== 'none') && 'Subtotal filter active • '}
                 {excludeLowValue && 'Hiding <$3 • '}
                 {excludeNoAmazonAccount && 'Hiding no Amazon account • '}
                 {searchOrderId && 'Order ID search active • '}
                 {searchBuyerName && 'Buyer name search active'}
               </Typography>
             </Box>
+            
+            {/* Category, Range, Product Counts */}
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Box 
+                sx={{ 
+                  textAlign: 'center', 
+                  px: 2, 
+                  borderLeft: '2px solid #1976d2', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+                onClick={() => setNamesModal({
+                  open: true,
+                  type: 'categories',
+                  title: 'Categories',
+                  items: counts.categoryData
+                })}
+              >
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                  {counts.uniqueCategories}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Categories
+                </Typography>
+              </Box>
+              <Box 
+                sx={{ 
+                  textAlign: 'center', 
+                  px: 2, 
+                  borderLeft: '2px solid #1976d2', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'rgba(46, 125, 50, 0.08)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+                onClick={() => setNamesModal({
+                  open: true,
+                  type: 'ranges',
+                  title: 'Ranges',
+                  items: counts.rangeData
+                })}
+              >
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                  {counts.uniqueRanges}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Ranges
+                </Typography>
+              </Box>
+              <Box 
+                sx={{ 
+                  textAlign: 'center', 
+                  px: 2, 
+                  borderLeft: '2px solid #1976d2', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'rgba(237, 108, 2, 0.08)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+                onClick={() => setNamesModal({
+                  open: true,
+                  type: 'products',
+                  title: 'Products',
+                  items: counts.productData
+                })}
+              >
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                  {counts.uniqueProducts}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Products
+                </Typography>
+              </Box>
+            </Stack>
+
             {dateFilter.mode !== 'single' && orders.length > 0 && (
               <Pagination
                 count={totalPages}
@@ -973,7 +1426,7 @@ export default function AllOrdersSheetPage() {
           <CircularProgress />
         </Box>
       ) : orders.length === 0 ? (
-        <Alert severity="info">No orders found{(selectedSeller || searchMarketplace || dateFilter.mode !== 'none' || profitFilter.mode !== 'none' || excludeLowValue || excludeNoAmazonAccount || searchOrderId || searchBuyerName) ? ' with current filters' : ''}</Alert>
+        <Alert severity="info">No orders found{(selectedSeller || searchMarketplace || dateFilter.mode !== 'none' || profitFilter.mode !== 'none' || subtotalFilter.mode !== 'none' || excludeLowValue || excludeNoAmazonAccount || searchOrderId || searchBuyerName) ? ' with current filters' : ''}</Alert>
       ) : (
         <TableContainer component={Paper} sx={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
           <Table size="small" stickyHeader sx={{ '& thead tr:nth-of-type(2) th': { top: 37, zIndex: 3 } }}>
@@ -982,8 +1435,8 @@ export default function AllOrdersSheetPage() {
               <TableRow>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 0, zIndex: 4, minWidth: 100 }}>Seller</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 100, zIndex: 4, minWidth: 110 }}>Date Sold</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 210, zIndex: 4, minWidth: 250 }}>Product Name</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 460, zIndex: 4, minWidth: 120, boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}>Marketplace</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 210, zIndex: 4, minWidth: 350 }}>Product Name</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 560, zIndex: 4, minWidth: 120, boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}>Marketplace</TableCell>
                 <TableCell colSpan={12} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderBottom: '2px solid #ffb74d', borderRight: '2px solid #90caf9' }}>eBay Side</TableCell>
                 <TableCell colSpan={5} align="center" sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', borderBottom: '2px solid #81c784', borderRight: '2px solid #90caf9' }}>Amazon Side</TableCell>
                 <TableCell colSpan={3} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fce4ec', borderBottom: '2px solid #f48fb1', borderRight: '2px solid #90caf9' }}>Credit Card</TableCell>
@@ -1066,7 +1519,7 @@ export default function AllOrdersSheetPage() {
                       {formatDate(order.dateSold, order.purchaseMarketplaceId)}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={{ minWidth: 250, maxWidth: 350, position: 'sticky', left: 210, zIndex: 1, bgcolor: 'background.paper' }}>
+                  <TableCell sx={{ minWidth: 350, maxWidth: 500, position: 'sticky', left: 210, zIndex: 1, bgcolor: 'background.paper' }}>
                     <Stack spacing={0.5}>
                       {order.lineItems && order.lineItems.length > 0 ? (
                         order.lineItems.map((item, i) => (
@@ -1116,7 +1569,7 @@ export default function AllOrdersSheetPage() {
                       )}
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ position: 'sticky', left: 460, zIndex: 1, bgcolor: 'background.paper', boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}>
+                  <TableCell sx={{ position: 'sticky', left: 560, zIndex: 1, bgcolor: 'background.paper', boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}>
                     <Chip 
                       label={order.purchaseMarketplaceId?.replace('EBAY_', '') || '-'} 
                       size="small"
@@ -1403,8 +1856,8 @@ export default function AllOrdersSheetPage() {
                   <TableRow sx={{ bgcolor: '#f5f5f5', '& td': { fontWeight: 'bold', borderTop: '2px solid #000' } }}>
                     <TableCell sx={{ position: 'sticky', left: 0, zIndex: 1, bgcolor: '#f5f5f5' }}>TOTALS</TableCell>
                     <TableCell sx={{ position: 'sticky', left: 100, zIndex: 1, bgcolor: '#f5f5f5' }}></TableCell>
-                    <TableCell sx={{ position: 'sticky', left: 210, zIndex: 1, bgcolor: '#f5f5f5' }}></TableCell>
-                    <TableCell sx={{ position: 'sticky', left: 460, zIndex: 1, bgcolor: '#f5f5f5', boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}></TableCell>
+                    <TableCell sx={{ position: 'sticky', left: 210, zIndex: 1, bgcolor: '#f5f5f5', minWidth: 350 }}></TableCell>
+                    <TableCell sx={{ position: 'sticky', left: 560, zIndex: 1, bgcolor: '#f5f5f5', boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}></TableCell>
                     <TableCell align="right">${totals.subtotal.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.shipping.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.salesTax.toFixed(2)}</TableCell>
@@ -1439,6 +1892,60 @@ export default function AllOrdersSheetPage() {
           </Table>
         </TableContainer>
       )}
+
+      {/* Category/Range/Product Names Modal */}
+      <Dialog 
+        open={namesModal.open} 
+        onClose={() => setNamesModal({ ...namesModal, open: false })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {namesModal.title} ({namesModal.items.length})
+        </DialogTitle>
+        <DialogContent>
+          {namesModal.items.length > 0 ? (
+            <List>
+              {namesModal.items.map((item, index) => (
+                <ListItem 
+                  key={index} 
+                  divider={index < namesModal.items.length - 1}
+                  secondaryAction={
+                    <Chip 
+                      label={`${item.count} order${item.count !== 1 ? 's' : ''}`}
+                      size="small"
+                      color={namesModal.type === 'categories' ? 'primary' : 
+                             namesModal.type === 'ranges' ? 'success' : 
+                             'warning'}
+                    />
+                  }
+                >
+                  <ListItemText 
+                    primary={item.name}
+                    primaryTypographyProps={{
+                      sx: { 
+                        fontWeight: 500,
+                        color: namesModal.type === 'categories' ? 'primary.main' : 
+                               namesModal.type === 'ranges' ? 'success.main' : 
+                               'warning.main'
+                      }
+                    }}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+              No {namesModal.title.toLowerCase()} found
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNamesModal({ ...namesModal, open: false })}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Bottom Pagination - Hide for single date mode */}
       {!loading && orders.length > 0 && dateFilter.mode !== 'single' && (
