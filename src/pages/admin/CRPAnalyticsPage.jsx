@@ -2,19 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {
   Box,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Typography,
   CircularProgress,
   Alert,
   TextField,
   Button,
   Stack,
-  Chip,
   FormControl,
   FormControlLabel,
   InputLabel,
@@ -23,9 +16,14 @@ import {
   Switch,
   ToggleButton,
   ToggleButtonGroup,
+  Divider,
+  LinearProgress,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import BarChartIcon from '@mui/icons-material/BarChart';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined';
 import {
   ResponsiveContainer,
   BarChart,
@@ -36,7 +34,8 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
+  Label,
+  LabelList,
 } from 'recharts';
 import api from '../../lib/api';
 
@@ -44,7 +43,78 @@ const COLORS = [
   '#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f',
   '#0288d1', '#388e3c', '#f57c00', '#7b1fa2', '#c62828',
   '#0097a7', '#558b2f', '#ff8f00', '#ad1457', '#37474f',
+  '#4e342e', '#00695c', '#1565c0', '#e65100', '#4a148c',
 ];
+
+// ── Donut centre label ────────────────────────────────────────────────────────
+const DonutCenter = ({ viewBox, total }) => {
+  const { cx, cy } = viewBox || {};
+  if (cx == null) return null;
+  return (
+    <g>
+      <text x={cx} y={cy - 6} textAnchor="middle" dominantBaseline="middle"
+        style={{ fontSize: 22, fontWeight: 700, fill: '#1a1a1a' }}>
+        {total.toLocaleString()}
+      </text>
+      <text x={cx} y={cy + 15} textAnchor="middle" dominantBaseline="middle"
+        style={{ fontSize: 11, fill: '#888' }}>
+        orders
+      </text>
+    </g>
+  );
+};
+
+// ── Custom bar tooltip ────────────────────────────────────────────────────────
+const BarTooltipContent = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <Paper elevation={3} sx={{ p: 1.5, minWidth: 160 }}>
+      <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>{d.name}</Typography>
+      <Typography variant="body2" color="text.secondary">{d.count.toLocaleString()} orders</Typography>
+      <Typography variant="body2" color="primary">{d.percentage}% of total</Typography>
+    </Paper>
+  );
+};
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+function StatCard({ icon, label, value, sub, color = '#1976d2' }) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        flex: '1 1 0',
+        minWidth: 150,
+        p: 1.75,
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 1.5,
+      }}
+    >
+      <Box
+        sx={{
+          mt: 0.25,
+          width: 36, height: 36, borderRadius: '10px',
+          bgcolor: color,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+          opacity: 0.9,
+          color: '#fff',
+        }}
+      >
+        {icon}
+      </Box>
+      <Box>
+        <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3, display: 'block' }}>{label}</Typography>
+        <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.3, fontSize: '1.1rem' }}>{value}</Typography>
+        {sub && <Typography variant="caption" color="text.disabled" sx={{ lineHeight: 1.2, display: 'block' }}>{sub}</Typography>}
+      </Box>
+    </Paper>
+  );
+}
 
 export default function CRPAnalyticsPage() {
   const [data, setData] = useState([]);
@@ -62,20 +132,15 @@ export default function CRPAnalyticsPage() {
     to: '',
   });
 
-  useEffect(() => {
-    fetchSellers();
-  }, []);
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, [dateFilter, selectedSeller, excludeLowValue, groupBy]);
+  useEffect(() => { fetchSellers(); }, []);
+  useEffect(() => { fetchAnalytics(); }, [dateFilter, selectedSeller, excludeLowValue, groupBy]);
 
   const fetchSellers = async () => {
     try {
-      const response = await api.get('/sellers/all');
-      setSellers(response.data || []);
-    } catch (err) {
-      console.error('Error fetching sellers:', err);
+      const res = await api.get('/sellers/all');
+      setSellers(res.data || []);
+    } catch (e) {
+      console.error('Error fetching sellers:', e);
     }
   };
 
@@ -83,72 +148,58 @@ export default function CRPAnalyticsPage() {
     try {
       setLoading(true);
       setError('');
-
       const params = { groupBy, excludeLowValue };
-
       if (dateFilter.mode === 'single' && dateFilter.single) {
-        params.startDate = dateFilter.single;
-        params.endDate = dateFilter.single;
+        params.startDate = params.endDate = dateFilter.single;
       } else if (dateFilter.mode === 'range') {
         if (dateFilter.from) params.startDate = dateFilter.from;
         if (dateFilter.to) params.endDate = dateFilter.to;
       }
-
       if (selectedSeller) params.sellerId = selectedSeller;
 
-      const response = await api.get('/orders/crp-analytics', { params });
-      const results = response.data || [];
-
-      const total = results.reduce((sum, r) => sum + r.count, 0);
-      const enriched = results.map(r => ({
+      const res = await api.get('/orders/crp-analytics', { params });
+      const results = res.data || [];
+      const total = results.reduce((s, r) => s + r.count, 0);
+      setData(results.map(r => ({
         ...r,
         percentage: total > 0 ? ((r.count / total) * 100).toFixed(1) : '0.0',
-      }));
-
-      setData(enriched);
-    } catch (err) {
-      console.error('Error fetching CRP analytics:', err);
+      })));
+    } catch (e) {
+      console.error('Error fetching CRP analytics:', e);
       setError('Failed to load CRP analytics. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const totalOrders = data.reduce((sum, r) => sum + r.count, 0);
-
+  // Derived stats
+  const totalOrders = data.reduce((s, r) => s + r.count, 0);
+  const unassigned = data.find(d => d.name === 'Unassigned');
+  const unassignedCount = unassigned?.count ?? 0;
+  const assignedCount = totalOrders - unassignedCount;
+  const assignedPct = totalOrders > 0 ? ((assignedCount / totalOrders) * 100).toFixed(1) : '0.0';
+  const unassignedPct = totalOrders > 0 ? ((unassignedCount / totalOrders) * 100).toFixed(1) : '0.0';
+  const topAssigned = data.filter(d => d.name !== 'Unassigned')[0];
   const groupByLabel = { category: 'Category', range: 'Range', product: 'Product' }[groupBy];
+  const barHeight = Math.max(240, data.length * 34);
 
   return (
     <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            CRP Analytics
-          </Typography>
+      {/* ── Page header + inline filters ────────────────────────────────────── */}
+      <Stack direction={{ xs: 'column', xl: 'row' }} alignItems={{ xl: 'flex-start' }}
+        justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+        <Box sx={{ flexShrink: 0 }}>
+          <Typography variant="h5" fontWeight={700}>CRP Analytics</Typography>
           <Typography variant="body2" color="text.secondary">
-            Orders grouped by Category, Range, or Product assignment (PST timezone).
+            Orders grouped by {groupByLabel.toLowerCase()} assignment · PST timezone
           </Typography>
         </Box>
-        <Chip
-          icon={<BarChartIcon />}
-          label={`${totalOrders} Total Orders`}
-          color="primary"
-          sx={{ fontSize: '1rem', px: 1, py: 2.5 }}
-        />
-      </Stack>
 
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" flexWrap="wrap">
-          {/* Date Mode */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+          <FormControl size="small" sx={{ minWidth: 130 }}>
             <InputLabel>Date Mode</InputLabel>
-            <Select
-              value={dateFilter.mode}
-              label="Date Mode"
-              onChange={(e) => setDateFilter(prev => ({ ...prev, mode: e.target.value }))}
-            >
+            <Select value={dateFilter.mode} label="Date Mode"
+              onChange={(e) => setDateFilter(p => ({ ...p, mode: e.target.value }))}>
               <MenuItem value="none">None</MenuItem>
               <MenuItem value="single">Single Day</MenuItem>
               <MenuItem value="range">Date Range</MenuItem>
@@ -156,103 +207,61 @@ export default function CRPAnalyticsPage() {
           </FormControl>
 
           {dateFilter.mode === 'single' && (
-            <TextField
-              label="Date"
-              type="date"
+            <TextField label="Date" type="date" size="small"
               value={dateFilter.single}
-              onChange={(e) => setDateFilter(prev => ({ ...prev, single: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-              size="small"
-              sx={{ minWidth: 200 }}
-            />
+              onChange={(e) => setDateFilter(p => ({ ...p, single: e.target.value }))}
+              InputLabelProps={{ shrink: true }} sx={{ width: 158 }} />
           )}
-
           {dateFilter.mode === 'range' && (
             <>
-              <TextField
-                label="From"
-                type="date"
+              <TextField label="From" type="date" size="small"
                 value={dateFilter.from}
-                onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
-                size="small"
-                sx={{ minWidth: 200 }}
-              />
-              <TextField
-                label="To"
-                type="date"
+                onChange={(e) => setDateFilter(p => ({ ...p, from: e.target.value }))}
+                InputLabelProps={{ shrink: true }} sx={{ width: 152 }} />
+              <TextField label="To" type="date" size="small"
                 value={dateFilter.to}
-                onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
-                size="small"
-                sx={{ minWidth: 200 }}
-              />
+                onChange={(e) => setDateFilter(p => ({ ...p, to: e.target.value }))}
+                InputLabelProps={{ shrink: true }} sx={{ width: 152 }} />
             </>
           )}
 
-          {/* Seller */}
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl size="small" sx={{ minWidth: 170 }}>
             <InputLabel>Seller</InputLabel>
-            <Select
-              value={selectedSeller}
-              onChange={(e) => setSelectedSeller(e.target.value)}
-              label="Seller"
-            >
+            <Select value={selectedSeller}
+              onChange={(e) => setSelectedSeller(e.target.value)} label="Seller">
               <MenuItem value="">All Sellers</MenuItem>
-              {sellers.map((seller) => (
-                <MenuItem key={seller._id} value={seller._id}>
-                  {seller.user?.username || 'Unknown'}
-                </MenuItem>
+              {sellers.map(s => (
+                <MenuItem key={s._id} value={s._id}>{s.user?.username || 'Unknown'}</MenuItem>
               ))}
             </Select>
           </FormControl>
 
-          {/* Group By */}
-          <ToggleButtonGroup
-            value={groupBy}
-            exclusive
-            onChange={(_, val) => { if (val) setGroupBy(val); }}
-            size="small"
-          >
+          <ToggleButtonGroup value={groupBy} exclusive size="small"
+            onChange={(_, v) => { if (v) setGroupBy(v); }}>
             <ToggleButton value="category">Category</ToggleButton>
             <ToggleButton value="range">Range</ToggleButton>
             <ToggleButton value="product">Product</ToggleButton>
           </ToggleButtonGroup>
 
-          {/* Exclude Low Value */}
           <FormControlLabel
-            control={
-              <Switch
-                checked={excludeLowValue}
-                onChange={(e) => setExcludeLowValue(e.target.checked)}
-                color="primary"
-                size="small"
-              />
-            }
-            label={
-              <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
-                Exclude &lt; $3 Orders
-              </Typography>
-            }
+            control={<Switch checked={excludeLowValue} size="small" color="primary"
+              onChange={(e) => setExcludeLowValue(e.target.checked)} />}
+            label={<Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Excl. &lt;$3</Typography>}
             sx={{ mx: 1 }}
           />
 
-          <Button
-            variant="outlined"
-            startIcon={loading ? <CircularProgress size={16} /> : <RefreshIcon />}
-            onClick={fetchAnalytics}
-            disabled={loading}
-            size="small"
-          >
+          <Button variant="outlined" size="small"
+            startIcon={loading ? <CircularProgress size={14} /> : <RefreshIcon />}
+            onClick={fetchAnalytics} disabled={loading}>
             Refresh
           </Button>
         </Stack>
-      </Paper>
+      </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress />
         </Box>
       )}
@@ -263,107 +272,161 @@ export default function CRPAnalyticsPage() {
 
       {!loading && data.length > 0 && (
         <>
-          {/* Bar Chart */}
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              Orders by {groupByLabel}
-            </Typography>
-            <ResponsiveContainer width="100%" height={Math.max(300, data.length * 36)}>
-              <BarChart
-                layout="vertical"
-                data={data}
-                margin={{ top: 5, right: 30, left: 24, bottom: 5 }}
-              >
-                <XAxis type="number" allowDecimals={false} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={160}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip
-                  formatter={(value, name) => [value, 'Orders']}
-                />
-                <Bar dataKey="count" name="Orders" radius={[0, 4, 4, 0]}>
-                  {data.map((entry, index) => (
-                    <Cell key={entry.id ?? index} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </Paper>
+          {/* ── Stat cards ────────────────────────────────────────────────────── */}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
+            <StatCard
+              icon={<TrendingUpIcon sx={{ fontSize: 19 }} />}
+              label="Total Orders"
+              value={totalOrders.toLocaleString()}
+              color="#1976d2"
+            />
+            <StatCard
+              icon={<CheckCircleOutlineIcon sx={{ fontSize: 19 }} />}
+              label="Assigned"
+              value={`${assignedPct}%`}
+              sub={`${assignedCount.toLocaleString()} orders`}
+              color="#2e7d32"
+            />
+            <StatCard
+              icon={<HelpOutlineIcon sx={{ fontSize: 19 }} />}
+              label="Unassigned"
+              value={`${unassignedPct}%`}
+              sub={`${unassignedCount.toLocaleString()} orders`}
+              color="#d32f2f"
+            />
+            <StatCard
+              icon={<EmojiEventsOutlinedIcon sx={{ fontSize: 19 }} />}
+              label={`Top ${groupByLabel}`}
+              value={topAssigned?.name ?? '—'}
+              sub={topAssigned ? `${topAssigned.count.toLocaleString()} orders · ${topAssigned.percentage}%` : ''}
+              color="#ed6c02"
+            />
+          </Stack>
 
-          {/* Pie Chart */}
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              Share by {groupByLabel}
-            </Typography>
-            <ResponsiveContainer width="100%" height={380}>
-              <PieChart>
-                <Pie
-                  data={data}
-                  dataKey="count"
-                  nameKey="name"
-                  cx="50%"
-                  cy="45%"
-                  outerRadius={140}
-                  label={({ name, percentage }) => `${name}: ${percentage}%`}
-                  labelLine={false}
-                >
-                  {data.map((entry, index) => (
-                    <Cell key={entry.id ?? index} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [value, 'Orders']} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </Paper>
+          {/* ── Charts ────────────────────────────────────────────────────────── */}
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
 
-          {/* Summary Table */}
-          <Paper>
-            <Typography variant="h6" sx={{ p: 2, pb: 0 }}>
-              Summary
-            </Typography>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>{groupByLabel}</strong></TableCell>
-                    <TableCell align="right"><strong>Orders</strong></TableCell>
-                    <TableCell align="right"><strong>Share %</strong></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {data.map((row, index) => (
-                    <TableRow key={row.id ?? index} hover>
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <Box
-                            sx={{
-                              width: 12,
-                              height: 12,
-                              borderRadius: '50%',
-                              bgcolor: COLORS[index % COLORS.length],
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Typography variant="body2">{row.name}</Typography>
-                        </Stack>
-                      </TableCell>
-                      <TableCell align="right">{row.count}</TableCell>
-                      <TableCell align="right">{row.percentage}%</TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow sx={{ bgcolor: 'action.hover' }}>
-                    <TableCell><strong>Total</strong></TableCell>
-                    <TableCell align="right"><strong>{totalOrders}</strong></TableCell>
-                    <TableCell align="right"><strong>100%</strong></TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+            {/* Left: Horizontal bar chart */}
+            <Paper elevation={0} sx={{
+              flex: '3 1 0', minWidth: 0,
+              border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2,
+            }}>
+              <Typography variant="subtitle1" fontWeight={700}>Orders by {groupByLabel}</Typography>
+              <Typography variant="caption" color="text.secondary">Sorted by volume · hover for details</Typography>
+              <Box sx={{ mt: 2 }}>
+                <ResponsiveContainer width="100%" height={barHeight}>
+                  <BarChart
+                    layout="vertical"
+                    data={data}
+                    margin={{ top: 2, right: 52, left: 8, bottom: 2 }}
+                  >
+                    <XAxis type="number" allowDecimals={false}
+                      tick={{ fontSize: 11, fill: '#999' }}
+                      axisLine={false} tickLine={false} />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={155}
+                      tick={{ fontSize: 11, fill: '#555' }}
+                      axisLine={false} tickLine={false}
+                      tickFormatter={(v) => v.length > 22 ? v.slice(0, 21) + '…' : v}
+                    />
+                    <Tooltip content={<BarTooltipContent />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                    <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={20}>
+                      {data.map((entry, i) => (
+                        <Cell key={entry.id ?? i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                      <LabelList
+                        dataKey="count"
+                        position="right"
+                        style={{ fontSize: 11, fill: '#555', fontWeight: 600 }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+
+            {/* Right: Donut + legend table */}
+            <Paper elevation={0} sx={{
+              flex: '2 1 0', minWidth: 280,
+              border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2,
+              display: 'flex', flexDirection: 'column',
+            }}>
+              <Typography variant="subtitle1" fontWeight={700}>Share by {groupByLabel}</Typography>
+              <Typography variant="caption" color="text.secondary">Proportional breakdown</Typography>
+
+              {/* Donut */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 1 }}>
+                <PieChart width={200} height={200}>
+                  <Pie
+                    data={data}
+                    dataKey="count"
+                    nameKey="name"
+                    cx={100} cy={100}
+                    innerRadius={58}
+                    outerRadius={92}
+                    startAngle={90}
+                    endAngle={-270}
+                    paddingAngle={data.length > 1 ? 1.5 : 0}
+                  >
+                    <Label content={<DonutCenter total={totalOrders} />} position="center" />
+                    {data.map((entry, i) => (
+                      <Cell key={entry.id ?? i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(v, _n, p) => [
+                      `${v.toLocaleString()} orders (${p.payload.percentage}%)`,
+                      p.payload.name,
+                    ]}
+                  />
+                </PieChart>
+              </Box>
+
+              <Divider sx={{ mb: 1.5 }} />
+
+              {/* Scrollable legend table */}
+              <Box sx={{ overflowY: 'auto', flex: 1 }}>
+                {data.map((entry, i) => (
+                  <Box key={entry.id ?? i} sx={{ mb: 1.2 }}>
+                    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.35 }}>
+                      <Box sx={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        bgcolor: COLORS[i % COLORS.length], flexShrink: 0,
+                      }} />
+                      <Typography variant="caption" sx={{
+                        flex: 1, fontWeight: 500,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {entry.name}
+                      </Typography>
+                      <Typography variant="caption" fontWeight={700} sx={{ flexShrink: 0, minWidth: 33, textAlign: 'right' }}>
+                        {entry.count.toLocaleString()}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, minWidth: 38, textAlign: 'right' }}>
+                        {entry.percentage}%
+                      </Typography>
+                    </Stack>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(parseFloat(entry.percentage), 100)}
+                      sx={{
+                        height: 3, borderRadius: 2,
+                        bgcolor: 'grey.100',
+                        ml: '14px',
+                        '& .MuiLinearProgress-bar': {
+                          bgcolor: COLORS[i % COLORS.length],
+                          borderRadius: 2,
+                        },
+                      }}
+                    />
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+
+          </Stack>
         </>
       )}
     </Box>
