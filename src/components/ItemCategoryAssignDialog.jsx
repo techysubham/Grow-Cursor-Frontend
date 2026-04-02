@@ -25,8 +25,10 @@ import {
   Delete as DeleteIcon,
   Check as CheckIcon,
   Close as CloseIcon,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
+import InputAdornment from '@mui/material/InputAdornment';
 import api from '../lib/api.js';
 
 // ── Simplified taxonomy panel (add/select/delete only) ─────────────────────
@@ -42,9 +44,14 @@ function TaxonomyPanel({
   emptyText,
   addPlaceholder,
   saving,
+  searchable,
 }) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Reset search when items change (panel switches to new category/range)
+  useEffect(() => { setSearchQuery(''); }, [items]);
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
@@ -90,6 +97,34 @@ function TaxonomyPanel({
         </Stack>
       </Box>
 
+      {/* Search bar */}
+      {searchable && !disabled && !loading && (
+        <Box sx={{ px: 1.5, py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={`Search ${title.toLowerCase()}...`}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchQuery('')} edge="end">
+                    <CloseIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null
+            }}
+            sx={{ '& input': { py: 0.5, fontSize: 13 } }}
+          />
+        </Box>
+      )}
+
       {/* Inline add field */}
       {adding && (
         <Box sx={{ px: 1.5, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
@@ -128,9 +163,17 @@ function TaxonomyPanel({
           <Box sx={{ py: 4, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">No items yet</Typography>
           </Box>
-        ) : (
+        ) : (() => {
+          const filtered = searchQuery.trim()
+            ? items.filter(item => item.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+            : items;
+          return filtered.length === 0 ? (
+            <Box sx={{ py: 3, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">No matches</Typography>
+            </Box>
+          ) : (
           <List dense disablePadding>
-            {items.map(item => (
+            {filtered.map(item => (
               <ListItem key={item._id} disablePadding>
                 <ListItemButton
                   selected={selectedId === item._id}
@@ -160,7 +203,9 @@ function TaxonomyPanel({
               </ListItem>
             ))}
           </List>
-        )}
+          )
+        })()
+        }
       </Box>
     </Box>
   );
@@ -470,6 +515,7 @@ export default function ItemCategoryAssignDialog({
               emptyText="Select a category"
               addPlaceholder="Range name"
               saving={savingRange}
+              searchable
             />
             <TaxonomyPanel
               title="Products"
@@ -483,6 +529,7 @@ export default function ItemCategoryAssignDialog({
               emptyText="Select a range"
               addPlaceholder="Product name"
               saving={savingProduct}
+              searchable
             />
           </Box>
 

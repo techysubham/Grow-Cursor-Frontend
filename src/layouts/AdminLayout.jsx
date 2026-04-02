@@ -105,6 +105,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import IdeasPage from '../pages/IdeasPage.jsx';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
+import CRPAnalyticsPage from '../pages/admin/CRPAnalyticsPage.jsx';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import SellerAnalyticsPage from '../pages/admin/SellerAnalyticsPage.jsx';
 import OrdersDepartmentDashboardPage from '../pages/admin/OrdersDepartmentDashboardPage.jsx';
@@ -223,6 +224,7 @@ const flyoutMenuSx = {
 const COMPONENT_MAP = {
   'OrdersDashboard': OrdersDepartmentDashboardPage,
   'OrderAnalytics': OrderAnalyticsPage,
+  'CRPAnalytics': CRPAnalyticsPage,
   'Fulfillment': FulfillmentDashboard,
   'AwaitingShipment': AwaitingShipmentPage,
   'AwaitingSheet': AwaitingSheetPage,
