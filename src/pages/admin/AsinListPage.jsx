@@ -64,7 +64,7 @@ export default function AsinListPage() {
   // ── Selection ───────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState([]);
 
-  // ── Filters ─────────────────────────────────────────────────────────────────
+  // ── Filters ──────────────────────────────────────────────────────
   const [keyword, setKeyword] = useState('');
   const [searchActive, setSearchActive] = useState('');  // committed on button press
 
@@ -75,6 +75,10 @@ export default function AsinListPage() {
   const [priceMaxActive, setPriceMaxActive] = useState('');
   const [ordersComparator, setOrdersComparator] = useState('more than');
   const [ordersValue, setOrdersValue] = useState('');
+
+  // Moved-to-list date filter
+  const [movedAfter, setMovedAfter] = useState('');
+  const [movedBefore, setMovedBefore] = useState('');
 
   // ── Feedback ────────────────────────────────────────────────────────────────
   const [error, setError] = useState('');
@@ -156,6 +160,8 @@ export default function AsinListPage() {
           search: searchActive || undefined,
           priceMin: priceMinActive || undefined,
           priceMax: priceMaxActive || undefined,
+          movedAfter: movedAfter || undefined,
+          movedBefore: movedBefore || undefined,
         }
       });
       setAsins(data.asins || []);
@@ -166,7 +172,7 @@ export default function AsinListPage() {
     } finally {
       setLoading(false);
     }
-  }, [productId, rangeId, page, rowsPerPage, searchActive, priceMinActive, priceMaxActive]);
+  }, [productId, rangeId, page, rowsPerPage, searchActive, priceMinActive, priceMaxActive, movedAfter, movedBefore]);
 
   useEffect(() => {
     if (rangeId) {
@@ -414,7 +420,7 @@ export default function AsinListPage() {
 
           <Divider />
 
-          {/* Row 2: Price Range + Orders Received */}
+          {/* Row 2: Price Range + Orders Received + Moved to List date filter */}
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
             <Typography variant="body2" color="text.secondary" fontWeight={500}>
               Price Range
@@ -464,6 +470,39 @@ export default function AsinListPage() {
               type="number"
               placeholder="0"
             />
+
+            <Box sx={{ width: 24 }} />
+
+            <Typography variant="body2" color="text.secondary" fontWeight={500}>
+              Moved to List
+            </Typography>
+            <TextField
+              size="small"
+              label="From"
+              type="date"
+              value={movedAfter}
+              onChange={e => { setMovedAfter(e.target.value); setPage(0); }}
+              sx={{ width: 145 }}
+              InputLabelProps={{ shrink: true }}
+            />
+            <Typography variant="body2">–</Typography>
+            <TextField
+              size="small"
+              label="To"
+              type="date"
+              value={movedBefore}
+              onChange={e => { setMovedBefore(e.target.value); setPage(0); }}
+              sx={{ width: 145 }}
+              InputLabelProps={{ shrink: true }}
+            />
+            {(movedAfter || movedBefore) && (
+              <Button
+                size="small"
+                onClick={() => { setMovedAfter(''); setMovedBefore(''); setPage(0); }}
+              >
+                Clear
+              </Button>
+            )}
           </Stack>
 
         </Stack>
