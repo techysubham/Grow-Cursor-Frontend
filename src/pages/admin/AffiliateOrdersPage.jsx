@@ -119,7 +119,14 @@ const AFFILIATE_EXPORT_COLUMNS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getTodayStr() {
-    return new Date().toISOString().slice(0, 10);
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
 }
 
 function fmt(val, digits = 2) {
@@ -155,6 +162,10 @@ function getSellerGroupName(order) {
     return order?.sellerGroupName || order?.seller?.user?.username || order?.sellerId || 'Unknown Seller';
 }
 
+function hasAffiliateLinks(order) {
+    return Boolean(String(order?.affiliateLinks || '').trim());
+}
+
 function normalizeAffiliateOrder(order) {
     const carryOverDays = Math.max(0, Number(order?.carryOverDays) || 0);
     const isCarryOver = order?.sourcingStatus === 'Not Yet' && (Boolean(order?.isCarryOver) || carryOverDays > 0);
@@ -171,6 +182,11 @@ function normalizeAffiliateOrder(order) {
 
 function getOrderSpendAmount(order) {
     return Number(order?.affiliatePrice) || 0;
+}
+
+function getOrderGiftCardBaseAmount(order) {
+    const beforeTax = Number(order?.beforeTax) || 0;
+    return beforeTax > 0 ? beforeTax : getOrderSpendAmount(order);
 }
 
 function getOrderCreditCardBaseAmount(order) {
@@ -984,6 +1000,8 @@ export default function AffiliateOrdersPage() {
     const [orders, setOrders] = useState([]);
     const [ordersLoading, setOrdersLoading] = useState(false);
     const [ordersError, setOrdersError] = useState('');
+    const [sellerOptions, setSellerOptions] = useState([]);
+    const [sellerOptionsLoading, setSellerOptionsLoading] = useState(false);
     const [amazonAccounts, setAmazonAccounts] = useState([]);
 
     // Tab 2 state
@@ -1033,29 +1051,53 @@ export default function AffiliateOrdersPage() {
         sessionStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns));
     }, [visibleColumns]);
 
-    const sellerOptions = useMemo(() => (
-        Array.from(new Set(orders.map((order) => order.sellerGroupName || 'Unknown Seller')))
-            .sort((left, right) => left.localeCompare(right))
-    ), [orders]);
-
-    const activeSeller = selectedSeller || sellerOptions[0] || '';
-
     useEffect(() => {
+        if (sellerOptionsLoading) {
+            return;
+        }
+
         if (sellerOptions.length === 0) {
             if (selectedSeller) {
                 setSelectedSeller('');
             }
+            setOrders([]);
             return;
         }
 
-        if (!selectedSeller || !sellerOptions.includes(selectedSeller)) {
-            setSelectedSeller(sellerOptions[0]);
+        if (!selectedSeller || !sellerOptions.some((option) => option.value === selectedSeller)) {
+            setSelectedSeller(sellerOptions[0].value);
         }
-    }, [selectedSeller, sellerOptions]);
+    }, [selectedSeller, sellerOptions, sellerOptionsLoading]);
 
     // ── Fetch ──────────────────────────────────────────────────────────────────
 
+    const fetchSellerOptions = useCallback(async () => {
+        setSellerOptionsLoading(true);
+        setOrdersError('');
+        try {
+            const { data } = await api.get('/affiliate-orders/daily/sellers', {
+                params: {
+                    date,
+                    excludeLowValue: excludeLowValue ? 'true' : 'false',
+                    includeDone: showDoneEntries ? 'true' : 'false',
+                }
+            });
+            setSellerOptions(data || []);
+        } catch (err) {
+            setSellerOptions([]);
+            setOrders([]);
+            setOrdersError(err?.response?.data?.error || 'Failed to load seller options');
+        } finally {
+            setSellerOptionsLoading(false);
+        }
+    }, [date, excludeLowValue, showDoneEntries]);
+
     const fetchOrders = useCallback(async () => {
+        if (!selectedSeller) {
+            setOrders([]);
+            return;
+        }
+
         setOrdersLoading(true);
         setOrdersError('');
         try {
@@ -1064,6 +1106,7 @@ export default function AffiliateOrdersPage() {
                     date,
                     excludeLowValue: excludeLowValue ? 'true' : 'false',
                     includeDone: showDoneEntries ? 'true' : 'false',
+                    sellerId: selectedSeller,
                 }
             });
             setOrders((data || []).map(normalizeAffiliateOrder));
@@ -1072,7 +1115,7 @@ export default function AffiliateOrdersPage() {
         } finally {
             setOrdersLoading(false);
         }
-    }, [date, excludeLowValue, showDoneEntries]);
+    }, [date, excludeLowValue, selectedSeller, showDoneEntries]);
 
     const fetchAmazonAccounts = useCallback(async () => {
         try {
@@ -1121,12 +1164,24 @@ export default function AffiliateOrdersPage() {
     }, [date, excludeLowValue]);
 
     useEffect(() => {
-        fetchOrders();
+        fetchSellerOptions();
         fetchAmazonAccounts();
         fetchBalances();
         fetchSummary();
         fetchSpendOrders();
-    }, [date, excludeLowValue, showDoneEntries, fetchOrders, fetchAmazonAccounts, fetchBalances, fetchSummary, fetchSpendOrders]);
+    }, [date, excludeLowValue, showDoneEntries, fetchSellerOptions, fetchAmazonAccounts, fetchBalances, fetchSummary, fetchSpendOrders]);
+
+    useEffect(() => {
+        if (sellerOptionsLoading || !selectedSeller) {
+            return;
+        }
+
+        if (!sellerOptions.some((option) => option.value === selectedSeller)) {
+            return;
+        }
+
+        fetchOrders();
+    }, [fetchOrders, selectedSeller, sellerOptions, sellerOptionsLoading]);
 
     // ── Order field patch ──────────────────────────────────────────────────────
 
@@ -1314,19 +1369,17 @@ export default function AffiliateOrdersPage() {
 
     const isColVisible = (id) => visibleColumns.includes(id);
     const visibleColumnCount = DAILY_ORDER_ALL_COLUMNS.filter((c) => visibleColumns.includes(c.id)).length;
-    const displayedOrders = useMemo(() => {
-        const filteredOrders = activeSeller
-            ? orders.filter((order) => (order.sellerGroupName || 'Unknown Seller') === activeSeller)
-            : orders;
-
-        return sortAffiliateOrders(filteredOrders);
-    }, [activeSeller, orders]);
+    const displayedOrders = useMemo(() => sortAffiliateOrders(orders), [orders]);
+    const isDailyOrdersLoading = ordersLoading || sellerOptionsLoading;
     const orderSections = buildOrderSections(displayedOrders, showNotYetFirst);
     const exportOrders = orderSections.flatMap((section) => section.orders);
+    const exportEligibleOrders = useMemo(() => (
+        exportOrders.filter((order) => order.sourcingStatus === 'Not Yet' && hasAffiliateLinks(order))
+    ), [exportOrders]);
     const notYetCount = displayedOrders.filter((order) => order.sourcingStatus === 'Not Yet').length;
     const carryOverCount = displayedOrders.filter((order) => order.isCarryOver).length;
     const sellerGroupStats = getSellerGroupStats(displayedOrders);
-    const sellerGroupCount = Object.keys(sellerGroupStats).length;
+    const sellerGroupCount = sellerOptions.length;
     const balanceByAccountName = useMemo(() => balances.reduce((acc, row) => {
         acc[row.amazonAccountName] = row;
         return acc;
@@ -1336,7 +1389,7 @@ export default function AffiliateOrdersPage() {
             const balanceRow = balanceByAccountName[order.amazonAccount] || null;
             const paymentType = Number(balanceRow?.addedBalance) > 0 ? 'Gift Card' : 'Credit Card';
             const baseAmount = paymentType === 'Gift Card'
-                ? getOrderSpendAmount(order)
+                ? getOrderGiftCardBaseAmount(order)
                 : getOrderCreditCardBaseAmount(order);
             const amounts = calculateActualSpend(baseAmount);
 
@@ -1382,8 +1435,8 @@ export default function AffiliateOrdersPage() {
     };
 
     const handleExecuteExport = () => {
-        if (exportOrders.length === 0) {
-            notify('warning', 'No affiliate orders to export');
+        if (exportEligibleOrders.length === 0) {
+            notify('warning', 'No Not Yet orders with affiliate links available to export');
             return;
         }
 
@@ -1392,7 +1445,7 @@ export default function AffiliateOrdersPage() {
             return;
         }
 
-        const rowsWithIndex = exportOrders.map((order, index) => ({
+        const rowsWithIndex = exportEligibleOrders.map((order, index) => ({
             ...order,
             exportIndex: index + 1,
         }));
@@ -1431,7 +1484,7 @@ export default function AffiliateOrdersPage() {
         const csvData = prepareCSVData(rowsWithIndex, csvFieldMapping);
         downloadCSV(csvData, `Affiliate_Orders_${date}`);
         setExportDialogOpen(false);
-        notify('success', `Exported ${rowsWithIndex.length} affiliate orders`);
+        notify('success', `Exported ${rowsWithIndex.length} eligible affiliate orders`);
     };
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1443,9 +1496,9 @@ export default function AffiliateOrdersPage() {
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Typography variant="subtitle2" color="text.secondary">
-                        {ordersLoading ? 'Loading…' : `${displayedOrders.length} order${displayedOrders.length !== 1 ? 's' : ''} in queue for ${date}`}
+                        {isDailyOrdersLoading ? 'Loading…' : `${displayedOrders.length} order${displayedOrders.length !== 1 ? 's' : ''} in queue for ${date}`}
                     </Typography>
-                    {!ordersLoading && carryOverCount > 0 && (
+                    {!isDailyOrdersLoading && carryOverCount > 0 && (
                         <Chip
                             size="small"
                             color="warning"
@@ -1453,14 +1506,14 @@ export default function AffiliateOrdersPage() {
                             sx={{ fontWeight: 600 }}
                         />
                     )}
-                    {!ordersLoading && sellerGroupCount > 0 && (
+                    {!isDailyOrdersLoading && sellerGroupCount > 0 && (
                         <Chip
                             size="small"
                             variant="outlined"
                             label={`${sellerGroupCount} seller group${sellerGroupCount !== 1 ? 's' : ''}`}
                         />
                     )}
-                    {!ordersLoading && notYetCount > 0 && (
+                    {!isDailyOrdersLoading && notYetCount > 0 && (
                         <Chip
                             size="small"
                             color="info"
@@ -1468,7 +1521,7 @@ export default function AffiliateOrdersPage() {
                             label={`${notYetCount} not yet`}
                         />
                     )}
-                    {!ordersLoading && summary?.ordersDone > 0 && (
+                    {!isDailyOrdersLoading && summary?.ordersDone > 0 && (
                         <Chip
                             size="small"
                             variant="outlined"
@@ -1482,12 +1535,12 @@ export default function AffiliateOrdersPage() {
                         <InputLabel id="affiliate-seller-filter-label">Seller</InputLabel>
                         <Select
                             labelId="affiliate-seller-filter-label"
-                            value={activeSeller}
+                            value={selectedSeller}
                             label="Seller"
                             onChange={(e) => setSelectedSeller(e.target.value)}
                         >
-                            {sellerOptions.map((sellerName) => (
-                                <MenuItem key={sellerName} value={sellerName}>{sellerName}</MenuItem>
+                            {sellerOptions.map((option) => (
+                                <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
                             ))}
                         </Select>
                     </FormControl>
@@ -1511,13 +1564,13 @@ export default function AffiliateOrdersPage() {
                         onReset={() => setVisibleColumns(DEFAULT_DAILY_VISIBLE_COLUMNS)}
                         page="affiliate-orders"
                     />
-                    <Button size="small" startIcon={<RefreshIcon />} onClick={fetchOrders}>Refresh</Button>
+                    <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSellerOptions}>Refresh</Button>
                 </Stack>
             </Stack>
 
             {ordersError && <Alert severity="error" sx={{ mb: 1 }}>{ordersError}</Alert>}
 
-            {ordersLoading ? (
+            {isDailyOrdersLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
             ) : (
                 <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
