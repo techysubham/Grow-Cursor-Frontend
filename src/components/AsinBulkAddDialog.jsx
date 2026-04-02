@@ -14,9 +14,11 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  LinearProgress
 } from '@mui/material';
 import { parseBulkAsins } from '../utils/asinDirectoryUtils.js';
+import api, { getAuthToken } from '../lib/api.js';
 
 const MARKETPLACE_OPTIONS = [
   { value: 'US', label: '🇺🇸 Amazon.com (US)' },
@@ -31,12 +33,11 @@ export default function AsinBulkAddDialog({ open, onClose, onAdd }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [region, setRegion] = useState('US');
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   const handleTextChange = (e) => {
     const text = e.target.value;
     setAsinText(text);
-    
-    // Auto-generate preview
     if (text.trim()) {
       const parsed = parseBulkAsins(text);
       setPreview(parsed);
@@ -45,7 +46,7 @@ export default function AsinBulkAddDialog({ open, onClose, onAdd }) {
     }
   };
 
-  const handleAdd = async () => {
+  const handleAdd = () => {
     if (!preview || preview.valid.length === 0) {
       setError('No valid ASINs to add');
       return;
@@ -53,34 +54,67 @@ export default function AsinBulkAddDialog({ open, onClose, onAdd }) {
 
     setLoading(true);
     setError('');
+    setProgress({ done: 0, total: preview.valid.length });
 
-    try {
-      await onAdd(preview.valid, region);
+    const asinsParam = encodeURIComponent(preview.valid.join(','));
+    const token = encodeURIComponent(getAuthToken() || '');
+    const url = `${api.defaults.baseURL}/asin-directory/bulk-manual-stream?asins=${asinsParam}&region=${region}&token=${token}`;
+    const es = new EventSource(url);
+
+    es.addEventListener('progress', (e) => {
+      const { done, total } = JSON.parse(e.data);
+      setProgress({ done, total });
+    });
+
+    es.addEventListener('complete', (e) => {
+      es.close();
+      const result = JSON.parse(e.data);
+      setLoading(false);
+      setProgress({ done: 0, total: 0 });
       setAsinText('');
       setPreview(null);
+      // bubble result up so parent can show success message
+      if (onAdd) onAdd(result);
       onClose();
-    } catch (err) {
-      setError(err.message || 'Failed to add ASINs');
-    } finally {
+    });
+
+    es.addEventListener('error', (e) => {
+      es.close();
+      let msg = 'Failed to add ASINs';
+      try { msg = JSON.parse(e.data).message || msg; } catch {}
+      setError(msg);
       setLoading(false);
-    }
+      setProgress({ done: 0, total: 0 });
+    });
+
+    es.onerror = () => {
+      es.close();
+      setError('Connection lost. Please try again.');
+      setLoading(false);
+      setProgress({ done: 0, total: 0 });
+    };
   };
 
   const handleClose = () => {
+    if (loading) return; // block close while streaming
     setAsinText('');
     setPreview(null);
     setError('');
     onClose();
   };
 
+  const progressPct = progress.total > 0
+    ? Math.round((progress.done / progress.total) * 100)
+    : 0;
+
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle>Add ASINs Manually</DialogTitle>
-      
+
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
-          
+
           <Alert severity="info">
             <Typography variant="body2">
               Paste ASINs separated by newlines, commas, semicolons, or spaces.
@@ -88,7 +122,7 @@ export default function AsinBulkAddDialog({ open, onClose, onAdd }) {
             </Typography>
           </Alert>
 
-          <FormControl size="small" sx={{ maxWidth: 280 }}>
+          <FormControl size="small" sx={{ maxWidth: 280 }} disabled={loading}>
             <InputLabel>Marketplace</InputLabel>
             <Select
               value={region}
@@ -109,37 +143,43 @@ export default function AsinBulkAddDialog({ open, onClose, onAdd }) {
             value={asinText}
             onChange={handleTextChange}
             helperText="Example: B08N5WRWNW, B07K2G8Z4Q"
+            disabled={loading}
           />
 
-          {preview && (
+          {loading && (
+            <Box>
+              <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Processing ASINs…
+                </Typography>
+                <Typography variant="body2" fontWeight={600}>
+                  {progress.done} / {progress.total}
+                </Typography>
+              </Stack>
+              <LinearProgress
+                variant="determinate"
+                value={progressPct}
+                sx={{ borderRadius: 1, height: 8 }}
+              />
+            </Box>
+          )}
+
+          {!loading && preview && (
             <Box>
               <Typography variant="subtitle2" gutterBottom>
                 Preview:
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
                 {preview.valid.length > 0 && (
-                  <Chip
-                    label={`${preview.valid.length} Valid`}
-                    color="success"
-                    size="small"
-                  />
+                  <Chip label={`${preview.valid.length} Valid`} color="success" size="small" />
                 )}
                 {preview.duplicates.length > 0 && (
-                  <Chip
-                    label={`${preview.duplicates.length} Duplicates in Input`}
-                    color="warning"
-                    size="small"
-                  />
+                  <Chip label={`${preview.duplicates.length} Duplicates in Input`} color="warning" size="small" />
                 )}
                 {preview.invalid.length > 0 && (
-                  <Chip
-                    label={`${preview.invalid.length} Invalid`}
-                    color="error"
-                    size="small"
-                  />
+                  <Chip label={`${preview.invalid.length} Invalid`} color="error" size="small" />
                 )}
               </Stack>
-
               {preview.invalid.length > 0 && preview.invalid.length <= 10 && (
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="caption" color="error">
@@ -161,7 +201,7 @@ export default function AsinBulkAddDialog({ open, onClose, onAdd }) {
           variant="contained"
           disabled={loading || !preview || preview.valid.length === 0}
         >
-          {loading ? 'Adding...' : `Add ${preview?.valid.length || 0} ASINs`}
+          {loading ? `${progress.done} / ${progress.total} done…` : `Add ${preview?.valid.length || 0} ASINs`}
         </Button>
       </DialogActions>
     </Dialog>

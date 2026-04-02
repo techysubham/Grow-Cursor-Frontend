@@ -104,20 +104,16 @@ export default function AsinDirectoryPage() {
     }
   };
 
-  const handleBulkAdd = async (asins, region = 'US') => {
-    try {
-      const { data } = await api.post('/asin-directory/bulk-manual', { asins, region });
-      setSuccess(
-        `Added ${data.added} ASINs successfully! ` +
-        (data.duplicates > 0 ? `(${data.duplicates} duplicates skipped)` : '') +
-        (data.errors.length > 0 ? ` (${data.errors.length} errors)` : '')
-      );
-      fetchAsins();
-      fetchStats();
-      setSelected([]);
-    } catch (err) {
-      throw new Error(err.response?.data?.error || 'Failed to add ASINs');
-    }
+  // Called by AsinBulkAddDialog with the completed result object (from SSE 'complete' event)
+  const handleBulkAdd = (result) => {
+    setSuccess(
+      `Added ${result.added} ASINs successfully! ` +
+      (result.duplicates > 0 ? `(${result.duplicates} duplicates skipped)` : '') +
+      (result.errors?.length > 0 ? ` (${result.errors.length} errors)` : '')
+    );
+    fetchAsins();
+    fetchStats();
+    setSelected([]);
   };
 
   const handleCsvImport = async (csvData, region = 'US') => {
