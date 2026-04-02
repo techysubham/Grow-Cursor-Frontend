@@ -56,6 +56,7 @@ import AdminTaskList from '../pages/compatibility/AdminTaskList.jsx';
 import EditorDashboard from '../pages/compatibility/EditorDashboard.jsx';
 import ProgressTrackingPage from '../pages/compatibility/ProgressTrackingPage.jsx';
 import CompatibilityBatchHistoryPage from '../pages/compatibility/CompatibilityBatchHistoryPage.jsx';
+import AutoCompatibilityPage from '../pages/compatibility/AutoCompatibilityPage.jsx';
 
 import FulfillmentDashboard from '../pages/admin/FulfillmentDashboard.jsx';
 import AllOrdersSheetPage from '../pages/admin/AllOrdersSheetPage.jsx';
@@ -234,6 +235,7 @@ const COMPONENT_MAP = {
   'AiFitmentUsage': AiFitmentUsagePage,
   'ListingStats': ListingStatsPage,
   'CompatibilityBatchHistory': CompatibilityBatchHistoryPage,
+  'AutoCompatibility': AutoCompatibilityPage,
   'EditListings': EditListingsDashboard,
   'CompatibilityEditor': EditorDashboard,
   'AddCompatibilityEditor': AddListerPage,
