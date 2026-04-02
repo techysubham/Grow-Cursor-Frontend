@@ -116,7 +116,7 @@ export default function TemplateDirectoryPage() {
           api.get('/listing-templates'),
         ]);
         const realSellers = (sellersRes.data || []).filter(
-          s => s.user?.username?.toLowerCase() !== 'testing'
+          s => s.user?.username?.toLowerCase() !== 'growmentality'
         );
         setSellers(realSellers);
         setSelectedSeller(realSellers[0] || null);

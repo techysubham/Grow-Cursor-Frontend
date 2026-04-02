@@ -66,7 +66,7 @@ function renderCellValue(col, listing) {
   return v || '-';
 }
 
-const SELLER_DISPLAY_NAMES = { testing: 'Grow Mentality' };
+const SELLER_DISPLAY_NAMES = { growmentality: 'Grow Mentality' };
 
 export default function ListingDirectoryPage() {
   // ── Seller (fixed: "Testing") ────────────────────────────────────────────
@@ -117,7 +117,7 @@ export default function ListingDirectoryPage() {
           api.get('/listing-templates'),
         ]);
         const testingSeller = sellersRes.data.find(
-          s => s.user?.username?.toLowerCase() === 'testing'
+          s => s.user?.username?.toLowerCase() === 'growmentality'
         );
         setSeller(testingSeller || null);
         const tmps = templatesRes.data || [];
@@ -587,11 +587,11 @@ export default function ListingDirectoryPage() {
 
           {sellerLoading && <CircularProgress size={16} />}
           {!sellerLoading && !seller && (
-            <Chip label="Seller 'Testing' not found" color="error" size="small" />
+            <Chip label="Seller 'growmentality' not found" color="error" size="small" />
           )}
           {seller && (
             <Chip
-              label={`Seller: ${SELLER_DISPLAY_NAMES[seller.user?.username?.toLowerCase()] || seller.user?.username || 'Testing'}`}
+              label={`Seller: ${SELLER_DISPLAY_NAMES[seller.user?.username?.toLowerCase()] || seller.user?.username || 'Grow Mentality'}`}
               size="small"
               color="default"
               variant="outlined"
