@@ -532,7 +532,7 @@ export default function AllOrdersSheetPage() {
       }
     } catch (e) {
       setOrders([]);
-      setCounts({ uniqueCategories: 0, uniqueRanges: 0, uniqueProducts: 0, categoryNames: [], rangeNames: [], productNames: [] });
+      setCounts({ uniqueCategories: 0, uniqueRanges: 0, uniqueProducts: 0, categoryData: [], rangeData: [], productData: [] });
       setError(e?.response?.data?.error || 'Failed to load orders');
     } finally {
       setLoading(false);
