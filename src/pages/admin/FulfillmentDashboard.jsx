@@ -1168,6 +1168,10 @@ const HEADER_CELL_SX = { backgroundColor: 'primary.main', color: 'white', fontWe
 const HEADER_CELL_RIGHT_SX = { ...HEADER_CELL_SX, textAlign: 'right' };
 
 function FulfillmentDashboard() {
+  // Get user role for permission checks
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isSuperAdmin = currentUser.role === 'superadmin';
+
   // Mobile responsiveness
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -2977,21 +2981,23 @@ function FulfillmentDashboard() {
                 <MenuItem value={30}>30 Days</MenuItem>
               </Select>
 
-              <Button
-                variant="outlined"
-                color="warning"
-                startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />)}
-                onClick={resyncRecent}
-                disabled={loading}
-                size="small"
-                fullWidth
-                sx={{
-                  fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                  px: { xs: 0.5, sm: 1 }
-                }}
-              >
-                {loading ? 'Syncing...' : isSmallMobile ? 'Resync' : `Resync ${resyncDays}D`}
-              </Button>
+              {isSuperAdmin && (
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />)}
+                  onClick={resyncRecent}
+                  disabled={loading}
+                  size="small"
+                  fullWidth
+                  sx={{
+                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                    px: { xs: 0.5, sm: 1 }
+                  }}
+                >
+                  {loading ? 'Syncing...' : isSmallMobile ? 'Resync' : `Resync ${resyncDays}D`}
+                </Button>
+              )}
             </Stack>
 
             {/* Row 3: Filters side by side */}
@@ -3070,38 +3076,42 @@ function FulfillmentDashboard() {
 
             {/* Row 4: Recalc & Column Selector */}
             <Stack direction="row" spacing={1} alignItems="center">
-              <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
-                <span style={{ flex: 1 }}>
-                  <Button
-                    variant="outlined"
-                    color="info"
-                    size="small"
-                    fullWidth
-                    startIcon={recalcEarningsLoading ? <CircularProgress size={14} color="inherit" /> : <SyncIcon />}
-                    onClick={recalculateEarnings}
-                    disabled={recalcEarningsLoading}
-                    sx={{ fontSize: '0.7rem' }}
-                  >
-                    {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
-                  </Button>
-                </span>
-              </Tooltip>
-              <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
-                <span style={{ flex: 1 }}>
-                  <Button
-                    variant="outlined"
-                    color="warning"
-                    size="small"
-                    fullWidth
-                    startIcon={recalcAmazonLoading ? <CircularProgress size={14} color="inherit" /> : <SyncIcon />}
-                    onClick={recalculateAmazonFinancials}
-                    disabled={recalcAmazonLoading}
-                    sx={{ fontSize: '0.7rem' }}
-                  >
-                    {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
-                  </Button>
-                </span>
-              </Tooltip>
+              {isSuperAdmin && (
+                <>
+                  <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
+                    <span style={{ flex: 1 }}>
+                      <Button
+                        variant="outlined"
+                        color="info"
+                        size="small"
+                        fullWidth
+                        startIcon={recalcEarningsLoading ? <CircularProgress size={14} color="inherit" /> : <SyncIcon />}
+                        onClick={recalculateEarnings}
+                        disabled={recalcEarningsLoading}
+                        sx={{ fontSize: '0.7rem' }}
+                      >
+                        {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
+                    <span style={{ flex: 1 }}>
+                      <Button
+                        variant="outlined"
+                        color="warning"
+                        size="small"
+                        fullWidth
+                        startIcon={recalcAmazonLoading ? <CircularProgress size={14} color="inherit" /> : <SyncIcon />}
+                        onClick={recalculateAmazonFinancials}
+                        disabled={recalcAmazonLoading}
+                        sx={{ fontSize: '0.7rem' }}
+                      >
+                        {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </>
+              )}
               <Tooltip title="Select Columns">
                 <IconButton
                   color="primary"
@@ -3159,60 +3169,64 @@ function FulfillmentDashboard() {
                 {loading ? 'Updating...' : 'Poll Order Updates'}
               </Button>
 
-              <FormControl size="small" sx={{ minWidth: 90 }}>
-                <Select
-                  value={resyncDays}
-                  onChange={(e) => setResyncDays(e.target.value)}
-                  sx={{ height: 36, fontSize: '0.85rem' }}
-                >
-                  <MenuItem value={3}>3 Days</MenuItem>
-                  <MenuItem value={7}>7 Days</MenuItem>
-                  <MenuItem value={10}>10 Days</MenuItem>
-                  <MenuItem value={15}>15 Days</MenuItem>
-                  <MenuItem value={30}>30 Days</MenuItem>
-                </Select>
-              </FormControl>
+              {isSuperAdmin && (
+                <>
+                  <FormControl size="small" sx={{ minWidth: 90 }}>
+                    <Select
+                      value={resyncDays}
+                      onChange={(e) => setResyncDays(e.target.value)}
+                      sx={{ height: 36, fontSize: '0.85rem' }}
+                    >
+                      <MenuItem value={3}>3 Days</MenuItem>
+                      <MenuItem value={7}>7 Days</MenuItem>
+                      <MenuItem value={10}>10 Days</MenuItem>
+                      <MenuItem value={15}>15 Days</MenuItem>
+                      <MenuItem value={30}>30 Days</MenuItem>
+                    </Select>
+                  </FormControl>
 
-              <Button
-                variant="outlined"
-                color="warning"
-                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
-                onClick={resyncRecent}
-                disabled={loading}
-                sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
-              >
-                {loading ? 'Syncing...' : `Resync ${resyncDays} Days`}
-              </Button>
-
-              <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
-                <span>
-                  <Button
-                    variant="outlined"
-                    color="info"
-                    startIcon={recalcEarningsLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
-                    onClick={recalculateEarnings}
-                    disabled={recalcEarningsLoading}
-                    sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
-                  >
-                    {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
-                <span>
                   <Button
                     variant="outlined"
                     color="warning"
-                    startIcon={recalcAmazonLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
-                    onClick={recalculateAmazonFinancials}
-                    disabled={recalcAmazonLoading}
-                    sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                    startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                    onClick={resyncRecent}
+                    disabled={loading}
+                    sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
                   >
-                    {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
+                    {loading ? 'Syncing...' : `Resync ${resyncDays} Days`}
                   </Button>
-                </span>
-              </Tooltip>
+
+                  <Tooltip title={selectedSeller ? "Recalculate orderEarnings since Feb 28 2026 (selected seller)" : "Recalculate orderEarnings since Feb 28 2026 (ALL sellers)"}>
+                    <span>
+                      <Button
+                        variant="outlined"
+                        color="info"
+                        startIcon={recalcEarningsLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                        onClick={recalculateEarnings}
+                        disabled={recalcEarningsLoading}
+                        sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                      >
+                        {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
+                      </Button>
+                    </span>
+                  </Tooltip>
+
+                  <Tooltip title={selectedSeller ? "Recalculate Amazon financials since Feb 28 2026 (selected seller)" : "Recalculate Amazon financials since Feb 28 2026 (ALL sellers)"}>
+                    <span>
+                      <Button
+                        variant="outlined"
+                        color="warning"
+                        startIcon={recalcAmazonLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                        onClick={recalculateAmazonFinancials}
+                        disabled={recalcAmazonLoading}
+                        sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                      >
+                        {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </>
+              )}
             </Stack>
 
             {/* Row 2: Filters, Toggles, Column Selector */}
