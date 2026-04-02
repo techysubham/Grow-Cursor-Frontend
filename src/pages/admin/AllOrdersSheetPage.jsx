@@ -27,7 +27,10 @@ import {
   DialogContent,
   DialogActions,
   Switch,
-  FormControlLabel
+  FormControlLabel,
+  List,
+  ListItem,
+  ListItemText
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -39,6 +42,16 @@ export default function AllOrdersSheetPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Counts for categories, ranges, and products
+  const [counts, setCounts] = useState({
+    uniqueCategories: 0,
+    uniqueRanges: 0,
+    uniqueProducts: 0,
+    categoryData: [],
+    rangeData: [],
+    productData: []
+  });
   
   // Exchange rate management
   const [currentExchangeRate, setCurrentExchangeRate] = useState(null);
@@ -116,6 +129,14 @@ export default function AllOrdersSheetPage() {
   const [showProfitCards, setShowProfitCards] = useState(() => getInitialState('showProfitCards', true));
   const [showSubtotalCards, setShowSubtotalCards] = useState(() => getInitialState('showSubtotalCards', true));
   const [showExchangeRate, setShowExchangeRate] = useState(() => getInitialState('showExchangeRate', true));
+
+  // Modal state for showing category/range/product names
+  const [namesModal, setNamesModal] = useState({
+    open: false,
+    type: '', // 'categories', 'ranges', or 'products'
+    title: '',
+    items: []
+  });
 
   const isInitialMount = useRef(true);
   const hasFetchedInitialData = useRef(false);
@@ -505,8 +526,13 @@ export default function AllOrdersSheetPage() {
         setTotalPages(data.pagination.totalPages);
         setTotalOrders(data.pagination.totalOrders);
       }
+
+      if (data?.counts) {
+        setCounts(data.counts);
+      }
     } catch (e) {
       setOrders([]);
+      setCounts({ uniqueCategories: 0, uniqueRanges: 0, uniqueProducts: 0, categoryNames: [], rangeNames: [], productNames: [] });
       setError(e?.response?.data?.error || 'Failed to load orders');
     } finally {
       setLoading(false);
@@ -1276,7 +1302,7 @@ export default function AllOrdersSheetPage() {
       {/* Orders Count & Pagination - Enhanced visibility */}
       {!loading && (
         <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" spacing={2}>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
                 {dateFilter.mode === 'single' ? (
@@ -1299,6 +1325,89 @@ export default function AllOrdersSheetPage() {
                 {searchBuyerName && 'Buyer name search active'}
               </Typography>
             </Box>
+            
+            {/* Category, Range, Product Counts */}
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Box 
+                sx={{ 
+                  textAlign: 'center', 
+                  px: 2, 
+                  borderLeft: '2px solid #1976d2', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+                onClick={() => setNamesModal({
+                  open: true,
+                  type: 'categories',
+                  title: 'Categories',
+                  items: counts.categoryData
+                })}
+              >
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                  {counts.uniqueCategories}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Categories
+                </Typography>
+              </Box>
+              <Box 
+                sx={{ 
+                  textAlign: 'center', 
+                  px: 2, 
+                  borderLeft: '2px solid #1976d2', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'rgba(46, 125, 50, 0.08)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+                onClick={() => setNamesModal({
+                  open: true,
+                  type: 'ranges',
+                  title: 'Ranges',
+                  items: counts.rangeData
+                })}
+              >
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                  {counts.uniqueRanges}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Ranges
+                </Typography>
+              </Box>
+              <Box 
+                sx={{ 
+                  textAlign: 'center', 
+                  px: 2, 
+                  borderLeft: '2px solid #1976d2', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: 'rgba(237, 108, 2, 0.08)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+                onClick={() => setNamesModal({
+                  open: true,
+                  type: 'products',
+                  title: 'Products',
+                  items: counts.productData
+                })}
+              >
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                  {counts.uniqueProducts}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Products
+                </Typography>
+              </Box>
+            </Stack>
+
             {dateFilter.mode !== 'single' && orders.length > 0 && (
               <Pagination
                 count={totalPages}
@@ -1783,6 +1892,60 @@ export default function AllOrdersSheetPage() {
           </Table>
         </TableContainer>
       )}
+
+      {/* Category/Range/Product Names Modal */}
+      <Dialog 
+        open={namesModal.open} 
+        onClose={() => setNamesModal({ ...namesModal, open: false })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {namesModal.title} ({namesModal.items.length})
+        </DialogTitle>
+        <DialogContent>
+          {namesModal.items.length > 0 ? (
+            <List>
+              {namesModal.items.map((item, index) => (
+                <ListItem 
+                  key={index} 
+                  divider={index < namesModal.items.length - 1}
+                  secondaryAction={
+                    <Chip 
+                      label={`${item.count} order${item.count !== 1 ? 's' : ''}`}
+                      size="small"
+                      color={namesModal.type === 'categories' ? 'primary' : 
+                             namesModal.type === 'ranges' ? 'success' : 
+                             'warning'}
+                    />
+                  }
+                >
+                  <ListItemText 
+                    primary={item.name}
+                    primaryTypographyProps={{
+                      sx: { 
+                        fontWeight: 500,
+                        color: namesModal.type === 'categories' ? 'primary.main' : 
+                               namesModal.type === 'ranges' ? 'success.main' : 
+                               'warning.main'
+                      }
+                    }}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+              No {namesModal.title.toLowerCase()} found
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNamesModal({ ...namesModal, open: false })}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Bottom Pagination - Hide for single date mode */}
       {!loading && orders.length > 0 && dateFilter.mode !== 'single' && (
