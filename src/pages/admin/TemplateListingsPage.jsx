@@ -1288,8 +1288,7 @@ export default function TemplateListingsPage() {
       </Stack>
 
       {/* Schedule block */}
-      {!fromAsinList && (
-        <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column' }}>
+      <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column' }}>
           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
             <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
             <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
@@ -1426,7 +1425,6 @@ export default function TemplateListingsPage() {
             </Tooltip>
           </Stack>
         </Paper>
-      )}
 
       {/* Batch Filter */}
       {!fromAsinList && (
@@ -1623,7 +1621,7 @@ export default function TemplateListingsPage() {
                         parts.push(`✓ ${stats.uniqueValid} valid ASIN${stats.uniqueValid !== 1 ? 's' : ''}`);
                         if (stats.invalid > 0) parts.push(`⚠ ${stats.invalid} invalid`);
                         if (stats.duplicates > 0) parts.push(`ℹ ${stats.duplicates} duplicate${stats.duplicates !== 1 ? 's' : ''}`);
-                        if (stats.uniqueValid > 50) parts.push(`❌ Exceeds limit (50 max)`);
+                        if (stats.uniqueValid > 100) parts.push(`❌ Exceeds limit (100 max)`);
                         return parts.join(' • ');
                       })()
                       : ''
