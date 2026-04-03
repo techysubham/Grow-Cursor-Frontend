@@ -1296,7 +1296,10 @@ export default function TemplateListingsPage() {
             </Typography>
             {scheduleDate && scheduleTimeFrom && scheduleStep >= 1 && pagination.total > 0 && (() => {
               const [h, m] = scheduleTimeFrom.split(':').map(Number);
-              const totalMin = h * 60 + m + (pagination.total - 1) * scheduleStep;
+              const effectiveFrom = scheduleFromRow ? parseInt(scheduleFromRow) : 1;
+              const effectiveTo   = scheduleToRow   ? parseInt(scheduleToRow)   : pagination.total;
+              const effectiveCount = Math.max(1, effectiveTo - effectiveFrom + 1);
+              const totalMin = h * 60 + m + (effectiveCount - 1) * scheduleStep;
               const lh = Math.floor((totalMin % 1440) / 60);
               const lm = totalMin % 60;
               const extraDays = Math.floor(totalMin / 1440);
@@ -1382,7 +1385,7 @@ export default function TemplateListingsPage() {
                 sx={{ width: 80, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
               />
             </Box>
-            <Tooltip title={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) ? 'Fill in date, start time, and interval first' : `Apply schedule to all ${pagination.total} listings`}>
+            <Tooltip title={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) ? 'Fill in date, start time, and interval first' : (scheduleFromRow || scheduleToRow ? `Apply to rows ${scheduleFromRow || 1}–${scheduleToRow || pagination.total}` : `Apply schedule to all ${pagination.total} listings`)}>
               <span>
                 <Button
                   variant="contained"
