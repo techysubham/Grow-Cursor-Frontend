@@ -1288,8 +1288,7 @@ export default function TemplateListingsPage() {
       </Stack>
 
       {/* Schedule block */}
-      {!fromAsinList && (
-        <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column' }}>
+      <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column' }}>
           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
             <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
             <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
@@ -1297,7 +1296,10 @@ export default function TemplateListingsPage() {
             </Typography>
             {scheduleDate && scheduleTimeFrom && scheduleStep >= 1 && pagination.total > 0 && (() => {
               const [h, m] = scheduleTimeFrom.split(':').map(Number);
-              const totalMin = h * 60 + m + (pagination.total - 1) * scheduleStep;
+              const effectiveFrom = scheduleFromRow ? parseInt(scheduleFromRow) : 1;
+              const effectiveTo   = scheduleToRow   ? parseInt(scheduleToRow)   : pagination.total;
+              const effectiveCount = Math.max(1, effectiveTo - effectiveFrom + 1);
+              const totalMin = h * 60 + m + (effectiveCount - 1) * scheduleStep;
               const lh = Math.floor((totalMin % 1440) / 60);
               const lm = totalMin % 60;
               const extraDays = Math.floor(totalMin / 1440);
@@ -1383,7 +1385,7 @@ export default function TemplateListingsPage() {
                 sx={{ width: 80, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
               />
             </Box>
-            <Tooltip title={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) ? 'Fill in date, start time, and interval first' : `Apply schedule to all ${pagination.total} listings`}>
+            <Tooltip title={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) ? 'Fill in date, start time, and interval first' : (scheduleFromRow || scheduleToRow ? `Apply to rows ${scheduleFromRow || 1}–${scheduleToRow || pagination.total}` : `Apply schedule to all ${pagination.total} listings`)}>
               <span>
                 <Button
                   variant="contained"
@@ -1426,7 +1428,6 @@ export default function TemplateListingsPage() {
             </Tooltip>
           </Stack>
         </Paper>
-      )}
 
       {/* Batch Filter */}
       {!fromAsinList && (
@@ -1623,7 +1624,7 @@ export default function TemplateListingsPage() {
                         parts.push(`✓ ${stats.uniqueValid} valid ASIN${stats.uniqueValid !== 1 ? 's' : ''}`);
                         if (stats.invalid > 0) parts.push(`⚠ ${stats.invalid} invalid`);
                         if (stats.duplicates > 0) parts.push(`ℹ ${stats.duplicates} duplicate${stats.duplicates !== 1 ? 's' : ''}`);
-                        if (stats.uniqueValid > 50) parts.push(`❌ Exceeds limit (50 max)`);
+                        if (stats.uniqueValid > 100) parts.push(`❌ Exceeds limit (100 max)`);
                         return parts.join(' • ');
                       })()
                       : ''
