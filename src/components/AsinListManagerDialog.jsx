@@ -342,12 +342,12 @@ export default function AsinListManagerDialog({ open, onClose }) {
   const [copyDialog, setCopyDialog] = useState(false);
   const [allRanges, setAllRanges] = useState([]);
   const [loadingAllRanges, setLoadingAllRanges] = useState(false);
-  const [targetRangeId, setTargetRangeId] = useState('');
+  const [targetRangeIds, setTargetRangeIds] = useState(new Set());
   const [copying, setCopying] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
   const openCopyDialog = async () => {
-    setTargetRangeId('');
+    setTargetRangeIds(new Set());
     setCopyDialog(true);
     if (allRanges.length === 0) {
       try {
@@ -362,21 +362,39 @@ export default function AsinListManagerDialog({ open, onClose }) {
     }
   };
 
+  const handleToggleTargetRange = (id) => {
+    setTargetRangeIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleAllTargetRanges = (rangeList) => {
+    const ids = rangeList.map(r => r._id);
+    const allChecked = ids.every(id => targetRangeIds.has(id));
+    setTargetRangeIds(prev => {
+      const next = new Set(prev);
+      if (allChecked) ids.forEach(id => next.delete(id));
+      else ids.forEach(id => next.add(id));
+      return next;
+    });
+  };
+
   const handleCopyToRange = async () => {
-    if (!targetRangeId || selectedProductIds.size === 0) return;
+    if (targetRangeIds.size === 0 || selectedProductIds.size === 0) return;
     try {
       setCopying(true);
       const { data } = await api.post('/asin-list-products/copy-to-range', {
         productIds: [...selectedProductIds],
-        targetRangeId
+        targetRangeIds: [...targetRangeIds]
       });
-      const targetRange = allRanges.find(r => r._id === targetRangeId);
-      const msg = `Copied ${data.copied} product(s) to "${targetRange?.name}"` +
+      const msg = `Copied ${data.copied} product(s) to ${data.rangesProcessed} range(s)` +
         (data.skipped > 0 ? `. ${data.skipped} already existed and were skipped.` : '.');
       setCopySuccess(msg);
       setCopyDialog(false);
       setSelectedProductIds(new Set());
-      setTargetRangeId('');
+      setTargetRangeIds(new Set());
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to copy products');
     } finally {
@@ -835,44 +853,65 @@ export default function AsinListManagerDialog({ open, onClose }) {
       {/* ── Copy-to-range sub-dialog ── */}
       <Dialog open={copyDialog} onClose={() => setCopyDialog(false)} maxWidth="xs" fullWidth>
         <DialogTitle>
-          Copy {selectedProductIds.size} product{selectedProductIds.size > 1 ? 's' : ''} to another range
+          Copy {selectedProductIds.size} product{selectedProductIds.size > 1 ? 's' : ''} to ranges
         </DialogTitle>
-        <DialogContent sx={{ pt: 1 }}>
-          {loadingAllRanges ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : (
-            <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-              <InputLabel>Target Range</InputLabel>
-              <Select
-                value={targetRangeId}
-                label="Target Range"
-                onChange={e => setTargetRangeId(e.target.value)}
-              >
-                {Object.entries(groupedRanges).sort(([a], [b]) => a.localeCompare(b)).flatMap(([catName, catRanges]) => [
-                  <MenuItem key={`header-${catName}`} disabled sx={{ opacity: '1 !important', fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary', pointerEvents: 'none' }}>
-                    {catName}
-                  </MenuItem>,
-                  ...catRanges.map(r => (
-                    <MenuItem key={r._id} value={r._id} sx={{ pl: 3 }}>
-                      {r.name}
-                    </MenuItem>
-                  ))
-                ])}
-              </Select>
-            </FormControl>
-          )}
+        <DialogContent sx={{ pt: 1, px: 1 }}>
+          {(() => {
+            const availableRanges = ranges.filter(r => r._id !== selectedRangeId);
+            const allChecked = availableRanges.length > 0 && availableRanges.every(r => targetRangeIds.has(r._id));
+            const someChecked = availableRanges.some(r => targetRangeIds.has(r._id));
+            return (
+              <Box sx={{ maxHeight: 360, overflowY: 'auto' }}>
+                {availableRanges.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+                    No other ranges in this category
+                  </Typography>
+                ) : (
+                  <>
+                    {/* Select All */}
+                    <ListItem disablePadding dense>
+                      <ListItemButton dense onClick={() => handleToggleAllTargetRanges(availableRanges)} sx={{ py: 0.5 }}>
+                        <Checkbox
+                          size="small"
+                          checked={allChecked}
+                          indeterminate={someChecked && !allChecked}
+                          sx={{ mr: 0.5 }}
+                        />
+                        <ListItemText primary={<Typography variant="body2" fontWeight={600}>Select All</Typography>} />
+                        <Typography variant="caption" color="text.secondary">
+                          {targetRangeIds.size} selected
+                        </Typography>
+                      </ListItemButton>
+                    </ListItem>
+                    <Divider />
+                    {/* Flat range list */}
+                    {availableRanges.map(r => (
+                      <ListItem key={r._id} disablePadding dense>
+                        <ListItemButton dense onClick={() => handleToggleTargetRange(r._id)} sx={{ py: 0.25 }}>
+                          <Checkbox
+                            size="small"
+                            checked={targetRangeIds.has(r._id)}
+                            sx={{ mr: 0.5 }}
+                          />
+                          <ListItemText primary={<Typography variant="body2">{r.name}</Typography>} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </>
+                )}
+              </Box>
+            );
+          })()}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCopyDialog(false)} disabled={copying}>Cancel</Button>
           <Button
             onClick={handleCopyToRange}
             variant="contained"
-            disabled={!targetRangeId || copying}
+            disabled={targetRangeIds.size === 0 || copying}
             startIcon={copying ? <CircularProgress size={14} /> : <CopyToIcon />}
           >
-            Copy
+            {copying ? 'Copying…' : `Copy to ${targetRangeIds.size || ''} Range${targetRangeIds.size !== 1 ? 's' : ''}`}
           </Button>
         </DialogActions>
       </Dialog>
