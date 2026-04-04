@@ -189,7 +189,7 @@ export default function CRPAnalyticsPage() {
       <Stack direction={{ xs: 'column', xl: 'row' }} alignItems={{ xl: 'flex-start' }}
         justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
         <Box sx={{ flexShrink: 0 }}>
-          <Typography variant="h5" fontWeight={700}>CRP Analytics</Typography>
+          <Typography variant="h5" fontWeight={700}>Order Analytics</Typography>
           <Typography variant="body2" color="text.secondary">
             Orders grouped by {groupByLabel.toLowerCase()} assignment · PST timezone
           </Typography>

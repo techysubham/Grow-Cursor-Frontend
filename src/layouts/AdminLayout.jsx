@@ -629,7 +629,7 @@ export default function AdminLayout({ user, onLogout }) {
 
   // Determine default redirect page
   const getDefaultRedirect = () => {
-    if (isSuper) return '/admin/research';
+    if (isSuper) return '/admin/crp-analytics';
     // Check categories in priority order
     const priorityPages = [
       'ProductResearch', 'ProductTable', 'CompatibilityTasks', 'CompatibilityEditor',
