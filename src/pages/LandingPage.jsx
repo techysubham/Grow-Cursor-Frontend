@@ -101,7 +101,7 @@ export default function LandingPage() {
           <Typography
             variant="h3"
             fontWeight={800}
-            sx={{ color: BRAND_DARK, mb: 2, lineHeight: 1.18, fontSize: { xs: '2rem', md: '2.75rem' } }}
+            sx={{ color: BRAND_DARK, mb: 2, lineHeight: 1.18, fontSize: { xs: '1.85rem', md: '2.5rem' } }}
           >
             Manage your team,{' '}
             <Box component="span" sx={{

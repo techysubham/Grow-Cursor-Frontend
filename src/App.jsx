@@ -66,7 +66,10 @@ function useAuth() {
 
 export default function App() {
   const { token, user, login, logout } = useAuth();
-  const theme = useMemo(() => createTheme({ palette: { mode: 'light' } }), []);
+  const theme = useMemo(() => createTheme({
+    palette: { mode: 'light' },
+    typography: { fontFamily: "'Inter', sans-serif" },
+  }), []);
 
   return (
     <ThemeProvider theme={theme}>
