@@ -69,6 +69,12 @@ export default function AllOrdersSheetPage() {
   const [csvEndDate, setCsvEndDate] = useState('');
   const [csvFileName, setCsvFileName] = useState('');
 
+  // Price update state (for manual price changes)
+  const [priceUpdateModal, setPriceUpdateModal] = useState({ open: false, order: null });
+  const [tryPricing, setTryPricing] = useState('');
+  const [itemPriceUpdates, setItemPriceUpdates] = useState({}); // { legacyItemId: newPrice }
+  const [updatingItemPrices, setUpdatingItemPrices] = useState({}); // { legacyItemId: boolean }
+
   // Session storage key for persisting state
   const STORAGE_KEY = 'all_orders_sheet_state';
 
@@ -545,6 +551,110 @@ export default function AllOrdersSheetPage() {
     if (isNaN(num)) return '-';
     return `$${num.toFixed(2)}`;
   };
+
+  // Handler for opening price update modal
+  function openPriceUpdateModal(order) {
+    setPriceUpdateModal({ open: true, order });
+    setTryPricing('');
+    setItemPriceUpdates({});
+  }
+
+  // Handler for updating individual item price
+  async function handleUpdateItemPrice(legacyItemId, order) {
+    const newPrice = itemPriceUpdates[legacyItemId];
+    
+    if (!newPrice || isNaN(parseFloat(newPrice))) {
+      alert('Please enter a valid price');
+      return;
+    }
+
+    setUpdatingItemPrices(prev => ({ ...prev, [legacyItemId]: true }));
+
+    try {
+      const response = await api.post('/ebay/update-listing', {
+        sellerId: order.seller._id,
+        itemId: legacyItemId,
+        price: parseFloat(newPrice)
+      });
+
+      if (response.data.success) {
+        alert(`✓ Successfully updated price to $${parseFloat(newPrice).toFixed(2)} for item ${legacyItemId}`);
+        if (response.data.warning) {
+          console.warn(`Warning:`, response.data.warning);
+        }
+        // Clear the input for this item
+        setItemPriceUpdates(prev => {
+          const updated = { ...prev };
+          delete updated[legacyItemId];
+          return updated;
+        });
+      }
+    } catch (err) {
+      alert('Failed to update price: ' + (err?.response?.data?.error || err.message));
+    } finally {
+      setUpdatingItemPrices(prev => ({ ...prev, [legacyItemId]: false }));
+    }
+  }
+
+  // Calculate expected profit based on try pricing
+  function calculateExpectedProfit(tryPricingValue, order) {
+    if (!tryPricingValue || isNaN(parseFloat(tryPricingValue))) return null;
+    
+    const tryPrice = parseFloat(tryPricingValue);
+    const originalSubtotal = parseFloat(order.subtotal) || 0;
+    
+    if (originalSubtotal === 0) return null;
+    
+    // Calculate the proportion/ratio
+    const ratio = tryPrice / originalSubtotal;
+    
+    // Scale the fees proportionally (keep high precision)
+    const originalDiscount = parseFloat(order.discount) || 0;
+    const originalTransactionFees = parseFloat(order.transactionFees) || 0;
+    const originalAdFeeGeneral = parseFloat(order.adFeeGeneral) || 0;
+    
+    const newDiscount = originalDiscount * ratio;
+    const newTransactionFees = originalTransactionFees * ratio;
+    const newAdFeeGeneral = originalAdFeeGeneral * ratio;
+    
+    // Calculate eBay earnings with new proportional fees (excluding sales tax)
+    // Using high precision to match backend calculation
+    const ebayEarnings = tryPrice + newDiscount - newTransactionFees - newAdFeeGeneral;
+    
+    // TDS and TID calculations (round to match backend)
+    const newTDS = Math.round(ebayEarnings * 0.01 * 100) / 100;
+    const newTID = 0.24;
+    const newNet = Math.round((ebayEarnings - newTDS - newTID) * 100) / 100;
+    
+    // Convert to INR
+    const ebayExchangeRate = parseFloat(order.ebayExchangeRate) || 85;
+    const newPBalanceINR = Math.round(newNet * ebayExchangeRate * 100) / 100;
+    
+    // Get Amazon and CC costs
+    const amazonTotalINR = parseFloat(order.amazonTotalINR) || 0;
+    const totalCC = parseFloat(order.totalCC) || 0;
+    
+    // Calculate expected profit
+    const expectedProfit = Math.round((newPBalanceINR - amazonTotalINR - totalCC) * 100) / 100;
+    
+    return {
+      profit: expectedProfit,
+      breakdown: {
+        tryPrice,
+        discount: newDiscount,
+        transactionFees: newTransactionFees,
+        adFeeGeneral: newAdFeeGeneral,
+        ebayEarnings,
+        tds: newTDS,
+        tid: newTID,
+        net: newNet,
+        pBalanceINR: newPBalanceINR,
+        amazonTotalINR,
+        totalCC,
+        ratio: ((ratio - 1) * 100).toFixed(1) // percentage change
+      }
+    };
+  }
 
   const formatDate = (dateStr, marketplaceId) => {
     if (!dateStr) return '-';
@@ -1444,7 +1554,8 @@ export default function AllOrdersSheetPage() {
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Amazon<br />Acc</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Order ID</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Buyer<br />Name</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd' }}>Arriving</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Arriving</TableCell>
+                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderRight: '2px solid #90caf9', minWidth: 180 }}>Update Price</TableCell>
               </TableRow>
               {/* Second row: eBay Side and Amazon Side column headers */}
               <TableRow>
@@ -1801,6 +1912,17 @@ export default function AllOrdersSheetPage() {
                   </TableCell>
                   <TableCell>{order.buyer?.buyerRegistrationAddress?.fullName || '-'}</TableCell>
                   <TableCell>{order.arrivingDate || '-'}</TableCell>
+                  {/* Update Price Column */}
+                  <TableCell>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => openPriceUpdateModal(order)}
+                      sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                    >
+                      Change Price
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               
@@ -1885,6 +2007,7 @@ export default function AllOrdersSheetPage() {
                     <TableCell></TableCell>
                     <TableCell></TableCell>
                     <TableCell></TableCell>
+                    <TableCell></TableCell>
                   </TableRow>
                 );
               })()}
@@ -1958,6 +2081,336 @@ export default function AllOrdersSheetPage() {
           />
         </Box>
       )}
+
+      {/* Price Update Modal */}
+      <Dialog 
+        open={priceUpdateModal.open} 
+        onClose={() => setPriceUpdateModal({ open: false, order: null })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ bgcolor: '#fff3e0', borderBottom: '2px solid #ffb74d' }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Update Listing Price
+          </Typography>
+          {priceUpdateModal.order && (
+            <Typography variant="caption" color="text.secondary">
+              Order ID: {priceUpdateModal.order.orderId}
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {priceUpdateModal.order && (() => {
+            const order = priceUpdateModal.order;
+            const amazonTotalINR = parseFloat(order.amazonTotalINR) || 0;
+            const totalCC = parseFloat(order.totalCC) || 0;
+            const profit = parseFloat(order.profit) || 0;
+            
+            return (
+              <Stack spacing={3}>
+                {/* Order Summary */}
+                <Paper sx={{ p: 2, bgcolor: '#f5f5f5' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: 'primary.main' }}>
+                    Order Summary
+                  </Typography>
+                  <Stack spacing={1}>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">Subtotal (eBay):</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        ${parseFloat(order.subtotal).toFixed(2)}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">Earnings (eBay):</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        ${parseFloat(order.orderEarnings).toFixed(2)}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">Amazon Total (INR):</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        ₹{amazonTotalINR.toFixed(2)}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">Total CC:</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        ₹{totalCC.toFixed(2)}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between" sx={{ pt: 1, borderTop: '1px solid #ddd' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Current PROFIT:</Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 'bold',
+                          fontSize: '1.1rem',
+                          color: profit < 0 ? 'error.main' : 'success.main'
+                        }}
+                      >
+                        ₹{profit.toFixed(2)}
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                </Paper>
+
+                {/* Try Pricing Calculator */}
+                <Paper sx={{ p: 2, bgcolor: '#e8f5e9' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: 'success.main' }}>
+                    Try Pricing Calculator
+                  </Typography>
+                  <Stack spacing={2}>
+                    <TextField
+                      label="Try New Price (USD)"
+                      type="number"
+                      value={tryPricing}
+                      onChange={(e) => setTryPricing(e.target.value)}
+                      placeholder="Enter price to see expected profit"
+                      fullWidth
+                      inputProps={{ step: '0.01', min: '0' }}
+                    />
+                    {tryPricing && (() => {
+                      const result = calculateExpectedProfit(tryPricing, order);
+                      if (!result) return null;
+                      
+                      const { profit: expectedProfit, breakdown } = result;
+                      
+                      // Check if there's a difference from current profit (for debugging rounding)
+                      const currentProfit = parseFloat(order.profit) || 0;
+                      const profitDifference = Math.abs(expectedProfit - currentProfit);
+                      const isSameAsSubtotal = Math.abs(parseFloat(tryPricing) - parseFloat(order.subtotal)) < 0.01;
+                      
+                      return (
+                        <Stack spacing={2}>
+                          {/* Show rounding notice if try pricing = subtotal but profit differs */}
+                          {isSameAsSubtotal && profitDifference > 0.1 && (
+                            <Alert severity="warning" sx={{ fontSize: '0.75rem' }}>
+                              <Typography variant="caption">
+                                Note: Expected profit differs from current by ₹{profitDifference.toFixed(2)} due to rounding differences in calculation methods.
+                              </Typography>
+                            </Alert>
+                          )}
+                          
+                          {/* Expected Profit Summary */}
+                          <Alert severity="info" sx={{ bgcolor: 'white' }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                Expected Profit:
+                              </Typography>
+                              <Typography 
+                                variant="h6" 
+                                sx={{ 
+                                  fontWeight: 'bold',
+                                  color: expectedProfit < 0 ? 'error.main' : 'success.main'
+                                }}
+                              >
+                                ₹{expectedProfit.toFixed(2)}
+                              </Typography>
+                            </Stack>
+                          </Alert>
+                          
+                          {/* Breakdown Details */}
+                          <Paper sx={{ p: 2, bgcolor: '#f9f9f9', border: '1px solid #ddd' }}>
+                            <Typography variant="caption" sx={{ fontWeight: 'bold', mb: 1, display: 'block', color: 'text.secondary' }}>
+                              Calculation Breakdown {breakdown.ratio !== '0.0' && `(${breakdown.ratio > 0 ? '+' : ''}${breakdown.ratio}% from original)`}
+                            </Typography>
+                            <Stack spacing={0.5} sx={{ fontSize: '0.8rem' }}>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">Try Price:</Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                                  ${breakdown.tryPrice.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">Discount (adjusted):</Typography>
+                                <Typography variant="caption" sx={{ color: 'error.main' }}>
+                                  ${breakdown.discount.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">Transaction Fees (adjusted):</Typography>
+                                <Typography variant="caption" sx={{ color: 'error.main' }}>
+                                  -${breakdown.transactionFees.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">Ad Fee (adjusted):</Typography>
+                                <Typography variant="caption" sx={{ color: 'error.main' }}>
+                                  -${breakdown.adFeeGeneral.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between" sx={{ pt: 0.5, borderTop: '1px dashed #ccc' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>eBay Earnings:</Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                                  ${breakdown.ebayEarnings.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">TDS (1%):</Typography>
+                                <Typography variant="caption" sx={{ color: 'error.main' }}>
+                                  -${breakdown.tds.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">T.ID:</Typography>
+                                <Typography variant="caption" sx={{ color: 'error.main' }}>
+                                  -${breakdown.tid.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between" sx={{ pt: 0.5, borderTop: '1px dashed #ccc' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>NET (USD):</Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                                  ${breakdown.net.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">Exchange Rate:</Typography>
+                                <Typography variant="caption">
+                                  {order.ebayExchangeRate || 85}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between" sx={{ pt: 0.5, borderTop: '1px dashed #ccc' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>P.Balance (INR):</Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                  ₹{breakdown.pBalanceINR.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">Amazon Total (INR):</Typography>
+                                <Typography variant="caption" sx={{ color: 'error.main' }}>
+                                  -₹{breakdown.amazonTotalINR.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">Total CC:</Typography>
+                                <Typography variant="caption" sx={{ color: 'error.main' }}>
+                                  -₹{breakdown.totalCC.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack 
+                                direction="row" 
+                                justifyContent="space-between" 
+                                sx={{ 
+                                  pt: 1, 
+                                  mt: 0.5,
+                                  borderTop: '2px solid #333',
+                                  bgcolor: expectedProfit < 0 ? '#ffebee' : '#e8f5e9',
+                                  p: 1,
+                                  borderRadius: 1
+                                }}
+                              >
+                                <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                  EXPECTED PROFIT:
+                                </Typography>
+                                <Typography 
+                                  variant="caption" 
+                                  sx={{ 
+                                    fontWeight: 'bold',
+                                    fontSize: '0.9rem',
+                                    color: expectedProfit < 0 ? 'error.main' : 'success.main'
+                                  }}
+                                >
+                                  ₹{expectedProfit.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+                          </Paper>
+                        </Stack>
+                      );
+                    })()}
+                  </Stack>
+                </Paper>
+
+                {/* Line Items with Individual Price Update */}
+                <Paper sx={{ p: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: 'primary.main' }}>
+                    Line Items & Price Update
+                  </Typography>
+                  <Stack spacing={2}>
+                    {order.lineItems?.map((item, index) => (
+                      <Box 
+                        key={index}
+                        sx={{ 
+                          p: 2, 
+                          border: '1px solid #ddd', 
+                          borderRadius: 1,
+                          bgcolor: '#fafafa'
+                        }}
+                      >
+                        <Stack spacing={1.5}>
+                          {/* Product Title */}
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {item.title}
+                          </Typography>
+                          
+                          {/* Legacy Item ID with eBay Link */}
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="caption" color="text.secondary">
+                              Item ID:
+                            </Typography>
+                            <Chip
+                              label={item.legacyItemId}
+                              size="small"
+                              onClick={() => window.open(`https://www.ebay.com/itm/${item.legacyItemId}`, '_blank')}
+                              sx={{ 
+                                cursor: 'pointer',
+                                '&:hover': { bgcolor: 'primary.light', color: 'white' }
+                              }}
+                            />
+                            <Typography variant="caption" color="text.secondary">
+                              (Click to view on eBay)
+                            </Typography>
+                          </Stack>
+
+                          {/* Current Price */}
+                          <Typography variant="caption" color="text.secondary">
+                            Current Price: ${parseFloat(item.lineItemCost?.value || 0).toFixed(2)}
+                          </Typography>
+
+                          {/* Price Update Input */}
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <TextField
+                              size="small"
+                              type="number"
+                              label="Change Listing Price in eBay"
+                              value={itemPriceUpdates[item.legacyItemId] || ''}
+                              onChange={(e) => setItemPriceUpdates(prev => ({ 
+                                ...prev, 
+                                [item.legacyItemId]: e.target.value 
+                              }))}
+                              inputProps={{ step: '0.01', min: '0' }}
+                              sx={{ flex: 1 }}
+                              placeholder="Enter new price"
+                              disabled={updatingItemPrices[item.legacyItemId]}
+                            />
+                            <Button
+                              variant="contained"
+                              onClick={() => handleUpdateItemPrice(item.legacyItemId, order)}
+                              disabled={!itemPriceUpdates[item.legacyItemId] || updatingItemPrices[item.legacyItemId]}
+                              sx={{ minWidth: 100 }}
+                            >
+                              {updatingItemPrices[item.legacyItemId] ? (
+                                <CircularProgress size={20} color="inherit" />
+                              ) : (
+                                'Update'
+                              )}
+                            </Button>
+                          </Stack>
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Paper>
+              </Stack>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPriceUpdateModal({ open: false, order: null })}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
