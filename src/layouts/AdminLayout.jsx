@@ -60,6 +60,7 @@ import AutoCompatibilityPage from '../pages/compatibility/AutoCompatibilityPage.
 
 import FulfillmentDashboard from '../pages/admin/FulfillmentDashboard.jsx';
 import AllOrdersSheetPage from '../pages/admin/AllOrdersSheetPage.jsx';
+import PriceChangeHistoryPage from '../pages/admin/PriceChangeHistoryPage.jsx';
 import AwaitingShipmentPage from '../pages/admin/AwaitingShipmentPage.jsx';
 import AwaitingSheetPage from '../pages/admin/AwaitingSheetPage.jsx';
 import AmazonArrivalsPage from '../pages/admin/AmazonArrivalsPage.jsx';
@@ -259,6 +260,7 @@ const COMPONENT_MAP = {
   'CreditCardNames': ManageCreditCardNamesPage,
   'Salary': SalaryPage,
   'AllOrdersSheet': AllOrdersSheetPage,
+  'PriceChangeHistory': PriceChangeHistoryPage,
   'SellerAnalytics': SellerAnalyticsPage,
   'Disputes': DisputesPage,
   'AccountHealth': AccountHealthReportPage,
