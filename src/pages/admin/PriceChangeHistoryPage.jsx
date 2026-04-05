@@ -29,8 +29,12 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import api from '../../lib/api';
+import usePageAccess from '../../hooks/usePageAccess';
 
 const PriceChangeHistoryPage = () => {
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const { hasAccess } = usePageAccess(user);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -183,6 +187,15 @@ const PriceChangeHistoryPage = () => {
     link.download = `price_change_history_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
   };
+
+  // Check page access
+  if (!hasAccess('PriceChangeHistory')) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">You do not have permission to view this page.</Alert>
+      </Box>
+    );
+  }
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
