@@ -35,6 +35,7 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../../lib/api';
 
 export default function AllOrdersSheetPage() {
@@ -74,6 +75,7 @@ export default function AllOrdersSheetPage() {
   const [tryPricing, setTryPricing] = useState('');
   const [itemPriceUpdates, setItemPriceUpdates] = useState({}); // { legacyItemId: newPrice }
   const [updatingItemPrices, setUpdatingItemPrices] = useState({}); // { legacyItemId: boolean }
+  const [updatedOrderIds, setUpdatedOrderIds] = useState(new Set()); // Track orders with price updates
 
   // Session storage key for persisting state
   const STORAGE_KEY = 'all_orders_sheet_state';
@@ -96,6 +98,7 @@ export default function AllOrdersSheetPage() {
   const [selectedSeller, setSelectedSeller] = useState(() => getInitialState('selectedSeller', ''));
   const [searchOrderId, setSearchOrderId] = useState(() => getInitialState('searchOrderId', ''));
   const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
+  const [searchItemNumber, setSearchItemNumber] = useState(() => getInitialState('searchItemNumber', ''));
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
   const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
@@ -163,6 +166,7 @@ export default function AllOrdersSheetPage() {
       selectedSeller,
       searchOrderId,
       searchBuyerName,
+      searchItemNumber,
       searchMarketplace,
       filtersExpanded,
       currentPage,
@@ -180,7 +184,7 @@ export default function AllOrdersSheetPage() {
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, filtersExpanded, currentPage, dateFilter, profitFilter, subtotalFilter, excludeLowValue, excludeNoAmazonAccount, showProfitCards, showSubtotalCards, showExchangeRate]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemNumber, searchMarketplace, filtersExpanded, currentPage, dateFilter, profitFilter, subtotalFilter, excludeLowValue, excludeNoAmazonAccount, showProfitCards, showSubtotalCards, showExchangeRate]);
 
   // Initial load
   useEffect(() => {
@@ -216,6 +220,7 @@ export default function AllOrdersSheetPage() {
       prevFilters.current.selectedSeller !== selectedSeller ||
       prevFilters.current.searchOrderId !== searchOrderId ||
       prevFilters.current.searchBuyerName !== searchBuyerName ||
+      prevFilters.current.searchItemNumber !== searchItemNumber ||
       prevFilters.current.searchMarketplace !== searchMarketplace ||
       prevFilters.current.excludeLowValue !== excludeLowValue ||
       prevFilters.current.excludeNoAmazonAccount !== excludeNoAmazonAccount ||
@@ -227,6 +232,7 @@ export default function AllOrdersSheetPage() {
       selectedSeller,
       searchOrderId,
       searchBuyerName,
+      searchItemNumber,
       searchMarketplace,
       excludeLowValue,
       excludeNoAmazonAccount,
@@ -244,7 +250,7 @@ export default function AllOrdersSheetPage() {
         setCurrentPage(1);
       }
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchMarketplace, excludeLowValue, excludeNoAmazonAccount, dateFilter, profitFilter, subtotalFilter]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemNumber, searchMarketplace, excludeLowValue, excludeNoAmazonAccount, dateFilter, profitFilter, subtotalFilter]);
 
   async function fetchSellers() {
     setError('');
@@ -497,6 +503,7 @@ export default function AllOrdersSheetPage() {
       if (selectedSeller) params.sellerId = selectedSeller;
       if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
+      if (searchItemNumber.trim()) params.searchItemNumber = searchItemNumber.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (excludeLowValue) params.excludeLowValue = true;
       if (excludeNoAmazonAccount) params.excludeNoAmazonAccount = true;
@@ -568,13 +575,19 @@ export default function AllOrdersSheetPage() {
       return;
     }
 
+    // Find the item in order.lineItems to get the product title
+    const item = order.lineItems?.find(item => item.legacyItemId === legacyItemId);
+    const productTitle = item?.title || 'Unknown Product';
+
     setUpdatingItemPrices(prev => ({ ...prev, [legacyItemId]: true }));
 
     try {
       const response = await api.post('/ebay/update-listing', {
         sellerId: order.seller._id,
         itemId: legacyItemId,
-        price: parseFloat(newPrice)
+        price: parseFloat(newPrice),
+        orderId: order.orderId,
+        productTitle: productTitle
       });
 
       if (response.data.success) {
@@ -582,6 +595,8 @@ export default function AllOrdersSheetPage() {
         if (response.data.warning) {
           console.warn(`Warning:`, response.data.warning);
         }
+        // Mark this order as having a price update
+        setUpdatedOrderIds(prev => new Set(prev).add(order.orderId));
         // Clear the input for this item
         setItemPriceUpdates(prev => {
           const updated = { ...prev };
@@ -856,6 +871,14 @@ export default function AllOrdersSheetPage() {
                 value={searchBuyerName}
                 onChange={(e) => setSearchBuyerName(e.target.value)}
                 placeholder="Search by buyer name..."
+                sx={{ flex: 1 }}
+              />
+              <TextField
+                size="small"
+                label="Item Number"
+                value={searchItemNumber}
+                onChange={(e) => setSearchItemNumber(e.target.value)}
+                placeholder="Search by legacy item ID..."
                 sx={{ flex: 1 }}
               />
               
@@ -1906,9 +1929,24 @@ export default function AllOrdersSheetPage() {
                   {/* Moved columns to end */}
                   <TableCell>{order.amazonAccount || '-'}</TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                      {order.orderId}
-                    </Typography>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                        {order.orderId}
+                      </Typography>
+                      {(order.priceUpdatedViaSheet || updatedOrderIds.has(order.orderId)) && (
+                        <Tooltip 
+                          title={
+                            order.lastPriceUpdateDate 
+                              ? `Price updated on ${new Date(order.lastPriceUpdateDate).toLocaleDateString()}` 
+                              : "Price updated via All Orders Sheet"
+                          } 
+                          arrow 
+                          placement="top"
+                        >
+                          <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </TableCell>
                   <TableCell>{order.buyer?.buyerRegistrationAddress?.fullName || '-'}</TableCell>
                   <TableCell>{order.arrivingDate || '-'}</TableCell>
