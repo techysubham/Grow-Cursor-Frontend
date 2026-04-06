@@ -15,30 +15,42 @@ function monthBounds(ym) {
   return { first: `${ym}-01`, last: `${ym}-${last}` };
 }
 
-// Sellers with a higher monthly quota
-const HIGH_QUOTA_SELLERS = ['truxi', 'raveoli_cart'];
-const getQuota = (sellerName) =>
-  HIGH_QUOTA_SELLERS.includes((sellerName || '').toLowerCase()) ? 25000 : 9000;
+// Sellers with a higher monthly quota (US only)
+const HIGH_QUOTA_SELLERS = ['truxi', 'raveoli_cart', 'techmania'];
+
+// Country-based quotas
+const COUNTRY_QUOTAS = {
+  US: { high: 25000, normal: 9000 },
+  UK: { high: 100000, normal: 100000 },  // 1 lakh
+  AU: { high: 250000, normal: 250000 },  // 2.5 lakh
+  Canada: { high: null, normal: null },   // Not yet defined
+};
+
+const getQuota = (sellerName, country = 'US') => {
+  const quotas = COUNTRY_QUOTAS[country] || COUNTRY_QUOTAS.US;
+  const isHighQuota = HIGH_QUOTA_SELLERS.includes((sellerName || '').toLowerCase());
+  return isHighQuota ? quotas.high : quotas.normal;
+};
 
 export default function FeedUploadStatsPage() {
   const [dayDate, setDayDate] = useState(todayStr);
   const [dayStats, setDayStats] = useState([]);
   const [dayLoading, setDayLoading] = useState(true);
   const [dayError, setDayError] = useState(null);
+  const [dayCountry, setDayCountry] = useState('ALL');
 
   const [monthPicker, setMonthPicker] = useState(currentMonthStr);
   const [monthStats, setMonthStats] = useState([]);
   const [monthLoading, setMonthLoading] = useState(true);
   const [monthError, setMonthError] = useState(null);
+  const [monthCountry, setMonthCountry] = useState('US');
 
-  const [selectedCountry, setSelectedCountry] = useState('ALL');
-
-  const fetchDay = async (date) => {
+  const fetchDay = async (date, country) => {
     try {
       setDayLoading(true);
       setDayError(null);
       const params = { startDate: date, endDate: date };
-      if (selectedCountry !== 'ALL') params.country = selectedCountry;
+      if (country !== 'ALL') params.country = country;
       const { data } = await api.get('/ebay/feed/upload-stats', { params });
       setDayStats([...data].sort((a, b) => (b.totalSuccess || 0) - (a.totalSuccess || 0)));
     } catch (err) {
@@ -48,13 +60,13 @@ export default function FeedUploadStatsPage() {
     }
   };
 
-  const fetchMonth = async (ym) => {
+  const fetchMonth = async (ym, country) => {
     try {
       setMonthLoading(true);
       setMonthError(null);
       const { first, last } = monthBounds(ym);
       const params = { startDate: first, endDate: last };
-      if (selectedCountry !== 'ALL') params.country = selectedCountry;
+      if (country !== 'ALL') params.country = country;
       const { data } = await api.get('/ebay/feed/upload-stats', { params });
       const map = {};
       data.forEach((r) => {
@@ -74,14 +86,17 @@ export default function FeedUploadStatsPage() {
     }
   };
 
-  useEffect(() => { fetchDay(todayStr()); }, []);
-  useEffect(() => { fetchMonth(currentMonthStr()); }, []);
+  useEffect(() => { fetchDay(todayStr(), dayCountry); }, []);
+  useEffect(() => { fetchMonth(currentMonthStr(), monthCountry); }, []);
 
-  // Refetch when country filter changes
+  // Refetch when country filters change
   useEffect(() => {
-    fetchDay(dayDate);
-    fetchMonth(monthPicker);
-  }, [selectedCountry]);
+    fetchDay(dayDate, dayCountry);
+  }, [dayCountry]);
+
+  useEffect(() => {
+    fetchMonth(monthPicker, monthCountry);
+  }, [monthCountry]);
 
   const dayTotal = dayStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
   const monthTotal = monthStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
@@ -102,33 +117,28 @@ export default function FeedUploadStatsPage() {
         Feed Upload Success Stats
       </Typography>
 
-      {/* Country Filter */}
-      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Typography variant="body1" fontWeight={600}>Filter by Country:</Typography>
-        <Select
-          size="small"
-          value={selectedCountry}
-          onChange={(e) => setSelectedCountry(e.target.value)}
-          sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="ALL">All Countries</MenuItem>
-          <MenuItem value="US">United States (US)</MenuItem>
-          <MenuItem value="UK">United Kingdom (UK)</MenuItem>
-          <MenuItem value="AU">Australia (AU)</MenuItem>
-          <MenuItem value="Canada">Canada</MenuItem>
-        </Select>
-      </Box>
-
       <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
         {/* ── Day-wise ─────────────────────────────────────────────────── */}
         <Paper sx={{ flex: 1, minWidth: 0 }}>
           <Box sx={{ px: 3, py: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="subtitle1" fontWeight={700} fontSize="1rem">Day-wise</Typography>
+            <Select
+              size="small"
+              value={dayCountry}
+              onChange={(e) => setDayCountry(e.target.value)}
+              sx={{ minWidth: 140 }}
+            >
+              <MenuItem value="ALL">All Countries</MenuItem>
+              <MenuItem value="US">US</MenuItem>
+              <MenuItem value="UK">UK</MenuItem>
+              <MenuItem value="AU">AU</MenuItem>
+              <MenuItem value="Canada">Canada</MenuItem>
+            </Select>
             <TextField
               type="date"
               size="small"
               value={dayDate}
-              onChange={(e) => { setDayDate(e.target.value); fetchDay(e.target.value); }}
+              onChange={(e) => { setDayDate(e.target.value); fetchDay(e.target.value, dayCountry); }}
               InputLabelProps={{ shrink: true }}
               sx={{ ml: 'auto', width: 170 }}
             />
@@ -192,11 +202,22 @@ export default function FeedUploadStatsPage() {
         <Paper sx={{ flex: 1, minWidth: 0 }}>
           <Box sx={{ px: 3, py: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="subtitle1" fontWeight={700} fontSize="1rem">Month-wise</Typography>
+            <Select
+              size="small"
+              value={monthCountry}
+              onChange={(e) => setMonthCountry(e.target.value)}
+              sx={{ minWidth: 140 }}
+            >
+              <MenuItem value="US">US</MenuItem>
+              <MenuItem value="UK">UK</MenuItem>
+              <MenuItem value="AU">AU</MenuItem>
+              <MenuItem value="Canada">Canada</MenuItem>
+            </Select>
             <TextField
               type="month"
               size="small"
               value={monthPicker}
-              onChange={(e) => { setMonthPicker(e.target.value); fetchMonth(e.target.value); }}
+              onChange={(e) => { setMonthPicker(e.target.value); fetchMonth(e.target.value, monthCountry); }}
               InputLabelProps={{ shrink: true }}
               sx={{ ml: 'auto', width: 190 }}
             />
@@ -228,7 +249,7 @@ export default function FeedUploadStatsPage() {
                   ) : (
                     <>
                       {monthStats.map((row, idx) => {
-                        const quota = getQuota(row.sellerName);
+                        const quota = getQuota(row.sellerName, monthCountry);
                         return (
                           <TableRow
                             key={`m-${row.sellerId}-${idx}`}
@@ -239,9 +260,11 @@ export default function FeedUploadStatsPage() {
                             <TableCell sx={cellSx}>{row.sellerName}</TableCell>
                             <TableCell align="right" sx={{ ...numCellSx, pr: 3 }}>
                               {row.totalSuccess.toLocaleString()}
-                              <Typography component="span" sx={{ fontSize: '0.78rem', color: 'text.secondary', ml: 0.5, fontWeight: 400 }}>
-                                / {quota.toLocaleString()}
-                              </Typography>
+                              {quota && (
+                                <Typography component="span" sx={{ fontSize: '0.78rem', color: 'text.secondary', ml: 0.5, fontWeight: 400 }}>
+                                  / {quota.toLocaleString()}
+                                </Typography>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
