@@ -1527,7 +1527,8 @@ function FulfillmentDashboard() {
     'shipping', 'salesTax', 'discount', 'transactionFees',
     'adFeeGeneral', 'cancelStatus', 'refunds', 'orderEarnings', 'trackingNumber',
     'amazonAccount', 'arriving', 'beforeTax', 'estimatedTax',
-    'azOrderId', 'amazonRefund', 'cardName', 'resolution', 'notes', 'messagingStatus', 'remark', 'issueFlags'
+    'azOrderId', 'amazonRefund', 'cardName', 'resolution', 'notes', 'messagingStatus', 'remark', 'issueFlags',
+    'convoCategory', 'convoCaseStatus'
   ];
 
   const ALL_COLUMNS = [
@@ -1567,7 +1568,9 @@ function FulfillmentDashboard() {
     { id: 'notes', label: 'Notes' },
     { id: 'messagingStatus', label: 'Messaging' },
     { id: 'remark', label: 'Remark' },
-    { id: 'issueFlags', label: 'Issues' }
+    { id: 'issueFlags', label: 'Issues' },
+    { id: 'convoCategory', label: 'Case Category' },
+    { id: 'convoCaseStatus', label: 'Case Status' }
   ];
 
   // CSV Export column selection - initialized after ALL_COLUMNS is defined
@@ -3626,6 +3629,8 @@ function FulfillmentDashboard() {
                     {visibleColumnsSet.has('messagingStatus') && <TableCell sx={HEADER_CELL_SX}>Messaging</TableCell>}
                     {visibleColumnsSet.has('remark') && <TableCell sx={HEADER_CELL_SX}>Remark</TableCell>}
                     {visibleColumnsSet.has('issueFlags') && <TableCell sx={HEADER_CELL_SX}>Issues</TableCell>}
+                    {visibleColumnsSet.has('convoCategory') && <TableCell sx={HEADER_CELL_SX}>Case Category</TableCell>}
+                    {visibleColumnsSet.has('convoCaseStatus') && <TableCell sx={HEADER_CELL_SX}>Case Status</TableCell>}
                     <TableCell sx={{ ...HEADER_CELL_SX, textAlign: 'center' }}></TableCell>
                   </TableRow>
                 </TableHead>
@@ -4485,6 +4490,36 @@ function FulfillmentDashboard() {
                             </TableCell>
                           );
                         })()}
+                        {visibleColumnsSet.has('convoCategory') && (
+                          <TableCell>
+                            {order.convoCategory ? (
+                              <Chip
+                                label={order.convoCategory}
+                                size="small"
+                                color="info"
+                                variant="outlined"
+                                sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}
+                              />
+                            ) : (
+                              <Typography variant="body2" color="text.disabled">-</Typography>
+                            )}
+                          </TableCell>
+                        )}
+                        {visibleColumnsSet.has('convoCaseStatus') && (
+                          <TableCell>
+                            {order.convoCaseStatus ? (
+                              <Chip
+                                label={order.convoCaseStatus}
+                                size="small"
+                                color={order.convoCaseStatus === 'Case Opened' ? 'error' : 'success'}
+                                variant="outlined"
+                                sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}
+                              />
+                            ) : (
+                              <Typography variant="body2" color="text.disabled">-</Typography>
+                            )}
+                          </TableCell>
+                        )}
 
 
                       </TableRow>
