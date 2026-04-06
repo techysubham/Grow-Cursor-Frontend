@@ -24,6 +24,8 @@ import {
   Tooltip,
   Snackbar,
   Chip,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -46,11 +48,12 @@ function TabPanel({ children, value, index }) {
 
 export default function AccountHealthReportPage() {
   const [tabValue, setTabValue] = useState(0);
-  
+
   // SNAD Details state
   const [details, setDetails] = useState([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  
+  const [hideInactiveDetails, setHideInactiveDetails] = useState(false);
+
   // Evaluation Windows state
   const [windows, setWindows] = useState([]);
   const [windowsLoading, setWindowsLoading] = useState(false);
@@ -59,13 +62,13 @@ export default function AccountHealthReportPage() {
   const [overviewData, setOverviewData] = useState([]);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewMarketAvg, setOverviewMarketAvg] = useState(1.1);
-  
+
   // Shared state
   const [sellers, setSellers] = useState([]);
   const [error, setError] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
-  
+
   // Filters
   const [sellerFilter, setSellerFilter] = useState('');
   const [dateFilter, setDateFilter] = useState({
@@ -73,7 +76,7 @@ export default function AccountHealthReportPage() {
     from: '',
     to: ''
   });
-  
+
   // Selected order for modal
   const [selectedOrderId, setSelectedOrderId] = useState(null);
 
@@ -127,7 +130,7 @@ export default function AccountHealthReportPage() {
         if (dateFilter.from) params.startDate = dateFilter.from;
         if (dateFilter.to) params.endDate = dateFilter.to;
       }
-      
+
       const res = await api.get('/account-health/details', { params });
       setDetails(res.data.details || []);
     } catch (e) {
@@ -143,7 +146,7 @@ export default function AccountHealthReportPage() {
     try {
       const params = {};
       if (sellerFilter) params.sellerId = sellerFilter;
-      
+
       const res = await api.get('/account-health/evaluation-windows', { params });
       setWindows(res.data.windows || []);
     } catch (e) {
@@ -171,7 +174,7 @@ export default function AccountHealthReportPage() {
   async function handleSellerFaultChange(orderId, newValue) {
     try {
       await api.patch(`/account-health/details/${orderId}`, { sellerFault: newValue });
-      setDetails(prev => prev.map(d => 
+      setDetails(prev => prev.map(d =>
         d._id === orderId ? { ...d, sellerFault: newValue } : d
       ));
       setSnackbarMsg('Seller Fault updated successfully');
@@ -188,10 +191,10 @@ export default function AccountHealthReportPage() {
 
   async function handleUpdateMarketAvg(rowKey, effectiveDate, sellerId) {
     if (!editingMarketAvg || editingMarketAvg.key !== rowKey) return;
-    
+
     // Don't save if value hasn't changed (optional optimization, but user logic says "new avg used going forward")
     // Use parseFloat to compare
-    
+
     setSavingMarketAvg(true);
     try {
       await api.post('/account-health/evaluation-windows/market-avg', {
@@ -199,11 +202,11 @@ export default function AccountHealthReportPage() {
         effectiveDate: effectiveDate, // This window's end date is the effective date for 'going forward' logic
         sellerId: sellerId || sellerFilter
       });
-      
+
       setSnackbarMsg('Market Average updated successfully');
       setSnackbarOpen(true);
       setEditingMarketAvg(null);
-      
+
       // Reload windows to reflect changes (and potential 'going forward' implications)
       await loadEvaluationWindows();
     } catch (e) {
@@ -290,9 +293,21 @@ export default function AccountHealthReportPage() {
 
   const hasActiveFilters = dateFilter.mode !== 'all' || (sellers.length > 0 && sellerFilter !== sellers[0]._id);
 
+  const isDetailStillCounted = (detail) => {
+    if (!detail?.remarkDate) return true;
+    const remarkDate = new Date(detail.remarkDate);
+    if (Number.isNaN(remarkDate.getTime())) return true;
+    return remarkDate >= new Date();
+  };
+
+  const visibleDetails = useMemo(() => {
+    if (!hideInactiveDetails) return details;
+    return details.filter(isDetailStillCounted);
+  }, [details, hideInactiveDetails]);
+
   // CSV Export for SNAD Details
   const handleExportDetails = () => {
-    const csvData = prepareCSVData(details, {
+    const csvData = prepareCSVData(visibleDetails, {
       'Order Date': (d) => formatDate(d.orderDate),
       'Order ID': 'orderId',
       'Item ID': 'itemId',
@@ -340,7 +355,7 @@ export default function AccountHealthReportPage() {
 
   const windowsWithStatus = useMemo(() => {
     if (!windows || windows.length === 0) return [];
-    
+
     // Group windows by seller
     const sellerWindowsMap = {};
     for (const w of windows) {
@@ -350,26 +365,26 @@ export default function AccountHealthReportPage() {
       }
       sellerWindowsMap[sellerId].push(w);
     }
-    
+
     const result = [];
-    
+
     // Process each seller's windows independently
     for (const sellerId of Object.keys(sellerWindowsMap)) {
       const sellerWindows = sellerWindowsMap[sellerId];
-      
+
       // Sort oldest first for chronological processing
-      const sortedWindows = [...sellerWindows].sort((a, b) => 
+      const sortedWindows = [...sellerWindows].sort((a, b) =>
         new Date(a.evaluationWindowEnd || a.windowEnd) - new Date(b.evaluationWindowEnd || b.windowEnd)
       );
-      
+
       let currentStatusLevel = 0; // 0 = Compliant
       let prevBbeRate = null;
-      
+
       for (const w of sortedWindows) {
         const bbeRate = parseFloat(w.bbeRate);
         const marketAvg = parseFloat(w.marketAvg);
         const isAbove = bbeRate > marketAvg;
-        
+
         if (!isAbove) {
           // Below market avg → Compliant
           currentStatusLevel = 0;
@@ -390,18 +405,18 @@ export default function AccountHealthReportPage() {
             // If equal, stay at same level
           }
         }
-        
+
         prevBbeRate = bbeRate;
-        
+
         const status = STATUS_LEVELS[currentStatusLevel];
         const statusColor = STATUS_COLORS[status];
-        
+
         result.push({ ...w, storeStatus: status, storeStatusColor: statusColor });
       }
     }
-    
+
     // Sort back to newest first for display
-    return result.sort((a, b) => 
+    return result.sort((a, b) =>
       new Date(b.evaluationWindowEnd || b.windowEnd) - new Date(a.evaluationWindowEnd || a.windowEnd)
     );
   }, [windows]);
@@ -452,7 +467,7 @@ export default function AccountHealthReportPage() {
             <InputLabel>Date</InputLabel>
             <Select
               value={dateFilter.mode}
-              onChange={(e) => setDateFilter({...dateFilter, mode: e.target.value})}
+              onChange={(e) => setDateFilter({ ...dateFilter, mode: e.target.value })}
               label="Date"
             >
               <MenuItem value="all">All</MenuItem>
@@ -466,7 +481,7 @@ export default function AccountHealthReportPage() {
                 type="date"
                 size="small"
                 value={dateFilter.from}
-                onChange={(e) => setDateFilter({...dateFilter, from: e.target.value})}
+                onChange={(e) => setDateFilter({ ...dateFilter, from: e.target.value })}
                 label="From"
                 InputLabelProps={{ shrink: true }}
               />
@@ -475,7 +490,7 @@ export default function AccountHealthReportPage() {
                 type="date"
                 size="small"
                 value={dateFilter.to}
-                onChange={(e) => setDateFilter({...dateFilter, to: e.target.value})}
+                onChange={(e) => setDateFilter({ ...dateFilter, to: e.target.value })}
                 label="To"
                 InputLabelProps={{ shrink: true }}
               />
@@ -506,8 +521,8 @@ export default function AccountHealthReportPage() {
 
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
-        <Tabs 
-          value={tabValue} 
+        <Tabs
+          value={tabValue}
           onChange={(e, newValue) => setTabValue(newValue)}
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
@@ -563,20 +578,20 @@ export default function AccountHealthReportPage() {
                       {seller.weeks.map((week, idx) => (
                         <TableCell key={idx} align="center">
                           {week.type === 'actual' ? (
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
+                            <Typography
+                              variant="body2"
+                              sx={{
                                 fontWeight: 'bold',
-                                color: week.bbeRate <= overviewMarketAvg ? 'success.main' : 
-                                       week.bbeRate <= overviewMarketAvg * 1.2 ? 'warning.main' : 'error.main'
+                                color: week.bbeRate <= overviewMarketAvg ? 'success.main' :
+                                  week.bbeRate <= overviewMarketAvg * 1.2 ? 'warning.main' : 'error.main'
                               }}
                             >
                               {week.bbeRate}%
                             </Typography>
                           ) : (
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
+                            <Typography
+                              variant="body2"
+                              sx={{
                                 fontWeight: 'bold',
                                 color: week.salesNeeded <= 0 ? 'success.main' : 'error.main'
                               }}
@@ -597,15 +612,24 @@ export default function AccountHealthReportPage() {
 
       {/* SNAD Details Tab */}
       <TabPanel value={tabValue} index={1}>
-        <Stack direction="row" justifyContent="flex-end" mb={2}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap mb={2}>
+          <FormControlLabel
+            control={(
+              <Switch
+                checked={hideInactiveDetails}
+                onChange={(e) => setHideInactiveDetails(e.target.checked)}
+              />
+            )}
+            label="Hide no longer counted"
+          />
           <Button
             variant="outlined"
             color="success"
             startIcon={<DownloadIcon />}
             onClick={handleExportDetails}
-            disabled={details.length === 0}
+            disabled={visibleDetails.length === 0}
           >
-            Download CSV ({details.length})
+            Download CSV ({visibleDetails.length})
           </Button>
         </Stack>
 
@@ -614,15 +638,15 @@ export default function AccountHealthReportPage() {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer 
+          <TableContainer
             component={Paper}
-            sx={{ 
+            sx={{
               maxWidth: '100%',
               overflowX: 'auto',
               '&::-webkit-scrollbar': { height: '8px' },
               '&::-webkit-scrollbar-track': { backgroundColor: '#f1f1f1' },
-              '&::-webkit-scrollbar-thumb': { 
-                backgroundColor: '#888', 
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: '#888',
                 borderRadius: '4px',
                 '&:hover': { backgroundColor: '#555' }
               },
@@ -642,24 +666,24 @@ export default function AccountHealthReportPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {details.length === 0 ? (
+                {visibleDetails.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
                       <Typography variant="body2" color="text.secondary" py={2}>
-                        No SNAD records found.
+                        {details.length === 0 ? 'No SNAD records found.' : 'No SNAD records match the current toggle.'}
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  details.map((d) => (
+                  visibleDetails.map((d) => (
                     <TableRow key={d._id} hover>
                       <TableCell>{formatDate(d.orderDate)}</TableCell>
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              fontFamily: 'monospace', 
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontFamily: 'monospace',
                               fontSize: '0.75rem',
                               cursor: 'pointer',
                               color: 'primary.main',
@@ -680,9 +704,9 @@ export default function AccountHealthReportPage() {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
+                        <Typography
+                          variant="body2"
+                          sx={{
                             fontWeight: 'bold',
                             color: d.snadCount > 0 ? 'error.main' : 'text.primary'
                           }}
@@ -703,7 +727,7 @@ export default function AccountHealthReportPage() {
                         </FormControl>
                       </TableCell>
                       <TableCell>
-                        <Typography 
+                        <Typography
                           variant="body2"
                           sx={{ color: d.hasInr ? 'warning.main' : 'text.secondary' }}
                         >
@@ -796,75 +820,75 @@ export default function AccountHealthReportPage() {
                       return d.toISOString();
                     })();
                     return (
-                    <TableRow key={rowKey} hover>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {formatWindowDate(getActualDataWindowStart(w))} - {formatWindowDate(getActualDataWindowEnd(w))}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{w.totalSales}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            fontWeight: 'bold',
-                            color: getBbeRateColor(w.bbeRate, w.marketAvg)
-                          }}
-                        >
-                          {w.bbeRate}%
-                        </Typography>
-                      </TableCell>
-                      <TableCell
-                        onClick={() => setEditingMarketAvg({ key: rowKey, value: w.marketAvg })}
-                        sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#f0f0f0' } }}
-                      >
-                        {editingMarketAvg?.key === rowKey ? (
-                          <TextField
-                            autoFocus
-                            size="small"
-                            type="number"
-                            value={editingMarketAvg.value}
-                            onChange={(e) => setEditingMarketAvg({ ...editingMarketAvg, value: e.target.value })}
-                            onBlur={() => handleUpdateMarketAvg(rowKey, w.evaluationWindowEnd || w.windowEnd, w.sellerId || w.seller?._id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleUpdateMarketAvg(rowKey, w.evaluationWindowEnd || w.windowEnd, w.sellerId || w.seller?._id);
-                              } else if (e.key === 'Escape') {
-                                setEditingMarketAvg(null);
-                              }
+                      <TableRow key={rowKey} hover>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {formatWindowDate(getActualDataWindowStart(w))} - {formatWindowDate(getActualDataWindowEnd(w))}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{w.totalSales}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 'bold',
+                              color: getBbeRateColor(w.bbeRate, w.marketAvg)
                             }}
-                            inputProps={{ step: 0.1, style: { padding: '4px 8px' } }}
-                            onClick={(e) => e.stopPropagation()}
-                            disabled={savingMarketAvg}
+                          >
+                            {w.bbeRate}%
+                          </Typography>
+                        </TableCell>
+                        <TableCell
+                          onClick={() => setEditingMarketAvg({ key: rowKey, value: w.marketAvg })}
+                          sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#f0f0f0' } }}
+                        >
+                          {editingMarketAvg?.key === rowKey ? (
+                            <TextField
+                              autoFocus
+                              size="small"
+                              type="number"
+                              value={editingMarketAvg.value}
+                              onChange={(e) => setEditingMarketAvg({ ...editingMarketAvg, value: e.target.value })}
+                              onBlur={() => handleUpdateMarketAvg(rowKey, w.evaluationWindowEnd || w.windowEnd, w.sellerId || w.seller?._id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleUpdateMarketAvg(rowKey, w.evaluationWindowEnd || w.windowEnd, w.sellerId || w.seller?._id);
+                                } else if (e.key === 'Escape') {
+                                  setEditingMarketAvg(null);
+                                }
+                              }}
+                              inputProps={{ step: 0.1, style: { padding: '4px 8px' } }}
+                              onClick={(e) => e.stopPropagation()}
+                              disabled={savingMarketAvg}
+                            />
+                          ) : (
+                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                              <Typography variant="body2">{w.marketAvg}</Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>(edit)</Typography>
+                            </Stack>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={w.storeStatus}
+                            size="small"
+                            sx={{
+                              fontWeight: 'bold',
+                              bgcolor: w.storeStatusColor,
+                              color: w.storeStatus === 'Non-Compliant' ? '#000' : '#fff'
+                            }}
                           />
-                        ) : (
-                          <Stack direction="row" alignItems="center" spacing={0.5}>
-                             <Typography variant="body2">{w.marketAvg}</Typography>
-                             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>(edit)</Typography>
-                          </Stack>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={w.storeStatus}
-                          size="small"
-                          sx={{ 
-                            fontWeight: 'bold',
-                            bgcolor: w.storeStatusColor,
-                            color: w.storeStatus === 'Non-Compliant' ? '#000' : '#fff'
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{formatDate(nextEvaluationDate || w.evaluationDate)}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{w.snadCount}</Typography>
-                      </TableCell>
-                    </TableRow>
-                  );
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{formatDate(nextEvaluationDate || w.evaluationDate)}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{w.snadCount}</Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
                   })
                 )}
               </TableBody>
@@ -881,7 +905,7 @@ export default function AccountHealthReportPage() {
       />
 
       {/* BBE Calculator Modal */}
-      <BBECalculatorModal 
+      <BBECalculatorModal
         open={calculatorOpen}
         onClose={() => setCalculatorOpen(false)}
         initialSales={initialCalcSales}
