@@ -703,7 +703,7 @@ export default function AllOrdersSheetPage() {
   if (loading && orders.length === 0) return <AllOrdersSheetSkeleton />;
 
   return (
-    <Fade in timeout={400}>
+    <Fade in timeout={600}>
     <Box sx={{ p: 3 }}>
       {/* CSV Export Modal */}
       <Dialog open={showExportModal} onClose={() => setShowExportModal(false)} maxWidth="sm" fullWidth>
@@ -1559,11 +1559,7 @@ export default function AllOrdersSheetPage() {
       )}
 
       {/* Orders Table */}
-      {loading ? (
-        <Box display="flex" justifyContent="center" py={4}>
-          <CircularProgress />
-        </Box>
-      ) : orders.length === 0 ? (
+      {orders.length === 0 ? (
         <Alert severity="info">No orders found{(selectedSeller || searchMarketplace || dateFilter.mode !== 'none' || profitFilter.mode !== 'none' || subtotalFilter.mode !== 'none' || excludeLowValue || excludeNoAmazonAccount || searchOrderId || searchBuyerName) ? ' with current filters' : ''}</Alert>
       ) : (
         <TableContainer component={Paper} sx={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)' }}>

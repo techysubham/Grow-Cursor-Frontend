@@ -1,7 +1,8 @@
-import { Box, Paper, Skeleton, Stack } from '@mui/material';
+import { Box, Fade, Paper, Skeleton, Stack } from '@mui/material';
 
 export default function CRPAnalyticsSkeleton() {
   return (
+    <Fade in timeout={200}>
     <Box sx={{ p: 3 }}>
       {/* Header + inline filters */}
       <Stack direction={{ xs: 'column', xl: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
@@ -45,5 +46,6 @@ export default function CRPAnalyticsSkeleton() {
         </Box>
       </Box>
     </Box>
+    </Fade>
   );
 }

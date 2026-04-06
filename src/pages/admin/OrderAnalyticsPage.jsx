@@ -225,7 +225,7 @@ export default function OrderAnalyticsPage() {
   if (loading) return <OrderAnalyticsSkeleton />;
 
   return (
-    <Fade in timeout={400}>
+    <Fade in timeout={600}>
     <Box sx={{ p: 3 }}>
       {/* Header with Total Orders chip in top-right */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>

@@ -1,7 +1,8 @@
-import { Box, Paper, Skeleton, Stack } from '@mui/material';
+import { Box, Fade, Paper, Skeleton, Stack } from '@mui/material';
 
 export default function AllOrdersSheetSkeleton() {
   return (
+    <Fade in timeout={200}>
     <Box sx={{ p: 3 }}>
       {/* Header row */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
@@ -38,5 +39,6 @@ export default function AllOrdersSheetSkeleton() {
         <Skeleton variant="rounded" width={300} height={32} sx={{ borderRadius: 4 }} />
       </Box>
     </Box>
+    </Fade>
   );
 }

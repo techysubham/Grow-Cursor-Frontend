@@ -1,7 +1,8 @@
-import { Box, Paper, Skeleton, Stack } from '@mui/material';
+import { Box, Fade, Paper, Skeleton, Stack } from '@mui/material';
 
 export default function AmazonArrivalsSkeleton() {
   return (
+    <Fade in timeout={200}>
     <Box sx={{
       height: '100vh',
       display: 'flex',
@@ -41,5 +42,6 @@ export default function AmazonArrivalsSkeleton() {
         </Box>
       </Paper>
     </Box>
+    </Fade>
   );
 }

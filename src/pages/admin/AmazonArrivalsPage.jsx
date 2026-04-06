@@ -486,7 +486,7 @@ export default function AmazonArrivalsPage() {
   if (loading && orders.length === 0) return <AmazonArrivalsSkeleton />;
 
   return (
-    <Fade in timeout={400}>
+    <Fade in timeout={600}>
     <Box sx={{
       height: '100vh',
       display: 'flex',

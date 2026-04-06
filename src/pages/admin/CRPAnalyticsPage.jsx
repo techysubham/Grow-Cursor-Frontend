@@ -188,7 +188,7 @@ export default function CRPAnalyticsPage() {
   if (loading && data.length === 0) return <CRPAnalyticsSkeleton />;
 
   return (
-    <Fade in timeout={400}>
+    <Fade in timeout={600}>
     <Box sx={{ p: 3 }}>
       {/* ── Page header + inline filters ────────────────────────────────────── */}
       <Stack direction={{ xs: 'column', xl: 'row' }} alignItems={{ xl: 'flex-start' }}

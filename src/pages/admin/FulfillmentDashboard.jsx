@@ -2804,7 +2804,7 @@ function FulfillmentDashboard() {
   if (loading && orders.length === 0) return <FulfillmentSkeleton />;
 
   return (
-    <Fade in timeout={400}>
+    <Fade in timeout={600}>
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',

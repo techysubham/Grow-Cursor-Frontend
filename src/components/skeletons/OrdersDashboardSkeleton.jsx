@@ -1,7 +1,8 @@
-import { Box, Paper, Skeleton, Stack } from '@mui/material';
+import { Box, Fade, Paper, Skeleton, Stack } from '@mui/material';
 
 export default function OrdersDashboardSkeleton() {
   return (
+    <Fade in timeout={200}>
     <Box sx={{ p: 3 }}>
       {/* Header row */}
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
@@ -62,5 +63,6 @@ export default function OrdersDashboardSkeleton() {
         <Skeleton key={i} variant="rounded" height={44} sx={{ mb: '2px', opacity: 1 - i * 0.08 }} />
       ))}
     </Box>
+    </Fade>
   );
 }

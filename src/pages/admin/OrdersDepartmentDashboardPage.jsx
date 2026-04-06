@@ -213,7 +213,7 @@ export default function OrdersDepartmentDashboardPage() {
   if (loading && !overview) return <OrdersDashboardSkeleton />;
 
   return (
-    <Fade in={!loading} timeout={400}>
+    <Fade in={!loading} timeout={600}>
     <Box sx={{ p: 3 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1} sx={{ mb: 2 }}>
         <Box>

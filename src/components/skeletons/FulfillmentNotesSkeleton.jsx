@@ -1,7 +1,8 @@
-import { Box, Paper, Skeleton, Stack } from '@mui/material';
+import { Box, Fade, Paper, Skeleton, Stack } from '@mui/material';
 
 export default function FulfillmentNotesSkeleton() {
   return (
+    <Fade in timeout={200}>
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
@@ -48,5 +49,6 @@ export default function FulfillmentNotesSkeleton() {
         </Box>
       </Paper>
     </Box>
+    </Fade>
   );
 }

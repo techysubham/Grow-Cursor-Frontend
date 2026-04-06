@@ -1146,7 +1146,7 @@ export default function AwaitingShipmentPage() {
   if (loading && orders.length === 0) return <AwaitingShipmentSkeleton />;
 
   return (
-    <Fade in timeout={400}>
+    <Fade in timeout={600}>
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
@@ -1300,11 +1300,7 @@ export default function AwaitingShipmentPage() {
         )}
       </Paper>
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
-          <CircularProgress />
-        </Box>
-      ) : orders.length === 0 ? (
+      {orders.length === 0 ? (
         <Box sx={{ textAlign: 'center', p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
           <LocalShippingIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1, opacity: 0.5 }} />
           <Typography variant="body1" color="text.secondary">

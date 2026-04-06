@@ -579,7 +579,7 @@ export default function FulfillmentNotesPage() {
   if (loading && orders.length === 0) return <FulfillmentNotesSkeleton />;
 
   return (
-    <Fade in timeout={400}>
+    <Fade in timeout={600}>
     <Box sx={{ 
       display: 'flex', 
       flexDirection: 'column', 
