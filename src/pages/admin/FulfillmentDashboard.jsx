@@ -1169,6 +1169,175 @@ const EditableCell = memo(function EditableCell({ value, type = 'text', onSave }
 const HEADER_CELL_SX = { backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 };
 const HEADER_CELL_RIGHT_SX = { ...HEADER_CELL_SX, textAlign: 'right' };
 
+const SearchFiltersPanel = memo(function SearchFiltersPanel({
+  searchOrderId, setSearchOrderId,
+  searchAzOrderId, setSearchAzOrderId,
+  searchBuyerName, setSearchBuyerName,
+  searchItemId, setSearchItemId,
+  searchProductName, setSearchProductName,
+  setSearchPaymentStatus,
+  dateFilter, setDateFilter,
+  isSmallMobile,
+}) {
+  const [filtersExpanded, setFiltersExpanded] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('fulfillment_dashboard_state');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed['filtersExpanded'] !== undefined ? parsed['filtersExpanded'] : false;
+      }
+    } catch (e) {}
+    return false;
+  });
+
+  useEffect(() => {
+    if (isSmallMobile && filtersExpanded) {
+      setFiltersExpanded(false);
+    }
+  }, []); // Only run on mount
+
+  return (
+    <Box sx={{ mt: { xs: 1.5, sm: 2 }, p: { xs: 1.5, sm: 2 }, backgroundColor: 'action.hover', borderRadius: 1 }}>
+      <Box
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+        onClick={() => setFiltersExpanded(prev => !prev)}
+      >
+        <Typography variant="subtitle2" fontWeight="bold" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+          Search Filters
+        </Typography>
+        <IconButton size="small">
+          {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        </IconButton>
+      </Box>
+      <Collapse in={filtersExpanded}>
+        <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ mt: 1.5 }}>
+          {/* Row 1: Text searches */}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 2 }}>
+            <TextField
+              size="small"
+              label="Order ID"
+              value={searchOrderId}
+              onChange={(e) => setSearchOrderId(e.target.value)}
+              placeholder="Search by order ID..."
+              sx={{ flex: 1 }}
+              fullWidth
+            />
+            <TextField
+              size="small"
+              label="Amazon Order ID"
+              value={searchAzOrderId}
+              onChange={(e) => setSearchAzOrderId(e.target.value)}
+              placeholder="Search by Amazon order ID..."
+              sx={{ flex: 1 }}
+              fullWidth
+            />
+            <TextField
+              size="small"
+              label="Buyer Name"
+              value={searchBuyerName}
+              onChange={(e) => setSearchBuyerName(e.target.value)}
+              placeholder="Search by buyer name..."
+              sx={{ flex: 1 }}
+              fullWidth
+            />
+            <TextField
+              size="small"
+              label="Item ID"
+              value={searchItemId}
+              onChange={(e) => setSearchItemId(e.target.value)}
+              placeholder="Search by item ID..."
+              sx={{ flex: 1 }}
+              fullWidth
+            />
+            <TextField
+              size="small"
+              label="Product Name"
+              value={searchProductName}
+              onChange={(e) => setSearchProductName(e.target.value)}
+              placeholder="Search by product name..."
+              sx={{ flex: 1 }}
+              fullWidth
+            />
+          </Stack>
+
+          {/* Row 2: Date filters */}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 2 }} alignItems={{ xs: 'stretch', sm: 'center' }}>
+            {/* DATE MODE SELECTOR */}
+            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 } }}>
+              <InputLabel id="date-mode-label">Date Mode</InputLabel>
+              <Select
+                labelId="date-mode-label"
+                value={dateFilter.mode}
+                label="Date Mode"
+                onChange={(e) => setDateFilter(prev => ({ ...prev, mode: e.target.value }))}
+              >
+                <MenuItem value="none">None</MenuItem>
+                <MenuItem value="single">Single Day</MenuItem>
+                <MenuItem value="range">Date Range</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* SINGLE DATE INPUT */}
+            {dateFilter.mode === 'single' && (
+              <TextField
+                size="small"
+                label="Date"
+                type="date"
+                value={dateFilter.single}
+                onChange={(e) => setDateFilter(prev => ({ ...prev, single: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: { xs: '100%', sm: 150 } }}
+              />
+            )}
+
+            {/* RANGE INPUTS */}
+            {dateFilter.mode === 'range' && (
+              <Stack direction="row" spacing={1} sx={{ flex: { xs: 1, sm: 'none' } }}>
+                <TextField
+                  size="small"
+                  label="From"
+                  type="date"
+                  value={dateFilter.from}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ width: { xs: '50%', sm: 150 } }}
+                />
+                <TextField
+                  size="small"
+                  label="To"
+                  type="date"
+                  value={dateFilter.to}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ width: { xs: '50%', sm: 150 } }}
+                />
+              </Stack>
+            )}
+
+            {/* CLEAR BUTTON */}
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                setSearchOrderId('');
+                setSearchAzOrderId('');
+                setSearchBuyerName('');
+                setSearchItemId('');
+                setSearchProductName('');
+                setSearchPaymentStatus('');
+                setDateFilter({ mode: 'none', single: '', from: '', to: '' });
+              }}
+              sx={{ minWidth: { xs: '100%', sm: 80 } }}
+            >
+              Clear
+            </Button>
+          </Stack>
+        </Stack>
+      </Collapse>
+    </Box>
+  );
+});
+
 function FulfillmentDashboard() {
   // Get user role for permission checks
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -1230,14 +1399,6 @@ function FulfillmentDashboard() {
   const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
   const [missingAmazonAccount, setMissingAmazonAccount] = useState(() => getInitialState('missingAmazonAccount', false));
   const [dateFilter, setDateFilter] = useState(() => getInitialState('dateFilter', ''));
-  const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
-
-  // Close filters by default on mobile
-  useEffect(() => {
-    if (isSmallMobile && filtersExpanded) {
-      setFiltersExpanded(false);
-    }
-  }, []); // Only run on mount
 
   // Pagination state - restored from sessionStorage
   const [currentPage, setCurrentPage] = useState(() => getInitialState('currentPage', 1));
@@ -3317,146 +3478,22 @@ function FulfillmentDashboard() {
         )}
 
         {/* SEARCH FILTERS */}
-
-        {/* SEARCH FILTERS - REMOVED THE CONDITIONAL CHECK */}
-        <Box sx={{ mt: { xs: 1.5, sm: 2 }, p: { xs: 1.5, sm: 2 }, backgroundColor: 'action.hover', borderRadius: 1 }}>
-          <Box
-            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-            onClick={() => setFiltersExpanded(!filtersExpanded)}
-          >
-            <Typography variant="subtitle2" fontWeight="bold" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-              Search Filters
-            </Typography>
-            <IconButton size="small">
-              {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
-          </Box>
-          <Collapse in={filtersExpanded}>
-            <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ mt: 1.5 }}>
-              {/* Row 1: Text searches */}
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 2 }}>
-                <TextField
-                  size="small"
-                  label="Order ID"
-                  value={searchOrderId}
-                  onChange={(e) => setSearchOrderId(e.target.value)}
-                  placeholder="Search by order ID..."
-                  sx={{ flex: 1 }}
-                  fullWidth
-                />
-                <TextField
-                  size="small"
-                  label="Amazon Order ID"
-                  value={searchAzOrderId}
-                  onChange={(e) => setSearchAzOrderId(e.target.value)}
-                  placeholder="Search by Amazon order ID..."
-                  sx={{ flex: 1 }}
-                  fullWidth
-                />
-                <TextField
-                  size="small"
-                  label="Buyer Name"
-                  value={searchBuyerName}
-                  onChange={(e) => setSearchBuyerName(e.target.value)}
-                  placeholder="Search by buyer name..."
-                  sx={{ flex: 1 }}
-                  fullWidth
-                />
-                <TextField
-                  size="small"
-                  label="Item ID"
-                  value={searchItemId}
-                  onChange={(e) => setSearchItemId(e.target.value)}
-                  placeholder="Search by item ID..."
-                  sx={{ flex: 1 }}
-                  fullWidth
-                />
-                <TextField
-                  size="small"
-                  label="Product Name"
-                  value={searchProductName}
-                  onChange={(e) => setSearchProductName(e.target.value)}
-                  placeholder="Search by product name..."
-                  sx={{ flex: 1 }}
-                  fullWidth
-                />
-              </Stack>
-
-              {/* Row 2: Date filters */}
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 2 }} alignItems={{ xs: 'stretch', sm: 'center' }}>
-                {/* DATE MODE SELECTOR */}
-                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 } }}>
-                  <InputLabel id="date-mode-label">Date Mode</InputLabel>
-                  <Select
-                    labelId="date-mode-label"
-                    value={dateFilter.mode}
-                    label="Date Mode"
-                    onChange={(e) => setDateFilter(prev => ({ ...prev, mode: e.target.value }))}
-                  >
-                    <MenuItem value="none">None</MenuItem>
-                    <MenuItem value="single">Single Day</MenuItem>
-                    <MenuItem value="range">Date Range</MenuItem>
-                  </Select>
-                </FormControl>
-
-                {/* SINGLE DATE INPUT */}
-                {dateFilter.mode === 'single' && (
-                  <TextField
-                    size="small"
-                    label="Date"
-                    type="date"
-                    value={dateFilter.single}
-                    onChange={(e) => setDateFilter(prev => ({ ...prev, single: e.target.value }))}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ width: { xs: '100%', sm: 150 } }}
-                  />
-                )}
-
-                {/* RANGE INPUTS */}
-                {dateFilter.mode === 'range' && (
-                  <Stack direction="row" spacing={1} sx={{ flex: { xs: 1, sm: 'none' } }}>
-                    <TextField
-                      size="small"
-                      label="From"
-                      type="date"
-                      value={dateFilter.from}
-                      onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
-                      InputLabelProps={{ shrink: true }}
-                      sx={{ width: { xs: '50%', sm: 150 } }}
-                    />
-                    <TextField
-                      size="small"
-                      label="To"
-                      type="date"
-                      value={dateFilter.to}
-                      onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
-                      InputLabelProps={{ shrink: true }}
-                      sx={{ width: { xs: '50%', sm: 150 } }}
-                    />
-                  </Stack>
-                )}
-
-                {/* CLEAR BUTTON */}
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => {
-                    setSearchOrderId('');
-                    setSearchAzOrderId('');
-                    setSearchBuyerName('');
-                    setSearchItemId('');
-                    setSearchProductName(''); // CLEAR NEW FILTER
-                    setSearchPaymentStatus('');
-                    setDateFilter({ mode: 'none', single: '', from: '', to: '' });
-                  }}
-                  sx={{ minWidth: { xs: '100%', sm: 80 } }}
-                >
-                  Clear
-                </Button>
-              </Stack>
-            </Stack>
-          </Collapse>
-        </Box>
+        <SearchFiltersPanel
+          searchOrderId={searchOrderId}
+          setSearchOrderId={setSearchOrderId}
+          searchAzOrderId={searchAzOrderId}
+          setSearchAzOrderId={setSearchAzOrderId}
+          searchBuyerName={searchBuyerName}
+          setSearchBuyerName={setSearchBuyerName}
+          searchItemId={searchItemId}
+          setSearchItemId={setSearchItemId}
+          searchProductName={searchProductName}
+          setSearchProductName={setSearchProductName}
+          setSearchPaymentStatus={setSearchPaymentStatus}
+          dateFilter={dateFilter}
+          setDateFilter={setDateFilter}
+          isSmallMobile={isSmallMobile}
+        />
 
 
 
