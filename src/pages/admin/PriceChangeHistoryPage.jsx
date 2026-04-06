@@ -22,7 +22,11 @@ import {
   MenuItem,
   Grid,
   IconButton,
-  Snackbar
+  Snackbar,
+  ToggleButton,
+  ToggleButtonGroup,
+  Autocomplete,
+  Tooltip
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -46,26 +50,47 @@ const PriceChangeHistoryPage = () => {
     totalPages: 0
   });
 
+  // User and Seller lists for dropdowns
+  const [users, setUsers] = useState([]);
+  const [sellers, setSellers] = useState([]);
+  const [loadingFilters, setLoadingFilters] = useState(false);
+
+  // Date filter mode
+  const [dateMode, setDateMode] = useState('range'); // 'single' or 'range'
+
   // Filters
   const [filters, setFilters] = useState({
     legacyItemId: '',
     orderId: '',
+    userId: '',
+    sellerId: '',
     startDate: null,
     endDate: null,
-    successOnly: false
+    successFilter: 'all' // 'all', 'success', 'failed'
   });
 
-  const fetchLogs = async (page = 1) => {
+  const fetchLogs = async (page = 1, customFilters = null) => {
     setLoading(true);
     setError('');
     try {
+      const currentFilters = customFilters || filters;
       const params = {
         page,
         limit: pagination.limit,
-        ...filters,
-        startDate: filters.startDate ? filters.startDate.toISOString() : undefined,
-        endDate: filters.endDate ? filters.endDate.toISOString() : undefined
+        legacyItemId: currentFilters.legacyItemId,
+        orderId: currentFilters.orderId,
+        userId: currentFilters.userId,
+        sellerId: currentFilters.sellerId,
+        startDate: currentFilters.startDate ? currentFilters.startDate.toISOString() : undefined,
+        endDate: currentFilters.endDate ? currentFilters.endDate.toISOString() : undefined
       };
+
+      // Handle success filter
+      if (currentFilters.successFilter === 'success') {
+        params.successOnly = 'true';
+      } else if (currentFilters.successFilter === 'failed') {
+        params.failedOnly = 'true';
+      }
 
       // Remove undefined values
       Object.keys(params).forEach(key => {
@@ -85,8 +110,25 @@ const PriceChangeHistoryPage = () => {
     }
   };
 
+  const fetchUsersAndSellers = async () => {
+    setLoadingFilters(true);
+    try {
+      const [usersRes, sellersRes] = await Promise.all([
+        api.get('/users'),
+        api.get('/sellers/all')
+      ]);
+      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+      setSellers(Array.isArray(sellersRes.data) ? sellersRes.data : []);
+    } catch (err) {
+      console.error('Error fetching users/sellers:', err);
+    } finally {
+      setLoadingFilters(false);
+    }
+  };
+
   useEffect(() => {
     fetchLogs();
+    fetchUsersAndSellers();
   }, []);
 
   const handleFilterChange = (field, value) => {
@@ -98,14 +140,27 @@ const PriceChangeHistoryPage = () => {
   };
 
   const handleClearFilters = () => {
-    setFilters({
+    const clearedFilters = {
       legacyItemId: '',
       orderId: '',
+      userId: '',
+      sellerId: '',
       startDate: null,
       endDate: null,
-      successOnly: false
-    });
-    setTimeout(() => fetchLogs(1), 100);
+      successFilter: 'all'
+    };
+    setFilters(clearedFilters);
+    fetchLogs(1, clearedFilters);
+  };
+
+  const handleDateModeChange = (event, newMode) => {
+    if (newMode !== null) {
+      setDateMode(newMode);
+      // Clear date filters when switching modes
+      if (newMode === 'single') {
+        setFilters(prev => ({ ...prev, endDate: null }));
+      }
+    }
   };
 
   const handleCopy = (text) => {
@@ -211,6 +266,34 @@ const PriceChangeHistoryPage = () => {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={3}>
+              <Autocomplete
+                fullWidth
+                size="small"
+                options={users}
+                getOptionLabel={(option) => option.username || ''}
+                value={users.find(u => u._id === filters.userId) || null}
+                onChange={(e, newValue) => handleFilterChange('userId', newValue?._id || '')}
+                loading={loadingFilters}
+                renderInput={(params) => (
+                  <TextField {...params} label="Username" />
+                )}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Autocomplete
+                fullWidth
+                size="small"
+                options={sellers}
+                getOptionLabel={(option) => option.user?.username || ''}
+                value={sellers.find(s => s._id === filters.sellerId) || null}
+                onChange={(e, newValue) => handleFilterChange('sellerId', newValue?._id || '')}
+                loading={loadingFilters}
+                renderInput={(params) => (
+                  <TextField {...params} label="Seller" />
+                )}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
                 label="Legacy Item ID"
@@ -228,32 +311,72 @@ const PriceChangeHistoryPage = () => {
                 size="small"
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <DatePicker
-                label="Start Date"
-                value={filters.startDate}
-                onChange={(date) => handleFilterChange('startDate', date)}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
-              />
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" sx={{ minWidth: 'fit-content' }}>
+                  Date Filter:
+                </Typography>
+                <ToggleButtonGroup
+                  value={dateMode}
+                  exclusive
+                  onChange={handleDateModeChange}
+                  size="small"
+                >
+                  <ToggleButton value="single">Single Date</ToggleButton>
+                  <ToggleButton value="range">Date Range</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <DatePicker
-                label="End Date"
-                value={filters.endDate}
-                onChange={(date) => handleFilterChange('endDate', date)}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
-              />
-            </Grid>
+            {dateMode === 'single' ? (
+              <Grid item xs={12} sm={6} md={3}>
+                <DatePicker
+                  label="Date"
+                  value={filters.startDate}
+                  onChange={(date) => {
+                    handleFilterChange('startDate', date);
+                    // Set endDate to same date for single date mode
+                    if (date) {
+                      const endOfDay = new Date(date);
+                      endOfDay.setHours(23, 59, 59, 999);
+                      handleFilterChange('endDate', endOfDay);
+                    } else {
+                      handleFilterChange('endDate', null);
+                    }
+                  }}
+                  slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                />
+              </Grid>
+            ) : (
+              <>
+                <Grid item xs={12} sm={6} md={3}>
+                  <DatePicker
+                    label="Start Date"
+                    value={filters.startDate}
+                    onChange={(date) => handleFilterChange('startDate', date)}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <DatePicker
+                    label="End Date"
+                    value={filters.endDate}
+                    onChange={(date) => handleFilterChange('endDate', date)}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                </Grid>
+              </>
+            )}
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
-                <InputLabel>Success Only</InputLabel>
+                <InputLabel>Status Filter</InputLabel>
                 <Select
-                  value={filters.successOnly}
-                  label="Success Only"
-                  onChange={(e) => handleFilterChange('successOnly', e.target.value)}
+                  value={filters.successFilter}
+                  label="Status Filter"
+                  onChange={(e) => handleFilterChange('successFilter', e.target.value)}
                 >
-                  <MenuItem value={false}>All</MenuItem>
-                  <MenuItem value={true}>Success Only</MenuItem>
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="success">Success Only</MenuItem>
+                  <MenuItem value="failed">Failed Only</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -357,16 +480,32 @@ const PriceChangeHistoryPage = () => {
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Chip
-                              label={log.success ? 'Success' : 'Failed'}
-                              size="small"
-                              color={log.success ? 'success' : 'error'}
-                            />
-                            {!log.success && log.errorMessage && (
-                              <Typography variant="caption" display="block" color="error">
-                                {log.errorMessage.substring(0, 50)}...
-                              </Typography>
-                            )}
+                            <Stack spacing={0.5}>
+                              <Chip
+                                label={log.success ? 'Success' : 'Failed'}
+                                size="small"
+                                color={log.success ? 'success' : 'error'}
+                                sx={{ width: 'fit-content' }}
+                              />
+                              {!log.success && log.errorMessage && (
+                                <Tooltip title={log.errorMessage} arrow placement="top">
+                                  <Typography 
+                                    variant="caption" 
+                                    display="block" 
+                                    color="error"
+                                    sx={{ 
+                                      overflow: 'hidden', 
+                                      textOverflow: 'ellipsis', 
+                                      whiteSpace: 'nowrap',
+                                      cursor: 'help',
+                                      maxWidth: 230
+                                    }}
+                                  >
+                                    {log.errorMessage}
+                                  </Typography>
+                                </Tooltip>
+                              )}
+                            </Stack>
                           </TableCell>
                           <TableCell>
                             <Chip
