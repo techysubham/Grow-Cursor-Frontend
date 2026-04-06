@@ -2,7 +2,7 @@
 import {
   Box, Typography, Container, Paper, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  TextField,
+  TextField, Select, MenuItem,
 } from '@mui/material';
 import api from '../../lib/api';
 
@@ -31,13 +31,15 @@ export default function FeedUploadStatsPage() {
   const [monthLoading, setMonthLoading] = useState(true);
   const [monthError, setMonthError] = useState(null);
 
+  const [selectedCountry, setSelectedCountry] = useState('ALL');
+
   const fetchDay = async (date) => {
     try {
       setDayLoading(true);
       setDayError(null);
-      const { data } = await api.get('/ebay/feed/upload-stats', {
-        params: { startDate: date, endDate: date },
-      });
+      const params = { startDate: date, endDate: date };
+      if (selectedCountry !== 'ALL') params.country = selectedCountry;
+      const { data } = await api.get('/ebay/feed/upload-stats', { params });
       setDayStats([...data].sort((a, b) => (b.totalSuccess || 0) - (a.totalSuccess || 0)));
     } catch (err) {
       setDayError(err.response?.data?.error || 'Failed to fetch data');
@@ -51,18 +53,18 @@ export default function FeedUploadStatsPage() {
       setMonthLoading(true);
       setMonthError(null);
       const { first, last } = monthBounds(ym);
-      const { data } = await api.get('/ebay/feed/upload-stats', {
-        params: { startDate: first, endDate: last },
-      });
+      const params = { startDate: first, endDate: last };
+      if (selectedCountry !== 'ALL') params.country = selectedCountry;
+      const { data } = await api.get('/ebay/feed/upload-stats', { params });
       const map = {};
       data.forEach((r) => {
-        if (!map[r.sellerId])
-          map[r.sellerId] = { sellerName: r.sellerName, totalSuccess: 0 };
-        map[r.sellerId].totalSuccess += r.totalSuccess || 0;
+        // Group by sellerName to handle duplicate seller accounts
+        if (!map[r.sellerName])
+          map[r.sellerName] = { sellerId: r.sellerId, sellerName: r.sellerName, totalSuccess: 0 };
+        map[r.sellerName].totalSuccess += r.totalSuccess || 0;
       });
       setMonthStats(
-        Object.entries(map)
-          .map(([id, v]) => ({ sellerId: id, ...v }))
+        Object.values(map)
           .sort((a, b) => b.totalSuccess - a.totalSuccess)
       );
     } catch (err) {
@@ -74,6 +76,12 @@ export default function FeedUploadStatsPage() {
 
   useEffect(() => { fetchDay(todayStr()); }, []);
   useEffect(() => { fetchMonth(currentMonthStr()); }, []);
+
+  // Refetch when country filter changes
+  useEffect(() => {
+    fetchDay(dayDate);
+    fetchMonth(monthPicker);
+  }, [selectedCountry]);
 
   const dayTotal = dayStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
   const monthTotal = monthStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
@@ -93,6 +101,23 @@ export default function FeedUploadStatsPage() {
       <Typography variant="h5" fontWeight={700} sx={{ mb: 3 }}>
         Feed Upload Success Stats
       </Typography>
+
+      {/* Country Filter */}
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography variant="body1" fontWeight={600}>Filter by Country:</Typography>
+        <Select
+          size="small"
+          value={selectedCountry}
+          onChange={(e) => setSelectedCountry(e.target.value)}
+          sx={{ minWidth: 200 }}
+        >
+          <MenuItem value="ALL">All Countries</MenuItem>
+          <MenuItem value="US">United States (US)</MenuItem>
+          <MenuItem value="UK">United Kingdom (UK)</MenuItem>
+          <MenuItem value="AU">Australia (AU)</MenuItem>
+          <MenuItem value="Canada">Canada</MenuItem>
+        </Select>
+      </Box>
 
       <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
         {/* ── Day-wise ─────────────────────────────────────────────────── */}
@@ -122,13 +147,14 @@ export default function FeedUploadStatsPage() {
                   <TableRow>
                     <TableCell sx={{ ...headSx, width: 52, pl: 3 }}>#</TableCell>
                     <TableCell sx={headSx}>Seller</TableCell>
+                    <TableCell sx={headSx}>Country</TableCell>
                     <TableCell sx={{ ...headSx, pr: 3 }} align="right">Successful Listings</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {dayStats.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
+                      <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
                         No data for this date
                       </TableCell>
                     </TableRow>
@@ -142,13 +168,14 @@ export default function FeedUploadStatsPage() {
                         >
                           <TableCell sx={{ ...cellSx, color: 'text.disabled', width: 52, pl: 3 }}>{idx + 1}</TableCell>
                           <TableCell sx={cellSx}>{row.sellerName}</TableCell>
+                          <TableCell sx={cellSx}>{row.country || 'US'}</TableCell>
                           <TableCell align="right" sx={{ ...numCellSx, pr: 3 }}>
                             {row.totalSuccess.toLocaleString()}
                           </TableCell>
                         </TableRow>
                       ))}
                       <TableRow sx={{ bgcolor: '#f5f5f5', borderTop: '2px solid #e0e0e0' }}>
-                        <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: '0.9rem', pl: 3, py: 1.6 }}>Total</TableCell>
+                        <TableCell colSpan={3} sx={{ fontWeight: 700, fontSize: '0.9rem', pl: 3, py: 1.6 }}>Total</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.9rem', pr: 3, py: 1.6 }}>
                           {dayTotal.toLocaleString()}
                         </TableCell>

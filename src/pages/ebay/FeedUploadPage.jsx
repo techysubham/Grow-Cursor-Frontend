@@ -39,6 +39,7 @@ const FeedUploadPage = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [feedType, setFeedType] = useState('FX_LISTING');
     const [schemaVersion, setSchemaVersion] = useState('1.0');
+    const [country, setCountry] = useState('US');
     const [uploading, setUploading] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
@@ -173,6 +174,7 @@ const FeedUploadPage = () => {
         formData.append('sellerId', selectedSeller);
         formData.append('feedType', feedType);
         formData.append('schemaVersion', schemaVersion);
+        formData.append('country', country);
 
         try {
             const response = await api.post('/ebay/feed/upload', formData, {
@@ -324,6 +326,22 @@ const FeedUploadPage = () => {
                             disabled
                             helperText="Fixed to 1.0 for CSV uploads"
                         />
+
+                        {/* Country Selection */}
+                        <FormControl fullWidth>
+                            <InputLabel>Upload Country</InputLabel>
+                            <Select
+                                value={country}
+                                label="Upload Country"
+                                onChange={(e) => setCountry(e.target.value)}
+                            >
+                                <MenuItem value="US">United States (US)</MenuItem>
+                                <MenuItem value="UK">United Kingdom (UK)</MenuItem>
+                                <MenuItem value="AU">Australia (AU)</MenuItem>
+                                <MenuItem value="Canada">Canada</MenuItem>
+                            </Select>
+                            <FormHelperText>Tag this upload with a country for reporting purposes</FormHelperText>
+                        </FormControl>
 
                         {/* File Input */}
                         <Box
@@ -504,6 +522,7 @@ const FeedUploadPage = () => {
                                 <TableCell>Date</TableCell>
                                 <TableCell>Task ID</TableCell>
                                 <TableCell>File Name</TableCell>
+                                <TableCell>Country</TableCell>
                                 <TableCell>Status</TableCell>
                                 <TableCell>Result</TableCell>
                             </TableRow>
@@ -511,13 +530,13 @@ const FeedUploadPage = () => {
                         <TableBody>
                             {loadingTasks ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} align="center">
+                                    <TableCell colSpan={6} align="center">
                                         <CircularProgress size={24} />
                                     </TableCell>
                                 </TableRow>
                             ) : tasks.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} align="center">
+                                    <TableCell colSpan={6} align="center">
                                         No recent uploads found.
                                     </TableCell>
                                 </TableRow>
@@ -530,6 +549,19 @@ const FeedUploadPage = () => {
                                         <TableCell>{task.taskId}</TableCell>
                                         <TableCell>
                                             {task.fileName || task.uploadSummary?.inputFileName || '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={task.country || 'US'}
+                                                size="small"
+                                                variant="outlined"
+                                                color={
+                                                    task.country === 'US' ? 'primary' :
+                                                        task.country === 'UK' ? 'secondary' :
+                                                            task.country === 'AU' ? 'success' :
+                                                                'info'
+                                                }
+                                            />
                                         </TableCell>
                                         <TableCell>
                                             <Chip
