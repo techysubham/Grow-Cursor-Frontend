@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Fade,
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -49,6 +50,7 @@ import {
   loadRemarkTemplates,
   saveRemarkTemplates
 } from '../../constants/remarkTemplates';
+import AwaitingShipmentSkeleton from '../../components/skeletons/AwaitingShipmentSkeleton';
 
 const ALL_COLUMNS = [
   { id: 'seller', label: 'Seller' },
@@ -443,7 +445,7 @@ function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
 
 export default function AwaitingShipmentPage() {
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedShipping, setExpandedShipping] = useState({});
   const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
@@ -565,31 +567,30 @@ export default function AwaitingShipmentPage() {
   async function fetchAwaitingOrders() {
     setError('');
 
+    // Build Params Object
+    const params = {
+      awaitingShipment: true,
+      page: page,
+      limit: 50
+    };
+
+    if (debouncedOrderId) params.searchOrderId = debouncedOrderId;
+    if (debouncedBuyerName) params.searchBuyerName = debouncedBuyerName;
+    if (selectedSeller) params.sellerId = selectedSeller;
+    if (searchMarketplace) params.searchMarketplace = searchMarketplace;
+    if (shipByDate) params.shipByDate = shipByDate;
+    if (dateSold) params.dateSold = dateSold;
+    if (arrivalDateFrom) params.arrivalDateFrom = arrivalDateFrom;
+    if (arrivalDateTo) params.arrivalDateTo = arrivalDateTo;
+
+    // SMART CHECK: If params haven't changed since last fetch, STOP.
+    const paramsString = JSON.stringify(params);
+    if (paramsString === lastFetchedParams.current) {
+      return; // Skip fetch, prevent loading spinner
+    }
+    lastFetchedParams.current = paramsString;
+
     try {
-      // Build Params Object
-      const params = {
-        awaitingShipment: true,
-        page: page,
-        limit: 50
-      };
-
-      if (debouncedOrderId) params.searchOrderId = debouncedOrderId;
-      if (debouncedBuyerName) params.searchBuyerName = debouncedBuyerName;
-      if (selectedSeller) params.sellerId = selectedSeller;
-      if (searchMarketplace) params.searchMarketplace = searchMarketplace;
-      if (shipByDate) params.shipByDate = shipByDate;
-      if (dateSold) params.dateSold = dateSold;
-      if (arrivalDateFrom) params.arrivalDateFrom = arrivalDateFrom;
-      if (arrivalDateTo) params.arrivalDateTo = arrivalDateTo;
-
-      // SMART CHECK: If params haven't changed since last fetch, STOP.
-      const paramsString = JSON.stringify(params);
-      if (paramsString === lastFetchedParams.current) {
-        return; // Skip fetch, prevent loading spinner
-      }
-
-      // Update ref and proceed
-      lastFetchedParams.current = paramsString;
       setLoading(true);
 
       const { data } = await api.get('/ebay/stored-orders', { params });
@@ -1142,7 +1143,10 @@ export default function AwaitingShipmentPage() {
     }
   };
 
+  if (loading && orders.length === 0) return <AwaitingShipmentSkeleton />;
+
   return (
+    <Fade in timeout={600}>
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
@@ -1296,11 +1300,7 @@ export default function AwaitingShipmentPage() {
         )}
       </Paper>
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
-          <CircularProgress />
-        </Box>
-      ) : orders.length === 0 ? (
+      {orders.length === 0 ? (
         <Box sx={{ textAlign: 'center', p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
           <LocalShippingIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1, opacity: 0.5 }} />
           <Typography variant="body1" color="text.secondary">
@@ -1463,6 +1463,7 @@ export default function AwaitingShipmentPage() {
         </DialogActions>
       </Dialog>
     </Box>
+    </Fade>
   );
 }
 

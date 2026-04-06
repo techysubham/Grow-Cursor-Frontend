@@ -37,7 +37,8 @@ import {
   Collapse,
   Menu,
   ListSubheader,
-  Switch
+  Switch,
+  Fade
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -89,6 +90,7 @@ import {
   saveRemarkTemplates
 } from '../../constants/remarkTemplates';
 import ItemCategoryAssignDialog from '../../components/ItemCategoryAssignDialog.jsx';
+import FulfillmentSkeleton from '../../components/skeletons/FulfillmentSkeleton';
 
 
 // --- IMAGE VIEWER DIALOG ---
@@ -1179,7 +1181,7 @@ function FulfillmentDashboard() {
 
   const [sellers, setSellers] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pollResults, setPollResults] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -2799,7 +2801,10 @@ function FulfillmentDashboard() {
     }
   }, []);
 
+  if (loading && orders.length === 0) return <FulfillmentSkeleton />;
+
   return (
+    <Fade in timeout={600}>
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
@@ -4748,6 +4753,7 @@ function FulfillmentDashboard() {
         </MuiAlert>
       </Snackbar>
     </Box >
+    </Fade>
   );
 }
 

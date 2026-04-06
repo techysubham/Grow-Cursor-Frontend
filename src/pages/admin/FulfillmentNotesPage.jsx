@@ -28,6 +28,7 @@ import {
   Link,
   Alert,
   Snackbar,
+  Fade,
 } from '@mui/material';
 import NoteIcon from '@mui/icons-material/Note';
 import ChatIcon from '@mui/icons-material/Chat';
@@ -36,6 +37,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import PersonIcon from '@mui/icons-material/Person';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../lib/api';
+import FulfillmentNotesSkeleton from '../../components/skeletons/FulfillmentNotesSkeleton';
 
 // --- Chat Dialog Component ---
 function ChatDialog({ open, onClose, order }) {
@@ -454,7 +456,7 @@ function formatDeliveryDate(order) {
 
 export default function FulfillmentNotesPage() {
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Pagination State
@@ -574,8 +576,10 @@ export default function FulfillmentNotesPage() {
       setLoading(false);
     }
   }
+  if (loading && orders.length === 0) return <FulfillmentNotesSkeleton />;
 
   return (
+    <Fade in timeout={600}>
     <Box sx={{ 
       display: 'flex', 
       flexDirection: 'column', 
@@ -791,5 +795,6 @@ export default function FulfillmentNotesPage() {
         </Alert>
       </Snackbar>
     </Box>
+    </Fade>
   );
 }

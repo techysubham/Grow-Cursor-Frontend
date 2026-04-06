@@ -27,6 +27,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Fade,
 } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -45,6 +46,7 @@ import {
   loadRemarkTemplates,
   saveRemarkTemplates
 } from '../../constants/remarkTemplates';
+import AmazonArrivalsSkeleton from '../../components/skeletons/AmazonArrivalsSkeleton';
 
 function NotesCell({
   order,
@@ -135,7 +137,7 @@ function NotesCell({
 
 export default function AmazonArrivalsPage() {
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
 
@@ -225,30 +227,29 @@ export default function AmazonArrivalsPage() {
   }, [page, selectedSeller, debouncedOrderId, searchMarketplace, selectedAmazonAccount, arrivalSort, arrivalDateFrom, arrivalDateTo]);
 
   async function fetchOrders() {
+    // Build Params Object
+    const params = {
+      amazonArriving: true,
+      arrivalSort: arrivalSort,
+      page: page,
+      limit: 50
+    };
+
+    if (debouncedOrderId) params.searchOrderId = debouncedOrderId;
+    if (selectedSeller) params.sellerId = selectedSeller;
+    if (searchMarketplace) params.searchMarketplace = searchMarketplace;
+    if (selectedAmazonAccount) params.amazonAccount = selectedAmazonAccount;
+    if (arrivalDateFrom) params.arrivalStartDate = arrivalDateFrom;
+    if (arrivalDateTo) params.arrivalEndDate = arrivalDateTo;
+
+    // SMART CHECK: If params haven't changed since last fetch, STOP.
+    const paramsString = JSON.stringify(params);
+    if (paramsString === lastFetchedParams.current) {
+      return; // Skip fetch, prevent loading spinner
+    }
+    lastFetchedParams.current = paramsString;
+
     try {
-      // Build Params Object
-      const params = {
-        amazonArriving: true,
-        arrivalSort: arrivalSort,
-        page: page,
-        limit: 50
-      };
-
-      if (debouncedOrderId) params.searchOrderId = debouncedOrderId;
-      if (selectedSeller) params.sellerId = selectedSeller;
-      if (searchMarketplace) params.searchMarketplace = searchMarketplace;
-      if (selectedAmazonAccount) params.amazonAccount = selectedAmazonAccount;
-      if (arrivalDateFrom) params.arrivalStartDate = arrivalDateFrom;
-      if (arrivalDateTo) params.arrivalEndDate = arrivalDateTo;
-
-      // SMART CHECK: If params haven't changed since last fetch, STOP.
-      const paramsString = JSON.stringify(params);
-      if (paramsString === lastFetchedParams.current) {
-        return; // Skip fetch, prevent loading spinner
-      }
-
-      // Update ref and proceed
-      lastFetchedParams.current = paramsString;
       setLoading(true);
       setError('');
 
@@ -482,7 +483,10 @@ export default function AmazonArrivalsPage() {
     }
   };
 
+  if (loading && orders.length === 0) return <AmazonArrivalsSkeleton />;
+
   return (
+    <Fade in timeout={600}>
     <Box sx={{
       height: '100vh',
       display: 'flex',
@@ -928,5 +932,6 @@ export default function AmazonArrivalsPage() {
         </DialogActions>
       </Dialog>
     </Box>
+    </Fade>
   );
 }
