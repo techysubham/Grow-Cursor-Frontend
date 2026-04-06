@@ -22,11 +22,13 @@ import {
   MenuItem,
   useTheme,
   Collapse,
-  Switch
+  Switch,
+  Fade
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import api from '../../lib/api';
+import OrderAnalyticsSkeleton from '../../components/skeletons/OrderAnalyticsSkeleton';
 
 export default function OrderAnalyticsPage() {
   const [statistics, setStatistics] = useState([]);
@@ -220,7 +222,10 @@ export default function OrderAnalyticsPage() {
     }, 0);
   };
 
+  if (loading) return <OrderAnalyticsSkeleton />;
+
   return (
+    <Fade in timeout={400}>
     <Box sx={{ p: 3 }}>
       {/* Header with Total Orders chip in top-right */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
@@ -590,5 +595,6 @@ export default function OrderAnalyticsPage() {
         </Alert>
       )}
     </Box>
+    </Fade>
   );
 }

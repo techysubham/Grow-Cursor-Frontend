@@ -27,6 +27,8 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../lib/api';
+import OrdersDashboardSkeleton from '../../components/skeletons/OrdersDashboardSkeleton';
+import { Fade } from '@mui/material';
 
 const DASHBOARD_DATE_KEY = 'orders_dashboard_date';
 
@@ -97,7 +99,7 @@ export default function OrdersDepartmentDashboardPage() {
   const [monthlyDelta, setMonthlyDelta] = useState([]);
   const [ordersTable, setOrdersTable] = useState([]);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState([]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
@@ -208,7 +210,10 @@ export default function OrdersDepartmentDashboardPage() {
   const awaitingBySeller = overview?.riskQueues?.awaitingBySeller || [];
   const arrivalsBySeller = overview?.riskQueues?.arrivalsBySeller || [];
 
+  if (loading && !overview) return <OrdersDashboardSkeleton />;
+
   return (
+    <Fade in={!loading} timeout={400}>
     <Box sx={{ p: 3 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1} sx={{ mb: 2 }}>
         <Box>
@@ -480,5 +485,6 @@ export default function OrdersDepartmentDashboardPage() {
         </Grid>
       </Grid>
     </Box>
+    </Fade>
   );
 }

@@ -30,18 +30,20 @@ import {
   FormControlLabel,
   List,
   ListItem,
-  ListItemText
+  ListItemText,
+  Fade
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../../lib/api';
+import AllOrdersSheetSkeleton from '../../components/skeletons/AllOrdersSheetSkeleton';
 
 export default function AllOrdersSheetPage() {
   const [sellers, setSellers] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
   // Counts for categories, ranges, and products
@@ -698,7 +700,10 @@ export default function AllOrdersSheetPage() {
     }
   };
 
+  if (loading && orders.length === 0) return <AllOrdersSheetSkeleton />;
+
   return (
+    <Fade in timeout={400}>
     <Box sx={{ p: 3 }}>
       {/* CSV Export Modal */}
       <Dialog open={showExportModal} onClose={() => setShowExportModal(false)} maxWidth="sm" fullWidth>
@@ -2450,5 +2455,6 @@ export default function AllOrdersSheetPage() {
         </DialogActions>
       </Dialog>
     </Box>
+    </Fade>
   );
 }

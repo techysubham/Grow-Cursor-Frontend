@@ -18,6 +18,7 @@ import {
   ToggleButtonGroup,
   Divider,
   LinearProgress,
+  Fade,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -38,6 +39,7 @@ import {
   LabelList,
 } from 'recharts';
 import api from '../../lib/api';
+import CRPAnalyticsSkeleton from '../../components/skeletons/CRPAnalyticsSkeleton';
 
 const COLORS = [
   '#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f',
@@ -119,7 +121,7 @@ function StatCard({ icon, label, value, sub, color = '#1976d2' }) {
 export default function CRPAnalyticsPage() {
   const [data, setData] = useState([]);
   const [sellers, setSellers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const [groupBy, setGroupBy] = useState('category');
@@ -183,7 +185,10 @@ export default function CRPAnalyticsPage() {
   const groupByLabel = { category: 'Category', range: 'Range', product: 'Product' }[groupBy];
   const barHeight = Math.max(240, data.length * 34);
 
+  if (loading && data.length === 0) return <CRPAnalyticsSkeleton />;
+
   return (
+    <Fade in timeout={400}>
     <Box sx={{ p: 3 }}>
       {/* ── Page header + inline filters ────────────────────────────────────── */}
       <Stack direction={{ xs: 'column', xl: 'row' }} alignItems={{ xl: 'flex-start' }}
@@ -430,5 +435,6 @@ export default function CRPAnalyticsPage() {
         </>
       )}
     </Box>
+    </Fade>
   );
 }
