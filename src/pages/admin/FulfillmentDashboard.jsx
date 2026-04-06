@@ -71,6 +71,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import SyncIcon from '@mui/icons-material/Sync';
 
 
+import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BlockIcon from '@mui/icons-material/Block';
@@ -1196,6 +1197,34 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
     }
   }, []); // Only run on mount
 
+  // Local state for all filter inputs — typing/changing only re-renders this small component.
+  // Values are pushed to parent only when the user clicks Search (or presses Enter).
+  const [localOrderId, setLocalOrderId] = useState(searchOrderId);
+  const [localAzOrderId, setLocalAzOrderId] = useState(searchAzOrderId);
+  const [localBuyerName, setLocalBuyerName] = useState(searchBuyerName);
+  const [localItemId, setLocalItemId] = useState(searchItemId);
+  const [localProductName, setLocalProductName] = useState(searchProductName);
+  const [localDateFilter, setLocalDateFilter] = useState(dateFilter);
+
+  // Sync local state when parent resets externally (e.g. Clear button calling parent setters).
+  useEffect(() => { setLocalOrderId(searchOrderId); }, [searchOrderId]);
+  useEffect(() => { setLocalAzOrderId(searchAzOrderId); }, [searchAzOrderId]);
+  useEffect(() => { setLocalBuyerName(searchBuyerName); }, [searchBuyerName]);
+  useEffect(() => { setLocalItemId(searchItemId); }, [searchItemId]);
+  useEffect(() => { setLocalProductName(searchProductName); }, [searchProductName]);
+
+  // Push all local values to parent → triggers the API fetch in parent's filter useEffect.
+  const handleSearch = () => {
+    setSearchOrderId(localOrderId);
+    setSearchAzOrderId(localAzOrderId);
+    setSearchBuyerName(localBuyerName);
+    setSearchItemId(localItemId);
+    setSearchProductName(localProductName);
+    setDateFilter(localDateFilter);
+  };
+
+  const handleKeyDown = (e) => { if (e.key === 'Enter') handleSearch(); };
+
   return (
     <Box sx={{ mt: { xs: 1.5, sm: 2 }, p: { xs: 1.5, sm: 2 }, backgroundColor: 'action.hover', borderRadius: 1 }}>
       <Box
@@ -1216,8 +1245,9 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
             <TextField
               size="small"
               label="Order ID"
-              value={searchOrderId}
-              onChange={(e) => setSearchOrderId(e.target.value)}
+              value={localOrderId}
+              onChange={(e) => setLocalOrderId(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Search by order ID..."
               sx={{ flex: 1 }}
               fullWidth
@@ -1225,8 +1255,9 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
             <TextField
               size="small"
               label="Amazon Order ID"
-              value={searchAzOrderId}
-              onChange={(e) => setSearchAzOrderId(e.target.value)}
+              value={localAzOrderId}
+              onChange={(e) => setLocalAzOrderId(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Search by Amazon order ID..."
               sx={{ flex: 1 }}
               fullWidth
@@ -1234,8 +1265,9 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
             <TextField
               size="small"
               label="Buyer Name"
-              value={searchBuyerName}
-              onChange={(e) => setSearchBuyerName(e.target.value)}
+              value={localBuyerName}
+              onChange={(e) => setLocalBuyerName(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Search by buyer name..."
               sx={{ flex: 1 }}
               fullWidth
@@ -1243,8 +1275,9 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
             <TextField
               size="small"
               label="Item ID"
-              value={searchItemId}
-              onChange={(e) => setSearchItemId(e.target.value)}
+              value={localItemId}
+              onChange={(e) => setLocalItemId(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Search by item ID..."
               sx={{ flex: 1 }}
               fullWidth
@@ -1252,8 +1285,9 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
             <TextField
               size="small"
               label="Product Name"
-              value={searchProductName}
-              onChange={(e) => setSearchProductName(e.target.value)}
+              value={localProductName}
+              onChange={(e) => setLocalProductName(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Search by product name..."
               sx={{ flex: 1 }}
               fullWidth
@@ -1267,9 +1301,9 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
               <InputLabel id="date-mode-label">Date Mode</InputLabel>
               <Select
                 labelId="date-mode-label"
-                value={dateFilter.mode}
+                value={localDateFilter.mode}
                 label="Date Mode"
-                onChange={(e) => setDateFilter(prev => ({ ...prev, mode: e.target.value }))}
+                onChange={(e) => setLocalDateFilter(prev => ({ ...prev, mode: e.target.value }))}
               >
                 <MenuItem value="none">None</MenuItem>
                 <MenuItem value="single">Single Day</MenuItem>
@@ -1278,27 +1312,27 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
             </FormControl>
 
             {/* SINGLE DATE INPUT */}
-            {dateFilter.mode === 'single' && (
+            {localDateFilter.mode === 'single' && (
               <TextField
                 size="small"
                 label="Date"
                 type="date"
-                value={dateFilter.single}
-                onChange={(e) => setDateFilter(prev => ({ ...prev, single: e.target.value }))}
+                value={localDateFilter.single}
+                onChange={(e) => setLocalDateFilter(prev => ({ ...prev, single: e.target.value }))}
                 InputLabelProps={{ shrink: true }}
                 sx={{ width: { xs: '100%', sm: 150 } }}
               />
             )}
 
             {/* RANGE INPUTS */}
-            {dateFilter.mode === 'range' && (
+            {localDateFilter.mode === 'range' && (
               <Stack direction="row" spacing={1} sx={{ flex: { xs: 1, sm: 'none' } }}>
                 <TextField
                   size="small"
                   label="From"
                   type="date"
-                  value={dateFilter.from}
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                  value={localDateFilter.from}
+                  onChange={(e) => setLocalDateFilter(prev => ({ ...prev, from: e.target.value }))}
                   InputLabelProps={{ shrink: true }}
                   sx={{ width: { xs: '50%', sm: 150 } }}
                 />
@@ -1306,26 +1340,36 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
                   size="small"
                   label="To"
                   type="date"
-                  value={dateFilter.to}
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
+                  value={localDateFilter.to}
+                  onChange={(e) => setLocalDateFilter(prev => ({ ...prev, to: e.target.value }))}
                   InputLabelProps={{ shrink: true }}
                   sx={{ width: { xs: '50%', sm: 150 } }}
                 />
               </Stack>
             )}
 
-            {/* CLEAR BUTTON */}
+            {/* SEARCH BUTTON */}
+            <Button
+              size="small"
+              variant="contained"
+              onClick={handleSearch}
+              startIcon={<SearchIcon />}
+              sx={{ minWidth: { xs: '100%', sm: 90 } }}
+            >
+              Search
+            </Button>
+
+            {/* CLEAR BUTTON — empties inputs only; click Search to apply */}
             <Button
               size="small"
               variant="outlined"
               onClick={() => {
-                setSearchOrderId('');
-                setSearchAzOrderId('');
-                setSearchBuyerName('');
-                setSearchItemId('');
-                setSearchProductName('');
-                setSearchPaymentStatus('');
-                setDateFilter({ mode: 'none', single: '', from: '', to: '' });
+                setLocalOrderId('');
+                setLocalAzOrderId('');
+                setLocalBuyerName('');
+                setLocalItemId('');
+                setLocalProductName('');
+                setLocalDateFilter({ mode: 'none', single: '', from: '', to: '' });
               }}
               sx={{ minWidth: { xs: '100%', sm: 80 } }}
             >
@@ -1860,29 +1904,25 @@ function FulfillmentDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
-  // When filters change, reset to page 1 and reload
-  // Text inputs are debounced (400ms) so we don't fire an API call on every keystroke
-  const filterDebounceRef = useRef(null);
+  // When filters change, reset to page 1 and reload.
+  // Text inputs are already debounced (400ms) inside SearchFiltersPanel before reaching here,
+  // so all changes fire the reload immediately — no double-debounce needed.
   useEffect(() => {
     // Check if any filter actually changed
     const prev = prevFilters.current;
 
-    const textChanged =
+    const filtersChanged =
       prev.searchOrderId !== searchOrderId ||
       prev.searchAzOrderId !== searchAzOrderId ||
       prev.searchBuyerName !== searchBuyerName ||
       prev.searchItemId !== searchItemId ||
-      prev.searchProductName !== searchProductName;
-
-    const immediateChanged =
+      prev.searchProductName !== searchProductName ||
       prev.selectedSeller !== selectedSeller ||
       prev.searchMarketplace !== searchMarketplace ||
       prev.searchPaymentStatus !== searchPaymentStatus ||
       prev.excludeLowValue !== excludeLowValue ||
       prev.missingAmazonAccount !== missingAmazonAccount ||
       JSON.stringify(prev.dateFilter) !== JSON.stringify(dateFilter);
-
-    const filtersChanged = textChanged || immediateChanged;
 
     // Update prev filters
     prevFilters.current = {
@@ -1904,33 +1944,11 @@ function FulfillmentDashboard() {
 
     if (!filtersChanged) return;
 
-    const doReload = () => {
-      if (currentPage === 1) {
-        loadStoredOrders();
-      } else {
-        setCurrentPage(1);
-      }
-    };
-
-    // Clear any pending debounce
-    if (filterDebounceRef.current) {
-      clearTimeout(filterDebounceRef.current);
-      filterDebounceRef.current = null;
-    }
-
-    if (immediateChanged) {
-      // Dropdowns/checkboxes: fire immediately
-      doReload();
+    if (currentPage === 1) {
+      loadStoredOrders();
     } else {
-      // Text inputs only: debounce 400ms
-      filterDebounceRef.current = setTimeout(doReload, 400);
+      setCurrentPage(1);
     }
-
-    return () => {
-      if (filterDebounceRef.current) {
-        clearTimeout(filterDebounceRef.current);
-      }
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, missingAmazonAccount, dateFilter]);
 
