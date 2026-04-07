@@ -1170,6 +1170,13 @@ const EditableCell = memo(function EditableCell({ value, type = 'text', onSave }
 const HEADER_CELL_SX = { backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 };
 const HEADER_CELL_RIGHT_SX = { ...HEADER_CELL_SX, textAlign: 'right' };
 
+const createEmptyDateFilter = () => ({ mode: 'none', single: '', from: '', to: '' });
+const normalizeDateFilter = (value) => (
+  value && typeof value === 'object'
+    ? { ...createEmptyDateFilter(), ...value }
+    : createEmptyDateFilter()
+);
+
 const SearchFiltersPanel = memo(function SearchFiltersPanel({
   searchOrderId, setSearchOrderId,
   searchAzOrderId, setSearchAzOrderId,
@@ -1204,7 +1211,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
   const [localBuyerName, setLocalBuyerName] = useState(searchBuyerName);
   const [localItemId, setLocalItemId] = useState(searchItemId);
   const [localProductName, setLocalProductName] = useState(searchProductName);
-  const [localDateFilter, setLocalDateFilter] = useState(dateFilter);
+  const [localDateFilter, setLocalDateFilter] = useState(() => normalizeDateFilter(dateFilter));
 
   // Sync local state when parent resets externally (e.g. Clear button calling parent setters).
   useEffect(() => { setLocalOrderId(searchOrderId); }, [searchOrderId]);
@@ -1212,6 +1219,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
   useEffect(() => { setLocalBuyerName(searchBuyerName); }, [searchBuyerName]);
   useEffect(() => { setLocalItemId(searchItemId); }, [searchItemId]);
   useEffect(() => { setLocalProductName(searchProductName); }, [searchProductName]);
+  useEffect(() => { setLocalDateFilter(normalizeDateFilter(dateFilter)); }, [dateFilter]);
 
   // Push all local values to parent → triggers the API fetch in parent's filter useEffect.
   const handleSearch = () => {
@@ -1220,7 +1228,25 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
     setSearchBuyerName(localBuyerName);
     setSearchItemId(localItemId);
     setSearchProductName(localProductName);
-    setDateFilter(localDateFilter);
+    setDateFilter(normalizeDateFilter(localDateFilter));
+  };
+
+  const handleClear = () => {
+    const clearedDateFilter = createEmptyDateFilter();
+
+    setLocalOrderId('');
+    setLocalAzOrderId('');
+    setLocalBuyerName('');
+    setLocalItemId('');
+    setLocalProductName('');
+    setLocalDateFilter(clearedDateFilter);
+
+    setSearchOrderId('');
+    setSearchAzOrderId('');
+    setSearchBuyerName('');
+    setSearchItemId('');
+    setSearchProductName('');
+    setDateFilter(clearedDateFilter);
   };
 
   const handleKeyDown = (e) => { if (e.key === 'Enter') handleSearch(); };
@@ -1354,24 +1380,17 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
               variant="contained"
               onClick={handleSearch}
               startIcon={<SearchIcon />}
-              sx={{ minWidth: { xs: '100%', sm: 90 } }}
+              sx={{ minWidth: { xs: '100%', sm: 90 }, height: 40, boxSizing: 'border-box' }}
             >
               Search
             </Button>
 
-            {/* CLEAR BUTTON — empties inputs only; click Search to apply */}
+            {/* CLEAR BUTTON — resets local + parent filters so the unfiltered list reloads immediately */}
             <Button
               size="small"
               variant="outlined"
-              onClick={() => {
-                setLocalOrderId('');
-                setLocalAzOrderId('');
-                setLocalBuyerName('');
-                setLocalItemId('');
-                setLocalProductName('');
-                setLocalDateFilter({ mode: 'none', single: '', from: '', to: '' });
-              }}
-              sx={{ minWidth: { xs: '100%', sm: 80 } }}
+              onClick={handleClear}
+              sx={{ minWidth: { xs: '100%', sm: 80 }, height: 40, boxSizing: 'border-box' }}
             >
               Clear
             </Button>

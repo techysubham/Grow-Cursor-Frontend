@@ -30,6 +30,7 @@ import ListAltIcon from '@mui/icons-material/ListAlt';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import ProductResearchPage from '../pages/admin/ProductResearchPage.jsx';
 import AddListerPage from '../pages/admin/AddListerPage.jsx';
 import ListingManagementPage from '../pages/admin/ListingManagementPage.jsx';
@@ -658,10 +659,13 @@ export default function AdminLayout({ user, onLogout }) {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>Admin Dashboard</Typography>
-          <Button color="inherit" startIcon={<ChatIcon />} onClick={() => navigate('/admin/internal-messages')} sx={{ mr: 1 }}>
+          <Button color="inherit" startIcon={<ChatIcon />} onClick={() => navigate('/admin/internal-messages')} sx={{ mr: 1, fontSize: '0.875rem', fontWeight: 400, letterSpacing: 0 }}>
             Team Chat
           </Button>
-          <Typography variant="body2" sx={{ mr: 2 }}>{user?.username} ({user?.role})</Typography>
+          <Box sx={{ mr: 2, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+            <PersonOutlineIcon sx={{ fontSize: 20 }} />
+            <Typography variant="body2">{user?.username} ({user?.role})</Typography>
+          </Box>
           <Button variant="contained" color="error" onClick={onLogout}>Logout</Button>
         </Toolbar>
       </AppBar>
