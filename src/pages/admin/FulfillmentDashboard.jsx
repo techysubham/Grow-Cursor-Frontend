@@ -3064,29 +3064,31 @@ function FulfillmentDashboard() {
                 (Page {currentPage}/{totalPages})
               </Typography>
             )}
-            {orders.length > 0 && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              {orders.length > 0 && (
+                <Button
+                  variant="outlined"
+                  color="success"
+                  size="small"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleOpenExportDialog}
+                  sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
+                >
+                  {isSmallMobile ? 'CSV' : 'Download CSV'}
+                </Button>
+              )}
               <Button
-                variant="outlined"
-                color="success"
+                variant="contained"
+                color="info"
                 size="small"
-                startIcon={<DownloadIcon />}
-                onClick={handleOpenExportDialog}
+                startIcon={autoMessageLoading ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+                onClick={handleSendAutoMessages}
+                disabled={autoMessageLoading}
                 sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
               >
-                {isSmallMobile ? 'CSV' : 'Download CSV'}
+                {isSmallMobile ? 'Auto Msg' : 'Send Auto Messages'}
               </Button>
-            )}
-            <Button
-              variant="contained"
-              color="info"
-              size="small"
-              startIcon={autoMessageLoading ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
-              onClick={handleSendAutoMessages}
-              disabled={autoMessageLoading}
-              sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
-            >
-              {isSmallMobile ? 'Auto Msg' : 'Send Auto Messages'}
-            </Button>
+            </Stack>
           </Stack>
         </Stack>
 
@@ -3232,7 +3234,6 @@ function FulfillmentDashboard() {
                     checked={excludeLowValue}
                     onChange={(e) => setExcludeLowValue(e.target.checked)}
                     color="primary"
-                    size="small"
                   />
                 }
                 label={
@@ -3240,7 +3241,7 @@ function FulfillmentDashboard() {
                     Exclude &lt; $3 Orders
                   </Typography>
                 }
-                sx={{ mx: 1 }}
+                sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
               />
 
               <FormControlLabel
@@ -3249,7 +3250,6 @@ function FulfillmentDashboard() {
                     checked={missingAmazonAccount}
                     onChange={(e) => setMissingAmazonAccount(e.target.checked)}
                     color="primary"
-                    size="small"
                   />
                 }
                 label={
@@ -3257,7 +3257,7 @@ function FulfillmentDashboard() {
                     Missing Amazon Acc
                   </Typography>
                 }
-                sx={{ mx: 1 }}
+                sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
               />
             </Stack>
 
@@ -3315,32 +3315,32 @@ function FulfillmentDashboard() {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {/* Row 1: Seller, Poll/Sync Actions, Recalc */}
             <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel id="seller-select-label">Select Seller</InputLabel>
-                <Select
-                  labelId="seller-select-label"
-                  value={selectedSeller}
-                  label="Select Seller"
-                  onChange={(e) => setSelectedSeller(e.target.value)}
-                >
-                  <MenuItem value="">
-                    <em>-- Select Seller --</em>
+              <Select
+                value={selectedSeller}
+                onChange={(e) => setSelectedSeller(e.target.value)}
+                displayEmpty
+                size="small"
+                renderValue={(val) => val ? (sellers.find(s => s._id === val)?.user?.username || sellers.find(s => s._id === val)?.user?.email || val) : 'Select Seller'}
+                sx={{ minWidth: 150, fontSize: '0.85rem', color: selectedSeller ? 'inherit' : 'text.secondary' }}
+              >
+                <MenuItem value="">
+                  <em>All Sellers</em>
+                </MenuItem>
+                {sellers.map((s) => (
+                  <MenuItem key={s._id} value={s._id}>
+                    {s.user?.username || s.user?.email || s._id}
                   </MenuItem>
-                  {sellers.map((s) => (
-                    <MenuItem key={s._id} value={s._id}>
-                      {s.user?.username || s.user?.email || s._id}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                ))}
+              </Select>
 
               <Button
                 variant="contained"
                 color="primary"
+                size="small"
                 startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
                 onClick={pollNewOrders}
                 disabled={loading}
-                sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
+                sx={{ minWidth: 120 }}
               >
                 {loading ? 'Polling...' : 'Poll New Orders'}
               </Button>
@@ -3348,10 +3348,11 @@ function FulfillmentDashboard() {
               <Button
                 variant="contained"
                 color="secondary"
+                size="small"
                 startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
                 onClick={pollOrderUpdates}
                 disabled={loading}
-                sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
+                sx={{ minWidth: 120 }}
               >
                 {loading ? 'Updating...' : 'Poll Order Updates'}
               </Button>
@@ -3375,10 +3376,11 @@ function FulfillmentDashboard() {
                   <Button
                     variant="outlined"
                     color="warning"
+                    size="small"
                     startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
                     onClick={resyncRecent}
                     disabled={loading}
-                    sx={{ minWidth: 120, fontSize: '0.85rem', px: 1 }}
+                    sx={{ minWidth: 120 }}
                   >
                     {loading ? 'Syncing...' : `Resync ${resyncDays} Days`}
                   </Button>
@@ -3388,10 +3390,11 @@ function FulfillmentDashboard() {
                       <Button
                         variant="outlined"
                         color="info"
+                        size="small"
                         startIcon={recalcEarningsLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
                         onClick={recalculateEarnings}
                         disabled={recalcEarningsLoading}
-                        sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                        sx={{ minWidth: 130 }}
                       >
                         {recalcEarningsLoading ? 'Recalculating...' : 'Recalc Earnings'}
                       </Button>
@@ -3403,10 +3406,11 @@ function FulfillmentDashboard() {
                       <Button
                         variant="outlined"
                         color="warning"
+                        size="small"
                         startIcon={recalcAmazonLoading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
                         onClick={recalculateAmazonFinancials}
                         disabled={recalcAmazonLoading}
-                        sx={{ minWidth: 130, fontSize: '0.85rem', px: 1 }}
+                        sx={{ minWidth: 130 }}
                       >
                         {recalcAmazonLoading ? 'Recalculating...' : 'Recalc Amazon'}
                       </Button>
@@ -3452,7 +3456,6 @@ function FulfillmentDashboard() {
                     checked={excludeLowValue}
                     onChange={(e) => setExcludeLowValue(e.target.checked)}
                     color="primary"
-                    size="small"
                   />
                 }
                 label={
@@ -3460,7 +3463,7 @@ function FulfillmentDashboard() {
                     Exclude &lt; $3 Orders
                   </Typography>
                 }
-                sx={{ ml: 0 }}
+                sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
               />
 
               <FormControlLabel
@@ -3469,7 +3472,6 @@ function FulfillmentDashboard() {
                     checked={missingAmazonAccount}
                     onChange={(e) => setMissingAmazonAccount(e.target.checked)}
                     color="primary"
-                    size="small"
                   />
                 }
                 label={
@@ -3477,7 +3479,7 @@ function FulfillmentDashboard() {
                     Missing Amazon Acc
                   </Typography>
                 }
-                sx={{ ml: 0 }}
+                sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
               />
 
               {/* Column Selector Button */}

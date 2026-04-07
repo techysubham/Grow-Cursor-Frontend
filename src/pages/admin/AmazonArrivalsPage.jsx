@@ -589,8 +589,11 @@ export default function AmazonArrivalsPage() {
 
           <Button
             variant="outlined"
+            color="primary"
+            size="small"
             onClick={fetchOrders}
-            startIcon={<RefreshIcon />}
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+            disabled={loading}
             sx={{ minWidth: { xs: '100%', sm: 100 } }}
           >
             Refresh

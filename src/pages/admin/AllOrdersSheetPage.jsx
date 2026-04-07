@@ -762,6 +762,7 @@ export default function AllOrdersSheetPage() {
         <Stack direction="row" spacing={2}>
           <Button
             variant="outlined"
+            size="small"
             onClick={() => exportToCSV(false)}
             disabled={exportingCSV || orders.length === 0}
           >
@@ -769,14 +770,17 @@ export default function AllOrdersSheetPage() {
           </Button>
           <Button
             variant="outlined"
+            size="small"
             onClick={() => setShowExportModal(true)}
             disabled={exportingCSV}
           >
             Download by Date Range
           </Button>
           <Button
-            variant="contained"
-            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+            variant="outlined"
+            color="primary"
+            size="small"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={loadOrders}
             disabled={loading}
           >

@@ -252,10 +252,11 @@ export default function OrderAnalyticsPage() {
           <Button
             variant="contained"
             color="primary"
+            size="small"
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
             onClick={pollNewOrders}
             disabled={loading}
-            sx={{ minWidth: 180 }}
+            sx={{ minWidth: 160 }}
           >
             {loading ? 'Polling...' : 'Poll New Orders'}
           </Button>
@@ -334,7 +335,6 @@ export default function OrderAnalyticsPage() {
                 checked={excludeLowValue}
                 onChange={(e) => setExcludeLowValue(e.target.checked)}
                 color="primary"
-                size="small"
               />
             }
             label={
@@ -342,15 +342,16 @@ export default function OrderAnalyticsPage() {
                 Exclude &lt; $3 Orders
               </Typography>
             }
-            sx={{ mx: 1 }}
+            sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
           />
           
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            color="primary"
+            size="small"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={handleRefresh}
             disabled={loading}
-            size="small"
           >
             Refresh
           </Button>

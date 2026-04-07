@@ -596,7 +596,7 @@ export default function FulfillmentNotesPage() {
             <NoteIcon color="primary" />
             <Typography variant="h5" fontWeight="bold">Orders with Fulfillment Notes</Typography>
           </Stack>
-          <Chip label={`${totalOrders} orders`} color="info" variant="outlined" />
+          <Chip label={`${totalOrders} orders`} color="primary" variant="filled" size="small" />
         </Stack>
 
         <Divider sx={{ my: 2 }} />

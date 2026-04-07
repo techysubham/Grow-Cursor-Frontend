@@ -69,6 +69,87 @@ export default function App() {
   const theme = useMemo(() => createTheme({
     palette: { mode: 'light' },
     typography: { fontFamily: "'Inter', sans-serif" },
+    components: {
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+            textTransform: 'none',
+            fontWeight: 500,
+            letterSpacing: 0.2,
+          },
+        },
+      },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+          },
+        },
+      },
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            fontWeight: 500,
+          },
+        },
+      },
+      MuiToggleButton: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+            textTransform: 'none',
+            fontWeight: 500,
+          },
+        },
+      },
+      MuiToggleButtonGroup: {
+        styleOverrides: {
+          grouped: {
+            '&:first-of-type': {
+              borderRadius: '8px 0 0 8px',
+            },
+            '&:last-of-type': {
+              borderRadius: '0 8px 8px 0',
+            },
+          },
+        },
+      },
+      MuiSwitch: {
+        styleOverrides: {
+          root: {
+              width: 46,
+              height: 28,
+            padding: 0,
+          },
+          switchBase: {
+            padding: 0,
+            margin: 2,
+            transitionDuration: '200ms',
+            '&.Mui-checked': {
+                transform: 'translateX(18px)',
+              color: '#fff',
+              '& + .MuiSwitch-track': {
+                backgroundColor: '#34C759',
+                opacity: 1,
+                border: 0,
+              },
+            },
+          },
+          thumb: {
+              width: 24,
+              height: 24,
+            backgroundColor: '#fff',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+          },
+          track: {
+              borderRadius: 14,
+            backgroundColor: '#c0c0c8',
+            opacity: 1,
+          },
+        },
+      },
+    },
   }), []);
 
   return (
