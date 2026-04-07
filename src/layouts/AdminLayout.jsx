@@ -662,7 +662,7 @@ export default function AdminLayout({ user, onLogout }) {
             Team Chat
           </Button>
           <Typography variant="body2" sx={{ mr: 2 }}>{user?.username} ({user?.role})</Typography>
-          <Button color="inherit" onClick={onLogout}>Logout</Button>
+          <Button variant="contained" color="error" onClick={onLogout}>Logout</Button>
         </Toolbar>
       </AppBar>
       <Box component="nav" sx={{ width: { sm: sidebarOpen ? drawerWidth : 56 }, flexShrink: { sm: 0 } }}>

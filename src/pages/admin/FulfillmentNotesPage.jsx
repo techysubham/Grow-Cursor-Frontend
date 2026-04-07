@@ -631,7 +631,7 @@ export default function FulfillmentNotesPage() {
               placeholder="Search ID..."
             />
 
-            <Button variant="outlined" onClick={handleClearFilters} size="small">Clear</Button>
+            <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ height: 40, boxSizing: 'border-box' }}>Clear</Button>
           </Stack>
         </Box>
 

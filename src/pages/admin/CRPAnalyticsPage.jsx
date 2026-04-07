@@ -255,9 +255,9 @@ export default function CRPAnalyticsPage() {
             sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
           />
 
-          <Button variant="outlined" size="small"
-            startIcon={loading ? <CircularProgress size={14} /> : <RefreshIcon />}
-            onClick={fetchAnalytics} disabled={loading}>
+          <Button variant="outlined" color="primary" size="small"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+            onClick={fetchAnalytics} disabled={loading} sx={{ height: 40, boxSizing: 'border-box' }}>
             Refresh
           </Button>
         </Stack>

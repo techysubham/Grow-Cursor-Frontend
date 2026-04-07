@@ -1283,7 +1283,7 @@ export default function AwaitingShipmentPage() {
               sx={{ minWidth: 160 }}
             />
 
-            <Button variant="outlined" onClick={handleClearFilters} size="small">Clear</Button>
+            <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ height: 40, boxSizing: 'border-box' }}>Clear</Button>
 
             <ColumnSelector
               allColumns={ALL_COLUMNS}

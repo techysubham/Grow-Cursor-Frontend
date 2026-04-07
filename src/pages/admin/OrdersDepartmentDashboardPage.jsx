@@ -264,6 +264,7 @@ export default function OrdersDepartmentDashboardPage() {
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={loadDashboard}
             disabled={loading}
+            sx={{ height: 40, boxSizing: 'border-box' }}
           >
             Refresh
           </Button>
