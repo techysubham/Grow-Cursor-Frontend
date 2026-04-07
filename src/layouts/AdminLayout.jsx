@@ -58,6 +58,7 @@ import EditorDashboard from '../pages/compatibility/EditorDashboard.jsx';
 import ProgressTrackingPage from '../pages/compatibility/ProgressTrackingPage.jsx';
 import CompatibilityBatchHistoryPage from '../pages/compatibility/CompatibilityBatchHistoryPage.jsx';
 import AutoCompatibilityPage from '../pages/compatibility/AutoCompatibilityPage.jsx';
+import AutoCompatReviewHistoryPage from '../pages/compatibility/AutoCompatReviewHistoryPage.jsx';
 
 import FulfillmentDashboard from '../pages/admin/FulfillmentDashboard.jsx';
 import AllOrdersSheetPage from '../pages/admin/AllOrdersSheetPage.jsx';
@@ -240,6 +241,7 @@ const COMPONENT_MAP = {
   'ListingStats': ListingStatsPage,
   'CompatibilityBatchHistory': CompatibilityBatchHistoryPage,
   'AutoCompatibility': AutoCompatibilityPage,
+  'AutoCompatReviewHistory': AutoCompatReviewHistoryPage,
   'EditListings': EditListingsDashboard,
   'CompatibilityEditor': EditorDashboard,
   'AddCompatibilityEditor': AddListerPage,
