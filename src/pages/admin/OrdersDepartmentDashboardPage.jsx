@@ -253,15 +253,18 @@ export default function OrdersDepartmentDashboardPage() {
               ))}
             </Select>
           </FormControl>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography variant="body2">Exclude &lt; $3</Typography>
-            <Switch checked={excludeLowValue} onChange={(e) => setExcludeLowValue(e.target.checked)} />
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.5, minHeight: 40, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}>
+            <Switch checked={excludeLowValue} onChange={(e) => setExcludeLowValue(e.target.checked)} color="primary" />
+            <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>Exclude &lt; $3</Typography>
           </Stack>
           <Button
             variant="outlined"
-            startIcon={loading ? <CircularProgress size={16} /> : <RefreshIcon />}
+            color="primary"
+            size="small"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={loadDashboard}
             disabled={loading}
+            sx={{ height: 40, boxSizing: 'border-box' }}
           >
             Refresh
           </Button>

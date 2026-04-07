@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import { createTheme, alpha } from '@mui/material/styles';
 import LoginPage from './pages/LoginPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
@@ -64,11 +65,137 @@ function useAuth() {
   return { token, user, login, logout };
 }
 
+function getButtonPalette(theme, color) {
+  if (color && color !== 'inherit' && theme.palette[color]) {
+    return theme.palette[color];
+  }
+
+  return theme.palette.primary;
+}
+
 export default function App() {
   const { token, user, login, logout } = useAuth();
   const theme = useMemo(() => createTheme({
     palette: { mode: 'light' },
     typography: { fontFamily: "'Inter', sans-serif" },
+    components: {
+      MuiButton: {
+        styleOverrides: {
+          root: ({ theme }) => ({
+            borderRadius: 8,
+            textTransform: 'none',
+            fontWeight: 500,
+            letterSpacing: 0.2,
+            transition: theme.transitions.create(['background-color', 'border-color', 'box-shadow'], {
+              duration: theme.transitions.duration.shorter,
+            }),
+          }),
+          outlined: ({ theme, ownerState }) => {
+            if (ownerState.color === 'inherit') {
+              return {};
+            }
+
+            const paletteColor = getButtonPalette(theme, ownerState.color);
+
+            return {
+              '&:hover': {
+                borderColor: paletteColor.main,
+                backgroundColor: alpha(paletteColor.main, 0.06),
+              },
+            };
+          },
+          contained: ({ theme }) => ({
+            boxShadow: 'none',
+            '&:hover': {
+              boxShadow: theme.shadows[2],
+            },
+          }),
+        },
+      },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+          },
+        },
+      },
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            fontWeight: 500,
+          },
+        },
+      },
+      MuiToggleButton: {
+        styleOverrides: {
+          root: ({ theme }) => ({
+            borderRadius: 8,
+            textTransform: 'none',
+            fontWeight: 500,
+            transition: theme.transitions.create(['background-color', 'border-color', 'box-shadow'], {
+              duration: theme.transitions.duration.shorter,
+            }),
+            '&:hover': {
+              borderColor: alpha(theme.palette.primary.main, 0.4),
+              backgroundColor: alpha(theme.palette.primary.main, 0.06),
+            },
+            '&.Mui-selected': {
+              backgroundColor: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+            },
+            '&.Mui-selected:hover': {
+              backgroundColor: alpha(theme.palette.primary.main, 0.18),
+            },
+          }),
+        },
+      },
+      MuiToggleButtonGroup: {
+        styleOverrides: {
+          grouped: {
+            '&:first-of-type': {
+              borderRadius: '8px 0 0 8px',
+            },
+            '&:last-of-type': {
+              borderRadius: '0 8px 8px 0',
+            },
+          },
+        },
+      },
+      MuiSwitch: {
+        styleOverrides: {
+          root: {
+              width: 46,
+              height: 28,
+            padding: 0,
+          },
+          switchBase: {
+            padding: 0,
+            margin: 2,
+            transitionDuration: '200ms',
+            '&.Mui-checked': {
+                transform: 'translateX(18px)',
+              color: '#fff',
+              '& + .MuiSwitch-track': {
+                backgroundColor: '#34C759',
+                opacity: 1,
+                border: 0,
+              },
+            },
+          },
+          thumb: {
+              width: 24,
+              height: 24,
+            backgroundColor: '#fff',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+          },
+          track: {
+              borderRadius: 14,
+            backgroundColor: '#c0c0c8',
+            opacity: 1,
+          },
+        },
+      },
+    },
   }), []);
 
   return (

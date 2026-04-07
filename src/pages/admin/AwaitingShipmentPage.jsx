@@ -1162,7 +1162,7 @@ export default function AwaitingShipmentPage() {
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="h5" fontWeight="bold">Awaiting Shipment</Typography>
           </Stack>
-          <Chip label={`${totalOrders} awaiting`} color="warning" variant="outlined" />
+          <Chip label={`${totalOrders} awaiting`} color="primary" variant="filled" size="small" />
         </Stack>
 
         <Divider sx={{ my: 2 }} />
@@ -1283,7 +1283,7 @@ export default function AwaitingShipmentPage() {
               sx={{ minWidth: 160 }}
             />
 
-            <Button variant="outlined" onClick={handleClearFilters} size="small">Clear</Button>
+            <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ height: 40, boxSizing: 'border-box' }}>Clear</Button>
 
             <ColumnSelector
               allColumns={ALL_COLUMNS}

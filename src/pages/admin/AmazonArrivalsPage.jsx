@@ -582,16 +582,18 @@ export default function AmazonArrivalsPage() {
             variant="outlined"
             onClick={toggleSort}
             startIcon={arrivalSort === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
-            sx={{ minWidth: { xs: '100%', sm: 140 }, textTransform: 'none' }}
+            sx={{ minWidth: { xs: '100%', sm: 140 }, height: 40, textTransform: 'none', boxSizing: 'border-box' }}
           >
             {arrivalSort === 'asc' ? 'Oldest First' : 'Newest First'}
           </Button>
 
           <Button
             variant="outlined"
+            color="primary"
             onClick={fetchOrders}
-            startIcon={<RefreshIcon />}
-            sx={{ minWidth: { xs: '100%', sm: 100 } }}
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+            disabled={loading}
+            sx={{ minWidth: { xs: '100%', sm: 100 }, height: 40, boxSizing: 'border-box' }}
           >
             Refresh
           </Button>
