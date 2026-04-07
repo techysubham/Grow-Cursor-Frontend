@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import { createTheme, alpha } from '@mui/material/styles';
 import LoginPage from './pages/LoginPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
@@ -64,6 +65,14 @@ function useAuth() {
   return { token, user, login, logout };
 }
 
+function getButtonPalette(theme, color) {
+  if (color && color !== 'inherit' && theme.palette[color]) {
+    return theme.palette[color];
+  }
+
+  return theme.palette.primary;
+}
+
 export default function App() {
   const { token, user, login, logout } = useAuth();
   const theme = useMemo(() => createTheme({
@@ -72,12 +81,35 @@ export default function App() {
     components: {
       MuiButton: {
         styleOverrides: {
-          root: {
+          root: ({ theme }) => ({
             borderRadius: 8,
             textTransform: 'none',
             fontWeight: 500,
             letterSpacing: 0.2,
+            transition: theme.transitions.create(['background-color', 'border-color', 'box-shadow'], {
+              duration: theme.transitions.duration.shorter,
+            }),
+          }),
+          outlined: ({ theme, ownerState }) => {
+            if (ownerState.color === 'inherit') {
+              return {};
+            }
+
+            const paletteColor = getButtonPalette(theme, ownerState.color);
+
+            return {
+              '&:hover': {
+                borderColor: paletteColor.main,
+                backgroundColor: alpha(paletteColor.main, 0.06),
+              },
+            };
           },
+          contained: ({ theme }) => ({
+            boxShadow: 'none',
+            '&:hover': {
+              boxShadow: theme.shadows[2],
+            },
+          }),
         },
       },
       MuiOutlinedInput: {
@@ -96,11 +128,25 @@ export default function App() {
       },
       MuiToggleButton: {
         styleOverrides: {
-          root: {
+          root: ({ theme }) => ({
             borderRadius: 8,
             textTransform: 'none',
             fontWeight: 500,
-          },
+            transition: theme.transitions.create(['background-color', 'border-color', 'box-shadow'], {
+              duration: theme.transitions.duration.shorter,
+            }),
+            '&:hover': {
+              borderColor: alpha(theme.palette.primary.main, 0.4),
+              backgroundColor: alpha(theme.palette.primary.main, 0.06),
+            },
+            '&.Mui-selected': {
+              backgroundColor: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+            },
+            '&.Mui-selected:hover': {
+              backgroundColor: alpha(theme.palette.primary.main, 0.18),
+            },
+          }),
         },
       },
       MuiToggleButtonGroup: {
