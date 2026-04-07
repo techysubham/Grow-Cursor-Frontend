@@ -256,7 +256,7 @@ export default function OrderAnalyticsPage() {
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
             onClick={pollNewOrders}
             disabled={loading}
-            sx={{ minWidth: 160 }}
+            sx={{ minWidth: 160, height: 40, boxSizing: 'border-box' }}
           >
             {loading ? 'Polling...' : 'Poll New Orders'}
           </Button>
@@ -352,6 +352,7 @@ export default function OrderAnalyticsPage() {
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={handleRefresh}
             disabled={loading}
+            sx={{ height: 40, boxSizing: 'border-box' }}
           >
             Refresh
           </Button>
