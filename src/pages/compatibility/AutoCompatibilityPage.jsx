@@ -178,6 +178,16 @@ const getVehicleString = (nameValueList) => {
 // Helper: trim key for uniqueness
 const trimKey = (entry) => `${entry.trim}|||${entry.engine}`;
 
+// Format a UTC timestamp for display in IST
+const formatDateIST = (dateString) => {
+  if (!dateString) return '\u2014';
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true
+  }).format(new Date(dateString));
+};
+
 export default function AutoCompatibilityPage() {
   const [sellers, setSellers] = useState([]);
   const [sellerId, setSellerId] = useState('');
@@ -251,6 +261,15 @@ export default function AutoCompatibilityPage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
+  // Load a specific batch from Review History page navigation
+  useEffect(() => {
+    const loadBatchId = sessionStorage.getItem('autoCompat_loadBatchId');
+    if (loadBatchId) {
+      sessionStorage.removeItem('autoCompat_loadBatchId');
+      setBatchId(loadBatchId);
+    }
+  }, []);
+
   // Poll batch status
   useEffect(() => {
     if (!batchId) return;
@@ -265,7 +284,7 @@ export default function AutoCompatibilityPage() {
       } catch (e) { console.error('Poll error:', e); }
     };
     poll(); // immediate first poll
-    pollRef.current = setInterval(poll, 2000);
+    pollRef.current = setInterval(poll, 5000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [batchId]);
 
@@ -350,6 +369,8 @@ export default function AutoCompatibilityPage() {
       setReviewIndex(0);
       setReviewItem(enrichedItems[0]);
       setReviewMode(true);
+      // Pre-load makes so the dropdown is ready immediately
+      if (makeOptions.length === 0) fetchMakes();
     } catch (e) {
       setSnackbar({ open: true, message: 'Failed to load batch: ' + (e.response?.data?.error || e.message), severity: 'error' });
     }
@@ -357,23 +378,35 @@ export default function AutoCompatibilityPage() {
 
   const navigateReview = (direction) => {
     const newIndex = direction === 'next' ? reviewIndex + 1 : reviewIndex - 1;
-    if (newIndex >= 0 && newIndex < reviewItems.length) {
-      setReviewIndex(newIndex);
-      setReviewItem(reviewItems[newIndex]);
-      // Reset editor state
-      setSelectedMake(null);
-      setSelectedModel(null);
-      setSelectedYears([]);
-      setSelectedTrimsByYear({});
-      setModelOptions([]);
-      setYearOptions([]);
-      setTrimsByYear({});
-      setExpandedYears({});
-      setTrimFilterKeyword(''); // Clear trim filter when navigating
-      setStartYear('');
-      setEndYear('');
-      setNewNotes('');
+    if (newIndex < 0 || newIndex >= reviewItems.length) return;
+
+    // When moving forward, mark the current item as reviewed if still pending
+    let currentItems = reviewItems;
+    if (direction === 'next') {
+      const currItem = reviewItems[reviewIndex];
+      if (!currItem?.reviewStatus || currItem.reviewStatus === 'pending') {
+        currentItems = [...reviewItems];
+        currentItems[reviewIndex] = { ...currItem, reviewStatus: 'skipped' };
+        setReviewItems(currentItems);
+      }
     }
+
+    const nextItem = currentItems[newIndex];
+    setReviewIndex(newIndex);
+    setReviewItem(nextItem);
+    // Reset editor state
+    setSelectedMake(null);
+    setSelectedModel(null);
+    setSelectedYears([]);
+    setSelectedTrimsByYear({});
+    setModelOptions([]);
+    setYearOptions([]);
+    setTrimsByYear({});
+    setExpandedYears({});
+    setTrimFilterKeyword('');
+    setStartYear('');
+    setEndYear('');
+    setNewNotes('');
   };
 
   const removeExistingCompatibility = async () => {
@@ -393,8 +426,8 @@ export default function AutoCompatibilityPage() {
         compatibilityList: []
       });
 
-      // Clear local state
-      const updated = { ...reviewItem, editCompatList: [], compatibilityList: [] };
+      // Clear local state; reset reviewStatus to pending (not ended)
+      const updated = { ...reviewItem, editCompatList: [], compatibilityList: [], reviewStatus: 'pending' };
       setReviewItem(updated);
       
       // Update in reviewItems array
@@ -402,7 +435,7 @@ export default function AutoCompatibilityPage() {
       updatedItems[reviewIndex] = updated;
       setReviewItems(updatedItems);
       
-      setSnackbar({ open: true, message: 'Compatibility removed from eBay successfully', severity: 'success' });
+      setSnackbar({ open: true, message: 'Compatibility cleared from eBay. Item is back to pending.', severity: 'success' });
     } catch (e) {
       setSnackbar({ open: true, message: 'Failed to remove: ' + (e.response?.data?.error || e.message), severity: 'error' });
     }
@@ -526,7 +559,7 @@ export default function AutoCompatibilityPage() {
   const fetchMakes = async () => {
     setLoadingMakes(true);
     try {
-      const { data } = await api.post('/ebay/compatibility/values', { property: 'Make' });
+      const { data } = await api.post('/ebay/compatibility/values', { sellerId, propertyName: 'Make' });
       setMakeOptions(data.values || []);
     } catch (e) {
       setSnackbar({ open: true, message: 'Failed to load makes', severity: 'error' });
@@ -547,8 +580,9 @@ export default function AutoCompatibilityPage() {
     setLoadingModels(true);
     try {
       const { data } = await api.post('/ebay/compatibility/values', {
-        property: 'Model',
-        inputProperty: [{ property: 'Make', value: make }]
+        sellerId,
+        propertyName: 'Model',
+        constraints: [{ name: 'Make', value: make }]
       });
       setModelOptions(data.values || []);
     } catch (e) {
@@ -568,10 +602,11 @@ export default function AutoCompatibilityPage() {
     setLoadingYears(true);
     try {
       const { data } = await api.post('/ebay/compatibility/values', {
-        property: 'Year',
-        inputProperty: [
-          { property: 'Make', value: selectedMake },
-          { property: 'Model', value: model }
+        sellerId,
+        propertyName: 'Year',
+        constraints: [
+          { name: 'Make', value: selectedMake },
+          { name: 'Model', value: model }
         ]
       });
       setYearOptions(data.values || []);
@@ -823,7 +858,37 @@ export default function AutoCompatibilityPage() {
     setSnackbar({ open: true, message: statusLabels[status] || 'Status updated', severity: 'info' });
   };
 
+  const handleSkip = () => {
+    if (!reviewItem) return;
+    // Mark current item as skipped
+    const updatedItems = [...reviewItems];
+    updatedItems[reviewIndex] = { ...reviewItem, reviewStatus: 'skipped' };
+    setReviewItems(updatedItems);
+    // Navigate to next inline (avoids stale closure issue)
+    const newIndex = reviewIndex + 1;
+    if (newIndex < reviewItems.length) {
+      setReviewIndex(newIndex);
+      const nextItem = updatedItems[newIndex];
+      setReviewItem(nextItem);
+      setSelectedMake(null); setSelectedModel(null); setSelectedYears([]);
+      setSelectedTrimsByYear({}); setModelOptions([]); setYearOptions([]);
+      setTrimsByYear({}); setExpandedYears({}); setTrimFilterKeyword('');
+      setStartYear(''); setEndYear(''); setNewNotes('');
+    } else {
+      setReviewItem(updatedItems[reviewIndex]);
+    }
+  };
+
   const finishReview = () => {
+    // Save manual review counts immediately (even if 0 correct)
+    if (batchId) {
+      const correctCount = reviewItems.filter(i => i.reviewStatus === 'correct').length;
+      const skippedCount = reviewItems.filter(i => i.reviewStatus === 'skipped').length;
+      const endedCount = reviewItems.filter(i => i.reviewStatus === 'ended').length;
+      api.patch(`/ebay/auto-compatibility-batch/${batchId}/review-summary`, {
+        correctCount, skippedCount, endedCount
+      }).catch(() => {});
+    }
     setSummaryOpen(true);
   };
 
@@ -841,11 +906,22 @@ export default function AutoCompatibilityPage() {
       });
 
       setSnackbar({ open: true, message: 'Listing ended successfully on eBay', severity: 'success' });
-      
-      // Mark as ended and move to next
-      markItemStatus('ended');
+
+      // Mark as ended and move to next inline (avoids stale closure issue)
+      const endedItems = [...reviewItems];
+      endedItems[reviewIndex] = { ...reviewItem, reviewStatus: 'ended' };
+      setReviewItems(endedItems);
       if (reviewIndex < reviewItems.length - 1) {
-        setTimeout(() => navigateReview('next'), 500);
+        const newIndex = reviewIndex + 1;
+        setReviewIndex(newIndex);
+        const nextItem = endedItems[newIndex];
+        setReviewItem(nextItem);
+        setSelectedMake(null); setSelectedModel(null); setSelectedYears([]);
+        setSelectedTrimsByYear({}); setModelOptions([]); setYearOptions([]);
+        setTrimsByYear({}); setExpandedYears({}); setTrimFilterKeyword('');
+        setStartYear(''); setEndYear(''); setNewNotes('');
+      } else {
+        setReviewItem(endedItems[reviewIndex]);
       }
     } catch (e) {
       setSnackbar({ open: true, message: 'Failed to end listing: ' + (e.response?.data?.error || e.message), severity: 'error' });
@@ -884,6 +960,16 @@ export default function AutoCompatibilityPage() {
         console.error(`Failed to send ${item.itemId}:`, e);
         failCount++;
       }
+    }
+
+    // Save manual review action counts to the batch record
+    if (batchId) {
+      const correctCount = reviewItems.filter(i => i.reviewStatus === 'correct').length;
+      const skippedCount = reviewItems.filter(i => i.reviewStatus === 'skipped').length;
+      const endedCount = reviewItems.filter(i => i.reviewStatus === 'ended').length;
+      api.patch(`/ebay/auto-compatibility-batch/${batchId}/review-summary`, {
+        correctCount, skippedCount, endedCount
+      }).catch(() => {});
     }
 
     setBulkSending(false);
@@ -1491,10 +1577,12 @@ export default function AutoCompatibilityPage() {
                   <Chip
                     label={
                       reviewItem.reviewStatus === 'correct' ? '✓ Marked Correct' :
-                      '⨯ Ended'
+                      reviewItem.reviewStatus === 'skipped' ? '→ Reviewed/Skipped' :
+                      reviewItem.reviewStatus === 'ended' ? '⨯ Ended' : reviewItem.reviewStatus
                     }
                     color={
-                      reviewItem.reviewStatus === 'correct' ? 'success' : 'error'
+                      reviewItem.reviewStatus === 'correct' ? 'success' :
+                      reviewItem.reviewStatus === 'skipped' ? 'warning' : 'error'
                     }
                     size="small"
                     sx={{ fontWeight: 600 }}
@@ -1523,21 +1611,27 @@ export default function AutoCompatibilityPage() {
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             <Box sx={{ display: 'flex', gap: 0.5, mr: 2 }}>
               <Chip 
-                label={`✓ ${reviewItems.filter(i => i.reviewStatus === 'correct').length}`} 
+                label={`✓ ${reviewItems.filter(i => i.reviewStatus === 'correct').length} correct`} 
                 size="small" 
                 color="success" 
                 sx={{ height: 22, fontSize: '0.7rem' }}
               />
               <Chip 
-                label={`⊘ ${reviewItems.filter(i => !i.reviewStatus || i.reviewStatus === 'pending').length}`} 
+                label={`→ ${reviewItems.filter(i => i.reviewStatus === 'skipped').length} skip`} 
                 size="small" 
                 color="warning" 
                 sx={{ height: 22, fontSize: '0.7rem' }}
               />
               <Chip 
-                label={`⨯ ${reviewItems.filter(i => i.reviewStatus === 'ended').length}`} 
+                label={`⨯ ${reviewItems.filter(i => i.reviewStatus === 'ended').length} end`} 
                 size="small" 
                 color="error" 
+                sx={{ height: 22, fontSize: '0.7rem' }}
+              />
+              <Chip 
+                label={`⊘ ${reviewItems.filter(i => !i.reviewStatus || i.reviewStatus === 'pending').length} pending`} 
+                size="small" 
+                variant="outlined"
                 sx={{ height: 22, fontSize: '0.7rem' }}
               />
             </Box>
@@ -1681,9 +1775,6 @@ export default function AutoCompatibilityPage() {
                   loading={loadingMakes}
                   renderInput={(params) => <TextField {...params} label="Make" size="small" />}
                 />
-                {makeOptions.length === 0 && !loadingMakes && (
-                  <Button size="small" onClick={fetchMakes} sx={{ mt: 0.5, fontSize: '0.7rem' }}>Load Makes</Button>
-                )}
               </Grid>
 
               {/* MODEL */}
@@ -1873,8 +1964,7 @@ export default function AutoCompatibilityPage() {
           </Button>
           
           <Button
-            onClick={() => navigateReview('next')}
-            disabled={reviewIndex >= reviewItems.length - 1}
+            onClick={handleSkip}
             variant="outlined"
             color="warning"
             size="small"
@@ -1932,7 +2022,7 @@ export default function AutoCompatibilityPage() {
         <DialogTitle sx={{ borderBottom: '1px solid #eee' }}>Bulk Review Summary</DialogTitle>
         <DialogContent sx={{ p: 3 }}>
           {/* Summary Cards */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2, mb: 3 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 2, mb: 3 }}>
             <Paper sx={{ p: 2, textAlign: 'center', border: '2px solid #e3e3e3' }}>
               <Typography variant="h3" color="primary" fontWeight="bold">
                 {reviewItems.length}
@@ -1945,6 +2035,13 @@ export default function AutoCompatibilityPage() {
                 {reviewItems.filter(i => i.reviewStatus === 'correct').length}
               </Typography>
               <Typography variant="body2">Marked Correct</Typography>
+            </Paper>
+
+            <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#fff7ed', border: '2px solid #fdba74' }}>
+              <Typography variant="h3" sx={{ color: '#f97316' }} fontWeight="bold">
+                {reviewItems.filter(i => i.reviewStatus === 'skipped').length}
+              </Typography>
+              <Typography variant="body2">Reviewed / Skipped</Typography>
             </Paper>
             
             <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#fffbeb', border: '2px solid #fde047' }}>
@@ -1981,10 +2078,12 @@ export default function AutoCompatibilityPage() {
                 {reviewItems.map((item, idx) => {
                   const statusColor = 
                     item.reviewStatus === 'correct' ? 'success' :
-                    item.reviewStatus === 'ended' ? 'error' : 'warning';
+                    item.reviewStatus === 'ended' ? 'error' :
+                    item.reviewStatus === 'skipped' ? 'warning' : 'default';
                   const statusLabel = 
                     item.reviewStatus === 'correct' ? '✓ Correct' :
-                    item.reviewStatus === 'ended' ? 'Ended' : 'Not Reviewed';
+                    item.reviewStatus === 'ended' ? 'Ended' :
+                    item.reviewStatus === 'skipped' ? '→ Reviewed/Skipped' : 'Not Reviewed';
                   
                   return (
                     <TableRow key={idx} hover sx={{ bgcolor: item.reviewStatus === 'correct' ? '#f0fdf4' : 'inherit' }}>
@@ -2033,7 +2132,8 @@ export default function AutoCompatibilityPage() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Listing Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Run On</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Seller</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>By</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
@@ -2041,6 +2141,7 @@ export default function AutoCompatibilityPage() {
                     <TableCell align="center" sx={{ fontWeight: 'bold' }}>✅</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold' }}>🔧</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold' }}>❌</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Manual Review</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
                   </TableRow>
                 </TableHead>
@@ -2048,6 +2149,9 @@ export default function AutoCompatibilityPage() {
                   {history.map(b => (
                     <TableRow key={b._id} hover>
                       <TableCell>{b.targetDate}</TableCell>
+                      <TableCell>
+                        <Typography variant="caption">{formatDateIST(b.createdAt)}</Typography>
+                      </TableCell>
                       <TableCell>{b.seller?.user?.username || '—'}</TableCell>
                       <TableCell>{b.triggeredBy?.username || '—'}</TableCell>
                       <TableCell>
@@ -2061,6 +2165,17 @@ export default function AutoCompatibilityPage() {
                       <TableCell align="center">{b.successCount + (b.warningCount || 0)}</TableCell>
                       <TableCell align="center">{b.needsManualCount || 0}</TableCell>
                       <TableCell align="center">{(b.ebayErrorCount || 0) + (b.aiFailedCount || 0)}</TableCell>
+                      <TableCell>
+                        {b.manualReviewDone ? (
+                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                            <Chip label={`✓${b.manualCorrectCount}`} size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            <Chip label={`→${b.manualSkippedCount}`} size="small" color="warning" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            <Chip label={`⨯${b.manualEndedCount}`} size="small" color="error" sx={{ height: 20, fontSize: '0.65rem' }} />
+                          </Box>
+                        ) : (
+                          <Typography variant="caption" color="textSecondary">—</Typography>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Button size="small" variant="outlined" onClick={() => handleViewHistoryBatch(b._id)}>
                           View
