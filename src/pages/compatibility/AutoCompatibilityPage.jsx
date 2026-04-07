@@ -192,7 +192,7 @@ export default function AutoCompatibilityPage() {
   const [sellers, setSellers] = useState([]);
   const [sellerId, setSellerId] = useState('');
   const [targetDate, setTargetDate] = useState(getTodayIST());
-  const [itemLimit, setItemLimit] = useState(10); // Default 10 for safety
+  const [itemLimit, setItemLimit] = useState(''); // Empty = no limit
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   // Batch state
@@ -296,7 +296,7 @@ export default function AutoCompatibilityPage() {
       const { data } = await api.post('/ebay/auto-compatibility', {
         sellerId,
         targetDate,
-        itemLimit: itemLimit || 0
+        itemLimit: itemLimit === '' ? 0 : Number(itemLimit)
       });
       if (data.batchId) {
         setBatchId(data.batchId);
@@ -1283,11 +1283,17 @@ export default function AutoCompatibilityPage() {
             type="number"
             label="Item Limit"
             size="small"
+            placeholder="All items"
             value={itemLimit}
-            onChange={e => setItemLimit(Math.max(0, parseInt(e.target.value) || 0))}
-            inputProps={{ min: 0 }}
-            sx={{ width: 120 }}
-            helperText={itemLimit === 0 ? 'No limit' : `First ${itemLimit}`}
+            onChange={e => {
+              const val = e.target.value;
+              if (val === '') { setItemLimit(''); return; }
+              const n = parseInt(val);
+              if (!isNaN(n) && n >= 0) setItemLimit(n);
+            }}
+            inputProps={{ min: 1 }}
+            sx={{ width: 130 }}
+            helperText={itemLimit === '' || itemLimit === 0 ? 'All items' : `First ${itemLimit}`}
           />
 
           <Button
