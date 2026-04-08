@@ -56,6 +56,7 @@ export const PAGE_REGISTRY = [
   { id: 'ListingStats', name: 'Listing Statistics', path: '/listing-stats', category: 'compatibility', defaultRoles: ['superadmin', 'compatibilityadmin'] },
   { id: 'CompatibilityBatchHistory', name: 'Batch History', path: '/compatibility-batch-history', category: 'compatibility', defaultRoles: ['superadmin', 'compatibilityadmin', 'compatibilityeditor'] },
   { id: 'AutoCompatibility', name: 'Auto Compatibility', path: '/auto-compatibility', category: 'compatibility', defaultRoles: ['superadmin', 'compatibilityadmin'] },
+  { id: 'AutoCompatSellerHistory', name: 'Auto Compat Seller History', path: '/auto-compat-seller-history', category: 'compatibility', defaultRoles: ['superadmin', 'compatibilityadmin'] },
   { id: 'AutoCompatReviewHistory', name: 'Review History', path: '/auto-compat-review-history', category: 'compatibility', defaultRoles: ['superadmin', 'compatibilityadmin'] },
   { id: 'EditListings', name: 'Edit Listings', path: '/edit-listings', category: 'compatibility', defaultRoles: ['superadmin', 'compatibilityadmin', 'compatibilityeditor'] },
   { id: 'CompatibilityEditor', name: 'My Assignments', path: '/compatibility-editor', category: 'compatibility', defaultRoles: ['superadmin', 'compatibilityeditor'] },
