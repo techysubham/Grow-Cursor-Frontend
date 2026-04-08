@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Container, Paper, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Button, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -10,6 +11,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import SecurityIcon from '@mui/icons-material/Security';
+import HistoryIcon from '@mui/icons-material/History';
 import PersonIcon from '@mui/icons-material/Person';
 import api from '../../lib/api';
 import { PAGE_REGISTRY, PAGE_CATEGORIES } from '../../constants/pages';
@@ -138,11 +140,16 @@ const PageAccessManagementPage = () => {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <SecurityIcon sx={{ fontSize: 32, mr: 1.5, color: 'primary.main' }} />
-        <Typography variant="h4" component="h1">
-          Page Access Management
-        </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <SecurityIcon sx={{ fontSize: 32, mr: 1.5, color: 'primary.main' }} />
+          <Typography variant="h4" component="h1">
+            Page Access Management
+          </Typography>
+        </Box>
+        <Button component={Link} to="/admin/page-access-audit-log" variant="outlined" startIcon={<HistoryIcon />}>
+          View Audit Log
+        </Button>
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>

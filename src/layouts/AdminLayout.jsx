@@ -156,6 +156,7 @@ import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import SecurityIcon from '@mui/icons-material/Security';
 
 import PageAccessManagementPage from '../pages/admin/PageAccessManagementPage.jsx';
+import PageAccessAuditLogPage from '../pages/admin/PageAccessAuditLogPage.jsx';
 import UserPasswordManagementPage from '../pages/admin/UserPasswordManagementPage.jsx';
 
 import usePageAccess from '../hooks/usePageAccess';
@@ -286,6 +287,7 @@ const COMPONENT_MAP = {
   'ViewAllMessages': InternalMessagesAdminPage,
   'Attendance': AttendanceAdminPage,
   'PageAccessManagement': PageAccessManagementPage,
+  'PageAccessAuditLog': PageAccessAuditLogPage,
   'UserPasswordManagement': UserPasswordManagementPage,
   'ManageCategories': ManageCategoriesPage,
   'ManagePlatforms': ManagePlatformsPage,
