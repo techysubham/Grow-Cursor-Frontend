@@ -333,13 +333,11 @@ export default function AutoCompatibilityPage() {
     try {
       const { data } = await api.get(`/ebay/auto-compatibility-batch/${batchId}`);
       setFullBatch(data);
-      // Filter items that need review
-      const needsReview = data.items.filter(i => 
-        ['needs_manual', 'ebay_error', 'ai_failed', 'warning'].includes(i.status)
-      );
+      // Show all items in manual review — user wants to see everything
+      const needsReview = data.items;
       
       if (needsReview.length === 0) {
-        setSnackbar({ open: true, message: 'No items need review', severity: 'info' });
+        setSnackbar({ open: true, message: 'No items in this batch', severity: 'info' });
         return;
       }
 
@@ -1386,7 +1384,7 @@ export default function AutoCompatibilityPage() {
               onClick={startReviewMode}
               sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}
             >
-              Manual Review ({batch.items.filter(i => ['needs_manual', 'ebay_error', 'ai_failed', 'warning'].includes(i.status)).length})
+              Manual Review ({batch.items.length})
             </Button>
           </Box>
 
@@ -1989,9 +1987,23 @@ export default function AutoCompatibilityPage() {
           
           <Button
             onClick={() => {
-              markItemStatus('correct');
+              if (!reviewItem) return;
+              // Mark current item as correct inline (avoids stale closure issue with setTimeout)
+              const updatedItems = [...reviewItems];
+              updatedItems[reviewIndex] = { ...reviewItem, reviewStatus: 'correct' };
+              setReviewItems(updatedItems);
+              setReviewItem(updatedItems[reviewIndex]);
+              setSnackbar({ open: true, message: 'Marked as Correct', severity: 'success' });
+              // Navigate to next inline
               if (reviewIndex < reviewItems.length - 1) {
-                setTimeout(() => navigateReview('next'), 300);
+                const newIndex = reviewIndex + 1;
+                setReviewIndex(newIndex);
+                const nextItem = updatedItems[newIndex];
+                setReviewItem(nextItem);
+                setSelectedMake(null); setSelectedModel(null); setSelectedYears([]);
+                setSelectedTrimsByYear({}); setModelOptions([]); setYearOptions([]);
+                setTrimsByYear({}); setExpandedYears({}); setTrimFilterKeyword('');
+                setStartYear(''); setEndYear(''); setNewNotes('');
               }
             }}
             variant="contained"
