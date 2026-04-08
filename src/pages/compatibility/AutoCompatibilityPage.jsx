@@ -1035,6 +1035,9 @@ export default function AutoCompatibilityPage() {
   const progress = batch ? (batch.processedCount / Math.max(batch.totalListings, 1)) * 100 : 0;
   const isRunning = batch?.status === 'running';
   const isComplete = batch?.status === 'completed' || batch?.status === 'failed';
+  const selectedSeller = sellers.find(s => s._id === sellerId);
+  const selectedSellerLabel = selectedSeller?.user?.username || selectedSeller?.user?.email || '—';
+  const activeBatchSellerLabel = batch?.seller?.user?.username || batch?.seller?.user?.email || selectedSellerLabel;
 
   const filteredItems = (batch?.items || []).filter(item =>
     statusFilter === 'all' || item.status === statusFilter
@@ -1365,6 +1368,11 @@ export default function AutoCompatibilityPage() {
             </Typography>
           </Box>
 
+          <Box display="flex" gap={1} flexWrap="wrap" sx={{ mb: 2 }}>
+            <Chip label={`Seller: ${activeBatchSellerLabel}`} size="small" variant="outlined" />
+            <Chip label={`Listing Date: ${batch.targetDate || targetDate}`} size="small" variant="outlined" />
+          </Box>
+
           <LinearProgress
             variant="determinate"
             value={progress}
@@ -1409,6 +1417,8 @@ export default function AutoCompatibilityPage() {
                 sx={{ cursor: 'pointer' }}
               />
             ))}
+            <Chip label={`Seller: ${activeBatchSellerLabel}`} size="small" variant="outlined" />
+            <Chip label={`Date: ${batch.targetDate || targetDate}`} size="small" variant="outlined" />
             <Box sx={{ flex: 1 }} />
             <Button
               variant="contained"
@@ -2219,12 +2229,20 @@ export default function AutoCompatibilityPage() {
 
       {/* HISTORY DIALOG */}
       <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Auto-Compatibility History</DialogTitle>
+        <DialogTitle>
+          <Typography variant="h6">Auto-Compatibility History</Typography>
+          <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Chip label={`Selected Seller: ${selectedSellerLabel}`} size="small" variant="outlined" />
+            <Chip label={`Selected Date: ${targetDate || '—'}`} size="small" variant="outlined" />
+          </Box>
+        </DialogTitle>
         <DialogContent>
           {historyLoading ? (
             <Box display="flex" justifyContent="center" p={3}><CircularProgress /></Box>
           ) : history.length === 0 ? (
-            <Typography color="textSecondary" textAlign="center" p={3}>No batches found</Typography>
+            <Typography color="textSecondary" textAlign="center" p={3}>
+              No batches found for {selectedSellerLabel}
+            </Typography>
           ) : (
             <TableContainer>
               <Table size="small">
