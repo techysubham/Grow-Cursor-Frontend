@@ -43,6 +43,8 @@ const STEP_LABELS = {
   done: '✅ Complete',
 };
 
+const MANUAL_REVIEW_FILTERS = ['all', 'success', 'warning', 'needs_manual', 'ebay_error', 'ai_failed'];
+
 // Get today in IST (YYYY-MM-DD)
 const getTodayIST = () => {
   return new Intl.DateTimeFormat('en-CA', {
@@ -207,6 +209,7 @@ export default function AutoCompatibilityPage() {
 
   // Manual Review Mode
   const [reviewMode, setReviewMode] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewItems, setReviewItems] = useState([]);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewItem, setReviewItem] = useState(null);
@@ -332,16 +335,29 @@ export default function AutoCompatibilityPage() {
   };
 
   // --- REVIEW MODE FUNCTIONS ---
-  const startReviewMode = async () => {
-    if (!batchId) return;
+  const startReviewMode = async (filter = statusFilter) => {
+    if (!batchId || reviewLoading) return;
+    setReviewLoading(true);
+    setReviewMode(true);
+    setReviewItems([]);
+    setReviewIndex(0);
+    setReviewItem(null);
     try {
       const { data } = await api.get(`/ebay/auto-compatibility-batch/${batchId}`);
       setFullBatch(data);
-      // Show all items in manual review — user wants to see everything
-      const needsReview = data.items;
+      const needsReview = filter === 'all'
+        ? data.items
+        : data.items.filter(item => item.status === filter);
       
       if (needsReview.length === 0) {
-        setSnackbar({ open: true, message: 'No items in this batch', severity: 'info' });
+        setReviewMode(false);
+        setSnackbar({
+          open: true,
+          message: filter === 'all'
+            ? 'No items in this batch'
+            : `No ${STATUS_CONFIG[filter]?.label || filter} items in this batch`,
+          severity: 'info'
+        });
         return;
       }
 
@@ -370,12 +386,19 @@ export default function AutoCompatibilityPage() {
       setReviewItems(enrichedItems);
       setReviewIndex(0);
       setReviewItem(enrichedItems[0]);
-      setReviewMode(true);
       // Pre-load makes so the dropdown is ready immediately
       if (makeOptions.length === 0) fetchMakes();
     } catch (e) {
+      setReviewMode(false);
       setSnackbar({ open: true, message: 'Failed to load batch: ' + (e.response?.data?.error || e.message), severity: 'error' });
+    } finally {
+      setReviewLoading(false);
     }
+  };
+
+  const handleReviewModeClose = (_, reason) => {
+    if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+    setReviewMode(false);
   };
 
   const navigateReview = (direction) => {
@@ -1016,6 +1039,8 @@ export default function AutoCompatibilityPage() {
   const filteredItems = (batch?.items || []).filter(item =>
     statusFilter === 'all' || item.status === statusFilter
   );
+  const manualReviewCount = statusFilter === 'all' ? (batch?.items?.length || 0) : filteredItems.length;
+  const manualReviewLabel = statusFilter === 'all' ? 'Manual Review All' : `Review ${STATUS_CONFIG[statusFilter]?.label || statusFilter}`;
 
   // Render trims section helper
   function renderTrimsSection() {
@@ -1373,7 +1398,7 @@ export default function AutoCompatibilityPage() {
           {/* Filters */}
           <Box sx={{ p: 2, display: 'flex', gap: 1, alignItems: 'center', borderBottom: '1px solid #eee', flexWrap: 'wrap' }}>
             <Typography variant="subtitle2" sx={{ mr: 1 }}>Filter:</Typography>
-            {['all', 'success', 'warning', 'needs_manual', 'ebay_error', 'ai_failed'].map(f => (
+            {MANUAL_REVIEW_FILTERS.map(f => (
               <Chip
                 key={f}
                 label={f === 'all' ? `All (${batch.items.length})` : `${STATUS_CONFIG[f]?.label} (${batch.items.filter(i => i.status === f).length})`}
@@ -1388,11 +1413,12 @@ export default function AutoCompatibilityPage() {
             <Button
               variant="contained"
               size="small"
-              startIcon={<BuildIcon />}
-              onClick={startReviewMode}
+              startIcon={reviewLoading ? <CircularProgress size={16} color="inherit" /> : <BuildIcon />}
+              onClick={() => startReviewMode(statusFilter)}
+              disabled={reviewLoading}
               sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}
             >
-              Manual Review ({batch.items.length})
+              {reviewLoading ? 'Loading Review...' : `${manualReviewLabel} (${manualReviewCount})`}
             </Button>
           </Box>
 
@@ -1560,7 +1586,8 @@ export default function AutoCompatibilityPage() {
       {/* MANUAL REVIEW MODAL */}
       <Dialog 
         open={reviewMode} 
-        onClose={() => setReviewMode(false)} 
+        onClose={handleReviewModeClose}
+        disableEscapeKeyDown
         maxWidth="xl" 
         fullWidth
       >
@@ -1662,7 +1689,16 @@ export default function AutoCompatibilityPage() {
           </Box>
         </DialogTitle>
 
-        <DialogContent sx={{ p: 0, display: 'flex', height: '75vh' }}>
+        <DialogContent sx={reviewLoading ? { p: 0, height: '75vh' } : { p: 0, display: 'flex', height: '75vh' }}>
+          {reviewLoading ? (
+            <Box sx={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+              <CircularProgress size={32} sx={{ color: '#7c3aed' }} />
+              <Typography variant="body2" color="textSecondary">
+                Loading manual review items...
+              </Typography>
+            </Box>
+          ) : (
+            <>
           {/* LEFT PANEL: Description Preview */}
           <Box sx={{ flex: 1, borderRight: '1px solid #eee', p: 2, overflowY: 'auto', bgcolor: '#fafafa' }}>
             {/* Product Image */}
@@ -1962,16 +1998,17 @@ export default function AutoCompatibilityPage() {
               </Table>
             </Box>
           </Box>
+            </>
+          )}
         </DialogContent>
 
         <DialogActions sx={{ borderTop: '1px solid #eee', p: 2, display: 'flex', gap: 1 }}>
-          <Button onClick={() => setReviewMode(false)} variant="outlined" size="small">Close</Button>
           <Box sx={{ flex: 1 }} />
           
           {/* Navigation and Action Buttons */}
           <Button
             onClick={() => navigateReview('prev')}
-            disabled={reviewIndex === 0}
+            disabled={reviewLoading || reviewIndex === 0}
             startIcon={<NavigateBeforeIcon />}
             variant="outlined"
             size="small"
@@ -1984,6 +2021,7 @@ export default function AutoCompatibilityPage() {
             variant="outlined"
             color="warning"
             size="small"
+            disabled={reviewLoading || !reviewItem}
           >
             Skip
           </Button>
@@ -1993,6 +2031,7 @@ export default function AutoCompatibilityPage() {
             variant="outlined"
             color="error"
             size="small"
+            disabled={reviewLoading || !reviewItem}
           >
             End Listing
           </Button>
@@ -2021,13 +2060,14 @@ export default function AutoCompatibilityPage() {
             variant="contained"
             color="success"
             size="small"
+            disabled={reviewLoading || !reviewItem}
           >
             ✓ Mark Correct
           </Button>
           
           <Button
             onClick={() => navigateReview('next')}
-            disabled={reviewIndex >= reviewItems.length - 1}
+            disabled={reviewLoading || reviewIndex >= reviewItems.length - 1}
             endIcon={<NavigateNextIcon />}
             size="small"
           >
@@ -2040,6 +2080,7 @@ export default function AutoCompatibilityPage() {
             onClick={finishReview}
             variant="contained"
             size="small"
+            disabled={reviewLoading || reviewItems.length === 0}
             sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}
           >
             Finish Review
