@@ -113,6 +113,7 @@ export const PAGE_REGISTRY = [
   { id: 'ViewAllMessages', name: 'View All Messages', path: '/internal-messages-admin', category: 'hrManagement', defaultRoles: ['superadmin'] },
   { id: 'Attendance', name: 'Working Hours Tracking', path: '/attendance', category: 'hrManagement', defaultRoles: ['superadmin'] },
   { id: 'PageAccessManagement', name: 'Page Access Management', path: '/page-access-management', category: 'hrManagement', defaultRoles: ['superadmin'] },
+  { id: 'PageAccessAuditLog', name: 'Page Access Audit Log', path: '/page-access-audit-log', category: 'hrManagement', defaultRoles: ['superadmin'] },
   { id: 'UserPasswordManagement', name: 'User Password Management', path: '/user-password-management', category: 'hrManagement', defaultRoles: ['superadmin'] },
 
   // ====== OTHERS ======
