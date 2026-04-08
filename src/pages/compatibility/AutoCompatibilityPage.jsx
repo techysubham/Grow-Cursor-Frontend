@@ -243,6 +243,10 @@ export default function AutoCompatibilityPage() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [bulkSending, setBulkSending] = useState(false);
 
+  // End Listing confirmation dialog
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
+  const [endingListing, setEndingListing] = useState(false);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -890,12 +894,14 @@ export default function AutoCompatibilityPage() {
     setSummaryOpen(true);
   };
 
-  const handleEndListing = async () => {
+  const handleEndListing = () => {
     if (!reviewItem || !sellerId) return;
-    
-    const confirmed = window.confirm(`Are you sure you want to END this listing immediately?\n\n"${reviewItem.title}"\n\nThis action cannot be undone.`);
-    if (!confirmed) return;
+    setConfirmEndOpen(true);
+  };
 
+  const confirmEndListing = async () => {
+    setConfirmEndOpen(false);
+    setEndingListing(true);
     try {
       await api.post('/ebay/end-item', {
         sellerId,
@@ -923,6 +929,8 @@ export default function AutoCompatibilityPage() {
       }
     } catch (e) {
       setSnackbar({ open: true, message: 'Failed to end listing: ' + (e.response?.data?.error || e.message), severity: 'error' });
+    } finally {
+      setEndingListing(false);
     }
   };
 
@@ -1758,6 +1766,7 @@ export default function AutoCompatibilityPage() {
               {/* MAKE */}
               <Grid item xs={3}>
                 <Autocomplete
+                  disablePortal
                   options={makeOptions}
                   value={selectedMake}
                   onChange={(e, val) => {
@@ -1784,6 +1793,7 @@ export default function AutoCompatibilityPage() {
               {/* MODEL */}
               <Grid item xs={3}>
                 <Autocomplete
+                  disablePortal
                   options={modelOptions}
                   value={selectedModel}
                   onChange={(e, val) => {
@@ -1811,6 +1821,7 @@ export default function AutoCompatibilityPage() {
                 <Box>
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                     <Autocomplete
+                      disablePortal
                       options={yearOptions}
                       value={startYear}
                       onChange={(e, newValue) => {
@@ -1832,6 +1843,7 @@ export default function AutoCompatibilityPage() {
                     />
                     <Typography variant="body2" color="textSecondary">to</Typography>
                     <Autocomplete
+                      disablePortal
                       options={yearOptions}
                       value={endYear}
                       onChange={(e, newValue) => {
@@ -2031,6 +2043,33 @@ export default function AutoCompatibilityPage() {
             sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}
           >
             Finish Review
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* END LISTING CONFIRMATION DIALOG */}
+      <Dialog open={confirmEndOpen} onClose={() => setConfirmEndOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ color: 'error.main' }}>End Listing on eBay?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            This will permanently end the following listing on eBay. This action cannot be undone.
+          </Typography>
+          <Typography variant="body2" fontWeight="bold" sx={{ wordBreak: 'break-word' }}>
+            {reviewItem?.title}
+          </Typography>
+          <Typography variant="caption" color="textSecondary">Item ID: {reviewItem?.itemId}</Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setConfirmEndOpen(false)} variant="outlined" size="small">Cancel</Button>
+          <Button
+            onClick={confirmEndListing}
+            variant="contained"
+            color="error"
+            size="small"
+            disabled={endingListing}
+            startIcon={endingListing ? <CircularProgress size={14} color="inherit" /> : null}
+          >
+            {endingListing ? 'Ending...' : 'Yes, End Listing'}
           </Button>
         </DialogActions>
       </Dialog>
