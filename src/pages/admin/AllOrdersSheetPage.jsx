@@ -101,6 +101,7 @@ export default function AllOrdersSheetPage() {
   const [searchOrderId, setSearchOrderId] = useState(() => getInitialState('searchOrderId', ''));
   const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
   const [searchItemNumber, setSearchItemNumber] = useState(() => getInitialState('searchItemNumber', ''));
+  const [searchProductName, setSearchProductName] = useState(() => getInitialState('searchProductName', ''));
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
   const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
@@ -156,6 +157,8 @@ export default function AllOrdersSheetPage() {
     selectedSeller,
     searchOrderId,
     searchBuyerName,
+    searchItemNumber,
+    searchProductName,
     searchMarketplace,
     dateFilter,
     profitFilter,
@@ -169,6 +172,7 @@ export default function AllOrdersSheetPage() {
       searchOrderId,
       searchBuyerName,
       searchItemNumber,
+      searchProductName,
       searchMarketplace,
       filtersExpanded,
       currentPage,
@@ -186,7 +190,7 @@ export default function AllOrdersSheetPage() {
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemNumber, searchMarketplace, filtersExpanded, currentPage, dateFilter, profitFilter, subtotalFilter, excludeLowValue, excludeNoAmazonAccount, showProfitCards, showSubtotalCards, showExchangeRate]);
+  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemNumber, searchProductName, searchMarketplace, filtersExpanded, currentPage, dateFilter, profitFilter, subtotalFilter, excludeLowValue, excludeNoAmazonAccount, showProfitCards, showSubtotalCards, showExchangeRate]);
 
   // Initial load
   useEffect(() => {
@@ -223,6 +227,7 @@ export default function AllOrdersSheetPage() {
       prevFilters.current.searchOrderId !== searchOrderId ||
       prevFilters.current.searchBuyerName !== searchBuyerName ||
       prevFilters.current.searchItemNumber !== searchItemNumber ||
+      prevFilters.current.searchProductName !== searchProductName ||
       prevFilters.current.searchMarketplace !== searchMarketplace ||
       prevFilters.current.excludeLowValue !== excludeLowValue ||
       prevFilters.current.excludeNoAmazonAccount !== excludeNoAmazonAccount ||
@@ -235,6 +240,7 @@ export default function AllOrdersSheetPage() {
       searchOrderId,
       searchBuyerName,
       searchItemNumber,
+      searchProductName,
       searchMarketplace,
       excludeLowValue,
       excludeNoAmazonAccount,
@@ -506,6 +512,7 @@ export default function AllOrdersSheetPage() {
       if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchItemNumber.trim()) params.searchItemNumber = searchItemNumber.trim();
+      if (searchProductName.trim()) params.productName = searchProductName.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (excludeLowValue) params.excludeLowValue = true;
       if (excludeNoAmazonAccount) params.excludeNoAmazonAccount = true;
@@ -890,6 +897,14 @@ export default function AllOrdersSheetPage() {
                 placeholder="Search by legacy item ID..."
                 sx={{ flex: 1 }}
               />
+              <TextField
+                size="small"
+                label="Product Name"
+                value={searchProductName}
+                onChange={(e) => setSearchProductName(e.target.value)}
+                placeholder="Search by product name..."
+                sx={{ flex: 1 }}
+              />
               
               {/* Date Mode Selector */}
               <FormControl size="small" sx={{ minWidth: 130 }}>
@@ -1003,6 +1018,8 @@ export default function AllOrdersSheetPage() {
                 onClick={() => {
                   setSearchOrderId('');
                   setSearchBuyerName('');
+                  setSearchItemNumber('');
+                  setSearchProductName('');
                   setDateFilter({ mode: 'none', single: '', from: '', to: '' });
                   setProfitFilter({ mode: 'none', single: '', from: '', to: '' });
                   setSubtotalFilter({ mode: 'none', single: '', from: '', to: '' });
@@ -1464,7 +1481,9 @@ export default function AllOrdersSheetPage() {
                 {excludeLowValue && 'Hiding <$3 • '}
                 {excludeNoAmazonAccount && 'Hiding no Amazon account • '}
                 {searchOrderId && 'Order ID search active • '}
-                {searchBuyerName && 'Buyer name search active'}
+                {searchBuyerName && 'Buyer name search active • '}
+                {searchItemNumber && 'Item number search active • '}
+                {searchProductName && 'Product name search active'}
               </Typography>
             </Box>
             
