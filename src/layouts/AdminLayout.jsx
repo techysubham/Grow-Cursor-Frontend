@@ -218,6 +218,15 @@ const flyoutMenuSx = {
     mx: 1,
     my: 0.3,
     transition: 'all 0.2s',
+    '&.Mui-selected': {
+      backgroundColor: 'rgba(25, 118, 210, 0.12)',
+      color: 'primary.main',
+      fontWeight: 600,
+    },
+    '&.Mui-selected:hover': {
+      backgroundColor: 'rgba(25, 118, 210, 0.18)',
+      color: 'primary.main',
+    },
     '&:hover': {
       backgroundColor: 'primary.light',
       color: 'primary.contrastText',
@@ -359,6 +368,21 @@ export default function AdminLayout({ user, onLogout }) {
     return pages.some(page => location.pathname.includes(page.path));
   };
 
+  const isPageActive = (page) => {
+    const pagePath = `/admin${page.path}`;
+    return location.pathname === pagePath || location.pathname.startsWith(`${pagePath}/`);
+  };
+
+  const isSubmenuActive = (submenuId) => {
+    const submenu = SUBMENUS[submenuId];
+    if (!submenu) return false;
+
+    return submenu.pages.some((pageId) => {
+      const page = PAGE_REGISTRY.find((registryPage) => registryPage.id === pageId);
+      return page ? isPageActive(page) : false;
+    });
+  };
+
   // Collapsed-mode icon centering
   const collapsedIconStyles = !sidebarOpen ? {
     justifyContent: 'center',
@@ -467,6 +491,7 @@ export default function AdminLayout({ user, onLogout }) {
           {categorySubmenus.map(([smId, sm]) => (
             <MenuItem
               key={smId}
+              selected={isSubmenuActive(smId)}
               onClick={(e) => openSubmenu(smId, e)}
               sx={{ display: 'flex', justifyContent: 'space-between' }}
             >
@@ -480,6 +505,7 @@ export default function AdminLayout({ user, onLogout }) {
               key={page.id}
               component={Link}
               to={`/admin${page.path}`}
+              selected={isPageActive(page)}
               onClick={closeAllMenus}
             >
               {page.name}
@@ -504,6 +530,7 @@ export default function AdminLayout({ user, onLogout }) {
                   key={page.id}
                   component={Link}
                   to={`/admin${page.path}`}
+                  selected={isPageActive(page)}
                   onClick={closeAllMenus}
                 >
                   {page.name}
