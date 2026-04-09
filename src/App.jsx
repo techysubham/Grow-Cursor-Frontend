@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { createTheme, alpha } from '@mui/material/styles';
 import LoginPage from './pages/LoginPage.jsx';
@@ -24,6 +24,66 @@ import { AttendanceProvider } from './context/AttendanceContext';
 import AttendanceModal from './components/Attendance/AttendanceModal';
 import AttendanceTimer from './components/Attendance/AttendanceTimer';
 import TimerPausedModal from './components/Attendance/TimerPausedModal';
+import { PAGE_REGISTRY } from './constants/pages';
+
+const BASE_DOCUMENT_TITLE = 'Grow Mentality • EMS';
+
+const STATIC_PAGE_TITLES = {
+  '/': BASE_DOCUMENT_TITLE,
+  '/login': `Login • ${BASE_DOCUMENT_TITLE}`,
+  '/ideas': `Ideas & Issues • ${BASE_DOCUMENT_TITLE}`,
+  '/about-me': `About Me • ${BASE_DOCUMENT_TITLE}`,
+  '/admin/about-me': `About Me • ${BASE_DOCUMENT_TITLE}`,
+  '/admin/my-leaves': `My Leaves • ${BASE_DOCUMENT_TITLE}`,
+  '/admin/internal-messages': `Team Chat • ${BASE_DOCUMENT_TITLE}`,
+  '/admin/ideas': `Ideas & Issues • ${BASE_DOCUMENT_TITLE}`,
+  '/admin/user-performance': `User Performance Logs • ${BASE_DOCUMENT_TITLE}`,
+  '/lister': `My Dashboard • ${BASE_DOCUMENT_TITLE}`,
+  '/lister/range-analyzer': `Range Analyzer • ${BASE_DOCUMENT_TITLE}`,
+  '/seller-ebay': `Seller Profile • ${BASE_DOCUMENT_TITLE}`,
+};
+
+const ADMIN_ROUTE_TITLE_OVERRIDES = {
+  '/admin/conversation-tracking': 'Conversation Tracking',
+  '/admin/cancelled-status': 'Issues and Resolutions',
+  '/admin/return-requested': 'Issues and Resolutions',
+  '/admin/worksheet': 'Issues and Resolutions',
+  '/admin/template-listings': 'Template Listings',
+  '/admin/seller-templates': 'Seller Templates',
+  '/admin/template-listing-analytics': 'Template Listing Analytics',
+  '/admin/store-wise-tasks/details': 'Store-Wise Task Details',
+  '/admin/lister-info/details': 'Lister Info Details',
+};
+
+function formatDocumentTitle(pageTitle) {
+  return pageTitle ? `${pageTitle} • ${BASE_DOCUMENT_TITLE}` : BASE_DOCUMENT_TITLE;
+}
+
+function resolveAdminRegistryTitle(pathname) {
+  const registryMatch = PAGE_REGISTRY.find((page) => pathname === `/admin${page.path}` || pathname.startsWith(`/admin${page.path}/`));
+  return registryMatch?.name || '';
+}
+
+function resolveDocumentTitle(pathname) {
+  if (STATIC_PAGE_TITLES[pathname]) {
+    return STATIC_PAGE_TITLES[pathname];
+  }
+
+  if (ADMIN_ROUTE_TITLE_OVERRIDES[pathname]) {
+    return formatDocumentTitle(ADMIN_ROUTE_TITLE_OVERRIDES[pathname]);
+  }
+
+  if (pathname.startsWith('/admin/')) {
+    const registryTitle = resolveAdminRegistryTitle(pathname);
+    return formatDocumentTitle(registryTitle || 'Admin Dashboard');
+  }
+
+  if (pathname.startsWith('/lister/')) {
+    return formatDocumentTitle('My Dashboard');
+  }
+
+  return BASE_DOCUMENT_TITLE;
+}
 
 function useAuth() {
   const [token, setToken] = useState(() => sessionStorage.getItem('auth_token'));
@@ -75,6 +135,7 @@ function getButtonPalette(theme, color) {
 
 export default function App() {
   const { token, user, login, logout } = useAuth();
+  const location = useLocation();
   const theme = useMemo(() => createTheme({
     palette: { mode: 'light' },
     typography: { fontFamily: "'Inter', sans-serif" },
@@ -197,6 +258,10 @@ export default function App() {
       },
     },
   }), []);
+
+  useEffect(() => {
+    document.title = resolveDocumentTitle(location.pathname);
+  }, [location.pathname]);
 
   return (
     <ThemeProvider theme={theme}>
