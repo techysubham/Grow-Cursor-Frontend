@@ -6,9 +6,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import PeopleIcon from '@mui/icons-material/People';
-
-const BRAND_YELLOW = '#f5c842';
-const BRAND_DARK = '#1a1a2e';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../constants/brandTheme';
 
 const features = [
   { icon: <BarChartIcon sx={{ fontSize: 17 }} />, label: 'Analytics & Reporting' },
@@ -70,7 +68,7 @@ export default function LandingPage() {
           {/* Brand mark */}
           <Box sx={{ display: 'inline-block', mb: 5 }}>
             <Box sx={{
-              background: `linear-gradient(135deg, ${BRAND_YELLOW} 0%, #f0b800 100%)`,
+              background: `linear-gradient(135deg, ${BRAND_YELLOW} 0%, ${BRAND_YELLOW_DARK} 100%)`,
               borderRadius: 3, px: 4, py: 2,
               boxShadow: '0 8px 40px rgba(245,200,66,0.42), 0 2px 8px rgba(0,0,0,0.08)',
               display: 'inline-block',

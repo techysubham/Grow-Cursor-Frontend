@@ -161,6 +161,7 @@ import UserPasswordManagementPage from '../pages/admin/UserPasswordManagementPag
 
 import usePageAccess from '../hooks/usePageAccess';
 import { PAGE_REGISTRY, PAGE_CATEGORIES, SUBMENUS } from '../constants/pages';
+import { BRAND_DARK, BRAND_DARK_ALT, BRAND_DARK_DEEP, BRAND_SIDEBAR_YELLOW, BRAND_SIDEBAR_YELLOW_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../constants/brandTheme';
 
 const drawerWidth = 260;
 
@@ -207,6 +208,7 @@ const flyoutMenuSx = {
     minWidth: '240px',
     maxHeight: '80vh',
     borderRadius: '12px',
+    border: '1px solid rgba(255, 204, 33, 0.24)',
     boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
     mt: 0.5
   },
@@ -219,17 +221,18 @@ const flyoutMenuSx = {
     my: 0.3,
     transition: 'all 0.2s',
     '&.Mui-selected': {
-      backgroundColor: 'rgba(25, 118, 210, 0.12)',
-      color: 'primary.main',
-      fontWeight: 600,
+      backgroundColor: 'rgba(255, 204, 33, 0.34)',
+      color: BRAND_DARK,
+      fontWeight: 700,
+      boxShadow: `inset 3px 0 0 ${BRAND_SIDEBAR_YELLOW_DARK}`,
     },
     '&.Mui-selected:hover': {
-      backgroundColor: 'rgba(25, 118, 210, 0.18)',
-      color: 'primary.main',
+      backgroundColor: 'rgba(255, 204, 33, 0.42)',
+      color: BRAND_DARK,
     },
     '&:hover': {
-      backgroundColor: 'primary.light',
-      color: 'primary.contrastText',
+      backgroundColor: 'rgba(255, 204, 33, 0.22)',
+      color: BRAND_DARK,
       transform: 'translateX(4px)'
     }
   }
@@ -401,19 +404,28 @@ export default function AdminLayout({ user, onLogout }) {
     transition: 'all 0.2s ease-in-out',
     ...collapsedIconStyles,
     '&.Mui-selected': {
-      backgroundColor: 'primary.main',
-      color: 'white',
+      background: `linear-gradient(135deg, ${BRAND_SIDEBAR_YELLOW} 0%, ${BRAND_SIDEBAR_YELLOW_DARK} 100%)`,
+      color: BRAND_DARK,
+      boxShadow: '0 8px 18px rgba(255, 204, 33, 0.34)',
       '& .MuiListItemIcon-root': {
-        color: 'white',
+        color: BRAND_DARK,
         ...(!sidebarOpen && { minWidth: 0, justifyContent: 'center' }),
       },
+      '& .MuiListItemText-primary': {
+        color: BRAND_DARK,
+        fontWeight: 700,
+      },
       '&:hover': {
-        backgroundColor: 'primary.dark',
+        background: `linear-gradient(135deg, ${BRAND_SIDEBAR_YELLOW} 0%, ${BRAND_SIDEBAR_YELLOW_DARK} 100%)`,
         ...(sidebarOpen && { transform: 'translateX(4px)' }),
       }
     },
     '&:hover': {
-      backgroundColor: 'action.hover',
+      backgroundColor: 'rgba(255, 204, 33, 0.2)',
+      color: BRAND_DARK,
+      '& .MuiListItemIcon-root': {
+        color: BRAND_DARK,
+      },
       ...(sidebarOpen && { transform: 'translateX(4px)' }),
     }
   };
@@ -423,25 +435,27 @@ export default function AdminLayout({ user, onLogout }) {
     minHeight: 44,
     justifyContent: sidebarOpen ? 'space-between' : 'center',
     ...(isActive && {
-      backgroundColor: 'rgba(25, 118, 210, 0.08)',
+      backgroundColor: 'rgba(255, 204, 33, 0.3)',
+      color: BRAND_DARK,
       ...(sidebarOpen && {
         borderLeft: '3px solid',
-        borderLeftColor: 'primary.main',
+        borderLeftColor: BRAND_SIDEBAR_YELLOW_DARK,
       }),
       '& .MuiListItemIcon-root': {
-        color: 'primary.main',
+        color: BRAND_DARK,
         ...(!sidebarOpen && { minWidth: 0, justifyContent: 'center' }),
       },
       '& .MuiListItemText-primary': {
-        color: 'primary.main',
-        fontWeight: 600,
+        color: BRAND_DARK,
+        fontWeight: 700,
       }
     }),
     '&:hover': {
-      backgroundColor: isActive ? 'rgba(25, 118, 210, 0.15)' : 'rgba(25, 118, 210, 0.08)',
+      backgroundColor: isActive ? 'rgba(255, 204, 33, 0.38)' : 'rgba(255, 204, 33, 0.22)',
+      color: BRAND_DARK,
       ...(sidebarOpen && { transform: 'translateX(4px)' }),
       '& .MuiListItemIcon-root': {
-        color: 'primary.main',
+        color: BRAND_DARK,
       },
     }
   });
@@ -683,23 +697,123 @@ export default function AdminLayout({ user, onLogout }) {
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
-      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-        <Toolbar>
-          <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(!mobileOpen)} sx={{ mr: 2, display: { sm: 'none' } }}>
+      <AppBar
+        position="fixed"
+        elevation={0}
+        sx={{
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          background: `linear-gradient(160deg, ${BRAND_DARK} 0%, ${BRAND_DARK_ALT} 62%, ${BRAND_DARK_DEEP} 100%)`,
+          color: BRAND_YELLOW,
+          borderBottom: '1px solid rgba(245, 200, 66, 0.22)',
+          boxShadow: '0 10px 28px rgba(15, 16, 32, 0.34)'
+        }}
+      >
+        <Toolbar sx={{ minHeight: 70, gap: 1.25 }}>
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            sx={{
+              mr: 1,
+              display: { sm: 'none' },
+              border: '1px solid rgba(245, 200, 66, 0.16)',
+              backgroundColor: 'rgba(245, 200, 66, 0.06)',
+              '&:hover': {
+                backgroundColor: 'rgba(245, 200, 66, 0.12)',
+              }
+            }}
+          >
             <MenuIcon />
           </IconButton>
-          <IconButton color="inherit" edge="start" onClick={() => setSidebarOpen((open) => !open)} sx={{ mr: 2, display: { xs: 'none', sm: 'inline-flex' } }}>
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setSidebarOpen((open) => !open)}
+            sx={{
+              mr: 1,
+              display: { xs: 'none', sm: 'inline-flex' },
+              border: '1px solid rgba(245, 200, 66, 0.16)',
+              backgroundColor: 'rgba(245, 200, 66, 0.06)',
+              '&:hover': {
+                backgroundColor: 'rgba(245, 200, 66, 0.12)',
+              }
+            }}
+          >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>Admin Dashboard</Typography>
-          <Button color="inherit" startIcon={<ChatIcon />} onClick={() => navigate('/admin/internal-messages')} sx={{ mr: 1, fontSize: '0.875rem', fontWeight: 400, letterSpacing: 0 }}>
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '0.04em', color: '#fffdf0', lineHeight: 1.1 }}>
+              Admin Dashboard
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'rgba(245, 200, 66, 0.72)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              Grow Mentality Operations Hub
+            </Typography>
+          </Box>
+          <Button
+            startIcon={<ChatIcon />}
+            onClick={() => navigate('/admin/internal-messages')}
+            sx={{
+              mr: 1,
+              px: 1.8,
+              minHeight: 40,
+              borderRadius: 2.5,
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              letterSpacing: '0.02em',
+              color: BRAND_YELLOW,
+              border: '1px solid rgba(245, 200, 66, 0.22)',
+              backgroundColor: 'rgba(245, 200, 66, 0.08)',
+              '&:hover': {
+                backgroundColor: 'rgba(245, 200, 66, 0.16)',
+                borderColor: 'rgba(245, 200, 66, 0.34)'
+              }
+            }}
+          >
             Team Chat
           </Button>
-          <Box sx={{ mr: 2, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-            <PersonOutlineIcon sx={{ fontSize: 20 }} />
-            <Typography variant="body2">{user?.username} ({user?.role})</Typography>
+          <Box
+            sx={{
+              mr: 1,
+              px: 1.5,
+              minHeight: 40,
+              display: { xs: 'none', md: 'inline-flex' },
+              alignItems: 'center',
+              gap: 0.9,
+              borderRadius: 2.5,
+              border: '1px solid rgba(245, 200, 66, 0.18)',
+              backgroundColor: 'rgba(255, 255, 255, 0.04)',
+              boxSizing: 'border-box'
+            }}
+          >
+            <PersonOutlineIcon sx={{ fontSize: 19, color: BRAND_YELLOW }} />
+            <Typography variant="body2" sx={{ color: '#fffdf0', fontWeight: 600 }}>
+              {user?.username}{' '}
+              <Box component="span" sx={{ color: 'rgba(245, 200, 66, 0.76)', fontWeight: 500 }}>
+                ({user?.role})
+              </Box>
+            </Typography>
           </Box>
-          <Button variant="contained" color="error" onClick={onLogout}>Logout</Button>
+          <Button
+            variant="contained"
+            onClick={onLogout}
+            sx={{
+              minHeight: 40,
+              px: 2.2,
+              borderRadius: 2.5,
+              fontWeight: 800,
+              letterSpacing: '0.04em',
+              background: `linear-gradient(135deg, ${BRAND_YELLOW} 0%, ${BRAND_YELLOW_DARK} 100%)`,
+              color: BRAND_DARK,
+              boxShadow: '0 8px 18px rgba(245, 200, 66, 0.22)',
+              '&:hover': {
+                background: `linear-gradient(135deg, ${BRAND_YELLOW} 0%, ${BRAND_YELLOW_DARK} 100%)`,
+                boxShadow: '0 10px 22px rgba(245, 200, 66, 0.3)',
+                transform: 'translateY(-1px)'
+              }
+            }}
+          >
+            Logout
+          </Button>
         </Toolbar>
       </AppBar>
       <Box component="nav" sx={{ width: { sm: sidebarOpen ? drawerWidth : 56 }, flexShrink: { sm: 0 } }}>

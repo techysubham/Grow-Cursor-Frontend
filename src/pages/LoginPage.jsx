@@ -5,9 +5,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, CheckCircle } from '@mui/icons-material';
 import api from '../lib/api.js';
-
-const BRAND_YELLOW = '#f5c842';
-const BRAND_DARK = '#1a1a2e';
+import { BRAND_DARK, BRAND_DARK_ALT, BRAND_DARK_DEEP, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../constants/brandTheme';
 
 const brandFeatures = [
   'Analytics & Order Reporting',
@@ -21,7 +19,7 @@ function BrandMark({ size = 'md' }) {
   const iconSize = size === 'sm' ? 18 : 20;
   return (
     <Box sx={{
-      background: `linear-gradient(135deg, ${BRAND_YELLOW} 0%, #f0b800 100%)`,
+      background: `linear-gradient(135deg, ${BRAND_YELLOW} 0%, ${BRAND_YELLOW_DARK} 100%)`,
       borderRadius: 2.5, px: size === 'sm' ? 3 : 3.5, py: '13px',
       boxShadow: '0 6px 28px rgba(245,200,66,0.32)',
       display: 'inline-block',
@@ -79,7 +77,7 @@ export default function LoginPage({ onLogin }) {
       <Box sx={{
         display: { xs: 'none', md: 'flex' },
         width: '42%', flexShrink: 0,
-        background: `linear-gradient(160deg, ${BRAND_DARK} 0%, #12122a 60%, #0f1020 100%)`,
+        background: `linear-gradient(160deg, ${BRAND_DARK} 0%, ${BRAND_DARK_ALT} 60%, ${BRAND_DARK_DEEP} 100%)`,
         flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         p: 6, position: 'relative', overflow: 'hidden',
@@ -217,7 +215,7 @@ export default function LoginPage({ onLogin }) {
                   background: BRAND_DARK, color: BRAND_YELLOW,
                   boxShadow: '0 4px 18px rgba(26,26,46,0.28)',
                   '&:hover': {
-                    background: '#252540',
+                    background: BRAND_DARK_ALT,
                     boxShadow: '0 6px 24px rgba(26,26,46,0.38)',
                     transform: 'translateY(-1px)',
                   },
