@@ -49,6 +49,25 @@ const MARKETPLACE_DOMAINS = {
   AU: 'www.amazon.com.au',
 };
 
+/**
+ * Calculates "Actual Profit" (INR) for a US marketplace listing.
+ * @param {number} buyingPrice - Amazon price in USD
+ * @param {number} sold - eBay Start Price in USD
+ * @returns {object} All intermediate values + actualProfit, all rounded to 2dp
+ */
+function calcActualProfit(buyingPrice, sold) {
+  const A            = parseFloat((sold * 1.1).toFixed(2));
+  const eBay         = parseFloat((A * 0.1395 + 0.4).toFixed(2));
+  const ADS          = parseFloat((A * 0.07).toFixed(2));
+  const TDS          = parseFloat((A * 0.01).toFixed(2));
+  const TCont        = 0.24;
+  const Net          = parseFloat((sold - eBay - ADS - TDS - TCont).toFixed(2));
+  const Payoneer     = parseFloat((Net * 84).toFixed(2));
+  const AmazonExpense = parseFloat((buyingPrice * 87).toFixed(2));
+  const actualProfit = parseFloat((Payoneer - AmazonExpense).toFixed(2));
+  return { A, eBay, ADS, TDS, TCont, Net, Payoneer, AmazonExpense, actualProfit };
+}
+
 export default function AsinReviewModal({ 
   open, 
   onClose, 
@@ -947,6 +966,75 @@ export default function AsinReviewModal({
                           </span>
                         </Tooltip>
                       </Stack>
+                    );
+                  }
+
+                  // Start Price field — with Actual Profit chip
+                  if (col.name === 'startPrice') {
+                    const buyingPrice = parseFloat(currentItem.sourceData?.price);
+                    const sold        = parseFloat(itemData.startPrice);
+                    const showProfit  = marketplace === 'US'
+                      && !isNaN(buyingPrice) && buyingPrice > 0
+                      && !isNaN(sold)        && sold > 0;
+                    const profit = showProfit ? calcActualProfit(buyingPrice, sold) : null;
+
+                    const tooltipContent = profit ? (
+                      <Box sx={{ fontFamily: 'monospace', fontSize: '0.72rem', lineHeight: 1.8, p: 0.5 }}>
+                        <Box>Bought (Amazon):&nbsp; ${buyingPrice.toFixed(2)}</Box>
+                        <Box>Sold (Start):&nbsp;&nbsp;&nbsp;&nbsp; ${sold.toFixed(2)}</Box>
+                        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+                        <Box>A (eBay+Tax):&nbsp;&nbsp;&nbsp;&nbsp; ${profit.A.toFixed(2)}&nbsp; (Sold × 1.1)</Box>
+                        <Box>eBay Fee:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.eBay.toFixed(2)}&nbsp; (A × 13.95% + $0.40)</Box>
+                        <Box>ADS:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.ADS.toFixed(2)}&nbsp; (A × 7%)</Box>
+                        <Box>TDS:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.TDS.toFixed(2)}&nbsp; (A × 1%)</Box>
+                        <Box>T.Cont:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.TCont.toFixed(2)}</Box>
+                        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+                        <Box>Net (USD):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.Net.toFixed(2)}&nbsp; (Sold − eBay − ADS − TDS − T.Cont)</Box>
+                        <Box>Payoneer (INR):&nbsp;&nbsp; ₹{profit.Payoneer.toFixed(2)}&nbsp; (Net × 84)</Box>
+                        <Box>Amazon Spend:&nbsp;&nbsp;&nbsp;&nbsp; ₹{profit.AmazonExpense.toFixed(2)}&nbsp; (Bought × 87)</Box>
+                        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+                        <Box sx={{ fontWeight: 700, color: profit.actualProfit >= 0 ? '#81c784' : '#e57373' }}>
+                          Actual Profit:&nbsp;&nbsp;&nbsp;&nbsp; ₹{profit.actualProfit.toFixed(2)}
+                        </Box>
+                      </Box>
+                    ) : '';
+
+                    return (
+                      <Box key="startPrice">
+                        <TextField
+                          label={col.label || col.name}
+                          value={itemData.startPrice || ''}
+                          onChange={(e) => handleFieldChange('startPrice', e.target.value, false)}
+                          size="small"
+                          fullWidth
+                          required
+                          type="number"
+                          sx={{
+                            '& input::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                            '& input::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                            '& input[type=number]': { MozAppearance: 'textfield' },
+                          }}
+                        />
+                        {showProfit && (
+                          <Tooltip
+                            title={tooltipContent}
+                            placement="bottom-start"
+                            arrow
+                            componentsProps={{
+                              tooltip: { sx: { maxWidth: 380, bgcolor: '#1a1a2e', color: '#fff' } },
+                              arrow:   { sx: { color: '#1a1a2e' } }
+                            }}
+                          >
+                            <Chip
+                              label={`Actual Profit: ₹${profit.actualProfit.toFixed(2)}`}
+                              size="small"
+                              variant="outlined"
+                              color={profit.actualProfit >= 0 ? 'success' : 'error'}
+                              sx={{ mt: 0.75, cursor: 'default' }}
+                            />
+                          </Tooltip>
+                        )}
+                      </Box>
                     );
                   }
 
