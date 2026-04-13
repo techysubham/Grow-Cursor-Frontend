@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
     Box,
     Typography,
@@ -24,70 +24,33 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../../lib/api';
+import useFetchTable from '../../hooks/useFetchTable';
+import useFormDialog from '../../hooks/useFormDialog';
+
+const INITIAL_FORM = { name: '', accountNumber: '', ifscCode: '' };
 
 const BankAccountsPage = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-    
-    const [accounts, setAccounts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [openDialog, setOpenDialog] = useState(false);
-    const [editingId, setEditingId] = useState(null);
-    const [formData, setFormData] = useState({ name: '', accountNumber: '', ifscCode: '' });
 
-    useEffect(() => {
-        fetchAccounts();
-    }, []);
+    const { rows: accounts, loading, refetch } = useFetchTable('/bank-accounts');
 
-    const fetchAccounts = async () => {
-        try {
-            const { data } = await api.get('/bank-accounts');
-            setAccounts(data);
-        } catch (error) {
-            console.error('Error fetching accounts:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSubmit = async () => {
-        try {
-            if (editingId) {
-                await api.put(`/bank-accounts/${editingId}`, formData);
-            } else {
-                await api.post('/bank-accounts', formData);
-            }
-            handleClose();
-            fetchAccounts();
-        } catch (error) {
-            alert(error.response?.data?.error || 'Operation failed');
-        }
-    };
-
-    const handleEdit = (account) => {
-        setEditingId(account._id);
-        setFormData({
-            name: account.name,
-            accountNumber: account.accountNumber || '',
-            ifscCode: account.ifscCode || ''
-        });
-        setOpenDialog(true);
-    };
+    const dialog = useFormDialog(INITIAL_FORM, {
+        onSave: (formData, editingId) =>
+            editingId
+                ? api.put(`/bank-accounts/${editingId}`, formData)
+                : api.post('/bank-accounts', formData),
+        onAfterSave: refetch,
+    });
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this bank account?')) return;
         try {
             await api.delete(`/bank-accounts/${id}`);
-            fetchAccounts();
+            refetch();
         } catch (error) {
             console.error(error);
         }
-    };
-
-    const handleClose = () => {
-        setOpenDialog(false);
-        setEditingId(null);
-        setFormData({ name: '', accountNumber: '', ifscCode: '' });
     };
 
     if (loading) return (
@@ -110,7 +73,7 @@ const BankAccountsPage = () => {
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    onClick={() => setOpenDialog(true)}
+                    onClick={dialog.openCreate}
                     fullWidth={isMobile}
                 >
                     Add Bank Account
@@ -134,7 +97,7 @@ const BankAccountsPage = () => {
                                 <TableCell sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>{acc.accountNumber}</TableCell>
                                 <TableCell sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>{acc.ifscCode}</TableCell>
                                 <TableCell align="right">
-                                    <IconButton onClick={() => handleEdit(acc)} color="primary" size="small"><EditIcon /></IconButton>
+                                    <IconButton onClick={() => dialog.openEdit(acc, (a) => ({ name: a.name, accountNumber: a.accountNumber || '', ifscCode: a.ifscCode || '' }))} color="primary" size="small"><EditIcon /></IconButton>
                                     <IconButton onClick={() => handleDelete(acc._id)} color="error" size="small"><DeleteIcon /></IconButton>
                                 </TableCell>
                             </TableRow>
@@ -148,33 +111,35 @@ const BankAccountsPage = () => {
                 </Table>
             </TableContainer>
 
-            <Dialog open={openDialog} onClose={handleClose} fullWidth maxWidth="sm">
-                <DialogTitle>{editingId ? 'Edit Bank Account' : 'New Bank Account'}</DialogTitle>
+            <Dialog open={dialog.open} onClose={dialog.handleClose} fullWidth maxWidth="sm">
+                <DialogTitle>{dialog.editingId ? 'Edit Bank Account' : 'New Bank Account'}</DialogTitle>
                 <DialogContent sx={{ pt: 2 }}>
                     <Box display="flex" flexDirection="column" gap={2}>
                         <TextField
                             label="Bank Name"
                             fullWidth
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            value={dialog.formData.name}
+                            onChange={(e) => dialog.setFormData({ ...dialog.formData, name: e.target.value })}
                         />
                         <TextField
                             label="Account Number (Optional)"
                             fullWidth
-                            value={formData.accountNumber}
-                            onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                            value={dialog.formData.accountNumber}
+                            onChange={(e) => dialog.setFormData({ ...dialog.formData, accountNumber: e.target.value })}
                         />
                         <TextField
                             label="IFSC Code (Optional)"
                             fullWidth
-                            value={formData.ifscCode}
-                            onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value })}
+                            value={dialog.formData.ifscCode}
+                            onChange={(e) => dialog.setFormData({ ...dialog.formData, ifscCode: e.target.value })}
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleClose}>Cancel</Button>
-                    <Button onClick={handleSubmit} variant="contained">Save</Button>
+                    <Button onClick={dialog.handleClose}>Cancel</Button>
+                    <Button onClick={dialog.handleSave} variant="contained" disabled={dialog.saving}>
+                        {dialog.saving ? 'Saving…' : 'Save'}
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

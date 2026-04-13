@@ -46,7 +46,17 @@ import AsinListManagerDialog from '../../components/AsinListManagerDialog.jsx';
 import AsinDetailDialog from '../../components/AsinDetailDialog.jsx';
 import { generateCsvContent, downloadCsv } from '../../utils/asinDirectoryUtils.js';
 
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AsinDirectoryPage() {
+  const currentUser = getStoredUser();
   const [asins, setAsins] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -59,6 +69,7 @@ export default function AsinDirectoryPage() {
 
   const [selected, setSelected] = useState([]);
   const [stats, setStats] = useState(null);
+  const [users, setUsers] = useState([]);
 
   const [bulkAddDialog, setBulkAddDialog] = useState(false);
   const [csvImportDialog, setCsvImportDialog] = useState(false);
@@ -67,11 +78,20 @@ export default function AsinDirectoryPage() {
   const [viewAsin, setViewAsin] = useState(null);
   const [showMoved, setShowMoved] = useState(false);
   const [marketplaceFilter, setMarketplaceFilter] = useState('');
+  const [addedByUserId, setAddedByUserId] = useState('');
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   useEffect(() => {
     fetchAsins();
     fetchStats();
-  }, [page, rowsPerPage, search, showMoved, marketplaceFilter]);
+  }, [page, rowsPerPage, search, showMoved, marketplaceFilter, addedByUserId]);
+
+  useEffect(() => {
+    setSelected([]);
+  }, [page, rowsPerPage, search, showMoved, marketplaceFilter, addedByUserId]);
 
   const fetchAsins = async () => {
     try {
@@ -82,7 +102,8 @@ export default function AsinDirectoryPage() {
           limit: rowsPerPage,
           search: search || undefined,
           showMoved: showMoved ? 'true' : undefined,
-          region: marketplaceFilter || undefined
+          region: marketplaceFilter || undefined,
+          addedByUserId: addedByUserId || undefined
         }
       });
       setAsins(data.asins || []);
@@ -97,10 +118,24 @@ export default function AsinDirectoryPage() {
 
   const fetchStats = async () => {
     try {
-      const { data } = await api.get('/asin-directory/stats');
+      const { data } = await api.get('/asin-directory/stats', {
+        params: {
+          addedByUserId: addedByUserId || undefined
+        }
+      });
       setStats(data);
     } catch (err) {
       console.error('Failed to fetch stats:', err);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const { data } = await api.get('/users');
+      const sortedUsers = [...(data || [])].sort((left, right) => left.username.localeCompare(right.username));
+      setUsers(sortedUsers);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
     }
   };
 
@@ -174,7 +209,11 @@ export default function AsinDirectoryPage() {
   const handleExport = async () => {
     try {
       const { data } = await api.get('/asin-directory', {
-        params: { limit: 999999, showMoved: 'true' }
+        params: {
+          limit: 999999,
+          showMoved: 'true',
+          addedByUserId: addedByUserId || undefined
+        }
       });
       const csv = generateCsvContent(data.asins);
       const date = new Date().toISOString().split('T')[0];
@@ -322,6 +361,25 @@ export default function AsinDirectoryPage() {
           />
 
           <Box sx={{ flex: 1 }} />
+
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Added By</InputLabel>
+            <Select
+              value={addedByUserId}
+              label="Added By"
+              onChange={(e) => { setAddedByUserId(e.target.value); setPage(0); }}
+            >
+              <MenuItem value="">All Users</MenuItem>
+              {currentUser?.id && (
+                <MenuItem value={currentUser.id}>My ASINs ({currentUser.username})</MenuItem>
+              )}
+              {users
+                .filter((user) => user._id !== currentUser?.id)
+                .map((user) => (
+                  <MenuItem key={user._id} value={user._id}>{user.username}</MenuItem>
+                ))}
+            </Select>
+          </FormControl>
 
           <FormControl size="small" sx={{ minWidth: 160 }}>
             <InputLabel>Marketplace</InputLabel>
