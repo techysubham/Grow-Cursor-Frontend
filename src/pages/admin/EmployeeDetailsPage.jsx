@@ -372,7 +372,7 @@ export default function EmployeeDetailsPage() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1, overflow: 'hidden' }}>
                         {r.hasProfilePic && (
                           <img
-                            src={`${import.meta.env.VITE_API_URL}/employee-profiles/${r._id}/file/profile-pic?token=${sessionStorage.getItem('auth_token')}&t=${r.updatedAt || Date.now()}`}
+                            src={`${import.meta.env.VITE_API_URL}/employee-profiles/${r._id}/file/profile-pic?token=${localStorage.getItem('auth_token')}&t=${r.updatedAt || Date.now()}`}
                             alt="Profile"
                             style={{
                               width: 50,

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getAttendanceStatus, startTimer, pauseTimer, resumeTimer, stopTimer, getAuthToken } from '../lib/api';
 
 const AttendanceContext = createContext();
@@ -17,6 +17,7 @@ export function AttendanceProvider({ children, user }) {
     const [isStrictTimer, setIsStrictTimer] = useState(false);
     const [totalHours, setTotalHours] = useState('0.00');
     const [isLoading, setIsLoading] = useState(false);
+    const abortControllerRef = useRef(null);
 
     // Fetch initial status
     const fetchStatus = useCallback(async () => {
@@ -25,13 +26,19 @@ export function AttendanceProvider({ children, user }) {
             return;
         }
 
+        // Cancel any previous in-flight request before starting a new one
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+        abortControllerRef.current = new AbortController();
+
         try {
-            const response = await getAttendanceStatus();
+            const response = await getAttendanceStatus(abortControllerRef.current.signal);
             setStatus(response.status || 'not_started');
             setAttendance(response.attendance);
             setIsStrictTimer(response.isStrictTimer);
             setTotalHours(response.totalHours || '0.00');
         } catch (error) {
+            // Ignore intentional aborts (unmount, tab switch, rapid re-fetch)
+            if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') return;
             console.error('Failed to fetch attendance status:', error);
             // Don't reset status on network error, otherwise the user might 
             // see the "Start Timer" popup during server redeploys.
@@ -64,6 +71,7 @@ export function AttendanceProvider({ children, user }) {
         return () => {
             clearInterval(interval);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (abortControllerRef.current) abortControllerRef.current.abort();
         };
     }, [fetchStatus]);
 
