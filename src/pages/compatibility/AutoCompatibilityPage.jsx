@@ -269,7 +269,7 @@ export default function AutoCompatibilityPage() {
 
   // ── Run-All-Sellers mode ────────────────────────────────────────────────────
   const [runMode, setRunMode] = useState('all'); // 'single' | 'all'
-  const [excludedSellerIds, setExcludedSellerIds] = useState(new Set());
+
   // allSellersRun: array of { sellerId, username, batchId, status, totalListings, reused? }
   const [allSellersRun, setAllSellersRun] = useState(null);
   // allBatchesData: { [batchId]: batch } — live-polled status for each batch in the run
@@ -413,11 +413,9 @@ export default function AutoCompatibilityPage() {
     if (allBatchesPollRef.current) clearInterval(allBatchesPollRef.current);
 
     try {
-      const excluded = Array.from(excludedSellerIds);
       const { data } = await api.post('/ebay/auto-compatibility/run-for-date', {
         targetDate,
         itemLimit: itemLimit === '' ? 0 : Number(itemLimit),
-        excludeSellerIds: excluded,
       });
       const runBatches = data.batches || [];
       setAllSellersRun(runBatches);
@@ -1594,37 +1592,7 @@ export default function AutoCompatibilityPage() {
               )}
             </Box>
 
-            {/* Seller exclusion checkboxes */}
-            <Box>
-              <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: 'block' }}>
-                Sellers to include (Vergo is excluded automatically):
-              </Typography>
-              <Box display="flex" gap={1} flexWrap="wrap">
-                {sellers
-                  .filter(s => !(s.user?.username || s.user?.email || '').toLowerCase().includes('vergo'))
-                  .map(s => {
-                    const id = s._id;
-                    const label = s.user?.username || s.user?.email;
-                    const excluded = excludedSellerIds.has(id);
-                    return (
-                      <Chip
-                        key={id}
-                        label={label}
-                        size="small"
-                        variant={excluded ? 'outlined' : 'filled'}
-                        color={excluded ? 'default' : 'primary'}
-                        onClick={() => {
-                          const next = new Set(excludedSellerIds);
-                          if (excluded) next.delete(id);
-                          else next.add(id);
-                          setExcludedSellerIds(next);
-                        }}
-                        sx={{ cursor: 'pointer', opacity: excluded ? 0.5 : 1 }}
-                      />
-                    );
-                  })}
-              </Box>
-            </Box>
+
           </Box>
         )}
       </Paper>
