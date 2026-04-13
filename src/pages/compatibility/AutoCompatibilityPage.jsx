@@ -603,7 +603,8 @@ export default function AutoCompatibilityPage() {
         sellerId: resolvedSellerId,
         itemId: reviewItem.itemId,
         sku: reviewItem.sku,
-        compatibilityList: []
+        compatibilityList: [],
+        batchId: batchId || undefined
       });
 
       // Clear local state; reset reviewStatus to pending (not ended)
@@ -1017,7 +1018,8 @@ export default function AutoCompatibilityPage() {
         sellerId: resolvedSellerId,
         itemId: reviewItem.itemId,
         sku: reviewItem.sku,
-        compatibilityList: reviewItem.editCompatList || []
+        compatibilityList: reviewItem.editCompatList || [],
+        batchId: batchId || undefined
       });
 
       setSnackbar({ open: true, message: 'Compatibility sent to eBay successfully!', severity: 'success' });
@@ -1145,7 +1147,8 @@ export default function AutoCompatibilityPage() {
           sellerId: resolvedSellerId,
           itemId: item.itemId,
           sku: item.sku,
-          compatibilityList: item.editCompatList || []
+          compatibilityList: item.editCompatList || [],
+          batchId: batchId || undefined
         });
         
         // Check if eBay returned warnings (e.g., duplicate resolved, etc.)
