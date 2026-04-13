@@ -49,7 +49,7 @@ export default function LeaveManagementPage() {
 
     const fetchLeaves = async () => {
         try {
-            const token = sessionStorage.getItem('auth_token');
+            const token = localStorage.getItem('auth_token');
             const res = await axios.get(`${API_URL}/leaves`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -117,7 +117,7 @@ export default function LeaveManagementPage() {
 
         setSubmitting(true);
         try {
-            const token = sessionStorage.getItem('auth_token');
+            const token = localStorage.getItem('auth_token');
             await axios.post(
                 `${API_URL}/leaves`,
                 form,
@@ -138,7 +138,7 @@ export default function LeaveManagementPage() {
         if (!window.confirm('Are you sure you want to cancel this leave request?')) return;
 
         try {
-            const token = sessionStorage.getItem('auth_token');
+            const token = localStorage.getItem('auth_token');
             await axios.delete(`${API_URL}/leaves/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });

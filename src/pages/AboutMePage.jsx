@@ -220,7 +220,7 @@ export default function AboutMePage() {
                 {fileFlags.hasProfilePic ? (
                   <img
                     key={fileRefreshKeys.profilePic}
-                    src={`${import.meta.env.VITE_API_URL}/employee-profiles/me/file/profile-pic?token=${sessionStorage.getItem('auth_token')}&t=${fileRefreshKeys.profilePic}`}
+                    src={`${import.meta.env.VITE_API_URL}/employee-profiles/me/file/profile-pic?token=${localStorage.getItem('auth_token')}&t=${fileRefreshKeys.profilePic}`}
                     alt="Profile"
                     style={{ width: 80, height: 80, borderRadius: '50%', display: 'block', marginTop: 8 }}
                   />

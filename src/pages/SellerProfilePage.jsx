@@ -52,8 +52,8 @@ export default function SellerProfilePage() {
   }
 
   function handleConnectEbay() {
-    // Get the auth token from sessionStorage
-    const token = sessionStorage.getItem('auth_token');
+    // Get the auth token from localStorage
+    const token = localStorage.getItem('auth_token');
     if (!token) {
       setError('Authentication token not found. Please log in again.');
       return;
@@ -84,7 +84,7 @@ export default function SellerProfilePage() {
 
   function handleLogout() {
     // Clear auth token
-    sessionStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_token');
     // Redirect to login
     navigate('/login');
   }

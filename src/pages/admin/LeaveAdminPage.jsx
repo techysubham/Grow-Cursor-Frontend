@@ -53,7 +53,7 @@ export default function LeaveAdminPage() {
     const fetchLeaves = async () => {
         setLoading(true);
         try {
-            const token = sessionStorage.getItem('auth_token');
+            const token = localStorage.getItem('auth_token');
             const res = await axios.get(`${API_URL}/leaves/admin`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -91,7 +91,7 @@ export default function LeaveAdminPage() {
 
         setSubmitting(true);
         try {
-            const token = sessionStorage.getItem('auth_token');
+            const token = localStorage.getItem('auth_token');
             await axios.put(
                 `${API_URL}/leaves/${selectedLeave._id}/status`,
                 {
