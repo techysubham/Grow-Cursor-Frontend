@@ -267,6 +267,9 @@ export default function AutoCompatibilityPage() {
   // End Listing confirmation dialog
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
 
+  // ── Current user role ────────────────────────────────────────────────────────
+  const isSuperAdmin = (() => { try { return JSON.parse(localStorage.getItem('user'))?.role === 'superadmin'; } catch { return false; } })();
+
   // ── Run-All-Sellers mode ────────────────────────────────────────────────────
   const [runMode, setRunMode] = useState('all'); // 'single' | 'all'
 
@@ -1514,6 +1517,7 @@ export default function AutoCompatibilityPage() {
               helperText={itemLimit === '' || itemLimit === 0 ? 'All items' : `First ${itemLimit}`}
             />
 
+            {isSuperAdmin && (
             <Button
               variant="contained"
               size="large"
@@ -1528,6 +1532,7 @@ export default function AutoCompatibilityPage() {
             >
               {starting ? 'Starting...' : isRunning ? 'Running...' : 'Run Auto-Compatibility'}
             </Button>
+            )}
           </Box>
         ) : (
           /* ─── ALL SELLERS MODE ───────────────────────────────────────────── */
