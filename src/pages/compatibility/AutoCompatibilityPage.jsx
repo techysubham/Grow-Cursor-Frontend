@@ -192,6 +192,7 @@ const formatDateIST = (dateString) => {
 
 export default function AutoCompatibilityPage() {
   const [sellers, setSellers] = useState([]);
+  const [staffUsers, setStaffUsers] = useState([]); // non-seller users for "By" filter
   const [sellerId, setSellerId] = useState('');
   const [targetDate, setTargetDate] = useState(getTodayIST());
   const [itemLimit, setItemLimit] = useState(''); // Empty = no limit
@@ -243,9 +244,16 @@ export default function AutoCompatibilityPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyFilters, setHistoryFilters] = useState({
-    dateFrom: '',
-    dateTo: '',
+    listingDateMode: 'single',  // 'single' | 'range'
+    listingDate: '',            // exact targetDate match (single mode)
+    dateFrom: '',               // targetDate range start
+    dateTo: '',                 // targetDate range end
+    runOnMode: 'single',        // 'single' | 'range'
+    runOnDate: '',              // exact createdAt day (single mode)
+    runOnFrom: '',              // createdAt range start
+    runOnTo: '',                // createdAt range end
     sellerFilter: '',
+    triggeredByFilter: '',
     statusFilter: '',
     reviewedFilter: '', // '' | 'reviewed' | 'not_reviewed'
     page: 1,
@@ -283,6 +291,11 @@ export default function AutoCompatibilityPage() {
           setSellerId(data._id);
         } catch (e) { console.error(e); }
       }
+      // Fetch all non-seller users for the "By" filter
+      try {
+        const { data } = await api.get('/users');
+        setStaffUsers((data || []).filter(u => u.role !== 'seller'));
+      } catch { /* non-critical, ignore */ }
     };
     load();
     return () => {
@@ -349,14 +362,25 @@ export default function AutoCompatibilityPage() {
       // Seller: use specific filter, or fall back to current seller in single mode
       if (filters.sellerFilter) params.sellerId = filters.sellerFilter;
       else if (runMode === 'single' && sellerId) params.sellerId = sellerId;
-      if (filters.dateFrom) params.dateFrom = filters.dateFrom;
-      if (filters.dateTo) params.dateTo = filters.dateTo;
-      if (filters.statusFilter) {
-        // Map UI values to query params
-        if (filters.statusFilter === 'running') params.status = 'running';
-        else if (filters.statusFilter === 'completed') params.status = 'completed';
-        else if (filters.statusFilter === 'failed') params.status = 'failed';
+      // Triggered By
+      if (filters.triggeredByFilter) params.triggeredBy = filters.triggeredByFilter;
+      // Listing Date (targetDate)
+      if (filters.listingDateMode === 'single') {
+        if (filters.listingDate) params.listingDate = filters.listingDate;
+      } else {
+        if (filters.dateFrom) params.dateFrom = filters.dateFrom;
+        if (filters.dateTo) params.dateTo = filters.dateTo;
       }
+      // Run On Date (createdAt)
+      if (filters.runOnMode === 'single') {
+        if (filters.runOnDate) params.runOnDate = filters.runOnDate;
+      } else {
+        if (filters.runOnFrom) params.runOnFrom = filters.runOnFrom;
+        if (filters.runOnTo) params.runOnTo = filters.runOnTo;
+      }
+      // Status
+      if (filters.statusFilter) params.status = filters.statusFilter;
+      // Review
       if (filters.reviewedFilter === 'reviewed') params.manualReviewDone = 'true';
       const { data } = await api.get('/ebay/auto-compatibility-batches', { params });
       setHistory(data.batches || []);
@@ -567,8 +591,8 @@ export default function AutoCompatibilityPage() {
 
   const removeExistingCompatibility = async () => {
     if (!reviewItem) return;
-    
-    if (!sellerId) {
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
+    if (!resolvedSellerId) {
       setSnackbar({ open: true, message: 'No seller selected', severity: 'error' });
       return;
     }
@@ -576,7 +600,7 @@ export default function AutoCompatibilityPage() {
     try {
       // Delete from DB via eBay API
       await api.post('/ebay/update-compatibility', {
-        sellerId,
+        sellerId: resolvedSellerId,
         itemId: reviewItem.itemId,
         sku: reviewItem.sku,
         compatibilityList: []
@@ -929,7 +953,14 @@ export default function AutoCompatibilityPage() {
     const hasAnyTrimsSelected = Object.values(selectedTrimsByYear).some(arr => arr && arr.length > 0);
     
     for (const year of selectedYears) {
-      const yearEntries = (hasAnyTrimsSelected && selectedTrimsByYear[year]?.length > 0) ? selectedTrimsByYear[year] : [null];
+      const trimsForYear = selectedTrimsByYear[year];
+      // If trims are selected somewhere but this specific year has none checked, skip it.
+      // Only fall back to a generic (no-trim) entry when NO trims have been selected at all.
+      const yearEntries = (hasAnyTrimsSelected && trimsForYear?.length > 0)
+        ? trimsForYear
+        : hasAnyTrimsSelected
+          ? []      // trims selected elsewhere but not for this year → skip this year
+          : [null]; // no trims selected anywhere → add year generically
       for (const entry of yearEntries) {
         const nameValueList = [
           { name: 'Year', value: year },
@@ -976,12 +1007,14 @@ export default function AutoCompatibilityPage() {
   };
 
   const sendNewCompatibility = async () => {
-    if (!reviewItem || !sellerId) return;
+    if (!reviewItem) return;
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
+    if (!resolvedSellerId) return;
 
     setSendingCompat(true);
     try {
       await api.post('/ebay/update-compatibility', {
-        sellerId,
+        sellerId: resolvedSellerId,
         itemId: reviewItem.itemId,
         sku: reviewItem.sku,
         compatibilityList: reviewItem.editCompatList || []
@@ -1049,16 +1082,21 @@ export default function AutoCompatibilityPage() {
   };
 
   const handleEndListing = () => {
-    if (!reviewItem || !sellerId) return;
+    if (!reviewItem) return;
+    // Must know whose seller token to use — prefer the batch's own seller, fall back to state
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
+    if (!resolvedSellerId) return;
     setConfirmEndOpen(true);
   };
 
   const confirmEndListing = async () => {
     setConfirmEndOpen(false);
     setEndingListing(true);
+    // Use the batch's own seller record as source of truth to avoid token mismatch
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
     try {
       await api.post('/ebay/end-item', {
-        sellerId,
+        sellerId: resolvedSellerId,
         itemId: reviewItem.itemId,
         endingReason: 'NotAvailable'
       });
@@ -1100,10 +1138,11 @@ export default function AutoCompatibilityPage() {
     let warningCount = 0;
     let failCount = 0;
 
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
     for (const item of itemsToSend) {
       try {
         const { data } = await api.post('/ebay/update-compatibility', {
-          sellerId,
+          sellerId: resolvedSellerId,
           itemId: item.itemId,
           sku: item.sku,
           compatibilityList: item.editCompatList || []
@@ -1755,8 +1794,12 @@ export default function AutoCompatibilityPage() {
 
           {/* Summary counters */}
           <Box display="flex" gap={1.5} flexWrap="wrap">
-            <Chip icon={<CheckCircleIcon />} label={`${batch.successCount || 0} Success`} color="success" size="small" />
-            <Chip icon={<WarningIcon />} label={`${batch.warningCount || 0} Warning`} color="warning" size="small" />
+            <Chip
+              icon={<CheckCircleIcon />}
+              label={`${(batch.successCount || 0) + (batch.warningCount || 0)} Success`}
+              color="success"
+              size="small"
+            />
             <Chip icon={<BuildIcon />} label={`${batch.needsManualCount || 0} Manual`} color="info" size="small" />
             <Chip icon={<ErrorIcon />} label={`${batch.ebayErrorCount || 0} eBay Error`} color="error" size="small" />
             <Chip icon={<SmartToyIcon />} label={`${batch.aiFailedCount || 0} AI Failed`} size="small" />
@@ -1855,8 +1898,11 @@ export default function AutoCompatibilityPage() {
                         <Typography 
                           variant="caption" 
                           color={
-                            item.status === 'success' || item.status === 'warning' ? 'success.main' : 
-                            (item.ebayWarning ? 'info.main' : 'error.main')
+                            (item.status === 'success' || item.status === 'warning') && item.ebayWarning
+                              ? 'warning.dark'
+                              : item.status === 'success' || item.status === 'warning'
+                              ? 'success.main'
+                              : item.ebayWarning ? 'info.main' : 'error.main'
                           }
                           sx={{ maxWidth: 250, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}
                         >
@@ -2599,75 +2645,205 @@ export default function AutoCompatibilityPage() {
             {historyTotal > 0 && <Chip label={`${historyTotal} total`} size="small" variant="outlined" />}
           </Box>
 
-          {/* ── Filter Row ── */}
-          <Box sx={{ mt: 1.5, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-            <TextField
-              label="Date From"
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={historyFilters.dateFrom}
-              onChange={e => updateHistoryFilter('dateFrom', e.target.value)}
-              sx={{ width: 155 }}
-            />
-            <TextField
-              label="Date To"
-              type="date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={historyFilters.dateTo}
-              onChange={e => updateHistoryFilter('dateTo', e.target.value)}
-              sx={{ width: 155 }}
-            />
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel>Seller</InputLabel>
-              <Select
-                value={historyFilters.sellerFilter}
-                label="Seller"
-                onChange={e => updateHistoryFilter('sellerFilter', e.target.value)}
+          {/* ── Filter Rows ── */}
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+            {/* Row 1: Date filters */}
+            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+
+              {/* Listing Date (targetDate) */}
+              <Box>
+                <Typography variant="caption" color="textSecondary" fontWeight={600} sx={{ display: 'block', mb: 0.75 }}>
+                  Listing Date
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={historyFilters.listingDateMode}
+                    onChange={(_, v) => {
+                      if (!v) return;
+                      const next = { ...historyFilters, listingDateMode: v, listingDate: '', dateFrom: '', dateTo: '', page: 1 };
+                      setHistoryFilters(next);
+                      loadHistory(next);
+                    }}
+                    sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.4, fontSize: '0.7rem' } }}
+                  >
+                    <ToggleButton value="single">Single</ToggleButton>
+                    <ToggleButton value="range">Range</ToggleButton>
+                  </ToggleButtonGroup>
+                  {historyFilters.listingDateMode === 'single' ? (
+                    <TextField
+                      type="date"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      value={historyFilters.listingDate}
+                      onChange={e => updateHistoryFilter('listingDate', e.target.value)}
+                      sx={{ width: 150 }}
+                    />
+                  ) : (
+                    <>
+                      <TextField
+                        label="From"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.dateFrom}
+                        onChange={e => updateHistoryFilter('dateFrom', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                      <TextField
+                        label="To"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.dateTo}
+                        onChange={e => updateHistoryFilter('dateTo', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                    </>
+                  )}
+                </Box>
+              </Box>
+
+              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+              {/* Run On Date (createdAt) */}
+              <Box>
+                <Typography variant="caption" color="textSecondary" fontWeight={600} sx={{ display: 'block', mb: 0.75 }}>
+                  Run On (IST)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={historyFilters.runOnMode}
+                    onChange={(_, v) => {
+                      if (!v) return;
+                      const next = { ...historyFilters, runOnMode: v, runOnDate: '', runOnFrom: '', runOnTo: '', page: 1 };
+                      setHistoryFilters(next);
+                      loadHistory(next);
+                    }}
+                    sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.4, fontSize: '0.7rem' } }}
+                  >
+                    <ToggleButton value="single">Single</ToggleButton>
+                    <ToggleButton value="range">Range</ToggleButton>
+                  </ToggleButtonGroup>
+                  {historyFilters.runOnMode === 'single' ? (
+                    <TextField
+                      type="date"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      value={historyFilters.runOnDate}
+                      onChange={e => updateHistoryFilter('runOnDate', e.target.value)}
+                      sx={{ width: 150 }}
+                    />
+                  ) : (
+                    <>
+                      <TextField
+                        label="From"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.runOnFrom}
+                        onChange={e => updateHistoryFilter('runOnFrom', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                      <TextField
+                        label="To"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.runOnTo}
+                        onChange={e => updateHistoryFilter('runOnTo', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                    </>
+                  )}
+                </Box>
+              </Box>
+            </Box>
+
+            <Divider />
+
+            {/* Row 2: Dropdown filters + Clear */}
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* By (Triggered By — non-seller staff only) */}
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>By</InputLabel>
+                <Select
+                  value={historyFilters.triggeredByFilter}
+                  label="By"
+                  onChange={e => updateHistoryFilter('triggeredByFilter', e.target.value)}
+                >
+                  <MenuItem value="">Anyone</MenuItem>
+                  {staffUsers.map(u => (
+                    <MenuItem key={u._id} value={u._id}>
+                      {u.username || u.email}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 175 }}>
+                <InputLabel>Seller</InputLabel>
+                <Select
+                  value={historyFilters.sellerFilter}
+                  label="Seller"
+                  onChange={e => updateHistoryFilter('sellerFilter', e.target.value)}
+                >
+                  <MenuItem value="">All Sellers</MenuItem>
+                  {sellers.map(s => (
+                    <MenuItem key={s._id} value={s._id}>{s.user?.username || s.user?.email}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 145 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={historyFilters.statusFilter}
+                  label="Status"
+                  onChange={e => updateHistoryFilter('statusFilter', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="running">Running</MenuItem>
+                  <MenuItem value="failed">Failed</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 155 }}>
+                <InputLabel>Review</InputLabel>
+                <Select
+                  value={historyFilters.reviewedFilter}
+                  label="Review"
+                  onChange={e => updateHistoryFilter('reviewedFilter', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="reviewed">Reviewed</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={() => {
+                  const reset = {
+                    listingDateMode: 'single', listingDate: '', dateFrom: '', dateTo: '',
+                    runOnMode: 'single', runOnDate: '', runOnFrom: '', runOnTo: '',
+                    sellerFilter: '', triggeredByFilter: '', statusFilter: '', reviewedFilter: '',
+                    page: 1, limit: 25,
+                  };
+                  setHistoryFilters(reset);
+                  loadHistory(reset);
+                }}
               >
-                <MenuItem value="">All Sellers</MenuItem>
-                {sellers.map(s => (
-                  <MenuItem key={s._id} value={s._id}>{s.user?.username || s.user?.email}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 130 }}>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={historyFilters.statusFilter}
-                label="Status"
-                onChange={e => updateHistoryFilter('statusFilter', e.target.value)}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="completed">Completed</MenuItem>
-                <MenuItem value="running">Running</MenuItem>
-                <MenuItem value="failed">Failed</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Review</InputLabel>
-              <Select
-                value={historyFilters.reviewedFilter}
-                label="Review"
-                onChange={e => updateHistoryFilter('reviewedFilter', e.target.value)}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="reviewed">Reviewed</MenuItem>
-              </Select>
-            </FormControl>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={() => {
-                const reset = { dateFrom: '', dateTo: '', sellerFilter: '', statusFilter: '', reviewedFilter: '', page: 1, limit: 25 };
-                setHistoryFilters(reset);
-                loadHistory(reset);
-              }}
-            >
-              Clear
-            </Button>
+                Clear All
+              </Button>
+            </Box>
+
           </Box>
         </DialogTitle>
 
