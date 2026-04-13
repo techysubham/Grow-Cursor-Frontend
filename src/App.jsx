@@ -86,16 +86,16 @@ function resolveDocumentTitle(pathname) {
 }
 
 function useAuth() {
-  const [token, setToken] = useState(() => sessionStorage.getItem('auth_token'));
+  const [token, setToken] = useState(() => localStorage.getItem('auth_token'));
   const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem('user'); // keeping user in localStorage is fine
+    const raw = localStorage.getItem('user');
     return raw ? JSON.parse(raw) : null;
   });
   const navigate = useNavigate();
   const login = (t, u) => {
     setToken(t);
     setUser(u);
-    sessionStorage.setItem('auth_token', t);   // per-tab token
+    localStorage.setItem('auth_token', t);
     setAuthToken(t);
     localStorage.setItem('user', JSON.stringify(u));
 
@@ -117,11 +117,25 @@ function useAuth() {
   const logout = () => {
     setToken(null);
     setUser(null);
-    sessionStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_token');
     setAuthToken(null);
     localStorage.removeItem('user');
     navigate('/login');
   };
+  // Cross-tab sync: when another tab logs out (removes auth_token from localStorage),
+  // mirror the logout in this tab immediately.
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key === 'auth_token' && !e.newValue) {
+        setToken(null);
+        setUser(null);
+        setAuthToken(null);
+        navigate('/login');
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [navigate]);
   return { token, user, login, logout };
 }
 

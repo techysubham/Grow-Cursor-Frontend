@@ -27,10 +27,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear auth token and session storage
+      // Clear auth token and local storage
       currentToken = null;
       delete api.defaults.headers.common.Authorization;
-      sessionStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_token');
 
       // Redirect to login page
       if (window.location.pathname !== '/login') {
@@ -132,8 +132,8 @@ export async function stopTimer() {
   return data;
 }
 
-export async function getAttendanceStatus() {
-  const { data } = await api.get('/attendance/status');
+export async function getAttendanceStatus(signal) {
+  const { data } = await api.get('/attendance/status', signal ? { signal } : undefined);
   return data;
 }
 
