@@ -281,6 +281,18 @@ export default function AutoCompatibilityPage() {
   const allBatchesPollRef = useRef(null);
   const [endingListing, setEndingListing] = useState(false);
 
+  // Active (running) batches — fetched once on page open so users know what's in progress
+  const [activeBatches, setActiveBatches] = useState([]);
+
+  const fetchActiveBatches = async () => {
+    try {
+      const { data } = await api.get('/ebay/auto-compatibility-batches', {
+        params: { status: 'running', limit: 50, page: 1 }
+      });
+      setActiveBatches(data.batches || []);
+    } catch { /* non-critical */ }
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -301,6 +313,7 @@ export default function AutoCompatibilityPage() {
       } catch { /* non-critical, ignore */ }
     };
     load();
+    fetchActiveBatches();
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       if (allBatchesPollRef.current) clearInterval(allBatchesPollRef.current);
@@ -347,6 +360,7 @@ export default function AutoCompatibilityPage() {
       if (data.batchId) {
         setBatchId(data.batchId);
         setSnackbar({ open: true, message: `Started processing ${data.totalListings} listings`, severity: 'info' });
+        fetchActiveBatches(); // refresh active batch list immediately
       } else {
         setSnackbar({ open: true, message: data.message || 'No listings found', severity: 'warning' });
       }
@@ -440,26 +454,27 @@ export default function AutoCompatibilityPage() {
 
   const startAllBatchesPolling = (batchIds) => {
     if (allBatchesPollRef.current) clearInterval(allBatchesPollRef.current);
+    // Only poll batches that are still running — drop completed ones each cycle
+    let pendingIds = [...batchIds];
     allBatchesPollRef.current = setInterval(async () => {
+      if (pendingIds.length === 0) {
+        clearInterval(allBatchesPollRef.current);
+        allBatchesPollRef.current = null;
+        return;
+      }
       try {
-        const results = await Promise.all(
-          batchIds.map(id =>
-            api.get(`/ebay/auto-compatibility-status/${id}`)
-              .then(r => [id, r.data])
-              .catch(() => [id, null])
-          )
-        );
-        const updated = {};
-        results.forEach(([id, d]) => { if (d) updated[id] = d; });
-        setAllBatchesData(updated);
-        // Stop polling when all batches are done
-        const stillRunning = Object.values(updated).some(b => b?.status === 'running');
-        if (!stillRunning) {
+        const { data } = await api.post('/ebay/auto-compatibility-status/bulk', { batchIds: pendingIds });
+        const fresh = data.batches || {};
+        // Merge into existing state (preserve completed batches already removed from pendingIds)
+        setAllBatchesData(prev => ({ ...prev, ...fresh }));
+        // Stop polling batches that finished this cycle
+        pendingIds = pendingIds.filter(id => fresh[id]?.status === 'running');
+        if (pendingIds.length === 0) {
           clearInterval(allBatchesPollRef.current);
           allBatchesPollRef.current = null;
         }
       } catch { /* ignore */ }
-    }, 5000);
+    }, 120000);
   };
 
   // Load the per-date batches when switching back to run-all mode for an existing date
@@ -1446,6 +1461,9 @@ export default function AutoCompatibilityPage() {
     );
   }
 
+  // Disable the Run button if ANY batch is currently running (any seller, any date)
+  const hasConflict = activeBatches.length > 0;
+
   return (
     <Box sx={{ p: 3 }}>
       {/* HEADER */}
@@ -1475,6 +1493,38 @@ export default function AutoCompatibilityPage() {
           </Button>
         </Box>
       </Box>
+
+      {/* Active batches banner */}
+      {activeBatches.length > 0 && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2, borderRadius: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={fetchActiveBatches}>Refresh</Button>
+          }
+        >
+          <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
+            {activeBatches.length} batch{activeBatches.length !== 1 ? 'es' : ''} currently running
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.5 }}>
+            {activeBatches.map(b => (
+              <Chip
+                key={b._id}
+                size="small"
+                label={
+                  `${b.seller?.user?.username || 'Unknown'} — ${b.targetDate}${
+                    b.triggeredBy?.username ? ` (by ${b.triggeredBy.username})` : ''
+                  }`
+                }
+                color="warning"
+                variant="outlined"
+                onClick={() => setBatchId(b._id)}
+                sx={{ cursor: 'pointer', fontWeight: 600 }}
+              />
+            ))}
+          </Box>
+        </Alert>
+      )}
 
       {/* CONTROLS */}
       <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
@@ -1518,20 +1568,30 @@ export default function AutoCompatibilityPage() {
             />
 
             {isSuperAdmin && (
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={starting ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
-              onClick={handleStart}
-              disabled={starting || isRunning || !sellerId || !targetDate}
-              sx={{
-                bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' },
-                fontWeight: 700, px: 4, borderRadius: 2,
-                textTransform: 'none', fontSize: '1rem'
-              }}
+            <Tooltip
+              title={hasConflict ? `${activeBatches.length} batch${activeBatches.length !== 1 ? 'es are' : ' is'} currently running. Wait for ${activeBatches.length !== 1 ? 'them' : 'it'} to finish or click the chip above to monitor.` : ''}
+              arrow
+              disableHoverListener={!hasConflict}
             >
-              {starting ? 'Starting...' : isRunning ? 'Running...' : 'Run Auto-Compatibility'}
-            </Button>
+              <span>
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={starting ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
+                  onClick={handleStart}
+                  disabled={starting || isRunning || hasConflict || !sellerId || !targetDate}
+                  sx={{
+                    bgcolor: hasConflict ? '#d97706' : '#7c3aed',
+                    '&:hover': { bgcolor: hasConflict ? '#b45309' : '#6d28d9' },
+                    '&.Mui-disabled': { bgcolor: '#e5e7eb', color: '#9ca3af' },
+                    fontWeight: 700, px: 4, borderRadius: 2,
+                    textTransform: 'none', fontSize: '1rem'
+                  }}
+                >
+                  {starting ? 'Starting...' : isRunning ? 'Running...' : hasConflict ? 'Already Running' : 'Run Auto-Compatibility'}
+                </Button>
+              </span>
+            </Tooltip>
             )}
           </Box>
         ) : (
