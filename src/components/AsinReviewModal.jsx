@@ -30,6 +30,7 @@ import {
   NavigateBefore as PrevIcon,
   NavigateNext as NextIcon,
   Save as SaveIcon,
+  Edit as EditIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
   CheckCircle as CheckIcon,
@@ -88,11 +89,21 @@ export default function AsinReviewModal({
   const [showAmazonPreview, setShowAmazonPreview] = useState(false);
   const [appliedDescTemplates, setAppliedDescTemplates] = useState({}); // { [itemId]: templateKey | '' }
   const [rephrasing, setRephrasing] = useState({}); // { [itemId]: true|false }
+  const [startPriceEditMode, setStartPriceEditMode] = useState({}); // { [itemId]: true|false }
 
   // Filter out dismissed items
   const activeItems = previewItems.filter(item => !dismissedItems.has(item.id));
   const currentItem = activeItems[currentIndex];
   const itemData = editedItems[currentItem?.id] || currentItem?.generatedListing || {};
+  const isStartPriceEditing = !!(currentItem?.id && startPriceEditMode[currentItem.id]);
+  const startPriceValue = itemData.startPrice ?? '';
+  const actualProfitBuyingPrice = parseFloat(currentItem?.sourceData?.price);
+  const actualProfitSoldPrice = parseFloat(startPriceValue);
+  const showActualProfit = marketplace === 'US'
+    && !isNaN(actualProfitBuyingPrice) && actualProfitBuyingPrice > 0
+    && !isNaN(actualProfitSoldPrice) && actualProfitSoldPrice > 0;
+  const actualProfit = showActualProfit ? calcActualProfit(actualProfitBuyingPrice, actualProfitSoldPrice) : null;
+  const actualProfitColor = actualProfit && actualProfit.actualProfit < 300 ? 'error' : 'success';
 
   // Initialize edited items from preview data
   useEffect(() => {
@@ -104,6 +115,7 @@ export default function AsinReviewModal({
         }
       });
       setEditedItems(initial);
+      setStartPriceEditMode({});
     }
   }, [previewItems]);
 
@@ -198,6 +210,22 @@ export default function AsinReviewModal({
     }));
     
     setHasUnsavedChanges(true);
+  };
+
+  const handleStartPriceEdit = () => {
+    if (!currentItem) return;
+    setStartPriceEditMode(prev => ({
+      ...prev,
+      [currentItem.id]: true
+    }));
+  };
+
+  const handleStartPriceSave = () => {
+    if (!currentItem) return;
+    setStartPriceEditMode(prev => ({
+      ...prev,
+      [currentItem.id]: false
+    }));
   };
 
   const applyDescTemplate = (itemId, templateKey) => {
@@ -337,6 +365,7 @@ export default function AsinReviewModal({
         return;
       }
     }
+    setStartPriceEditMode({});
     onClose();
   };
 
@@ -381,6 +410,27 @@ export default function AsinReviewModal({
     return null;
   }
 
+
+  const actualProfitTooltipContent = actualProfit ? (
+    <Box sx={{ fontFamily: 'monospace', fontSize: '0.72rem', lineHeight: 1.8, p: 0.5 }}>
+      <Box>Bought (Amazon):&nbsp; ${actualProfitBuyingPrice.toFixed(2)}</Box>
+      <Box>Sold (Start):&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfitSoldPrice.toFixed(2)}</Box>
+      <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+      <Box>A (eBay+Tax):&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.A.toFixed(2)}&nbsp; (Sold × 1.1)</Box>
+      <Box>eBay Fee:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.eBay.toFixed(2)}&nbsp; (A × 13.95% + $0.40)</Box>
+      <Box>ADS:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.ADS.toFixed(2)}&nbsp; (A × 7%)</Box>
+      <Box>TDS:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.TDS.toFixed(2)}&nbsp; (A × 1%)</Box>
+      <Box>T.Cont:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.TCont.toFixed(2)}</Box>
+      <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+      <Box>Net (USD):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.Net.toFixed(2)}&nbsp; (Sold − eBay − ADS − TDS − T.Cont)</Box>
+      <Box>Payoneer (INR):&nbsp;&nbsp; ₹{actualProfit.Payoneer.toFixed(2)}&nbsp; (Net × 84)</Box>
+      <Box>Amazon Spend:&nbsp;&nbsp;&nbsp;&nbsp; ₹{actualProfit.AmazonExpense.toFixed(2)}&nbsp; (Bought × 87)</Box>
+      <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+      <Box sx={{ fontWeight: 700, color: actualProfit.actualProfit < 300 ? '#e57373' : '#81c784' }}>
+        Actual Profit:&nbsp;&nbsp;&nbsp;&nbsp; ₹{actualProfit.actualProfit.toFixed(2)}
+      </Box>
+    </Box>
+  ) : '';
   // Separate core fields and custom fields from template columns
   const coreFieldColumns = templateColumns.filter(col => col.type === 'core');
   const customFieldColumns = templateColumns.filter(col => col.type === 'custom');
@@ -880,19 +930,48 @@ export default function AsinReviewModal({
                         </Box>
 
                         {/* Footer Template Dropdown */}
-                        <FormControl size="small" sx={{ mb: 1.5, width: 280 }}>
-                          <InputLabel>Append Footer Template</InputLabel>
-                          <Select
-                            value={appliedDescTemplates[currentItem?.id] || ''}
-                            label="Append Footer Template"
-                            onChange={(e) => applyDescTemplate(currentItem.id, e.target.value)}
-                          >
-                            <MenuItem value=""><em>— No Footer —</em></MenuItem>
-                            {DESCRIPTION_FOOTER_TEMPLATES.map(t => (
-                              <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
+                        <Stack
+                          direction="row"
+                          alignItems="flex-start"
+                          justifyContent="space-between"
+                          spacing={1.5}
+                          sx={{ mb: 1.5, flexWrap: 'wrap' }}
+                          useFlexGap
+                        >
+                          <FormControl size="small" sx={{ width: 280 }}>
+                            <InputLabel>Append Footer Template</InputLabel>
+                            <Select
+                              value={appliedDescTemplates[currentItem?.id] || ''}
+                              label="Append Footer Template"
+                              onChange={(e) => applyDescTemplate(currentItem.id, e.target.value)}
+                            >
+                              <MenuItem value=""><em>— No Footer —</em></MenuItem>
+                              {DESCRIPTION_FOOTER_TEMPLATES.map(t => (
+                                <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+
+                          {showActualProfit && (
+                            <Tooltip
+                              title={actualProfitTooltipContent}
+                              placement="bottom-end"
+                              arrow
+                              componentsProps={{
+                                tooltip: { sx: { maxWidth: 380, bgcolor: '#1a1a2e', color: '#fff' } },
+                                arrow: { sx: { color: '#1a1a2e' } }
+                              }}
+                            >
+                              <Chip
+                                label={`Actual Profit: ₹${actualProfit.actualProfit.toFixed(2)}`}
+                                size="small"
+                                variant="outlined"
+                                color={actualProfitColor}
+                                sx={{ mt: 0.5, cursor: 'default' }}
+                              />
+                            </Tooltip>
+                          )}
+                        </Stack>
 
                         {/* Content Area */}
                         {descriptionViewMode === 'code' ? (
@@ -971,69 +1050,34 @@ export default function AsinReviewModal({
 
                   // Start Price field — with Actual Profit chip
                   if (col.name === 'startPrice') {
-                    const buyingPrice = parseFloat(currentItem.sourceData?.price);
-                    const sold        = parseFloat(itemData.startPrice);
-                    const showProfit  = marketplace === 'US'
-                      && !isNaN(buyingPrice) && buyingPrice > 0
-                      && !isNaN(sold)        && sold > 0;
-                    const profit = showProfit ? calcActualProfit(buyingPrice, sold) : null;
-
-                    const tooltipContent = profit ? (
-                      <Box sx={{ fontFamily: 'monospace', fontSize: '0.72rem', lineHeight: 1.8, p: 0.5 }}>
-                        <Box>Bought (Amazon):&nbsp; ${buyingPrice.toFixed(2)}</Box>
-                        <Box>Sold (Start):&nbsp;&nbsp;&nbsp;&nbsp; ${sold.toFixed(2)}</Box>
-                        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
-                        <Box>A (eBay+Tax):&nbsp;&nbsp;&nbsp;&nbsp; ${profit.A.toFixed(2)}&nbsp; (Sold × 1.1)</Box>
-                        <Box>eBay Fee:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.eBay.toFixed(2)}&nbsp; (A × 13.95% + $0.40)</Box>
-                        <Box>ADS:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.ADS.toFixed(2)}&nbsp; (A × 7%)</Box>
-                        <Box>TDS:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.TDS.toFixed(2)}&nbsp; (A × 1%)</Box>
-                        <Box>T.Cont:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.TCont.toFixed(2)}</Box>
-                        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
-                        <Box>Net (USD):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${profit.Net.toFixed(2)}&nbsp; (Sold − eBay − ADS − TDS − T.Cont)</Box>
-                        <Box>Payoneer (INR):&nbsp;&nbsp; ₹{profit.Payoneer.toFixed(2)}&nbsp; (Net × 84)</Box>
-                        <Box>Amazon Spend:&nbsp;&nbsp;&nbsp;&nbsp; ₹{profit.AmazonExpense.toFixed(2)}&nbsp; (Bought × 87)</Box>
-                        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
-                        <Box sx={{ fontWeight: 700, color: profit.actualProfit >= 0 ? '#81c784' : '#e57373' }}>
-                          Actual Profit:&nbsp;&nbsp;&nbsp;&nbsp; ₹{profit.actualProfit.toFixed(2)}
-                        </Box>
-                      </Box>
-                    ) : '';
-
                     return (
                       <Box key="startPrice">
-                        <TextField
-                          label={col.label || col.name}
-                          value={itemData.startPrice || ''}
-                          onChange={(e) => handleFieldChange('startPrice', e.target.value, false)}
-                          size="small"
-                          fullWidth
-                          required
-                          type="number"
-                          sx={{
-                            '& input::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
-                            '& input::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 },
-                            '& input[type=number]': { MozAppearance: 'textfield' },
-                          }}
-                        />
-                        {showProfit && (
-                          <Tooltip
-                            title={tooltipContent}
-                            placement="bottom-start"
-                            arrow
-                            componentsProps={{
-                              tooltip: { sx: { maxWidth: 380, bgcolor: '#1a1a2e', color: '#fff' } },
-                              arrow:   { sx: { color: '#1a1a2e' } }
+                        <Stack direction="row" spacing={1} alignItems="flex-start">
+                          <TextField
+                            label={col.label || col.name}
+                            value={startPriceValue}
+                            onChange={(e) => handleFieldChange('startPrice', e.target.value, false)}
+                            size="small"
+                            fullWidth
+                            required
+                            type="number"
+                            disabled={!isStartPriceEditing}
+                            sx={{
+                              '& input::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                              '& input::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                              '& input[type=number]': { MozAppearance: 'textfield' },
                             }}
+                          />
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={isStartPriceEditing ? handleStartPriceSave : handleStartPriceEdit}
+                            startIcon={isStartPriceEditing ? <SaveIcon fontSize="small" /> : <EditIcon fontSize="small" />}
+                            sx={{ minWidth: 86, height: 40, flexShrink: 0 }}
                           >
-                            <Chip
-                              label={`Actual Profit: ₹${profit.actualProfit.toFixed(2)}`}
-                              size="small"
-                              variant="outlined"
-                              color={profit.actualProfit >= 0 ? 'success' : 'error'}
-                              sx={{ mt: 0.75, cursor: 'default' }}
-                            />
-                          </Tooltip>
-                        )}
+                            {isStartPriceEditing ? 'Save' : 'Edit'}
+                          </Button>
+                        </Stack>
                       </Box>
                     );
                   }
