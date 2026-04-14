@@ -60,8 +60,8 @@ const getVehicleString = (nameValueList) => {
 // Helper: Date to PST
 const formatDate = (dateString) => {
   if (!dateString) return '-';
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: true
   }).format(new Date(dateString));
