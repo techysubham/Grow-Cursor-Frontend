@@ -5,7 +5,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions,
   Collapse, IconButton, Tooltip, Grid, Divider, Autocomplete,
-  InputAdornment, Checkbox
+  InputAdornment, Checkbox, ToggleButton, ToggleButtonGroup, Card, CardContent, CardActions
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -28,7 +28,7 @@ import api from '../../lib/api';
 
 const STATUS_CONFIG = {
   success: { label: 'Success', color: 'success', icon: <CheckCircleIcon fontSize="small" />, bg: '#f0fdf4' },
-  warning: { label: 'Success', color: 'success', icon: <CheckCircleIcon fontSize="small" />, bg: '#f0fdf4' }, // Warnings = successful send with notes
+  warning: { label: 'Sent w/ Notes', color: 'success', icon: <WarningIcon fontSize="small" />, bg: '#f0fdf4' }, // Sent to eBay but eBay returned a non-fatal warning
   needs_manual: { label: 'Needs Manual', color: 'info', icon: <BuildIcon fontSize="small" />, bg: '#eff6ff' },
   ebay_error: { label: 'eBay Error', color: 'error', icon: <ErrorIcon fontSize="small" />, bg: '#fef2f2' },
   ai_failed: { label: 'AI Failed', color: 'default', icon: <SmartToyIcon fontSize="small" />, bg: '#f5f5f5' },
@@ -192,6 +192,7 @@ const formatDateIST = (dateString) => {
 
 export default function AutoCompatibilityPage() {
   const [sellers, setSellers] = useState([]);
+  const [staffUsers, setStaffUsers] = useState([]); // non-seller users for "By" filter
   const [sellerId, setSellerId] = useState('');
   const [targetDate, setTargetDate] = useState(getTodayIST());
   const [itemLimit, setItemLimit] = useState(''); // Empty = no limit
@@ -241,6 +242,23 @@ export default function AutoCompatibilityPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyFilters, setHistoryFilters] = useState({
+    listingDateMode: 'single',  // 'single' | 'range'
+    listingDate: '',            // exact targetDate match (single mode)
+    dateFrom: '',               // targetDate range start
+    dateTo: '',                 // targetDate range end
+    runOnMode: 'single',        // 'single' | 'range'
+    runOnDate: '',              // exact createdAt day (single mode)
+    runOnFrom: '',              // createdAt range start
+    runOnTo: '',                // createdAt range end
+    sellerFilter: '',
+    triggeredByFilter: '',
+    statusFilter: '',
+    reviewedFilter: '', // '' | 'reviewed' | 'not_reviewed'
+    page: 1,
+    limit: 25,
+  });
 
   // Bulk Review Summary
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -248,6 +266,19 @@ export default function AutoCompatibilityPage() {
 
   // End Listing confirmation dialog
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
+
+  // ── Current user role ────────────────────────────────────────────────────────
+  const isSuperAdmin = (() => { try { return JSON.parse(localStorage.getItem('user'))?.role === 'superadmin'; } catch { return false; } })();
+
+  // ── Run-All-Sellers mode ────────────────────────────────────────────────────
+  const [runMode, setRunMode] = useState('all'); // 'single' | 'all'
+
+  // allSellersRun: array of { sellerId, username, batchId, status, totalListings, reused? }
+  const [allSellersRun, setAllSellersRun] = useState(null);
+  // allBatchesData: { [batchId]: batch } — live-polled status for each batch in the run
+  const [allBatchesData, setAllBatchesData] = useState({});
+  const [allSellersRunning, setAllSellersRunning] = useState(false);
+  const allBatchesPollRef = useRef(null);
   const [endingListing, setEndingListing] = useState(false);
 
   useEffect(() => {
@@ -263,9 +294,17 @@ export default function AutoCompatibilityPage() {
           setSellerId(data._id);
         } catch (e) { console.error(e); }
       }
+      // Fetch all non-seller users for the "By" filter
+      try {
+        const { data } = await api.get('/users');
+        setStaffUsers((data || []).filter(u => u.role !== 'seller'));
+      } catch { /* non-critical, ignore */ }
     };
     load();
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (allBatchesPollRef.current) clearInterval(allBatchesPollRef.current);
+    };
   }, []);
 
   // Load a specific batch from Review History page navigation
@@ -318,15 +357,132 @@ export default function AutoCompatibilityPage() {
     }
   };
 
-  const loadHistory = async () => {
+  const loadHistory = async (overrides = {}) => {
     setHistoryLoading(true);
     try {
-      const params = {};
-      if (sellerId) params.sellerId = sellerId;
+      const filters = { ...historyFilters, ...overrides };
+      const params = { page: filters.page, limit: filters.limit };
+      // Seller: use specific filter, or fall back to current seller in single mode
+      if (filters.sellerFilter) params.sellerId = filters.sellerFilter;
+      else if (runMode === 'single' && sellerId) params.sellerId = sellerId;
+      // Triggered By
+      if (filters.triggeredByFilter) params.triggeredBy = filters.triggeredByFilter;
+      // Listing Date (targetDate)
+      if (filters.listingDateMode === 'single') {
+        if (filters.listingDate) params.listingDate = filters.listingDate;
+      } else {
+        if (filters.dateFrom) params.dateFrom = filters.dateFrom;
+        if (filters.dateTo) params.dateTo = filters.dateTo;
+      }
+      // Run On Date (createdAt)
+      if (filters.runOnMode === 'single') {
+        if (filters.runOnDate) params.runOnDate = filters.runOnDate;
+      } else {
+        if (filters.runOnFrom) params.runOnFrom = filters.runOnFrom;
+        if (filters.runOnTo) params.runOnTo = filters.runOnTo;
+      }
+      // Status
+      if (filters.statusFilter) params.status = filters.statusFilter;
+      // Review
+      if (filters.reviewedFilter === 'reviewed') params.manualReviewDone = 'true';
       const { data } = await api.get('/ebay/auto-compatibility-batches', { params });
       setHistory(data.batches || []);
+      setHistoryTotal(data.total || 0);
     } catch (e) { console.error(e); }
     finally { setHistoryLoading(false); }
+  };
+
+  const updateHistoryFilter = (key, value) => {
+    const next = { ...historyFilters, [key]: value, page: 1 };
+    setHistoryFilters(next);
+    loadHistory({ ...next });
+  };
+
+  // Refresh a single batch's data in the single-seller state (used after bulk send)
+  const fetchBatchData = async (id) => {
+    try {
+      const { data } = await api.get(`/ebay/auto-compatibility-status/${id}`);
+      setBatch(data);
+    } catch { /* ignore */ }
+  };
+
+  // ── Run-All-Sellers helpers ──────────────────────────────────────────────────
+
+  const handleRunAllSellers = async () => {
+    if (!targetDate) return;
+    setAllSellersRunning(true);
+    setAllSellersRun(null);
+    setAllBatchesData({});
+    if (allBatchesPollRef.current) clearInterval(allBatchesPollRef.current);
+
+    try {
+      const { data } = await api.post('/ebay/auto-compatibility/run-for-date', {
+        targetDate,
+        itemLimit: itemLimit === '' ? 0 : Number(itemLimit),
+      });
+      const runBatches = data.batches || [];
+      setAllSellersRun(runBatches);
+      // Seed with initial status
+      const initial = {};
+      runBatches.forEach(b => { if (b.batchId) initial[b.batchId] = { status: b.status, totalListings: b.totalListings }; });
+      setAllBatchesData(initial);
+
+      if (runBatches.length > 0) {
+        setSnackbar({ open: true, message: `Processing ${runBatches.filter(b => b.status === 'running').length} seller(s) for ${targetDate}`, severity: 'info' });
+        startAllBatchesPolling(runBatches.map(b => b.batchId).filter(Boolean));
+      }
+    } catch (e) {
+      setSnackbar({ open: true, message: 'Failed: ' + (e.response?.data?.error || e.message), severity: 'error' });
+    } finally {
+      setAllSellersRunning(false);
+    }
+  };
+
+  const startAllBatchesPolling = (batchIds) => {
+    if (allBatchesPollRef.current) clearInterval(allBatchesPollRef.current);
+    allBatchesPollRef.current = setInterval(async () => {
+      try {
+        const results = await Promise.all(
+          batchIds.map(id =>
+            api.get(`/ebay/auto-compatibility-status/${id}`)
+              .then(r => [id, r.data])
+              .catch(() => [id, null])
+          )
+        );
+        const updated = {};
+        results.forEach(([id, d]) => { if (d) updated[id] = d; });
+        setAllBatchesData(updated);
+        // Stop polling when all batches are done
+        const stillRunning = Object.values(updated).some(b => b?.status === 'running');
+        if (!stillRunning) {
+          clearInterval(allBatchesPollRef.current);
+          allBatchesPollRef.current = null;
+        }
+      } catch { /* ignore */ }
+    }, 5000);
+  };
+
+  // Load the per-date batches when switching back to run-all mode for an existing date
+  const reloadDateBatches = async (date) => {
+    try {
+      const { data } = await api.get('/ebay/auto-compatibility-batches-for-date', { params: { targetDate: date } });
+      const batches = data.batches || [];
+      if (batches.length === 0) return;
+      const runRows = batches.map(b => ({
+        sellerId: b.seller?._id,
+        username: b.seller?.user?.username || b.seller?.user?.email,
+        batchId: b._id,
+        status: b.status,
+        totalListings: b.totalListings,
+        reused: true,
+      }));
+      setAllSellersRun(runRows);
+      const initial = {};
+      batches.forEach(b => { initial[b._id] = b; });
+      setAllBatchesData(initial);
+      const stillRunning = batches.some(b => b.status === 'running');
+      if (stillRunning) startAllBatchesPolling(batches.map(b => b._id));
+    } catch { /* ignore */ }
   };
 
   const handleViewHistoryBatch = async (id) => {
@@ -436,8 +592,8 @@ export default function AutoCompatibilityPage() {
 
   const removeExistingCompatibility = async () => {
     if (!reviewItem) return;
-    
-    if (!sellerId) {
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
+    if (!resolvedSellerId) {
       setSnackbar({ open: true, message: 'No seller selected', severity: 'error' });
       return;
     }
@@ -445,10 +601,11 @@ export default function AutoCompatibilityPage() {
     try {
       // Delete from DB via eBay API
       await api.post('/ebay/update-compatibility', {
-        sellerId,
+        sellerId: resolvedSellerId,
         itemId: reviewItem.itemId,
         sku: reviewItem.sku,
-        compatibilityList: []
+        compatibilityList: [],
+        batchId: batchId || undefined
       });
 
       // Clear local state; reset reviewStatus to pending (not ended)
@@ -798,7 +955,14 @@ export default function AutoCompatibilityPage() {
     const hasAnyTrimsSelected = Object.values(selectedTrimsByYear).some(arr => arr && arr.length > 0);
     
     for (const year of selectedYears) {
-      const yearEntries = (hasAnyTrimsSelected && selectedTrimsByYear[year]?.length > 0) ? selectedTrimsByYear[year] : [null];
+      const trimsForYear = selectedTrimsByYear[year];
+      // If trims are selected somewhere but this specific year has none checked, skip it.
+      // Only fall back to a generic (no-trim) entry when NO trims have been selected at all.
+      const yearEntries = (hasAnyTrimsSelected && trimsForYear?.length > 0)
+        ? trimsForYear
+        : hasAnyTrimsSelected
+          ? []      // trims selected elsewhere but not for this year → skip this year
+          : [null]; // no trims selected anywhere → add year generically
       for (const entry of yearEntries) {
         const nameValueList = [
           { name: 'Year', value: year },
@@ -845,15 +1009,18 @@ export default function AutoCompatibilityPage() {
   };
 
   const sendNewCompatibility = async () => {
-    if (!reviewItem || !sellerId) return;
+    if (!reviewItem) return;
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
+    if (!resolvedSellerId) return;
 
     setSendingCompat(true);
     try {
       await api.post('/ebay/update-compatibility', {
-        sellerId,
+        sellerId: resolvedSellerId,
         itemId: reviewItem.itemId,
         sku: reviewItem.sku,
-        compatibilityList: reviewItem.editCompatList || []
+        compatibilityList: reviewItem.editCompatList || [],
+        batchId: batchId || undefined
       });
 
       setSnackbar({ open: true, message: 'Compatibility sent to eBay successfully!', severity: 'success' });
@@ -918,16 +1085,21 @@ export default function AutoCompatibilityPage() {
   };
 
   const handleEndListing = () => {
-    if (!reviewItem || !sellerId) return;
+    if (!reviewItem) return;
+    // Must know whose seller token to use — prefer the batch's own seller, fall back to state
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
+    if (!resolvedSellerId) return;
     setConfirmEndOpen(true);
   };
 
   const confirmEndListing = async () => {
     setConfirmEndOpen(false);
     setEndingListing(true);
+    // Use the batch's own seller record as source of truth to avoid token mismatch
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
     try {
       await api.post('/ebay/end-item', {
-        sellerId,
+        sellerId: resolvedSellerId,
         itemId: reviewItem.itemId,
         endingReason: 'NotAvailable'
       });
@@ -969,13 +1141,15 @@ export default function AutoCompatibilityPage() {
     let warningCount = 0;
     let failCount = 0;
 
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
     for (const item of itemsToSend) {
       try {
         const { data } = await api.post('/ebay/update-compatibility', {
-          sellerId,
+          sellerId: resolvedSellerId,
           itemId: item.itemId,
           sku: item.sku,
-          compatibilityList: item.editCompatList || []
+          compatibilityList: item.editCompatList || [],
+          batchId: batchId || undefined
         });
         
         // Check if eBay returned warnings (e.g., duplicate resolved, etc.)
@@ -1282,70 +1456,275 @@ export default function AutoCompatibilityPage() {
             Automatically add fitment data to eBay Motors listings using AI
           </Typography>
         </Box>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={() => { setHistoryOpen(true); loadHistory(); }}
-        >
-          View History
-        </Button>
+        <Box display="flex" gap={1} alignItems="center">
+          <ToggleButtonGroup
+            value={runMode}
+            exclusive
+            onChange={(_, val) => { if (val) setRunMode(val); }}
+            size="small"
+          >
+            <ToggleButton value="single" sx={{ textTransform: 'none', px: 2 }}>Single Seller</ToggleButton>
+            <ToggleButton value="all" sx={{ textTransform: 'none', px: 2 }}>All Sellers</ToggleButton>
+          </ToggleButtonGroup>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => { setHistoryOpen(true); loadHistory(); }}
+          >
+            View History
+          </Button>
+        </Box>
       </Box>
 
       {/* CONTROLS */}
       <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-        <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Seller</InputLabel>
-            <Select value={sellerId} label="Seller" onChange={e => setSellerId(e.target.value)}>
-              {sellers.map(s => (
-                <MenuItem key={s._id} value={s._id}>{s.user?.username || s.user?.email}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        {runMode === 'single' ? (
+          /* ─── SINGLE SELLER MODE ─────────────────────────────────────────── */
+          <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Seller</InputLabel>
+              <Select value={sellerId} label="Seller" onChange={e => setSellerId(e.target.value)}>
+                {sellers.map(s => (
+                  <MenuItem key={s._id} value={s._id}>{s.user?.username || s.user?.email}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-          <TextField
-            type="date"
-            label="Listing Date"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            value={targetDate}
-            onChange={e => setTargetDate(e.target.value)}
-            sx={{ minWidth: 160 }}
-          />
+            <TextField
+              type="date"
+              label="Listing Date"
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              value={targetDate}
+              onChange={e => setTargetDate(e.target.value)}
+              sx={{ minWidth: 160 }}
+            />
 
-          <TextField
-            type="number"
-            label="Item Limit"
-            size="small"
-            placeholder="All items"
-            value={itemLimit}
-            onChange={e => {
-              const val = e.target.value;
-              if (val === '') { setItemLimit(''); return; }
-              const n = parseInt(val);
-              if (!isNaN(n) && n >= 0) setItemLimit(n);
-            }}
-            inputProps={{ min: 1 }}
-            sx={{ width: 130 }}
-            helperText={itemLimit === '' || itemLimit === 0 ? 'All items' : `First ${itemLimit}`}
-          />
+            <TextField
+              type="number"
+              label="Item Limit"
+              size="small"
+              placeholder="All items"
+              value={itemLimit}
+              onChange={e => {
+                const val = e.target.value;
+                if (val === '') { setItemLimit(''); return; }
+                const n = parseInt(val);
+                if (!isNaN(n) && n >= 0) setItemLimit(n);
+              }}
+              inputProps={{ min: 1 }}
+              sx={{ width: 130 }}
+              helperText={itemLimit === '' || itemLimit === 0 ? 'All items' : `First ${itemLimit}`}
+            />
 
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={starting ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
-            onClick={handleStart}
-            disabled={starting || isRunning || !sellerId || !targetDate}
-            sx={{
-              bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' },
-              fontWeight: 700, px: 4, borderRadius: 2,
-              textTransform: 'none', fontSize: '1rem'
-            }}
-          >
-            {starting ? 'Starting...' : isRunning ? 'Running...' : 'Run Auto-Compatibility'}
-          </Button>
-        </Box>
+            {isSuperAdmin && (
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={starting ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
+              onClick={handleStart}
+              disabled={starting || isRunning || !sellerId || !targetDate}
+              sx={{
+                bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' },
+                fontWeight: 700, px: 4, borderRadius: 2,
+                textTransform: 'none', fontSize: '1rem'
+              }}
+            >
+              {starting ? 'Starting...' : isRunning ? 'Running...' : 'Run Auto-Compatibility'}
+            </Button>
+            )}
+          </Box>
+        ) : (
+          /* ─── ALL SELLERS MODE ───────────────────────────────────────────── */
+          <Box>
+            <Box display="flex" gap={2} alignItems="flex-start" flexWrap="wrap" mb={2}>
+              <TextField
+                type="date"
+                label="Listing Date"
+                size="small"
+                InputLabelProps={{ shrink: true }}
+                value={targetDate}
+                onChange={e => {
+                  setTargetDate(e.target.value);
+                  setAllSellersRun(null);
+                  setAllBatchesData({});
+                  if (allBatchesPollRef.current) { clearInterval(allBatchesPollRef.current); allBatchesPollRef.current = null; }
+                }}
+                sx={{ minWidth: 160 }}
+              />
+
+              <TextField
+                type="number"
+                label="Item Limit"
+                size="small"
+                placeholder="All items"
+                value={itemLimit}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === '') { setItemLimit(''); return; }
+                  const n = parseInt(val);
+                  if (!isNaN(n) && n >= 0) setItemLimit(n);
+                }}
+                inputProps={{ min: 1 }}
+                sx={{ width: 130 }}
+                helperText={itemLimit === '' || itemLimit === 0 ? 'All items' : `First ${itemLimit}`}
+              />
+
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={allSellersRunning ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
+                onClick={handleRunAllSellers}
+                disabled={allSellersRunning || !targetDate}
+                sx={{
+                  bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' },
+                  fontWeight: 700, px: 4, borderRadius: 2,
+                  textTransform: 'none', fontSize: '1rem'
+                }}
+              >
+                {allSellersRunning ? 'Starting...' : 'Run All Sellers for Date'}
+              </Button>
+
+              {targetDate && !allSellersRun && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => reloadDateBatches(targetDate)}
+                  sx={{ alignSelf: 'center' }}
+                >
+                  Load Existing Batches for Date
+                </Button>
+              )}
+            </Box>
+
+
+          </Box>
+        )}
       </Paper>
+
+      {/* ALL-SELLERS DASHBOARD */}
+      {runMode === 'all' && allSellersRun && (
+        <Box mb={3}>
+          <Typography variant="h6" fontWeight={600} mb={2}>
+            📋 Sellers — {targetDate}
+          </Typography>
+          <Box display="flex" gap={2} flexWrap="wrap">
+            {allSellersRun.map((row) => {
+              const bd = row.batchId ? allBatchesData[row.batchId] : null;
+              const status = bd?.status || row.status;
+              const total = bd?.totalListings ?? row.totalListings ?? 0;
+              const processed = bd?.processedCount ?? 0;
+              const needsManual = bd?.needsManualCount ?? 0;
+              const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+              const isRunning = status === 'running';
+              const isComplete = status === 'completed' || status === 'failed';
+              const borderColor = isRunning ? '#7c3aed' : status === 'completed' ? '#22c55e' : status === 'failed' ? '#ef4444' : '#e0e0e0';
+
+              return (
+                <Card key={row.sellerId} sx={{ minWidth: 260, maxWidth: 320, border: `2px solid ${borderColor}`, borderRadius: 2 }}>
+                  <CardContent sx={{ pb: 1 }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ maxWidth: 180 }}>
+                        {row.username || '—'}
+                      </Typography>
+                      <Chip
+                        label={status === 'skipped' ? 'No items' : status}
+                        size="small"
+                        color={status === 'completed' ? 'success' : status === 'running' ? 'warning' : status === 'failed' ? 'error' : 'default'}
+                      />
+                    </Box>
+                    {row.reason === 'no_listings' ? (
+                      <Typography variant="caption" color="textSecondary">No listings without compatibility on this date.</Typography>
+                    ) : row.batchId ? (
+                      <>
+                        <LinearProgress
+                          variant={isRunning ? 'indeterminate' : 'determinate'}
+                          value={pct}
+                          sx={{ height: 6, borderRadius: 3, mb: 1, '& .MuiLinearProgress-bar': { bgcolor: '#7c3aed' } }}
+                        />
+                        <Box display="flex" gap={0.5} flexWrap="wrap">
+                          <Chip label={`${processed}/${total}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                          {bd?.successCount > 0 && <Chip label={`✅ ${bd.successCount + (bd.warningCount || 0)}`} size="small" color="success" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                          {needsManual > 0 && <Chip label={`🔧 ${needsManual} manual`} size="small" color="info" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                          {bd?.ebayErrorCount > 0 && <Chip label={`❌ ${bd.ebayErrorCount}`} size="small" color="error" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                          {bd?.manualReviewDone && <Chip label="✓ Reviewed" size="small" color="success" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                        </Box>
+                        {isRunning && bd?.currentItemTitle && (
+                          <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }} noWrap>
+                            {bd.currentItemTitle}
+                          </Typography>
+                        )}
+                      </>
+                    ) : null}
+                  </CardContent>
+                  {row.batchId && isComplete && (
+                    <CardActions sx={{ pt: 0, pb: 1, px: 2, gap: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          setRunMode('single');
+                          setSellerId(row.sellerId);
+                          setBatchId(row.batchId);
+                          setBatch(allBatchesData[row.batchId] || null);
+                        }}
+                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                      >
+                        View Results
+                      </Button>
+                      {needsManual > 0 && !bd?.manualReviewDone && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => {
+                            setRunMode('single');
+                            setSellerId(row.sellerId);
+                            setBatchId(row.batchId);
+                            setBatch(allBatchesData[row.batchId] || null);
+                            setStatusFilter('needs_manual');
+                          }}
+                          sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' }, textTransform: 'none', fontSize: '0.75rem' }}
+                        >
+                          Review ({needsManual})
+                        </Button>
+                      )}
+                    </CardActions>
+                  )}
+                </Card>
+              );
+            })}
+          </Box>
+
+          {/* "Review Next" sequential helper */}
+          {allSellersRun.some(r => {
+            const bd = r.batchId ? allBatchesData[r.batchId] : null;
+            return bd?.status === 'completed' && (bd?.needsManualCount || 0) > 0 && !bd?.manualReviewDone;
+          }) && (
+            <Box mt={2}>
+              <Button
+                variant="contained"
+                startIcon={<BuildIcon />}
+                onClick={() => {
+                  const next = allSellersRun.find(r => {
+                    const bd = r.batchId ? allBatchesData[r.batchId] : null;
+                    return bd?.status === 'completed' && (bd?.needsManualCount || 0) > 0 && !bd?.manualReviewDone;
+                  });
+                  if (next) {
+                    setRunMode('single');
+                    setSellerId(next.sellerId);
+                    setBatchId(next.batchId);
+                    setBatch(allBatchesData[next.batchId] || null);
+                    setStatusFilter('needs_manual');
+                  }
+                }}
+                sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' }, textTransform: 'none' }}
+              >
+                Review Next Seller with Pending Manual
+              </Button>
+            </Box>
+          )}
+        </Box>
+      )}
 
       {/* LIVE PROGRESS */}
       {batch && (
@@ -1391,8 +1770,12 @@ export default function AutoCompatibilityPage() {
 
           {/* Summary counters */}
           <Box display="flex" gap={1.5} flexWrap="wrap">
-            <Chip icon={<CheckCircleIcon />} label={`${batch.successCount || 0} Success`} color="success" size="small" />
-            <Chip icon={<WarningIcon />} label={`${batch.warningCount || 0} Warning`} color="warning" size="small" />
+            <Chip
+              icon={<CheckCircleIcon />}
+              label={`${(batch.successCount || 0) + (batch.warningCount || 0)} Success`}
+              color="success"
+              size="small"
+            />
             <Chip icon={<BuildIcon />} label={`${batch.needsManualCount || 0} Manual`} color="info" size="small" />
             <Chip icon={<ErrorIcon />} label={`${batch.ebayErrorCount || 0} eBay Error`} color="error" size="small" />
             <Chip icon={<SmartToyIcon />} label={`${batch.aiFailedCount || 0} AI Failed`} size="small" />
@@ -1491,8 +1874,11 @@ export default function AutoCompatibilityPage() {
                         <Typography 
                           variant="caption" 
                           color={
-                            item.status === 'success' || item.status === 'warning' ? 'success.main' : 
-                            (item.ebayWarning ? 'info.main' : 'error.main')
+                            (item.status === 'success' || item.status === 'warning') && item.ebayWarning
+                              ? 'warning.dark'
+                              : item.status === 'success' || item.status === 'warning'
+                              ? 'success.main'
+                              : item.ebayWarning ? 'info.main' : 'error.main'
                           }
                           sx={{ maxWidth: 250, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}
                         >
@@ -2228,43 +2614,244 @@ export default function AutoCompatibilityPage() {
       </Dialog>
 
       {/* HISTORY DIALOG */}
-      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Typography variant="h6">Auto-Compatibility History</Typography>
-          <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Chip label={`Selected Seller: ${selectedSellerLabel}`} size="small" variant="outlined" />
-            <Chip label={`Selected Date: ${targetDate || '—'}`} size="small" variant="outlined" />
+      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6" fontWeight={700}>Auto-Compatibility History</Typography>
+            {historyTotal > 0 && <Chip label={`${historyTotal} total`} size="small" variant="outlined" />}
+          </Box>
+
+          {/* ── Filter Rows ── */}
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+            {/* Row 1: Date filters */}
+            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+
+              {/* Listing Date (targetDate) */}
+              <Box>
+                <Typography variant="caption" color="textSecondary" fontWeight={600} sx={{ display: 'block', mb: 0.75 }}>
+                  Listing Date
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={historyFilters.listingDateMode}
+                    onChange={(_, v) => {
+                      if (!v) return;
+                      const next = { ...historyFilters, listingDateMode: v, listingDate: '', dateFrom: '', dateTo: '', page: 1 };
+                      setHistoryFilters(next);
+                      loadHistory(next);
+                    }}
+                    sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.4, fontSize: '0.7rem' } }}
+                  >
+                    <ToggleButton value="single">Single</ToggleButton>
+                    <ToggleButton value="range">Range</ToggleButton>
+                  </ToggleButtonGroup>
+                  {historyFilters.listingDateMode === 'single' ? (
+                    <TextField
+                      type="date"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      value={historyFilters.listingDate}
+                      onChange={e => updateHistoryFilter('listingDate', e.target.value)}
+                      sx={{ width: 150 }}
+                    />
+                  ) : (
+                    <>
+                      <TextField
+                        label="From"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.dateFrom}
+                        onChange={e => updateHistoryFilter('dateFrom', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                      <TextField
+                        label="To"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.dateTo}
+                        onChange={e => updateHistoryFilter('dateTo', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                    </>
+                  )}
+                </Box>
+              </Box>
+
+              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+              {/* Run On Date (createdAt) */}
+              <Box>
+                <Typography variant="caption" color="textSecondary" fontWeight={600} sx={{ display: 'block', mb: 0.75 }}>
+                  Run On (IST)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={historyFilters.runOnMode}
+                    onChange={(_, v) => {
+                      if (!v) return;
+                      const next = { ...historyFilters, runOnMode: v, runOnDate: '', runOnFrom: '', runOnTo: '', page: 1 };
+                      setHistoryFilters(next);
+                      loadHistory(next);
+                    }}
+                    sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.4, fontSize: '0.7rem' } }}
+                  >
+                    <ToggleButton value="single">Single</ToggleButton>
+                    <ToggleButton value="range">Range</ToggleButton>
+                  </ToggleButtonGroup>
+                  {historyFilters.runOnMode === 'single' ? (
+                    <TextField
+                      type="date"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      value={historyFilters.runOnDate}
+                      onChange={e => updateHistoryFilter('runOnDate', e.target.value)}
+                      sx={{ width: 150 }}
+                    />
+                  ) : (
+                    <>
+                      <TextField
+                        label="From"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.runOnFrom}
+                        onChange={e => updateHistoryFilter('runOnFrom', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                      <TextField
+                        label="To"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.runOnTo}
+                        onChange={e => updateHistoryFilter('runOnTo', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                    </>
+                  )}
+                </Box>
+              </Box>
+            </Box>
+
+            <Divider />
+
+            {/* Row 2: Dropdown filters + Clear */}
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* By (Triggered By — non-seller staff only) */}
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>By</InputLabel>
+                <Select
+                  value={historyFilters.triggeredByFilter}
+                  label="By"
+                  onChange={e => updateHistoryFilter('triggeredByFilter', e.target.value)}
+                >
+                  <MenuItem value="">Anyone</MenuItem>
+                  {staffUsers.map(u => (
+                    <MenuItem key={u._id} value={u._id}>
+                      {u.username || u.email}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 175 }}>
+                <InputLabel>Seller</InputLabel>
+                <Select
+                  value={historyFilters.sellerFilter}
+                  label="Seller"
+                  onChange={e => updateHistoryFilter('sellerFilter', e.target.value)}
+                >
+                  <MenuItem value="">All Sellers</MenuItem>
+                  {sellers.map(s => (
+                    <MenuItem key={s._id} value={s._id}>{s.user?.username || s.user?.email}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 145 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={historyFilters.statusFilter}
+                  label="Status"
+                  onChange={e => updateHistoryFilter('statusFilter', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="running">Running</MenuItem>
+                  <MenuItem value="failed">Failed</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 155 }}>
+                <InputLabel>Review</InputLabel>
+                <Select
+                  value={historyFilters.reviewedFilter}
+                  label="Review"
+                  onChange={e => updateHistoryFilter('reviewedFilter', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="reviewed">Reviewed</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={() => {
+                  const reset = {
+                    listingDateMode: 'single', listingDate: '', dateFrom: '', dateTo: '',
+                    runOnMode: 'single', runOnDate: '', runOnFrom: '', runOnTo: '',
+                    sellerFilter: '', triggeredByFilter: '', statusFilter: '', reviewedFilter: '',
+                    page: 1, limit: 25,
+                  };
+                  setHistoryFilters(reset);
+                  loadHistory(reset);
+                }}
+              >
+                Clear All
+              </Button>
+            </Box>
+
           </Box>
         </DialogTitle>
-        <DialogContent>
+
+        <DialogContent sx={{ p: 0 }}>
           {historyLoading ? (
-            <Box display="flex" justifyContent="center" p={3}><CircularProgress /></Box>
+            <Box display="flex" justifyContent="center" p={4}><CircularProgress /></Box>
           ) : history.length === 0 ? (
-            <Typography color="textSecondary" textAlign="center" p={3}>
-              No batches found for {selectedSellerLabel}
+            <Typography color="textSecondary" textAlign="center" p={4}>
+              No batches found for the selected filters
             </Typography>
           ) : (
-            <TableContainer>
-              <Table size="small">
+            <TableContainer sx={{ maxHeight: 'calc(80vh - 200px)' }}>
+              <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Listing Date</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Run On</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Seller</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>By</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Total</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>✅</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>🔧</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>❌</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Manual Review</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Listing Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Run On (IST)</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Seller</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>By</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Status</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Total</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>✅ Sent</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>🔧 Manual</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>❌ Errors</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Review</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {history.map(b => (
                     <TableRow key={b._id} hover>
-                      <TableCell>{b.targetDate}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{b.targetDate}</TableCell>
                       <TableCell>
                         <Typography variant="caption">{formatDateIST(b.createdAt)}</Typography>
                       </TableCell>
@@ -2278,7 +2865,12 @@ export default function AutoCompatibilityPage() {
                         />
                       </TableCell>
                       <TableCell align="center">{b.totalListings}</TableCell>
-                      <TableCell align="center">{b.successCount + (b.warningCount || 0)}</TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                          <Typography variant="caption" color="success.main" fontWeight={600}>{b.successCount || 0} ✓</Typography>
+                          {(b.warningCount || 0) > 0 && <Typography variant="caption" color="warning.dark" sx={{ fontSize: '0.65rem' }}>{b.warningCount} w/notes</Typography>}
+                        </Box>
+                      </TableCell>
                       <TableCell align="center">{b.needsManualCount || 0}</TableCell>
                       <TableCell align="center">{(b.ebayErrorCount || 0) + (b.aiFailedCount || 0)}</TableCell>
                       <TableCell>
@@ -2289,7 +2881,7 @@ export default function AutoCompatibilityPage() {
                             <Chip label={`⨯${b.manualEndedCount}`} size="small" color="error" sx={{ height: 20, fontSize: '0.65rem' }} />
                           </Box>
                         ) : (
-                          <Typography variant="caption" color="textSecondary">—</Typography>
+                          <Typography variant="caption" color="textSecondary">Pending</Typography>
                         )}
                       </TableCell>
                       <TableCell>
@@ -2304,7 +2896,35 @@ export default function AutoCompatibilityPage() {
             </TableContainer>
           )}
         </DialogContent>
-        <DialogActions>
+
+        <DialogActions sx={{ borderTop: '1px solid #eee', p: 1.5, gap: 1 }}>
+          {/* Pagination */}
+          <Button
+            size="small"
+            disabled={historyFilters.page <= 1 || historyLoading}
+            onClick={() => {
+              const next = { ...historyFilters, page: historyFilters.page - 1 };
+              setHistoryFilters(next);
+              loadHistory(next);
+            }}
+          >
+            ← Prev
+          </Button>
+          <Typography variant="caption" sx={{ mx: 1 }}>
+            Page {historyFilters.page} · {history.length} of {historyTotal}
+          </Typography>
+          <Button
+            size="small"
+            disabled={historyFilters.page * historyFilters.limit >= historyTotal || historyLoading}
+            onClick={() => {
+              const next = { ...historyFilters, page: historyFilters.page + 1 };
+              setHistoryFilters(next);
+              loadHistory(next);
+            }}
+          >
+            Next →
+          </Button>
+          <Box sx={{ flex: 1 }} />
           <Button onClick={() => setHistoryOpen(false)} variant="contained">Close</Button>
         </DialogActions>
       </Dialog>
