@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Button, Typography, CircularProgress, Chip, TextField, Autocomplete, Pagination
+  Button, Typography, CircularProgress, Chip, TextField, Autocomplete, Pagination,
+  ToggleButtonGroup, ToggleButton, Select, MenuItem, FormControl, InputLabel, Divider
 } from '@mui/material';
 import api from '../../lib/api';
 
@@ -20,8 +21,18 @@ export default function AutoCompatReviewHistoryPage() {
   const [selectedSellerId, setSelectedSellerId] = useState('');
   const [selectedRunById, setSelectedRunById] = useState('');
   const [selectedReviewedById, setSelectedReviewedById] = useState('');
+  // Listing date (targetDate) filters
+  const [listingDateMode, setListingDateMode] = useState('range'); // 'single' | 'range'
+  const [listingDate, setListingDate] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  // Run On (createdAt) filters
+  const [runOnMode, setRunOnMode] = useState('single'); // 'single' | 'range'
+  const [runOnDate, setRunOnDate] = useState('');
+  const [runOnFrom, setRunOnFrom] = useState('');
+  const [runOnTo, setRunOnTo] = useState('');
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState('');
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -49,7 +60,9 @@ export default function AutoCompatReviewHistoryPage() {
 
   useEffect(() => {
     fetchBatches();
-  }, [page, selectedSellerId, selectedRunById, selectedReviewedById, dateFrom, dateTo]);
+  }, [page, selectedSellerId, selectedRunById, selectedReviewedById,
+      listingDateMode, listingDate, dateFrom, dateTo,
+      runOnMode, runOnDate, runOnFrom, runOnTo, statusFilter]);
 
   const fetchBatches = async () => {
     setLoading(true);
@@ -58,8 +71,21 @@ export default function AutoCompatReviewHistoryPage() {
       if (selectedSellerId) params.sellerId = selectedSellerId;
       if (selectedRunById) params.triggeredBy = selectedRunById;
       if (selectedReviewedById) params.reviewedBy = selectedReviewedById;
-      if (dateFrom) params.dateFrom = dateFrom;
-      if (dateTo) params.dateTo = dateTo;
+      // Listing date
+      if (listingDateMode === 'single') {
+        if (listingDate) params.listingDate = listingDate;
+      } else {
+        if (dateFrom) params.dateFrom = dateFrom;
+        if (dateTo) params.dateTo = dateTo;
+      }
+      // Run On date (createdAt)
+      if (runOnMode === 'single') {
+        if (runOnDate) params.runOnDate = runOnDate;
+      } else {
+        if (runOnFrom) params.runOnFrom = runOnFrom;
+        if (runOnTo) params.runOnTo = runOnTo;
+      }
+      if (statusFilter) params.status = statusFilter;
       const { data } = await api.get('/ebay/auto-compatibility-batches', { params });
       setBatches(data.batches || []);
       setTotalPages(data.pages || 1);
@@ -78,8 +104,15 @@ export default function AutoCompatReviewHistoryPage() {
     setSelectedSellerId('');
     setSelectedRunById('');
     setSelectedReviewedById('');
+    setListingDateMode('range');
+    setListingDate('');
     setDateFrom('');
     setDateTo('');
+    setRunOnMode('single');
+    setRunOnDate('');
+    setRunOnFrom('');
+    setRunOnTo('');
+    setStatusFilter('');
     setPage(1);
   };
 
@@ -95,46 +128,137 @@ export default function AutoCompatReviewHistoryPage() {
       </Box>
 
       {/* Filters */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-        <TextField
-          type="date" label="Listing Date From" size="small"
-          InputLabelProps={{ shrink: true }} value={dateFrom}
-          onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-          sx={{ minWidth: 170 }}
-        />
-        <TextField
-          type="date" label="Listing Date To" size="small"
-          InputLabelProps={{ shrink: true }} value={dateTo}
-          onChange={e => { setDateTo(e.target.value); setPage(1); }}
-          sx={{ minWidth: 170 }}
-        />
-        <Autocomplete
-          size="small" sx={{ minWidth: 200 }} options={sellers}
-          getOptionLabel={o => o.user?.username || o.user?.email || ''}
-          value={sellers.find(s => s._id === selectedSellerId) || null}
-          onChange={(_, v) => { setSelectedSellerId(v?._id || ''); setPage(1); }}
-          renderInput={p => <TextField {...p} label="Seller" />}
-          isOptionEqualToValue={(o, v) => o._id === v._id}
-        />
-        <Autocomplete
-          size="small" sx={{ minWidth: 180 }} options={users}
-          getOptionLabel={o => o.username || o.email || ''}
-          value={users.find(u => u._id === selectedRunById) || null}
-          onChange={(_, v) => { setSelectedRunById(v?._id || ''); setPage(1); }}
-          renderInput={p => <TextField {...p} label="Run By" />}
-          isOptionEqualToValue={(o, v) => o._id === v._id}
-        />
-        <Autocomplete
-          size="small" sx={{ minWidth: 180 }} options={users}
-          getOptionLabel={o => o.username || o.email || ''}
-          value={users.find(u => u._id === selectedReviewedById) || null}
-          onChange={(_, v) => { setSelectedReviewedById(v?._id || ''); setPage(1); }}
-          renderInput={p => <TextField {...p} label="Reviewed By" />}
-          isOptionEqualToValue={(o, v) => o._id === v._id}
-        />
-        {(selectedSellerId || selectedRunById || selectedReviewedById || dateFrom || dateTo) && (
-          <Button size="small" variant="outlined" onClick={clearFilters}>Clear</Button>
-        )}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+
+        {/* Row 1: Date filters */}
+        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+
+          {/* Listing Date (targetDate) */}
+          <Box>
+            <Typography variant="caption" color="textSecondary" fontWeight={600} sx={{ display: 'block', mb: 0.75 }}>
+              Listing Date
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <ToggleButtonGroup
+                size="small" exclusive value={listingDateMode}
+                onChange={(_, v) => { if (!v) return; setListingDateMode(v); setListingDate(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+                sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.4, fontSize: '0.7rem' } }}
+              >
+                <ToggleButton value="single">Single</ToggleButton>
+                <ToggleButton value="range">Range</ToggleButton>
+              </ToggleButtonGroup>
+              {listingDateMode === 'single' ? (
+                <TextField
+                  type="date" size="small" InputLabelProps={{ shrink: true }}
+                  value={listingDate}
+                  onChange={e => { setListingDate(e.target.value); setPage(1); }}
+                  sx={{ width: 150 }}
+                />
+              ) : (
+                <>
+                  <TextField
+                    label="From" type="date" size="small" InputLabelProps={{ shrink: true }}
+                    value={dateFrom}
+                    onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+                    sx={{ width: 150 }}
+                  />
+                  <TextField
+                    label="To" type="date" size="small" InputLabelProps={{ shrink: true }}
+                    value={dateTo}
+                    onChange={e => { setDateTo(e.target.value); setPage(1); }}
+                    sx={{ width: 150 }}
+                  />
+                </>
+              )}
+            </Box>
+          </Box>
+
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+          {/* Run On Date (createdAt) */}
+          <Box>
+            <Typography variant="caption" color="textSecondary" fontWeight={600} sx={{ display: 'block', mb: 0.75 }}>
+              Run On (IST)
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <ToggleButtonGroup
+                size="small" exclusive value={runOnMode}
+                onChange={(_, v) => { if (!v) return; setRunOnMode(v); setRunOnDate(''); setRunOnFrom(''); setRunOnTo(''); setPage(1); }}
+                sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.4, fontSize: '0.7rem' } }}
+              >
+                <ToggleButton value="single">Single</ToggleButton>
+                <ToggleButton value="range">Range</ToggleButton>
+              </ToggleButtonGroup>
+              {runOnMode === 'single' ? (
+                <TextField
+                  type="date" size="small" InputLabelProps={{ shrink: true }}
+                  value={runOnDate}
+                  onChange={e => { setRunOnDate(e.target.value); setPage(1); }}
+                  sx={{ width: 150 }}
+                />
+              ) : (
+                <>
+                  <TextField
+                    label="From" type="date" size="small" InputLabelProps={{ shrink: true }}
+                    value={runOnFrom}
+                    onChange={e => { setRunOnFrom(e.target.value); setPage(1); }}
+                    sx={{ width: 150 }}
+                  />
+                  <TextField
+                    label="To" type="date" size="small" InputLabelProps={{ shrink: true }}
+                    value={runOnTo}
+                    onChange={e => { setRunOnTo(e.target.value); setPage(1); }}
+                    sx={{ width: 150 }}
+                  />
+                </>
+              )}
+            </Box>
+          </Box>
+        </Box>
+
+        <Divider />
+
+        {/* Row 2: Dropdown filters */}
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Autocomplete
+            size="small" sx={{ minWidth: 200 }} options={sellers}
+            getOptionLabel={o => o.user?.username || o.user?.email || ''}
+            value={sellers.find(s => s._id === selectedSellerId) || null}
+            onChange={(_, v) => { setSelectedSellerId(v?._id || ''); setPage(1); }}
+            renderInput={p => <TextField {...p} label="Seller" />}
+            isOptionEqualToValue={(o, v) => o._id === v._id}
+          />
+          <Autocomplete
+            size="small" sx={{ minWidth: 180 }} options={users}
+            getOptionLabel={o => o.username || o.email || ''}
+            value={users.find(u => u._id === selectedRunById) || null}
+            onChange={(_, v) => { setSelectedRunById(v?._id || ''); setPage(1); }}
+            renderInput={p => <TextField {...p} label="Run By" />}
+            isOptionEqualToValue={(o, v) => o._id === v._id}
+          />
+          <Autocomplete
+            size="small" sx={{ minWidth: 180 }} options={users}
+            getOptionLabel={o => o.username || o.email || ''}
+            value={users.find(u => u._id === selectedReviewedById) || null}
+            onChange={(_, v) => { setSelectedReviewedById(v?._id || ''); setPage(1); }}
+            renderInput={p => <TextField {...p} label="Reviewed By" />}
+            isOptionEqualToValue={(o, v) => o._id === v._id}
+          />
+          <FormControl size="small" sx={{ minWidth: 145 }}>
+            <InputLabel>Status</InputLabel>
+            <Select value={statusFilter} label="Status" onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+              <MenuItem value="running">Running</MenuItem>
+              <MenuItem value="failed">Failed</MenuItem>
+            </Select>
+          </FormControl>
+          {(selectedSellerId || selectedRunById || selectedReviewedById ||
+            listingDate || dateFrom || dateTo ||
+            runOnDate || runOnFrom || runOnTo || statusFilter) && (
+            <Button size="small" variant="outlined" onClick={clearFilters}>Clear All</Button>
+          )}
+        </Box>
       </Box>
 
       {/* Summary chips */}
