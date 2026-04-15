@@ -1567,7 +1567,6 @@ export default function AutoCompatibilityPage() {
               helperText={itemLimit === '' || itemLimit === 0 ? 'All items' : `First ${itemLimit}`}
             />
 
-            {isSuperAdmin && (
             <Tooltip
               title={hasConflict ? `${activeBatches.length} batch${activeBatches.length !== 1 ? 'es are' : ' is'} currently running. Wait for ${activeBatches.length !== 1 ? 'them' : 'it'} to finish or click the chip above to monitor.` : ''}
               arrow
@@ -1592,7 +1591,6 @@ export default function AutoCompatibilityPage() {
                 </Button>
               </span>
             </Tooltip>
-            )}
           </Box>
         ) : (
           /* ─── ALL SELLERS MODE ───────────────────────────────────────────── */
