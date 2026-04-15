@@ -10,7 +10,12 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Snackbar,
   Table,
   TableBody,
@@ -19,9 +24,12 @@ import {
   TableHead,
   TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import HistoryIcon from '@mui/icons-material/History';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import api from '../../lib/api';
 
 const formatDateIST = (dateString) => {
@@ -41,8 +49,18 @@ export default function AutoCompatSellerHistoryPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [history, setHistory] = useState([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
   const [selectedSeller, setSelectedSeller] = useState(null);
+  const [staffUsers, setStaffUsers] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  const defaultFilters = {
+    listingDateMode: 'single', listingDate: '', dateFrom: '', dateTo: '',
+    runOnMode: 'single', runOnDate: '', runOnFrom: '', runOnTo: '',
+    triggeredByFilter: '', statusFilter: '', reviewedFilter: '',
+    page: 1, limit: 25,
+  };
+  const [historyFilters, setHistoryFilters] = useState(defaultFilters);
 
   useEffect(() => {
     const loadSellers = async () => {
@@ -63,7 +81,15 @@ export default function AutoCompatSellerHistoryPage() {
       }
     };
 
+    const loadStaff = async () => {
+      try {
+        const { data } = await api.get('/users');
+        setStaffUsers((data || []).filter(u => u.role !== 'seller'));
+      } catch { /* non-critical */ }
+    };
+
     loadSellers();
+    loadStaff();
   }, []);
 
   const filteredSellers = useMemo(() => {
@@ -77,15 +103,35 @@ export default function AutoCompatSellerHistoryPage() {
     });
   }, [sellerSearch, sellers]);
 
-  const loadHistory = async (seller) => {
-    setSelectedSeller(seller);
-    setHistoryOpen(true);
+  const loadHistory = async (seller, overrides = {}) => {
+    const resolvedSeller = seller || selectedSeller;
+    if (!resolvedSeller) return;
+    if (seller) {
+      setSelectedSeller(seller);
+      setHistoryOpen(true);
+    }
     setHistoryLoading(true);
     try {
-      const { data } = await api.get('/ebay/auto-compatibility-batches', {
-        params: { sellerId: seller._id, limit: 100 },
-      });
+      const filters = { ...historyFilters, ...overrides };
+      const params = { sellerId: resolvedSeller._id, page: filters.page, limit: filters.limit };
+      if (filters.triggeredByFilter) params.triggeredBy = filters.triggeredByFilter;
+      if (filters.listingDateMode === 'single') {
+        if (filters.listingDate) params.listingDate = filters.listingDate;
+      } else {
+        if (filters.dateFrom) params.dateFrom = filters.dateFrom;
+        if (filters.dateTo) params.dateTo = filters.dateTo;
+      }
+      if (filters.runOnMode === 'single') {
+        if (filters.runOnDate) params.runOnDate = filters.runOnDate;
+      } else {
+        if (filters.runOnFrom) params.runOnFrom = filters.runOnFrom;
+        if (filters.runOnTo) params.runOnTo = filters.runOnTo;
+      }
+      if (filters.statusFilter) params.status = filters.statusFilter;
+      if (filters.reviewedFilter === 'reviewed') params.manualReviewDone = 'true';
+      const { data } = await api.get('/ebay/auto-compatibility-batches', { params });
       setHistory(data.batches || []);
+      setHistoryTotal(data.total || 0);
     } catch (e) {
       console.error(e);
       setHistory([]);
@@ -93,6 +139,12 @@ export default function AutoCompatSellerHistoryPage() {
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const updateHistoryFilter = (key, value) => {
+    const next = { ...historyFilters, [key]: value, page: 1 };
+    setHistoryFilters(next);
+    loadHistory(null, next);
   };
 
   const handleViewBatch = (batchId) => {
@@ -164,50 +216,229 @@ export default function AutoCompatSellerHistoryPage() {
         )}
       </Paper>
 
-      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="lg" fullWidth>
-        <DialogTitle>
-          <Typography variant="h6">Auto-Compatibility History</Typography>
-          <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Chip
-              label={`Seller: ${selectedSeller?.user?.username || selectedSeller?.user?.email || '—'}`}
-              size="small"
-              variant="outlined"
-            />
+      <Dialog open={historyOpen} onClose={() => { setHistoryOpen(false); setHistoryFilters(defaultFilters); }} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6" fontWeight={700}>Auto-Compatibility History</Typography>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Chip
+                label={`Seller: ${selectedSeller?.user?.username || selectedSeller?.user?.email || '—'}`}
+                size="small"
+                variant="outlined"
+              />
+              {historyTotal > 0 && <Chip label={`${historyTotal} total`} size="small" variant="outlined" />}
+            </Box>
+          </Box>
+
+          {/* ── Filter Rows ── */}
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+            {/* Row 1: Date filters */}
+            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+
+              {/* Listing Date (targetDate) */}
+              <Box>
+                <Typography variant="caption" color="textSecondary" fontWeight={600} sx={{ display: 'block', mb: 0.75 }}>
+                  Listing Date
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={historyFilters.listingDateMode}
+                    onChange={(_, v) => {
+                      if (!v) return;
+                      const next = { ...historyFilters, listingDateMode: v, listingDate: '', dateFrom: '', dateTo: '', page: 1 };
+                      setHistoryFilters(next);
+                      loadHistory(null, next);
+                    }}
+                    sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.4, fontSize: '0.7rem' } }}
+                  >
+                    <ToggleButton value="single">Single</ToggleButton>
+                    <ToggleButton value="range">Range</ToggleButton>
+                  </ToggleButtonGroup>
+                  {historyFilters.listingDateMode === 'single' ? (
+                    <TextField
+                      type="date"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      value={historyFilters.listingDate}
+                      onChange={e => updateHistoryFilter('listingDate', e.target.value)}
+                      sx={{ width: 150 }}
+                    />
+                  ) : (
+                    <>
+                      <TextField
+                        label="From"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.dateFrom}
+                        onChange={e => updateHistoryFilter('dateFrom', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                      <TextField
+                        label="To"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.dateTo}
+                        onChange={e => updateHistoryFilter('dateTo', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                    </>
+                  )}
+                </Box>
+              </Box>
+
+              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+              {/* Run On Date (createdAt) */}
+              <Box>
+                <Typography variant="caption" color="textSecondary" fontWeight={600} sx={{ display: 'block', mb: 0.75 }}>
+                  Run On (IST)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={historyFilters.runOnMode}
+                    onChange={(_, v) => {
+                      if (!v) return;
+                      const next = { ...historyFilters, runOnMode: v, runOnDate: '', runOnFrom: '', runOnTo: '', page: 1 };
+                      setHistoryFilters(next);
+                      loadHistory(null, next);
+                    }}
+                    sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.4, fontSize: '0.7rem' } }}
+                  >
+                    <ToggleButton value="single">Single</ToggleButton>
+                    <ToggleButton value="range">Range</ToggleButton>
+                  </ToggleButtonGroup>
+                  {historyFilters.runOnMode === 'single' ? (
+                    <TextField
+                      type="date"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      value={historyFilters.runOnDate}
+                      onChange={e => updateHistoryFilter('runOnDate', e.target.value)}
+                      sx={{ width: 150 }}
+                    />
+                  ) : (
+                    <>
+                      <TextField
+                        label="From"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.runOnFrom}
+                        onChange={e => updateHistoryFilter('runOnFrom', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                      <TextField
+                        label="To"
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={historyFilters.runOnTo}
+                        onChange={e => updateHistoryFilter('runOnTo', e.target.value)}
+                        sx={{ width: 150 }}
+                      />
+                    </>
+                  )}
+                </Box>
+              </Box>
+            </Box>
+
+            <Divider />
+
+            {/* Row 2: Dropdown filters + Clear */}
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>By</InputLabel>
+                <Select
+                  value={historyFilters.triggeredByFilter}
+                  label="By"
+                  onChange={e => updateHistoryFilter('triggeredByFilter', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {staffUsers.map(u => (
+                    <MenuItem key={u._id} value={u._id}>{u.username || u.email}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 145 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={historyFilters.statusFilter}
+                  label="Status"
+                  onChange={e => updateHistoryFilter('statusFilter', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="running">Running</MenuItem>
+                  <MenuItem value="failed">Failed</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 155 }}>
+                <InputLabel>Review</InputLabel>
+                <Select
+                  value={historyFilters.reviewedFilter}
+                  label="Review"
+                  onChange={e => updateHistoryFilter('reviewedFilter', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="reviewed">Reviewed</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={() => {
+                  setHistoryFilters(defaultFilters);
+                  loadHistory(null, defaultFilters);
+                }}
+              >
+                Clear All
+              </Button>
+            </Box>
           </Box>
         </DialogTitle>
-        <DialogContent>
+
+        <DialogContent sx={{ p: 0 }}>
           {historyLoading ? (
             <Box display="flex" justifyContent="center" p={3}><CircularProgress /></Box>
           ) : history.length === 0 ? (
             <Typography color="textSecondary" textAlign="center" p={3}>
-              No batches found for {selectedSeller?.user?.username || selectedSeller?.user?.email || 'this seller'}
+              No batches found for the selected filters
             </Typography>
           ) : (
-            <TableContainer>
-              <Table size="small">
+            <TableContainer sx={{ maxHeight: 'calc(80vh - 260px)' }}>
+              <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Listing Date</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Run On</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Seller</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>By</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Total</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>✅</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>🔧</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>❌</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Manual Review</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Listing Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Run On (IST)</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>By</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Status</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Total</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>✅ Sent</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>🔧 Manual</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>❌ Errors</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Review</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {history.map((batch) => (
                     <TableRow key={batch._id} hover>
-                      <TableCell>{batch.targetDate}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{batch.targetDate}</TableCell>
                       <TableCell>
                         <Typography variant="caption">{formatDateIST(batch.createdAt)}</Typography>
                       </TableCell>
-                      <TableCell>{batch.seller?.user?.username || '—'}</TableCell>
                       <TableCell>{batch.triggeredBy?.username || '—'}</TableCell>
                       <TableCell>
                         <Chip
@@ -217,7 +448,12 @@ export default function AutoCompatSellerHistoryPage() {
                         />
                       </TableCell>
                       <TableCell align="center">{batch.totalListings}</TableCell>
-                      <TableCell align="center">{batch.successCount + (batch.warningCount || 0)}</TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                          <Typography variant="caption" color="success.main" fontWeight={600}>{batch.successCount || 0} ✓</Typography>
+                          {(batch.warningCount || 0) > 0 && <Typography variant="caption" color="warning.dark" sx={{ fontSize: '0.65rem' }}>{batch.warningCount} w/notes</Typography>}
+                        </Box>
+                      </TableCell>
                       <TableCell align="center">{batch.needsManualCount || 0}</TableCell>
                       <TableCell align="center">{(batch.ebayErrorCount || 0) + (batch.aiFailedCount || 0)}</TableCell>
                       <TableCell>
@@ -242,9 +478,39 @@ export default function AutoCompatSellerHistoryPage() {
               </Table>
             </TableContainer>
           )}
+          {/* Pagination */}
+          {historyTotal > historyFilters.limit && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, p: 1.5, borderTop: '1px solid #eee' }}>
+              <Button
+                size="small"
+                disabled={historyFilters.page <= 1 || historyLoading}
+                onClick={() => {
+                  const next = { ...historyFilters, page: historyFilters.page - 1 };
+                  setHistoryFilters(next);
+                  loadHistory(null, next);
+                }}
+              >
+                Prev
+              </Button>
+              <Typography variant="caption">
+                Page {historyFilters.page} of {Math.ceil(historyTotal / historyFilters.limit)}
+              </Typography>
+              <Button
+                size="small"
+                disabled={historyFilters.page >= Math.ceil(historyTotal / historyFilters.limit) || historyLoading}
+                onClick={() => {
+                  const next = { ...historyFilters, page: historyFilters.page + 1 };
+                  setHistoryFilters(next);
+                  loadHistory(null, next);
+                }}
+              >
+                Next
+              </Button>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setHistoryOpen(false)} variant="contained">Close</Button>
+          <Button onClick={() => { setHistoryOpen(false); setHistoryFilters(defaultFilters); }} variant="contained">Close</Button>
         </DialogActions>
       </Dialog>
 

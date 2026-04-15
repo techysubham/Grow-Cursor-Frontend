@@ -1,4 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+
+const getISTDate = (offsetDays = 0) => {
+  const d = new Date(Date.now() + offsetDays * 86400000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+};
 import {
   Box, Typography, Container, Paper, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -21,19 +26,19 @@ export default function ListingStatsPage() {
   const [dateMode, setDateMode] = useState('single');
   
   // Single date
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => getISTDate());
   
   // Date range
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
-  });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(() => getISTDate(-7));
+  const [endDate, setEndDate] = useState(() => getISTDate());
   
   const [sellerFilter, setSellerFilter] = useState('all');
 
+  // Used to discard stale responses when date changes mid-request
+  const fetchGenRef = useRef(0);
+
   const fetchData = useCallback(async () => {
+    const gen = ++fetchGenRef.current;
     try {
       setLoading(true);
       setError(null);
@@ -48,11 +53,13 @@ export default function ListingStatsPage() {
       }
       
       const { data } = await api.get('/listing-stats/day-wise-counts', { params });
+      if (gen !== fetchGenRef.current) return; // stale — a newer request is in-flight
       setStats(data);
     } catch (err) {
+      if (gen !== fetchGenRef.current) return;
       setError(err.response?.data?.error || 'Failed to fetch listing statistics');
     } finally {
-      setLoading(false);
+      if (gen === fetchGenRef.current) setLoading(false);
     }
   }, [dateMode, selectedDate, startDate, endDate]);
 
@@ -123,7 +130,7 @@ export default function ListingStatsPage() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           {dateMode === 'single' ? (
             <TextField
-              label="Select Date (PST)"
+              label="Select Date (IST)"
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
@@ -137,7 +144,7 @@ export default function ListingStatsPage() {
           ) : (
             <>
               <TextField
-                label="Start Date (PST)"
+                label="Start Date (IST)"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -149,7 +156,7 @@ export default function ListingStatsPage() {
                 sx={{ minWidth: 180 }}
               />
               <TextField
-                label="End Date (PST)"
+                label="End Date (IST)"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
@@ -204,14 +211,14 @@ export default function ListingStatsPage() {
         <Paper>
           <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0' }}>
             <Typography variant="h6" fontWeight={600}>
-              Listings by Date and Seller (PST Timezone)
+              Listings by Date and Seller (IST)
             </Typography>
           </Box>
           <TableContainer sx={{ maxHeight: 600 }}>
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow sx={{ bgcolor: 'grey.100' }}>
-                  <TableCell><strong>Date (PST)</strong></TableCell>
+                  <TableCell><strong>Date (IST)</strong></TableCell>
                   <TableCell><strong>Seller Name</strong></TableCell>
                   <TableCell align="right"><strong>Listings Count</strong></TableCell>
                   <TableCell align="right"><strong>Empty Compatibility</strong></TableCell>
@@ -232,12 +239,12 @@ export default function ListingStatsPage() {
                         <TableCell colSpan={4}>
                           <Typography variant="subtitle2" fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <CalendarMonthIcon fontSize="small" />
-                            {new Date(date + 'T00:00:00-08:00').toLocaleDateString('en-US', { 
+                            {new Date(date + 'T00:00:00+05:30').toLocaleDateString('en-IN', { 
                               weekday: 'short', 
                               year: 'numeric', 
                               month: 'short', 
                               day: 'numeric',
-                              timeZone: 'America/Los_Angeles'
+                              timeZone: 'Asia/Kolkata'
                             })}
                             <Chip 
                               label={`${dateStats.reduce((sum, s) => sum + s.count, 0)} total`} 

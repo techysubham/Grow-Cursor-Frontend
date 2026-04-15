@@ -4,7 +4,8 @@ import {
   Button, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, IconButton, TextField, Grid, Chip, Divider, FormControl,
   InputLabel, Select, MenuItem, Snackbar, Alert, Pagination, OutlinedInput, Checkbox, ListItemText,
-  Autocomplete, InputAdornment, Tooltip, Switch, FormControlLabel, Collapse
+  Autocomplete, InputAdornment, Tooltip, Switch, FormControlLabel, Collapse,
+  ToggleButtonGroup, ToggleButton
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -60,8 +61,8 @@ const getVehicleString = (nameValueList) => {
 // Helper: Date to PST
 const formatDate = (dateString) => {
   if (!dateString) return '-';
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: true
   }).format(new Date(dateString));
@@ -115,6 +116,10 @@ export default function CompatibilityDashboard() {
   const [newNotes, setNewNotes] = useState('');
   const [pageInputValue, setPageInputValue] = useState('');
   const [filterNoFitment, setFilterNoFitment] = useState(false);
+  const [listedDateMode, setListedDateMode] = useState('range'); // 'single' | 'range'
+  const [listedDate, setListedDate] = useState('');
+  const [listedFrom, setListedFrom] = useState('');
+  const [listedTo, setListedTo] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [trimFilterKeyword, setTrimFilterKeyword] = useState('');
 
@@ -288,7 +293,7 @@ export default function CompatibilityDashboard() {
 
   useEffect(() => {
     if (currentSellerId) loadListings();
-  }, [currentSellerId, page]);
+  }, [currentSellerId, page, listedDateMode, listedDate, listedFrom, listedTo]);
 
   useEffect(() => {
     if (currentSellerId) fetchApiUsage();
@@ -351,7 +356,10 @@ export default function CompatibilityDashboard() {
           sellerId: currentSellerId,
           page,
           limit: 100,
-          search: searchToSend
+          search: searchToSend,
+          ...(listedDateMode === 'single'
+            ? (listedDate ? { listedFrom: listedDate, listedTo: listedDate } : {})
+            : { ...(listedFrom ? { listedFrom } : {}), ...(listedTo ? { listedTo } : {}) }),
         }
       });
       setListings(data.listings);
@@ -1423,6 +1431,54 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
             }
             sx={{ mr: 0 }}
           />
+
+          {/* Listed On date filter (IST) — single or range */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="caption" color="textSecondary" fontWeight={600}>
+              Listed On (IST)
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <ToggleButtonGroup
+                size="small" exclusive value={listedDateMode}
+                onChange={(_, v) => {
+                  if (!v) return;
+                  setListedDateMode(v);
+                  setListedDate(''); setListedFrom(''); setListedTo('');
+                  setPage(1);
+                }}
+                sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.4, fontSize: '0.7rem' } }}
+              >
+                <ToggleButton value="single">Single</ToggleButton>
+                <ToggleButton value="range">Range</ToggleButton>
+              </ToggleButtonGroup>
+              {listedDateMode === 'single' ? (
+                <TextField
+                  type="date" size="small" InputLabelProps={{ shrink: true }}
+                  value={listedDate}
+                  onChange={e => { setListedDate(e.target.value); setPage(1); }}
+                  sx={{ width: 150 }}
+                />
+              ) : (
+                <>
+                  <TextField
+                    label="From" type="date" size="small" InputLabelProps={{ shrink: true }}
+                    value={listedFrom}
+                    onChange={e => { setListedFrom(e.target.value); setPage(1); }}
+                    sx={{ width: 150 }}
+                  />
+                  <TextField
+                    label="To" type="date" size="small" InputLabelProps={{ shrink: true }}
+                    value={listedTo}
+                    onChange={e => { setListedTo(e.target.value); setPage(1); }}
+                    sx={{ width: 150 }}
+                  />
+                </>
+              )}
+              {(listedDate || listedFrom || listedTo) && (
+                <Button size="small" variant="outlined" onClick={() => { setListedDate(''); setListedFrom(''); setListedTo(''); setPage(1); }}>Clear</Button>
+              )}
+            </Box>
+          </Box>
 
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Select Seller</InputLabel>
