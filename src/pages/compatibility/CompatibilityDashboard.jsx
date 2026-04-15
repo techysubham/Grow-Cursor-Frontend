@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Button, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
@@ -273,6 +273,38 @@ export default function CompatibilityDashboard() {
   const displayedListings = filterNoFitment
     ? listings.filter(item => !item.compatibility || item.compatibility.length === 0)
     : listings;
+
+  // Detect if a Poll All Sellers sync is already running when the page loads
+  // (e.g., triggered by the scheduled cron job) and attach to its progress.
+  const syncPollRef = useRef(null);
+  useEffect(() => {
+    const attachToRunningSyncIfNeeded = async () => {
+      try {
+        const { data: status } = await api.get('/ebay/sync-all-sellers-status');
+        if (!status.running) return;
+        const pageInfo = status.currentTotalPages > 0 ? ` (page ${status.currentPage}/${status.currentTotalPages})` : '';
+        setSyncingAll(true);
+        setSyncAllProgress(`${status.currentSeller}${pageInfo} — ${status.sellersComplete}/${status.sellersTotal} done`);
+        syncPollRef.current = setInterval(async () => {
+          try {
+            const { data: s } = await api.get('/ebay/sync-all-sellers-status');
+            if (s.running) {
+              const pi = s.currentTotalPages > 0 ? ` (page ${s.currentPage}/${s.currentTotalPages})` : '';
+              setSyncAllProgress(`${s.currentSeller}${pi} — ${s.sellersComplete}/${s.sellersTotal} done`);
+            } else {
+              clearInterval(syncPollRef.current);
+              const summary = s.results?.map(r => `${r.sellerName}: ${r.processedCount}${r.error ? ' ❌' : ''}`).join(' | ') || 'Done';
+              showSnackbar(`✅ ${summary}`, s.errors?.length ? 'warning' : 'success');
+              setSyncingAll(false);
+              setSyncAllProgress('');
+            }
+          } catch { /* ignore poll errors */ }
+        }, 3000);
+      } catch { /* non-critical */ }
+    };
+    attachToRunningSyncIfNeeded();
+    return () => { if (syncPollRef.current) clearInterval(syncPollRef.current); };
+  }, []);
 
   useEffect(() => {
     const initDashboard = async () => {
@@ -1494,6 +1526,24 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
           </Button>
         </Box>
       </Box>
+
+      {/* POLL ALL SELLERS RUNNING BANNER */}
+      {syncingAll && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2, borderRadius: 2 }}
+          icon={<CircularProgress size={18} color="inherit" />}
+        >
+          <Typography variant="body2" fontWeight={700}>
+            Poll All Sellers in progress
+          </Typography>
+          {syncAllProgress && (
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.25 }}>
+              {syncAllProgress}
+            </Typography>
+          )}
+        </Alert>
+      )}
 
       {/* TABLE */}
       {loading ? <Box display="flex" justifyContent="center" mt={5}><CircularProgress /></Box> : (
