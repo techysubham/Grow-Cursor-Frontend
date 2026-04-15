@@ -41,6 +41,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import InfoIcon from '@mui/icons-material/Info';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import api from '../../lib/api';
 import ColumnSelector from '../../components/ColumnSelector';
 import ChatModal from '../../components/ChatModal';
@@ -460,6 +461,9 @@ export default function AwaitingShipmentPage() {
   const [editingArrivalDate, setEditingArrivalDate] = useState({});
   const [savingArrivalDateId, setSavingArrivalDateId] = useState(null);
 
+  // Ship By Date Fetch State
+  const [fetchingShipByDateIds, setFetchingShipByDateIds] = useState(new Set());
+
   // Pagination State
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -729,6 +733,23 @@ export default function AwaitingShipmentPage() {
     if (updated) showSnack('success', '✅ Remark updated');
   };
 
+  // --- Fetch Ship By Date ---
+  const handleFetchShipByDate = async (order) => {
+    const id = order._id;
+    setFetchingShipByDateIds(prev => new Set([...prev, id]));
+    try {
+      const { data } = await api.post(`/ebay/orders/${id}/fetch-ship-by-date`);
+      if (data?.shipByDate) {
+        setOrders(prev => prev.map(o => o._id === id ? { ...o, shipByDate: data.shipByDate } : o));
+        showSnack('success', 'Ship by date fetched successfully');
+      }
+    } catch (err) {
+      showSnack('error', err?.response?.data?.error || 'Failed to fetch ship by date');
+    } finally {
+      setFetchingShipByDateIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+    }
+  };
+
   // --- Arrival Date helpers ---
   const startEditArrivalDate = (orderId, currentDate) => {
     setEditingArrivalDate(prev => ({ ...prev, [orderId]: (currentDate || '').slice(0, 10) }));
@@ -861,7 +882,24 @@ export default function AwaitingShipmentPage() {
         return formatDate(order.dateSold, order.purchaseMarketplaceId);
       case 'shipBy': {
         const shipByDateStr = order.shipByDate || order.lineItems?.[0]?.lineItemFulfillmentInstructions?.shipByDate;
-        if (!shipByDateStr) return '-';
+        if (!shipByDateStr) {
+          const isFetching = fetchingShipByDateIds.has(order._id);
+          return (
+            <Tooltip title="Fetch ship by date from eBay">
+              <span>
+                <IconButton
+                  size="small"
+                  color="primary"
+                  disabled={isFetching}
+                  onClick={() => handleFetchShipByDate(order)}
+                  sx={{ p: 0.5 }}
+                >
+                  <RefreshIcon sx={{ fontSize: '1rem', animation: isFetching ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } } }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          );
+        }
 
         // Check if ship-by date is within 24 hours of current IST time
         const shipByDate = new Date(shipByDateStr);
