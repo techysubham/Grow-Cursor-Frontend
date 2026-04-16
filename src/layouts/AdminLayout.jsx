@@ -146,6 +146,7 @@ import AttendanceAdminPage from '../pages/admin/AttendanceAdminPage.jsx';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import AsinDirectoryPage from '../pages/admin/AsinDirectoryPage.jsx';
 import AsinListPage from '../pages/admin/AsinListPage.jsx';
+import CRPComparisonPage from '../pages/admin/CRPComparisonPage.jsx';
 import UserSellerAssignmentPage from '../pages/admin/UserSellerAssignmentPage.jsx';
 import UserPerformancePage from '../pages/admin/UserPerformancePage.jsx';
 import AiFitmentUsagePage from '../pages/admin/AiFitmentUsagePage.jsx';
@@ -243,6 +244,7 @@ const COMPONENT_MAP = {
   'OrdersDashboard': OrdersDepartmentDashboardPage,
   'OrderAnalytics': OrderAnalyticsPage,
   'CRPAnalytics': CRPAnalyticsPage,
+  'CRPComparison': CRPComparisonPage,
   'Fulfillment': FulfillmentDashboard,
   'AwaitingShipment': AwaitingShipmentPage,
   'AwaitingSheet': AwaitingSheetPage,
