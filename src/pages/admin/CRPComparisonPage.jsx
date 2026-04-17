@@ -160,7 +160,7 @@ function DateFilterCard({ title, date, onChange }) {
         {title}
       </Typography>
       <Typography variant="caption" color="text.secondary">
-        Use a single comparison day for this side of the dashboard
+        Pick a day for this side. Changes apply together when you run the comparison.
       </Typography>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ mt: 1.5 }}>
         <TextField
@@ -290,18 +290,20 @@ function PreviewCell({ side, row, onOpen }) {
 
 export default function CRPComparisonPage() {
   const today = useMemo(() => formatInputDate(new Date()), []);
+  const initialFilters = useMemo(() => ({
+    listingsStartDate: today,
+    listingsEndDate: today,
+    ordersStartDate: today,
+    ordersEndDate: today,
+  }), [today]);
 
   const [sellers, setSellers] = useState([]);
   const [selectedSeller, setSelectedSeller] = useState('');
   const [excludeLowValue, setExcludeLowValue] = useState(false);
   const [chartLevel, setChartLevel] = useState('category');
   const [rowFilter, setRowFilter] = useState('all');
-  const [filters, setFilters] = useState({
-    listingsStartDate: today,
-    listingsEndDate: today,
-    ordersStartDate: today,
-    ordersEndDate: today,
-  });
+  const [draftFilters, setDraftFilters] = useState(initialFilters);
+  const [filters, setFilters] = useState(initialFilters);
   const [comparison, setComparison] = useState({
     summary: {
       listingsTotal: 0,
@@ -427,11 +429,20 @@ export default function CRPComparisonPage() {
   };
 
   const handleDateChange = (prefix, value) => {
-    setFilters((prev) => ({
+    setDraftFilters((prev) => ({
       ...prev,
       [`${prefix}StartDate`]: value,
       [`${prefix}EndDate`]: value,
     }));
+  };
+
+  const hasPendingDateChanges = useMemo(() => (
+    draftFilters.listingsStartDate !== filters.listingsStartDate
+    || draftFilters.ordersStartDate !== filters.ordersStartDate
+  ), [draftFilters, filters]);
+
+  const handleApplyDates = () => {
+    setFilters(draftFilters);
   };
 
   const levelLabel = LEVEL_LABELS[chartLevel];
@@ -525,14 +536,28 @@ export default function CRPComparisonPage() {
       <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} sx={{ mb: 2 }}>
         <DateFilterCard
           title="Listings Day"
-          date={filters.listingsStartDate}
+          date={draftFilters.listingsStartDate}
           onChange={(value) => handleDateChange('listings', value)}
         />
         <DateFilterCard
           title="Orders Day"
-          date={filters.ordersStartDate}
+          date={draftFilters.ordersStartDate}
           onChange={(value) => handleDateChange('orders', value)}
         />
+      </Stack>
+
+      <Stack alignItems="center" spacing={0.75} sx={{ mb: 2 }}>
+        <Button
+          variant="contained"
+          onClick={handleApplyDates}
+          disabled={loading || !hasPendingDateChanges}
+          sx={{ minWidth: 220 }}
+        >
+          Run Comparison
+        </Button>
+        <Typography variant="caption" color="text.secondary">
+          Apply both selected days in one fetch so listings and orders refresh together.
+        </Typography>
       </Stack>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
