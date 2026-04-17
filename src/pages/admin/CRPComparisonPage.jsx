@@ -40,13 +40,10 @@ import {
 } from '@mui/icons-material';
 import {
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
+  PieChart,
+  Pie,
   Tooltip as RechartsTooltip,
   Cell,
-  LabelList,
 } from 'recharts';
 import api from '../../lib/api.js';
 
@@ -180,15 +177,26 @@ function DateFilterCard({ title, date, onChange }) {
 function ChartTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const item = payload[0].payload;
+  const percentage = item.percentage != null ? `${item.percentage}%` : null;
+
   return (
     <Paper elevation={3} sx={{ p: 1.25, minWidth: 160 }}>
       <Typography variant="body2" fontWeight={700}>{item.name}</Typography>
       <Typography variant="body2" color="text.secondary">{item.count.toLocaleString()} items</Typography>
+      {percentage ? (
+        <Typography variant="body2" color="text.secondary">{percentage} of visible total</Typography>
+      ) : null}
     </Paper>
   );
 }
 
 function SideChart({ title, subtitle, data, colorIndex = 0 }) {
+  const total = data.reduce((sum, item) => sum + (item.count || 0), 0);
+  const chartData = data.map((item) => ({
+    ...item,
+    percentage: total > 0 ? Number(((item.count / total) * 100).toFixed(1)) : 0,
+  }));
+
   return (
     <Paper
       elevation={0}
@@ -210,31 +218,85 @@ function SideChart({ title, subtitle, data, colorIndex = 0 }) {
         </Box>
       ) : (
         <Box sx={{ mt: 2 }}>
-          <ResponsiveContainer width="100%" height={360}>
-            <BarChart
-              layout="vertical"
-              data={data}
-              margin={{ top: 4, right: 40, left: 8, bottom: 4 }}
-            >
-              <XAxis type="number" allowDecimals={false} axisLine={false} tickLine={false} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                width={170}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11 }}
-                tickFormatter={(value) => value.length > 24 ? `${value.slice(0, 23)}…` : value}
-              />
-              <RechartsTooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-              <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={24}>
-                {data.map((entry, index) => (
-                  <Cell key={entry.id || `${entry.name}-${index}`} fill={CHART_COLORS[(index + colorIndex) % CHART_COLORS.length]} />
-                ))}
-                <LabelList dataKey="count" position="right" style={{ fontSize: 11, fill: '#555', fontWeight: 600 }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
+            <Box sx={{ width: '100%', maxWidth: 360, height: 320, mx: 'auto' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={72}
+                    outerRadius={118}
+                    paddingAngle={2}
+                    stroke="#fff"
+                    strokeWidth={2}
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={entry.id || `${entry.name}-${index}`} fill={CHART_COLORS[(index + colorIndex) % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip content={<ChartTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </Box>
+
+            <Stack spacing={1} sx={{ width: '100%', minWidth: 0 }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  px: 1.5,
+                  py: 1.25,
+                  borderRadius: 2,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">Visible total</Typography>
+                <Typography variant="subtitle2" fontWeight={700}>{total.toLocaleString()}</Typography>
+              </Paper>
+
+              {chartData.map((entry, index) => (
+                <Paper
+                  key={entry.id || `${entry.name}-${index}`}
+                  variant="outlined"
+                  sx={{
+                    px: 1.5,
+                    py: 1.1,
+                    borderRadius: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 1.5,
+                  }}
+                >
+                  <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        bgcolor: CHART_COLORS[(index + colorIndex) % CHART_COLORS.length],
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Typography variant="body2" sx={{ lineHeight: 1.25 }}>
+                      {entry.name}
+                    </Typography>
+                  </Stack>
+
+                  <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexShrink: 0 }}>
+                    <Typography variant="body2" color="text.secondary">{entry.percentage}%</Typography>
+                    <Typography variant="subtitle2" fontWeight={700}>{entry.count.toLocaleString()}</Typography>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          </Stack>
         </Box>
       )}
     </Paper>
