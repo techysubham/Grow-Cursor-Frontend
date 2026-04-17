@@ -42,6 +42,7 @@ export const PAGE_REGISTRY = [
   { id: 'OrdersDashboard', name: 'Orders Dashboard', path: '/orders-dashboard', category: 'orderFulfilment', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
   { id: 'OrderAnalytics', name: 'Order Analytics', path: '/order-analytics', category: 'orderFulfilment', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
   { id: 'CRPAnalytics', name: 'CRP Analytics', path: '/crp-analytics', category: 'orderFulfilment', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
+  { id: 'CRPComparison', name: 'CRP Comparison', path: '/crp-comparison', category: 'orderFulfilment', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
   { id: 'Fulfillment', name: 'All Orders (Fulfilment)', path: '/fulfillment', category: 'orderFulfilment', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
   { id: 'AwaitingShipment', name: 'Awaiting Shipment', path: '/awaiting-shipment', category: 'orderFulfilment', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
   { id: 'AwaitingSheet', name: 'Awaiting Sheet', path: '/awaiting-sheet', category: 'orderFulfilment', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
