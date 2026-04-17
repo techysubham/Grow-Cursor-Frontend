@@ -479,6 +479,8 @@ export default function AwaitingShipmentPage() {
   const [dateSold, setDateSold] = useState('');
   const [arrivalDateFrom, setArrivalDateFrom] = useState('');
   const [arrivalDateTo, setArrivalDateTo] = useState('');
+  const [amazonAccounts, setAmazonAccounts] = useState([]);
+  const [selectedAmazonAccount, setSelectedAmazonAccount] = useState('');
 
   const [visibleColumns, setVisibleColumns] = useState([
     'seller', 'orderId', 'marketplace', 'dateSold', 'shipBy', 'deliveryDate', 'productName', 'buyerName', 'shippingAddress', 'trackingNumber', 'trackingId', 'arriving', 'notes'
@@ -509,6 +511,19 @@ export default function AwaitingShipmentPage() {
       }
     };
     loadSellers();
+  }, []);
+
+  // Fetch Amazon Accounts on Mount
+  useEffect(() => {
+    const loadAmazonAccounts = async () => {
+      try {
+        const { data } = await api.get('/amazon-accounts');
+        setAmazonAccounts(data || []);
+      } catch (e) {
+        console.error('Failed to load Amazon accounts', e);
+      }
+    };
+    loadAmazonAccounts();
   }, []);
 
   useEffect(() => {
@@ -546,7 +561,7 @@ export default function AwaitingShipmentPage() {
   useEffect(() => {
     fetchAwaitingOrders();
     // eslint-disable-next-line
-  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace, shipByDate, dateSold, arrivalDateFrom, arrivalDateTo]);
+  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace, shipByDate, dateSold, arrivalDateFrom, arrivalDateTo, selectedAmazonAccount]);
 
   // Handlers
   const handleSellerChange = (e) => {
@@ -565,6 +580,7 @@ export default function AwaitingShipmentPage() {
     setDateSold('');
     setArrivalDateFrom('');
     setArrivalDateTo('');
+    setSelectedAmazonAccount('');
     setPage(1);
   };
 
@@ -586,6 +602,7 @@ export default function AwaitingShipmentPage() {
     if (dateSold) params.dateSold = dateSold;
     if (arrivalDateFrom) params.arrivalDateFrom = arrivalDateFrom;
     if (arrivalDateTo) params.arrivalDateTo = arrivalDateTo;
+    if (selectedAmazonAccount) params.amazonAccount = selectedAmazonAccount;
 
     // SMART CHECK: If params haven't changed since last fetch, STOP.
     const paramsString = JSON.stringify(params);
@@ -1320,6 +1337,25 @@ export default function AwaitingShipmentPage() {
               InputLabelProps={{ shrink: true }}
               sx={{ minWidth: 160 }}
             />
+
+            {/* 9. AMAZON ACCOUNT FILTER */}
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel id="amazon-account-select-label">Amazon Account</InputLabel>
+              <Select
+                labelId="amazon-account-select-label"
+                value={selectedAmazonAccount}
+                label="Amazon Account"
+                onChange={(e) => {
+                  setSelectedAmazonAccount(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <MenuItem value=""><em>All Accounts</em></MenuItem>
+                {amazonAccounts.map((acc) => (
+                  <MenuItem key={acc._id} value={acc.name}>{acc.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ height: 40, boxSizing: 'border-box' }}>Clear</Button>
 
