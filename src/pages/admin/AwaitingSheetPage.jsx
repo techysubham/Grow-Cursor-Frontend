@@ -5,11 +5,13 @@ import {
     Chip,
     CircularProgress,
     FormControl,
+    FormControlLabel,
     InputLabel,
     MenuItem,
     Paper,
     Select,
     Stack,
+    Switch,
     Table,
     TableBody,
     TableCell,
@@ -147,12 +149,13 @@ export default function AwaitingSheetPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [marketplace, setMarketplace] = useState('');
+    const [excludeClient, setExcludeClient] = useState(true);
 
     useEffect(() => {
         if (date) {
             fetchSummary();
         }
-    }, [date, marketplace]);
+    }, [date, marketplace, excludeClient]);
 
     async function fetchSummary() {
         setLoading(true);
@@ -160,6 +163,7 @@ export default function AwaitingSheetPage() {
         try {
             const params = { date };
             if (marketplace) params.marketplace = marketplace;
+            params.excludeClient = excludeClient;
             const { data: result } = await api.get('/ebay/awaiting-sheet-summary', {
                 params
             });
@@ -238,6 +242,17 @@ export default function AwaitingSheetPage() {
                                 <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
                             </Select>
                         </FormControl>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={excludeClient}
+                                    onChange={(e) => setExcludeClient(e.target.checked)}
+                                    color="primary"
+                                />
+                            }
+                            label="Exclude Client"
+                            sx={{ m: 0, px: 1.5, minHeight: 40, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+                        />
                     </Stack>
                 </Stack>
 

@@ -143,7 +143,8 @@ export default function OrderAnalyticsPage() {
   const [selectedSeller, setSelectedSeller] = useState('');
   const [draftMarketplace, setDraftMarketplace] = useState('');
   const [appliedMarketplace, setAppliedMarketplace] = useState('');
-  const [excludeLowValue, setExcludeLowValue] = useState(false);
+  const [excludeClient, setExcludeClient] = useState(true);
+  const [excludeLowValue, setExcludeLowValue] = useState(true);
 
   // Summary statistics - only count
   const [totalOrders, setTotalOrders] = useState(0);
@@ -155,7 +156,7 @@ export default function OrderAnalyticsPage() {
   // Auto-fetch when applied filters change
   useEffect(() => {
     fetchStatistics();
-  }, [appliedDateFilter, selectedSeller, appliedMarketplace, excludeLowValue]);
+  }, [appliedDateFilter, selectedSeller, appliedMarketplace, excludeClient, excludeLowValue]);
 
   const fetchSellers = async () => {
     try {
@@ -184,6 +185,7 @@ export default function OrderAnalyticsPage() {
 
       if (selectedSeller) params.sellerId = selectedSeller;
       if (appliedMarketplace) params.marketplace = appliedMarketplace;
+      params.excludeClient = excludeClient;
       params.excludeLowValue = excludeLowValue;
 
       const statsResponse = await api.get('/orders/daily-statistics', { params });
@@ -521,6 +523,22 @@ export default function OrderAnalyticsPage() {
                   <MenuItem value="GB">England</MenuItem>
                 </Select>
               </FormControl>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={excludeClient}
+                    onChange={(e) => setExcludeClient(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                    Exclude Client
+                  </Typography>
+                }
+                sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
+              />
 
               <FormControlLabel
                 control={
