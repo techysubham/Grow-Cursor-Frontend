@@ -59,7 +59,7 @@ const MARKETPLACE_DOMAINS = {
 function calcActualProfit(buyingPrice, sold) {
   const A            = parseFloat((sold * 1.1).toFixed(2));
   const eBay         = parseFloat((A * 0.1395 + 0.4).toFixed(2));
-  const ADS          = parseFloat((A * 0.07).toFixed(2));
+  const ADS          = parseFloat((A * 0.15).toFixed(2));
   const TDS          = parseFloat((A * 0.01).toFixed(2));
   const TCont        = 0.24;
   const Net          = parseFloat((sold - eBay - ADS - TDS - TCont).toFixed(2));
@@ -418,7 +418,7 @@ export default function AsinReviewModal({
       <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
       <Box>A (eBay+Tax):&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.A.toFixed(2)}&nbsp; (Sold × 1.1)</Box>
       <Box>eBay Fee:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.eBay.toFixed(2)}&nbsp; (A × 13.95% + $0.40)</Box>
-      <Box>ADS:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.ADS.toFixed(2)}&nbsp; (A × 7%)</Box>
+      <Box>ADS:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.ADS.toFixed(2)}&nbsp; (A × 15%)</Box>
       <Box>TDS:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.TDS.toFixed(2)}&nbsp; (A × 1%)</Box>
       <Box>T.Cont:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.TCont.toFixed(2)}</Box>
       <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
