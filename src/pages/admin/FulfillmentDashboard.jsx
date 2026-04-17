@@ -1478,6 +1478,7 @@ function FulfillmentDashboard() {
   // Recalculate Earnings state
   const [recalcEarningsLoading, setRecalcEarningsLoading] = useState(false);
   const [recalcAmazonLoading, setRecalcAmazonLoading] = useState(false);
+  const [fetchingAdFeeGeneral, setFetchingAdFeeGeneral] = useState({});
 
   // Auto-message state
   const [autoMessageLoading, setAutoMessageLoading] = useState(false);
@@ -2427,6 +2428,30 @@ function FulfillmentDashboard() {
       setSnackbarOpen(true);
     }
   };
+
+  const handleFetchAdFeeGeneral = useCallback(async (order) => {
+    try {
+      setFetchingAdFeeGeneral(prev => ({ ...prev, [order._id]: true }));
+
+      const { data } = await api.post(`/ebay/orders/${order._id}/fetch-ad-fee-general`);
+
+      setOrders(prev => prev.map(existingOrder => (
+        existingOrder._id === order._id
+          ? { ...existingOrder, ...data.order }
+          : existingOrder
+      )));
+
+      setSnackbarMsg(`Ad fee updated for ${order.orderId}`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (e) {
+      setSnackbarMsg(e?.response?.data?.error || 'Failed to fetch ad fee');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setFetchingAdFeeGeneral(prev => ({ ...prev, [order._id]: false }));
+    }
+  }, []);
 
   // Recalculate Earnings for all orders of selected seller
   const recalculateEarnings = async () => {
@@ -4093,15 +4118,28 @@ function FulfillmentDashboard() {
                         {visibleColumnsSet.has('adFeeGeneral') && (
                           order.orderPaymentStatus !== 'PARTIALLY_REFUNDED' ? (
                             <TableCell align="right">
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontWeight: order.adFeeGeneral ? 'medium' : 'normal',
-                                  color: order.adFeeGeneral ? 'error.main' : 'text.secondary'
-                                }}
-                              >
-                                {order.adFeeGeneral ? formatCurrency(order.adFeeGeneral) : '-'}
-                              </Typography>
+                              {order.adFeeGeneral ? (
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontWeight: 'medium',
+                                    color: 'error.main'
+                                  }}
+                                >
+                                  {formatCurrency(order.adFeeGeneral)}
+                                </Typography>
+                              ) : (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => handleFetchAdFeeGeneral(order)}
+                                  disabled={Boolean(fetchingAdFeeGeneral[order._id])}
+                                  startIcon={fetchingAdFeeGeneral[order._id] ? <CircularProgress size={14} color="inherit" /> : <SyncIcon />}
+                                  sx={{ minWidth: 110, fontSize: '0.72rem', py: 0.4 }}
+                                >
+                                  {fetchingAdFeeGeneral[order._id] ? 'Fetching...' : 'Fetch Ad Fee'}
+                                </Button>
+                              )}
                             </TableCell>
                           ) : <TableCell align="center"><Typography variant="body2" color="text.disabled">-</Typography></TableCell>
                         )}
