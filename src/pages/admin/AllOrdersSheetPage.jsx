@@ -40,6 +40,33 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../../lib/api';
 import AllOrdersSheetSkeleton from '../../components/skeletons/AllOrdersSheetSkeleton';
 
+const EXCHANGE_RATE_OPTIONS = [
+  { value: 'EBAY_US', label: 'eBay US', channel: 'EBAY' },
+  { value: 'EBAY_AU', label: 'eBay AU', channel: 'EBAY' },
+  { value: 'EBAY_GB', label: 'eBay GB', channel: 'EBAY' },
+  { value: 'EBAY_CA', label: 'eBay CA', channel: 'EBAY' },
+  { value: 'AMAZON_US', label: 'Amazon US', channel: 'AMAZON' },
+  { value: 'AMAZON_AU', label: 'Amazon AU', channel: 'AMAZON' },
+  { value: 'AMAZON_GB', label: 'Amazon GB', channel: 'AMAZON' },
+  { value: 'AMAZON_CA', label: 'Amazon CA', channel: 'AMAZON' }
+];
+
+const EXCHANGE_RATE_LABELS = EXCHANGE_RATE_OPTIONS.reduce((acc, option) => {
+  acc[option.value] = option.label;
+  return acc;
+}, {});
+
+const EXCHANGE_RATE_DEFAULTS = {
+  EBAY_US: 82,
+  EBAY_AU: 82,
+  EBAY_GB: 82,
+  EBAY_CA: 82,
+  AMAZON_US: 87,
+  AMAZON_AU: 87,
+  AMAZON_GB: 87,
+  AMAZON_CA: 87
+};
+
 export default function AllOrdersSheetPage() {
   const [sellers, setSellers] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -57,13 +84,14 @@ export default function AllOrdersSheetPage() {
   });
   
   // Exchange rate management
-  const [currentExchangeRate, setCurrentExchangeRate] = useState(null);
-  const [amazonExchangeRate, setAmazonExchangeRate] = useState(null);
-  const [selectedMarketplace, setSelectedMarketplace] = useState('EBAY');
+  const [exchangeRatesByMarketplace, setExchangeRatesByMarketplace] = useState({});
+  const [selectedRateMarketplace, setSelectedRateMarketplace] = useState('EBAY_US');
+  const [rateApplicationMode, setRateApplicationMode] = useState('effective');
   const [newRate, setNewRate] = useState('');
   const [newRateDate, setNewRateDate] = useState('');
   const [rateHistory, setRateHistory] = useState([]);
   const [showRateHistory, setShowRateHistory] = useState(false);
+  const [updatingExchangeRates, setUpdatingExchangeRates] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
   
   // CSV Export modal
@@ -78,6 +106,8 @@ export default function AllOrdersSheetPage() {
   const [itemPriceUpdates, setItemPriceUpdates] = useState({}); // { legacyItemId: newPrice }
   const [updatingItemPrices, setUpdatingItemPrices] = useState({}); // { legacyItemId: boolean }
   const [updatedOrderIds, setUpdatedOrderIds] = useState(new Set()); // Track orders with price updates
+  const [orderTotalUpdates, setOrderTotalUpdates] = useState({}); // { orderId: value }
+  const [updatingOrderTotals, setUpdatingOrderTotals] = useState({}); // { orderId: boolean }
 
   // Session storage key for persisting state
   const STORAGE_KEY = 'all_orders_sheet_state';
@@ -197,9 +227,8 @@ export default function AllOrdersSheetPage() {
     if (!hasFetchedInitialData.current) {
       hasFetchedInitialData.current = true;
       fetchSellers();
-      fetchCurrentExchangeRate('EBAY');
-      fetchCurrentExchangeRate('AMAZON');
-      fetchRateHistory();
+      fetchAllCurrentExchangeRates();
+      fetchRateHistory('EBAY_US');
       loadOrders();
     }
   }, []);
@@ -207,9 +236,9 @@ export default function AllOrdersSheetPage() {
   // Refetch rate history when marketplace or showRateHistory changes
   useEffect(() => {
     if (showRateHistory) {
-      fetchRateHistory(selectedMarketplace);
+      fetchRateHistory(selectedRateMarketplace);
     }
-  }, [showRateHistory, selectedMarketplace]);
+  }, [showRateHistory, selectedRateMarketplace]);
 
   // Reload when page changes
   useEffect(() => {
@@ -270,20 +299,20 @@ export default function AllOrdersSheetPage() {
     }
   }
 
-  async function fetchCurrentExchangeRate(marketplace = 'EBAY') {
+  async function fetchCurrentExchangeRate(marketplace = 'EBAY_US') {
     try {
       const { data } = await api.get('/exchange-rates/current', { params: { marketplace } });
-      if (marketplace === 'EBAY') {
-        setCurrentExchangeRate(data);
-      } else if (marketplace === 'AMAZON') {
-        setAmazonExchangeRate(data);
-      }
+      setExchangeRatesByMarketplace(prev => ({ ...prev, [marketplace]: data }));
     } catch (e) {
       console.error(`Failed to fetch ${marketplace} exchange rate:`, e);
     }
   }
 
-  async function fetchRateHistory(marketplace = 'EBAY') {
+  async function fetchAllCurrentExchangeRates() {
+    await Promise.all(EXCHANGE_RATE_OPTIONS.map((option) => fetchCurrentExchangeRate(option.value)));
+  }
+
+  async function fetchRateHistory(marketplace = 'EBAY_US') {
     try {
       const { data } = await api.get('/exchange-rates/history', { params: { marketplace, limit: 20 } });
       setRateHistory(data || []);
@@ -299,21 +328,26 @@ export default function AllOrdersSheetPage() {
     }
 
     try {
-      await api.post('/exchange-rates', {
+      setUpdatingExchangeRates(true);
+      const { data } = await api.post('/exchange-rates', {
         rate: parseFloat(newRate),
         effectiveDate: newRateDate,
-        marketplace: selectedMarketplace,
-        notes: `Set via All Orders Sheet for ${selectedMarketplace}`
+        marketplace: selectedRateMarketplace,
+        applicationMode: rateApplicationMode,
+        updateExistingOrders: true,
+        notes: `Set via All Orders Sheet for ${selectedRateMarketplace} (${rateApplicationMode})`
       });
       
       setNewRate('');
       setNewRateDate('');
-      await fetchCurrentExchangeRate('EBAY');
-      await fetchCurrentExchangeRate('AMAZON');
-      await fetchRateHistory(selectedMarketplace);
-      alert(`${selectedMarketplace} exchange rate set successfully`);
+      await fetchAllCurrentExchangeRates();
+      await fetchRateHistory(selectedRateMarketplace);
+      await loadOrders();
+      alert(`${EXCHANGE_RATE_LABELS[selectedRateMarketplace]} rate set successfully. Updated ${data?.updatedOrders || 0} orders.`);
     } catch (e) {
       alert('Failed to set exchange rate: ' + (e?.response?.data?.error || e.message));
+    } finally {
+      setUpdatingExchangeRates(false);
     }
   }
 
@@ -355,7 +389,7 @@ export default function AllOrdersSheetPage() {
         'Date Sold',
         'Product Name',
         'Marketplace',
-        // eBay Side (12 columns - removed Refunds)
+        // eBay Side
         'Subtotal',
         'Shipping',
         'Sales Tax',
@@ -363,6 +397,7 @@ export default function AllOrdersSheetPage() {
         'Transaction Fees',
         'Ad Fee',
         'Earnings',
+        'Order total',
         'TDS',
         'T.ID',
         'NET',
@@ -401,6 +436,7 @@ export default function AllOrdersSheetPage() {
         const adFeeGeneral = showZero ? 0 : (parseFloat(order.adFeeGeneral) || 0);
         const discount = showZero ? 0 : (parseFloat(order.discount) || 0);
         const shipping = showZero ? 0 : (parseFloat(order.shipping) || 0);
+        const orderTotal = showZero ? 0 : (order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0)));
         
         // Use DB fields for financial calculations
         const earnings = parseFloat(order.orderEarnings) || 0;
@@ -412,8 +448,8 @@ export default function AllOrdersSheetPage() {
         const pBalanceINR = parseFloat(order.pBalanceINR) || 0;
 
         // Use DB fields for Amazon financial calculations
-        const beforeTax = isCancelled ? 0 : (parseFloat(order.beforeTaxUSD) || 0);
-        const estimatedTax = isCancelled ? 0 : (parseFloat(order.estimatedTaxUSD) || 0);
+        const beforeTax = isCancelled ? 0 : (parseFloat(order.beforeTax) || 0);
+        const estimatedTax = isCancelled ? 0 : (parseFloat(order.estimatedTax) || 0);
         const amazonTotal = parseFloat(order.amazonTotal) || 0;
         const amazonExchangeRate = order.amazonExchangeRate || 87;
         const aTotalInr = parseFloat(order.amazonTotalINR) || 0;
@@ -437,6 +473,7 @@ export default function AllOrdersSheetPage() {
           transactionFees.toFixed(2),
           adFeeGeneral.toFixed(2),
           earnings.toFixed(2),
+          orderTotal.toFixed(2),
           tds.toFixed(2),
           tid.toFixed(2),
           net.toFixed(2),
@@ -575,6 +612,58 @@ export default function AllOrdersSheetPage() {
     setItemPriceUpdates({});
   }
 
+  function getOrderTotalInputValue(order) {
+    if (Object.prototype.hasOwnProperty.call(orderTotalUpdates, order._id)) {
+      return orderTotalUpdates[order._id];
+    }
+
+    const storedValue = order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
+    return storedValue == null ? '' : String(storedValue);
+  }
+
+  async function handleSaveOrderTotal(order) {
+    const rawValue = orderTotalUpdates[order._id];
+    const fallbackValue = order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
+    const nextValue = rawValue === undefined ? fallbackValue : rawValue;
+
+    if (nextValue === '' || nextValue === null || nextValue === undefined || Number.isNaN(parseFloat(nextValue))) {
+      alert('Please enter a valid order total');
+      return;
+    }
+
+    const parsedValue = parseFloat(nextValue);
+    const currentValue = order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
+    if (parsedValue === currentValue) {
+      setOrderTotalUpdates(prev => {
+        const updated = { ...prev };
+        delete updated[order._id];
+        return updated;
+      });
+      return;
+    }
+
+    setUpdatingOrderTotals(prev => ({ ...prev, [order._id]: true }));
+
+    try {
+      const { data } = await api.patch(`/ebay/orders/${order._id}/order-total`, {
+        orderTotal: parsedValue
+      });
+
+      setOrders(prev => prev.map(existingOrder => (
+        existingOrder._id === order._id ? data.order : existingOrder
+      )));
+      setOrderTotalUpdates(prev => {
+        const updated = { ...prev };
+        delete updated[order._id];
+        return updated;
+      });
+    } catch (err) {
+      alert('Failed to update order total: ' + (err?.response?.data?.error || err.message));
+    } finally {
+      setUpdatingOrderTotals(prev => ({ ...prev, [order._id]: false }));
+    }
+  }
+
   // Handler for updating individual item price
   async function handleUpdateItemPrice(legacyItemId, order) {
     const newPrice = itemPriceUpdates[legacyItemId];
@@ -640,13 +729,15 @@ export default function AllOrdersSheetPage() {
     const newDiscount = originalDiscount * ratio;
     const newTransactionFees = originalTransactionFees * ratio;
     const newAdFeeGeneral = originalAdFeeGeneral * ratio;
+    const originalOrderTotal = order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
+    const newOrderTotal = originalOrderTotal * ratio;
     
     // Calculate eBay earnings with new proportional fees (excluding sales tax)
     // Using high precision to match backend calculation
     const ebayEarnings = tryPrice + newDiscount - newTransactionFees - newAdFeeGeneral;
     
     // TDS and TID calculations (round to match backend)
-    const newTDS = Math.round(ebayEarnings * 0.01 * 100) / 100;
+    const newTDS = Math.round(newOrderTotal * 0.01 * 100) / 100;
     const newTID = 0.24;
     const newNet = Math.round((ebayEarnings - newTDS - newTID) * 100) / 100;
     
@@ -669,6 +760,7 @@ export default function AllOrdersSheetPage() {
         transactionFees: newTransactionFees,
         adFeeGeneral: newAdFeeGeneral,
         ebayEarnings,
+        orderTotal: newOrderTotal,
         tds: newTDS,
         tid: newTID,
         net: newNet,
@@ -1336,7 +1428,7 @@ export default function AllOrdersSheetPage() {
       </Paper>
 
       {/* Exchange Rate Management */}
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper sx={{ p: 2, mb: 2, position: 'relative', overflow: 'hidden' }}>
         <Stack spacing={2}>
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -1352,43 +1444,65 @@ export default function AllOrdersSheetPage() {
             </Button>
           </Stack>
 
+          {updatingExchangeRates && (
+            <Alert
+              severity="info"
+              icon={<CircularProgress size={18} color="inherit" />}
+            >
+              Recalculating affected orders. P.Balance (INR), A_total-inr, and Profit are being refreshed.
+            </Alert>
+          )}
+
           {showExchangeRate && (
           <>
-          <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap">
-            <Box>
-              <Typography variant="body2" color="text.secondary">eBay Rate</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                {currentExchangeRate?.rate || 82} INR
-              </Typography>
-              {currentExchangeRate?.effectiveDate && (
-                <Typography variant="caption" color="text.secondary">
-                  Effective: {new Date(currentExchangeRate.effectiveDate).toLocaleDateString()}
-                </Typography>
-              )}
-            </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary">Amazon Rate</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                {amazonExchangeRate?.rate || 87} INR
-              </Typography>
-              {amazonExchangeRate?.effectiveDate && (
-                <Typography variant="caption" color="text.secondary">
-                  Effective: {new Date(amazonExchangeRate.effectiveDate).toLocaleDateString()}
-                </Typography>
-              )}
-            </Box>
+          <Stack direction="row" spacing={2} alignItems="stretch" flexWrap="wrap">
+            {EXCHANGE_RATE_OPTIONS.map((option) => {
+              const rateInfo = exchangeRatesByMarketplace[option.value];
+              const accentColor = option.channel === 'AMAZON' ? 'success.main' : 'primary.main';
+
+              return (
+                <Paper key={option.value} variant="outlined" sx={{ p: 1.5, minWidth: 150 }}>
+                  <Typography variant="body2" color="text.secondary">{option.label}</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', color: accentColor }}>
+                    {rateInfo?.rate || EXCHANGE_RATE_DEFAULTS[option.value]} INR
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {rateInfo?.applicationMode === 'specific-date' ? 'Specific Date' : 'Effective'}
+                  </Typography>
+                  {rateInfo?.effectiveDate && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      {new Date(rateInfo.effectiveDate).toLocaleDateString()}
+                    </Typography>
+                  )}
+                </Paper>
+              );
+            })}
           </Stack>
 
           <Stack direction="row" spacing={2} alignItems="center">
             <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>Marketplace</InputLabel>
+              <InputLabel>Rate For</InputLabel>
               <Select
-                value={selectedMarketplace}
-                label="Marketplace"
-                onChange={(e) => setSelectedMarketplace(e.target.value)}
+                value={selectedRateMarketplace}
+                label="Rate For"
+                onChange={(e) => setSelectedRateMarketplace(e.target.value)}
+                disabled={updatingExchangeRates}
               >
-                <MenuItem value="EBAY">eBay</MenuItem>
-                <MenuItem value="AMAZON">Amazon</MenuItem>
+                {EXCHANGE_RATE_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Apply As</InputLabel>
+              <Select
+                value={rateApplicationMode}
+                label="Apply As"
+                onChange={(e) => setRateApplicationMode(e.target.value)}
+                disabled={updatingExchangeRates}
+              >
+                <MenuItem value="effective">Effective From</MenuItem>
+                <MenuItem value="specific-date">Specific Date Only</MenuItem>
               </Select>
             </FormControl>
             <TextField
@@ -1399,28 +1513,33 @@ export default function AllOrdersSheetPage() {
               onChange={(e) => setNewRate(e.target.value)}
               sx={{ width: 150 }}
               placeholder="e.g. 84"
+              disabled={updatingExchangeRates}
             />
             <TextField
               size="small"
-              label="Effective Date"
+              label={rateApplicationMode === 'specific-date' ? 'Specific Date' : 'Effective From'}
               type="date"
               value={newRateDate}
               onChange={(e) => setNewRateDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
+              helperText={rateApplicationMode === 'specific-date' ? 'Uses the same PST/PDT day pattern as the All Orders Sheet search date filter.' : 'Starts from this PST/PDT day, matching the All Orders Sheet search date filter.'}
               sx={{ width: 180 }}
+              disabled={updatingExchangeRates}
             />
             <Button
               variant="contained"
               onClick={handleSetExchangeRate}
-              disabled={!newRate || !newRateDate}
+              disabled={!newRate || !newRateDate || updatingExchangeRates}
+              startIcon={updatingExchangeRates ? <CircularProgress size={16} color="inherit" /> : null}
             >
-              Set {selectedMarketplace} Rate
+              {updatingExchangeRates ? 'Recalculating...' : `Set ${EXCHANGE_RATE_LABELS[selectedRateMarketplace]} Rate`}
             </Button>
             <Button
               size="small"
               variant="outlined"
               onClick={() => setShowRateHistory(!showRateHistory)}
               endIcon={showRateHistory ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              disabled={updatingExchangeRates}
             >
               {showRateHistory ? 'Hide' : 'Show'} History
             </Button>
@@ -1428,12 +1547,13 @@ export default function AllOrdersSheetPage() {
 
           {showRateHistory && rateHistory.length > 0 && (
             <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>{selectedMarketplace} Rate History</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>{EXCHANGE_RATE_LABELS[selectedRateMarketplace]} Rate History</Typography>
               <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 200 }}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Effective Date</TableCell>
+                      <TableCell>Mode</TableCell>
                       <TableCell>Rate (INR)</TableCell>
                       <TableCell>Created</TableCell>
                       <TableCell>Notes</TableCell>
@@ -1443,6 +1563,7 @@ export default function AllOrdersSheetPage() {
                     {rateHistory.map((rate) => (
                       <TableRow key={rate._id}>
                         <TableCell>{new Date(rate.effectiveDate).toLocaleDateString()}</TableCell>
+                        <TableCell>{rate.applicationMode === 'specific-date' ? 'Specific Date' : 'Effective'}</TableCell>
                         <TableCell><strong>{rate.rate}</strong></TableCell>
                         <TableCell>{new Date(rate.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>{rate.notes || '-'}</TableCell>
@@ -1594,7 +1715,7 @@ export default function AllOrdersSheetPage() {
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 100, zIndex: 4, minWidth: 110 }}>Date Sold</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 210, zIndex: 4, minWidth: 350 }}>Product Name</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 560, zIndex: 4, minWidth: 120, boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}>Marketplace</TableCell>
-                <TableCell colSpan={12} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderBottom: '2px solid #ffb74d', borderRight: '2px solid #90caf9' }}>eBay Side</TableCell>
+                <TableCell colSpan={13} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderBottom: '2px solid #ffb74d', borderRight: '2px solid #90caf9' }}>eBay Side</TableCell>
                 <TableCell colSpan={5} align="center" sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', borderBottom: '2px solid #81c784', borderRight: '2px solid #90caf9' }}>Amazon Side</TableCell>
                 <TableCell colSpan={3} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fce4ec', borderBottom: '2px solid #f48fb1', borderRight: '2px solid #90caf9' }}>Credit Card</TableCell>
                 <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#fff9c4', borderRight: '2px solid #90caf9' }} align="right">PROFIT<br />(INR)</TableCell>
@@ -1627,7 +1748,10 @@ export default function AllOrdersSheetPage() {
                 <Tooltip title="Earnings = Subtotal + Discount - Sales Tax - Transaction Fees - Ad Fee - Shipping" arrow placement="top">
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Earnings</TableCell>
                 </Tooltip>
-                <Tooltip title="TDS = Earnings × 1%" arrow placement="top">
+                <Tooltip title="Order total = pricingSummary.total.value + salesTax" arrow placement="top">
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Order total</TableCell>
+                </Tooltip>
+                <Tooltip title="TDS = 1% of (pricingSummary.total.value + salesTax)" arrow placement="top">
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">TDS</TableCell>
                 </Tooltip>
                 <Tooltip title="T.ID = $0.24 (fixed transaction ID fee)" arrow placement="top">
@@ -1759,6 +1883,45 @@ export default function AllOrdersSheetPage() {
                     {formatCurrency(order.orderEarnings)}
                   </TableCell>
                   <TableCell align="right">
+                    {(() => {
+                      const isCancelled = order.cancelState === 'CANCELED' || 
+                                         order.cancelState === 'CANCELLED' || 
+                                         order.cancelStatus?.cancelState === 'CANCELED' ||
+                                         order.cancelStatus?.cancelState === 'CANCELLED';
+                      const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
+                      const showZero = isCancelled || isPartiallyRefunded;
+
+                      if (showZero) {
+                        return '$0.00';
+                      }
+
+                      return (
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={getOrderTotalInputValue(order)}
+                          onChange={(e) => setOrderTotalUpdates(prev => ({
+                            ...prev,
+                            [order._id]: e.target.value
+                          }))}
+                          onBlur={() => handleSaveOrderTotal(order)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveOrderTotal(order);
+                            }
+                          }}
+                          disabled={Boolean(updatingOrderTotals[order._id])}
+                          inputProps={{
+                            min: 0,
+                            step: '0.01',
+                            style: { textAlign: 'right', padding: '6px 8px', width: 90 }
+                          }}
+                        />
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell align="right">
                     {formatCurrency(order.tds)}
                   </TableCell>
                   <TableCell align="right">
@@ -1818,7 +1981,7 @@ export default function AllOrdersSheetPage() {
                                          order.cancelState === 'CANCELLED' || 
                                          order.cancelStatus?.cancelState === 'CANCELED' ||
                                          order.cancelStatus?.cancelState === 'CANCELLED';
-                      return isCancelled ? '$0.00' : formatCurrency(order.beforeTaxUSD);
+                      return isCancelled ? '$0.00' : formatCurrency(order.beforeTax);
                     })()}
                   </TableCell>
                   <TableCell align="right">
@@ -1827,7 +1990,7 @@ export default function AllOrdersSheetPage() {
                                          order.cancelState === 'CANCELLED' || 
                                          order.cancelStatus?.cancelState === 'CANCELED' ||
                                          order.cancelStatus?.cancelState === 'CANCELLED';
-                      return isCancelled ? '$0.00' : formatCurrency(order.estimatedTaxUSD);
+                      return isCancelled ? '$0.00' : formatCurrency(order.estimatedTax);
                     })()}
                   </TableCell>
                   <TableCell align="right">
@@ -2005,6 +2168,7 @@ export default function AllOrdersSheetPage() {
                     acc.discount += parseFloat(order.discount) || 0;
                     acc.transactionFees += parseFloat(order.transactionFees) || 0;
                     acc.adFeeGeneral += parseFloat(order.adFeeGeneral) || 0;
+                    acc.orderTotal += order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
                   }
                   
                   acc.orderEarnings += parseFloat(order.orderEarnings) || 0;
@@ -2014,8 +2178,8 @@ export default function AllOrdersSheetPage() {
                   acc.pBalanceINR += parseFloat(order.pBalanceINR) || 0;
                   
                   if (!isCancelled) {
-                    acc.beforeTaxUSD += parseFloat(order.beforeTaxUSD) || 0;
-                    acc.estimatedTaxUSD += parseFloat(order.estimatedTaxUSD) || 0;
+                    acc.beforeTax += parseFloat(order.beforeTax) || 0;
+                    acc.estimatedTax += parseFloat(order.estimatedTax) || 0;
                     acc.amazonTotal += parseFloat(order.amazonTotal) || 0;
                     acc.amazonTotalINR += parseFloat(order.amazonTotalINR) || 0;
                     acc.marketplaceFee += parseFloat(order.marketplaceFee) || 0;
@@ -2031,8 +2195,8 @@ export default function AllOrdersSheetPage() {
                   return acc;
                 }, {
                   subtotal: 0, shipping: 0, salesTax: 0, discount: 0, transactionFees: 0,
-                  adFeeGeneral: 0, orderEarnings: 0, tds: 0, tid: 0, net: 0,
-                  pBalanceINR: 0, beforeTaxUSD: 0, estimatedTaxUSD: 0, amazonTotal: 0,
+                  adFeeGeneral: 0, orderEarnings: 0, orderTotal: 0, tds: 0, tid: 0, net: 0,
+                  pBalanceINR: 0, beforeTax: 0, estimatedTax: 0, amazonTotal: 0,
                   amazonTotalINR: 0, marketplaceFee: 0, igst: 0, totalCC: 0, profit: 0
                 });
                 
@@ -2049,13 +2213,14 @@ export default function AllOrdersSheetPage() {
                     <TableCell align="right">${totals.transactionFees.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.adFeeGeneral.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.orderEarnings.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.orderTotal.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.tds.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.tid.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.net.toFixed(2)}</TableCell>
                     <TableCell align="right">-</TableCell>
                     <TableCell align="right">₹{totals.pBalanceINR.toFixed(2)}</TableCell>
-                    <TableCell align="right">${totals.beforeTaxUSD.toFixed(2)}</TableCell>
-                    <TableCell align="right">${totals.estimatedTaxUSD.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.beforeTax.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.estimatedTax.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.amazonTotal.toFixed(2)}</TableCell>
                     <TableCell align="right">-</TableCell>
                     <TableCell align="right">₹{totals.amazonTotalINR.toFixed(2)}</TableCell>
@@ -2308,7 +2473,13 @@ export default function AllOrdersSheetPage() {
                                 </Typography>
                               </Stack>
                               <Stack direction="row" justifyContent="space-between">
-                                <Typography variant="caption">TDS (1%):</Typography>
+                                <Typography variant="caption">Order total (adjusted):</Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                                  ${breakdown.orderTotal.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">TDS (1% of pricingSummary.total.value + salesTax):</Typography>
                                 <Typography variant="caption" sx={{ color: 'error.main' }}>
                                   -${breakdown.tds.toFixed(2)}
                                 </Typography>
