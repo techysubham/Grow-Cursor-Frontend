@@ -63,10 +63,11 @@ function calcActualProfit(buyingPrice, sold) {
   const TDS          = parseFloat((A * 0.01).toFixed(2));
   const TCont        = 0.24;
   const Net          = parseFloat((sold - eBay - ADS - TDS - TCont).toFixed(2));
-  const Payoneer     = parseFloat((Net * 84).toFixed(2));
-  const AmazonExpense = parseFloat((buyingPrice * 87).toFixed(2));
+  const AmazonWithTax = parseFloat((buyingPrice * 1.1).toFixed(2));
+  const Payoneer     = parseFloat((Net * 90).toFixed(2));
+  const AmazonExpense = parseFloat((AmazonWithTax * 95).toFixed(2));
   const actualProfit = parseFloat((Payoneer - AmazonExpense).toFixed(2));
-  return { A, eBay, ADS, TDS, TCont, Net, Payoneer, AmazonExpense, actualProfit };
+  return { A, eBay, ADS, TDS, TCont, Net, AmazonWithTax, Payoneer, AmazonExpense, actualProfit };
 }
 
 export default function AsinReviewModal({ 
@@ -423,8 +424,9 @@ export default function AsinReviewModal({
       <Box>T.Cont:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.TCont.toFixed(2)}</Box>
       <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
       <Box>Net (USD):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${actualProfit.Net.toFixed(2)}&nbsp; (Sold − eBay − ADS − TDS − T.Cont)</Box>
-      <Box>Payoneer (INR):&nbsp;&nbsp; ₹{actualProfit.Payoneer.toFixed(2)}&nbsp; (Net × 84)</Box>
-      <Box>Amazon Spend:&nbsp;&nbsp;&nbsp;&nbsp; ₹{actualProfit.AmazonExpense.toFixed(2)}&nbsp; (Bought × 87)</Box>
+      <Box>Amazon + Tax:&nbsp;&nbsp; ${actualProfit.AmazonWithTax.toFixed(2)}&nbsp; (Bought + 10% of Bought)</Box>
+      <Box>Payoneer (INR):&nbsp;&nbsp; ₹{actualProfit.Payoneer.toFixed(2)}&nbsp; (Net × 90)</Box>
+      <Box>Amazon Spend:&nbsp;&nbsp;&nbsp;&nbsp; ₹{actualProfit.AmazonExpense.toFixed(2)}&nbsp; ((Amazon + Tax) × 95)</Box>
       <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
       <Box sx={{ fontWeight: 700, color: actualProfit.actualProfit < 300 ? '#e57373' : '#81c784' }}>
         Actual Profit:&nbsp;&nbsp;&nbsp;&nbsp; ₹{actualProfit.actualProfit.toFixed(2)}
