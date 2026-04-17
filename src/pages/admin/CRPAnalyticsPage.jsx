@@ -48,6 +48,23 @@ const COLORS = [
   '#4e342e', '#00695c', '#1565c0', '#e65100', '#4a148c',
 ];
 
+function formatInputDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date, days) {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+}
+
+function getDefaultSingleDay() {
+  return formatInputDate(addDays(new Date(), -1));
+}
+
 // ── Donut centre label ────────────────────────────────────────────────────────
 const DonutCenter = ({ viewBox, total }) => {
   const { cx, cy } = viewBox || {};
@@ -127,12 +144,12 @@ export default function CRPAnalyticsPage() {
   const [groupBy, setGroupBy] = useState('category');
   const [selectedSeller, setSelectedSeller] = useState('');
   const [excludeLowValue, setExcludeLowValue] = useState(false);
-  const [dateFilter, setDateFilter] = useState({
+  const [dateFilter, setDateFilter] = useState(() => ({
     mode: 'single',
-    single: new Date().toISOString().split('T')[0],
+    single: getDefaultSingleDay(),
     from: '',
     to: '',
-  });
+  }));
 
   useEffect(() => { fetchSellers(); }, []);
   useEffect(() => { fetchAnalytics(); }, [dateFilter, selectedSeller, excludeLowValue, groupBy]);
@@ -204,7 +221,11 @@ export default function CRPAnalyticsPage() {
           <FormControl size="small" sx={{ minWidth: 130 }}>
             <InputLabel>Date Mode</InputLabel>
             <Select value={dateFilter.mode} label="Date Mode"
-              onChange={(e) => setDateFilter(p => ({ ...p, mode: e.target.value }))}>
+              onChange={(e) => setDateFilter((prev) => ({
+                ...prev,
+                mode: e.target.value,
+                single: e.target.value === 'single' && !prev.single ? getDefaultSingleDay() : prev.single,
+              }))}>
               <MenuItem value="none">None</MenuItem>
               <MenuItem value="single">Single Day</MenuItem>
               <MenuItem value="range">Date Range</MenuItem>

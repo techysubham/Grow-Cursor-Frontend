@@ -58,6 +58,12 @@ function formatInputDate(date) {
   return date.toISOString().split('T')[0];
 }
 
+function addDays(date, days) {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+}
+
 function formatDateTime(value) {
   if (!value) return '—';
   return new Date(value).toLocaleString();
@@ -351,13 +357,12 @@ function PreviewCell({ side, row, onOpen }) {
 }
 
 export default function CRPComparisonPage() {
-  const today = useMemo(() => formatInputDate(new Date()), []);
   const initialFilters = useMemo(() => ({
-    listingsStartDate: today,
-    listingsEndDate: today,
-    ordersStartDate: today,
-    ordersEndDate: today,
-  }), [today]);
+    listingsStartDate: formatInputDate(addDays(new Date(), -2)),
+    listingsEndDate: formatInputDate(addDays(new Date(), -2)),
+    ordersStartDate: formatInputDate(addDays(new Date(), -1)),
+    ordersEndDate: formatInputDate(addDays(new Date(), -1)),
+  }), []);
 
   const [sellers, setSellers] = useState([]);
   const [selectedSeller, setSelectedSeller] = useState('');
