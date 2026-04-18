@@ -583,7 +583,7 @@ export default function AwaitingShipmentPage() {
     setDateSold('');
     setArrivalDateFrom('');
     setArrivalDateTo('');
-    setExcludeClient(false);
+    setExcludeClient(true);
     setSelectedAmazonAccount('');
     setPage(1);
   };

@@ -143,6 +143,8 @@ export default function CRPAnalyticsPage() {
 
   const [groupBy, setGroupBy] = useState('category');
   const [selectedSeller, setSelectedSeller] = useState('');
+  const [selectedMarketplace, setSelectedMarketplace] = useState('');
+  const [excludeClient, setExcludeClient] = useState(true);
   const [excludeLowValue, setExcludeLowValue] = useState(false);
   const [dateFilter, setDateFilter] = useState(() => ({
     mode: 'single',
@@ -152,7 +154,7 @@ export default function CRPAnalyticsPage() {
   }));
 
   useEffect(() => { fetchSellers(); }, []);
-  useEffect(() => { fetchAnalytics(); }, [dateFilter, selectedSeller, excludeLowValue, groupBy]);
+  useEffect(() => { fetchAnalytics(); }, [dateFilter, selectedSeller, selectedMarketplace, excludeClient, excludeLowValue, groupBy]);
 
   const fetchSellers = async () => {
     try {
@@ -167,7 +169,7 @@ export default function CRPAnalyticsPage() {
     try {
       setLoading(true);
       setError('');
-      const params = { groupBy, excludeLowValue };
+      const params = { groupBy, excludeClient, excludeLowValue };
       if (dateFilter.mode === 'single' && dateFilter.single) {
         params.startDate = params.endDate = dateFilter.single;
       } else if (dateFilter.mode === 'range') {
@@ -175,6 +177,7 @@ export default function CRPAnalyticsPage() {
         if (dateFilter.to) params.endDate = dateFilter.to;
       }
       if (selectedSeller) params.sellerId = selectedSeller;
+      if (selectedMarketplace) params.marketplace = selectedMarketplace;
 
       const res = await api.get('/orders/crp-analytics', { params });
       const results = res.data || [];
@@ -262,12 +265,36 @@ export default function CRPAnalyticsPage() {
             </Select>
           </FormControl>
 
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel>Marketplace</InputLabel>
+            <Select
+              value={selectedMarketplace}
+              onChange={(e) => setSelectedMarketplace(e.target.value)}
+              label="Marketplace"
+            >
+              <MenuItem value="">
+                <em>All</em>
+              </MenuItem>
+              <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+              <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+              <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+              <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
+            </Select>
+          </FormControl>
+
           <ToggleButtonGroup value={groupBy} exclusive size="small"
             onChange={(_, v) => { if (v) setGroupBy(v); }}>
             <ToggleButton value="category">Category</ToggleButton>
             <ToggleButton value="range">Range</ToggleButton>
             <ToggleButton value="product">Product</ToggleButton>
           </ToggleButtonGroup>
+
+          <FormControlLabel
+            control={<Switch checked={excludeClient} color="primary"
+              onChange={(e) => setExcludeClient(e.target.checked)} />}
+            label={<Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Exclude Client</Typography>}
+            sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
+          />
 
           <FormControlLabel
             control={<Switch checked={excludeLowValue} color="primary"
