@@ -53,6 +53,7 @@ const LEVEL_LABELS = {
   range: 'Range',
   product: 'Product',
 };
+const DEFAULT_EXCLUDE_CLIENT = true;
 
 function formatInputDate(date) {
   return date.toISOString().split('T')[0];
@@ -366,6 +367,7 @@ export default function CRPComparisonPage() {
 
   const [sellers, setSellers] = useState([]);
   const [selectedSeller, setSelectedSeller] = useState('');
+  const [excludeClient, setExcludeClient] = useState(DEFAULT_EXCLUDE_CLIENT);
   const [excludeLowValue, setExcludeLowValue] = useState(false);
   const [chartLevel, setChartLevel] = useState('category');
   const [rowFilter, setRowFilter] = useState('all');
@@ -419,6 +421,7 @@ export default function CRPComparisonPage() {
       const { data } = await api.get('/orders/crp-comparison', {
         params: {
           sellerId: selectedSeller || undefined,
+          excludeClient: excludeClient ? 'true' : undefined,
           excludeLowValue: excludeLowValue ? 'true' : undefined,
           chartLevel,
           ...filters,
@@ -431,7 +434,7 @@ export default function CRPComparisonPage() {
     } finally {
       setLoading(false);
     }
-  }, [chartLevel, excludeLowValue, filters, selectedSeller]);
+  }, [chartLevel, excludeClient, excludeLowValue, filters, selectedSeller]);
 
   useEffect(() => {
     fetchComparison();
@@ -444,6 +447,7 @@ export default function CRPComparisonPage() {
         params: {
           side,
           sellerId: selectedSeller || undefined,
+          excludeClient: excludeClient ? 'true' : undefined,
           excludeLowValue: excludeLowValue ? 'true' : undefined,
           categoryId: row.categoryId || 'null',
           rangeId: row.rangeId || 'null',
@@ -471,7 +475,7 @@ export default function CRPComparisonPage() {
         error: fetchError.response?.data?.error || 'Failed to load drill-down details.',
       }));
     }
-  }, [detailDialog.limit, excludeLowValue, filters, selectedSeller]);
+  }, [detailDialog.limit, excludeClient, excludeLowValue, filters, selectedSeller]);
 
   const openDetail = (side, row) => {
     setDetailDialog({
@@ -571,18 +575,44 @@ export default function CRPComparisonPage() {
           <FormControlLabel
             control={
               <Switch
-                checked={excludeLowValue}
-                onChange={(event) => setExcludeLowValue(event.target.checked)}
+                checked={excludeClient}
+                onChange={(event) => setExcludeClient(event.target.checked)}
               />
             }
-            label={<Typography variant="body2">Excl. &lt;$3 Orders</Typography>}
+            label={<Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Exclude Client</Typography>}
             sx={{
               m: 0,
               px: 1.5,
               minHeight: 40,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
               border: '1px solid',
               borderColor: 'divider',
               borderRadius: 2,
+              boxSizing: 'border-box',
+            }}
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={excludeLowValue}
+                onChange={(event) => setExcludeLowValue(event.target.checked)}
+              />
+            }
+            label={<Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Excl. &lt;$3 Orders</Typography>}
+            sx={{
+              m: 0,
+              px: 1.5,
+              minHeight: 40,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              boxSizing: 'border-box',
             }}
           />
 
