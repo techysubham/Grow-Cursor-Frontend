@@ -143,6 +143,7 @@ export default function CRPAnalyticsPage() {
 
   const [groupBy, setGroupBy] = useState('category');
   const [selectedSeller, setSelectedSeller] = useState('');
+  const [selectedMarketplace, setSelectedMarketplace] = useState('');
   const [excludeClient, setExcludeClient] = useState(true);
   const [excludeLowValue, setExcludeLowValue] = useState(false);
   const [dateFilter, setDateFilter] = useState(() => ({
@@ -153,7 +154,7 @@ export default function CRPAnalyticsPage() {
   }));
 
   useEffect(() => { fetchSellers(); }, []);
-  useEffect(() => { fetchAnalytics(); }, [dateFilter, selectedSeller, excludeClient, excludeLowValue, groupBy]);
+  useEffect(() => { fetchAnalytics(); }, [dateFilter, selectedSeller, selectedMarketplace, excludeClient, excludeLowValue, groupBy]);
 
   const fetchSellers = async () => {
     try {
@@ -176,6 +177,7 @@ export default function CRPAnalyticsPage() {
         if (dateFilter.to) params.endDate = dateFilter.to;
       }
       if (selectedSeller) params.sellerId = selectedSeller;
+      if (selectedMarketplace) params.marketplace = selectedMarketplace;
 
       const res = await api.get('/orders/crp-analytics', { params });
       const results = res.data || [];
@@ -260,6 +262,23 @@ export default function CRPAnalyticsPage() {
               {sellers.map(s => (
                 <MenuItem key={s._id} value={s._id}>{s.user?.username || 'Unknown'}</MenuItem>
               ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel>Marketplace</InputLabel>
+            <Select
+              value={selectedMarketplace}
+              onChange={(e) => setSelectedMarketplace(e.target.value)}
+              label="Marketplace"
+            >
+              <MenuItem value="">
+                <em>All</em>
+              </MenuItem>
+              <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+              <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+              <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+              <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
             </Select>
           </FormControl>
 
