@@ -21,6 +21,7 @@ import {
   Pagination,
   TextField,
   FormControl,
+  FormControlLabel,
   InputLabel,
   Select,
   MenuItem,
@@ -30,6 +31,7 @@ import {
   DialogContent,
   DialogActions,
   Fade,
+  Switch,
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -479,6 +481,7 @@ export default function AwaitingShipmentPage() {
   const [dateSold, setDateSold] = useState('');
   const [arrivalDateFrom, setArrivalDateFrom] = useState('');
   const [arrivalDateTo, setArrivalDateTo] = useState('');
+  const [excludeClient, setExcludeClient] = useState(true);
   const [amazonAccounts, setAmazonAccounts] = useState([]);
   const [selectedAmazonAccount, setSelectedAmazonAccount] = useState('');
 
@@ -561,7 +564,7 @@ export default function AwaitingShipmentPage() {
   useEffect(() => {
     fetchAwaitingOrders();
     // eslint-disable-next-line
-  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace, shipByDate, dateSold, arrivalDateFrom, arrivalDateTo, selectedAmazonAccount]);
+  }, [page, debouncedOrderId, debouncedBuyerName, selectedSeller, searchMarketplace, shipByDate, dateSold, arrivalDateFrom, arrivalDateTo, excludeClient, selectedAmazonAccount]);
 
   // Handlers
   const handleSellerChange = (e) => {
@@ -580,6 +583,7 @@ export default function AwaitingShipmentPage() {
     setDateSold('');
     setArrivalDateFrom('');
     setArrivalDateTo('');
+    setExcludeClient(false);
     setSelectedAmazonAccount('');
     setPage(1);
   };
@@ -602,6 +606,7 @@ export default function AwaitingShipmentPage() {
     if (dateSold) params.dateSold = dateSold;
     if (arrivalDateFrom) params.arrivalDateFrom = arrivalDateFrom;
     if (arrivalDateTo) params.arrivalDateTo = arrivalDateTo;
+    params.excludeClient = excludeClient;
     if (selectedAmazonAccount) params.amazonAccount = selectedAmazonAccount;
 
     // SMART CHECK: If params haven't changed since last fetch, STOP.
@@ -1356,6 +1361,21 @@ export default function AwaitingShipmentPage() {
                 ))}
               </Select>
             </FormControl>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={excludeClient}
+                  onChange={(e) => {
+                    setExcludeClient(e.target.checked);
+                    setPage(1);
+                  }}
+                  color="primary"
+                />
+              }
+              label="Exclude Client"
+              sx={{ m: 0, px: 1.5, minHeight: 40, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+            />
 
             <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ height: 40, boxSizing: 'border-box' }}>Clear</Button>
 

@@ -1459,7 +1459,8 @@ function FulfillmentDashboard() {
   //const [searchSoldDate, setSearchSoldDate] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [searchPaymentStatus, setSearchPaymentStatus] = useState(() => getInitialState('searchPaymentStatus', ''));
-  const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
+  const [excludeClient, setExcludeClient] = useState(() => getInitialState('excludeClient', true));
+  const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', true));
   const [missingAmazonAccount, setMissingAmazonAccount] = useState(() => getInitialState('missingAmazonAccount', false));
   const [dateFilter, setDateFilter] = useState(() => getInitialState('dateFilter', ''));
 
@@ -1908,6 +1909,7 @@ function FulfillmentDashboard() {
     searchProductName,
     searchMarketplace,
     searchPaymentStatus,
+    excludeClient,
     excludeLowValue,
     missingAmazonAccount,
     dateFilter
@@ -1962,6 +1964,7 @@ function FulfillmentDashboard() {
       prev.selectedSeller !== selectedSeller ||
       prev.searchMarketplace !== searchMarketplace ||
       prev.searchPaymentStatus !== searchPaymentStatus ||
+      prev.excludeClient !== excludeClient ||
       prev.excludeLowValue !== excludeLowValue ||
       prev.missingAmazonAccount !== missingAmazonAccount ||
       JSON.stringify(prev.dateFilter) !== JSON.stringify(dateFilter);
@@ -1976,6 +1979,7 @@ function FulfillmentDashboard() {
       searchProductName,
       searchMarketplace,
       searchPaymentStatus,
+      excludeClient,
       excludeLowValue,
       missingAmazonAccount,
       dateFilter
@@ -1992,7 +1996,7 @@ function FulfillmentDashboard() {
       setCurrentPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeLowValue, missingAmazonAccount, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeClient, excludeLowValue, missingAmazonAccount, dateFilter]);
 
   // orderEarnings is now read-only (auto-calculated server-side)
   // No manual editing handlers needed
@@ -2025,6 +2029,7 @@ function FulfillmentDashboard() {
       if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
+      params.excludeClient = excludeClient;
       params.excludeLowValue = excludeLowValue;
       params.missingAmazonAccount = missingAmazonAccount;
 
@@ -2879,6 +2884,7 @@ function FulfillmentDashboard() {
       if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
+      params.excludeClient = excludeClient;
       params.excludeLowValue = excludeLowValue;
       params.missingAmazonAccount = missingAmazonAccount;
 
@@ -3294,6 +3300,22 @@ function FulfillmentDashboard() {
                 <FormControlLabel
                   control={
                     <Switch
+                      checked={excludeClient}
+                      onChange={(e) => setExcludeClient(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                      Exclude Client
+                    </Typography>
+                  }
+                  sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
+                />
+
+                <FormControlLabel
+                  control={
+                    <Switch
                       checked={excludeLowValue}
                       onChange={(e) => setExcludeLowValue(e.target.checked)}
                       color="primary"
@@ -3512,6 +3534,22 @@ function FulfillmentDashboard() {
                   <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
                   <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
                 </Select>
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={excludeClient}
+                      onChange={(e) => setExcludeClient(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                      Exclude Client
+                    </Typography>
+                  }
+                  sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
+                />
 
                 <FormControlLabel
                   control={
