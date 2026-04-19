@@ -148,6 +148,7 @@ import AsinDirectoryPage from '../pages/admin/AsinDirectoryPage.jsx';
 import AsinListPage from '../pages/admin/AsinListPage.jsx';
 import CRPComparisonPage from '../pages/admin/CRPComparisonPage.jsx';
 import UserSellerAssignmentPage from '../pages/admin/UserSellerAssignmentPage.jsx';
+import MeetingsPage from '../pages/admin/MeetingsPage.jsx';
 import UserPerformancePage from '../pages/admin/UserPerformancePage.jsx';
 import AiFitmentUsagePage from '../pages/admin/AiFitmentUsagePage.jsx';
 import ListingStatsPage from '../pages/admin/ListingStatsPage.jsx';
@@ -298,6 +299,7 @@ const COMPONENT_MAP = {
   'EmployeeManagement': EmployeeManagementPage,
   'AddUser': AddListerPage,
   'UserSellerAssignments': UserSellerAssignmentPage,
+  'Meetings': MeetingsPage,
   'ViewAllMessages': InternalMessagesAdminPage,
   'Attendance': AttendanceAdminPage,
   'PageAccessManagement': PageAccessManagementPage,
@@ -331,7 +333,7 @@ export default function AdminLayout({ user, onLogout }) {
 
   // Flyout menu anchor states
   const [menuAnchors, setMenuAnchors] = useState({});
-  
+
   // Submenu anchors
   const [submenuAnchors, setSubmenuAnchors] = useState({});
 
