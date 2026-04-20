@@ -122,6 +122,8 @@ export default function CompatibilityDashboard() {
   const [listedTo, setListedTo] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [trimFilterKeyword, setTrimFilterKeyword] = useState('');
+  const [aiSuggestedTrims, setAiSuggestedTrims] = useState([]);
+  const [aiExcludedTrims, setAiExcludedTrims] = useState([]);
 
   // BULK AI SUGGEST STATE
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -615,6 +617,8 @@ export default function CompatibilityDashboard() {
       setTrimsByYear({});
       setSelectedTrimsByYear({});
       setExpandedYears({});
+      setAiSuggestedTrims(data.suggestedTrims || []);
+      setAiExcludedTrims(data.excludedTrims || []);
 
       const modelsRes = await api.post('/ebay/compatibility/values', {
         sellerId: currentSellerId,
@@ -1060,6 +1064,57 @@ export default function CompatibilityDashboard() {
     }
   }, [selectedYears, selectedMake, selectedModel]);
 
+  // Auto-select AI suggested trims when trims by year load
+  useEffect(() => {
+    if (Object.keys(trimsByYear).length > 0) {
+      const newSelectedTrims = { ...selectedTrimsByYear };
+      let anySelected = false;
+
+      Object.keys(trimsByYear).forEach(year => {
+        const availableTrims = trimsByYear[year] || [];
+        let matchedTrims = [];
+        
+        if (aiSuggestedTrims && aiSuggestedTrims.length > 0) {
+          matchedTrims = availableTrims.filter(t => 
+             aiSuggestedTrims.some(suggested => {
+               if (!suggested || typeof suggested !== 'string') return false;
+               const escapedSuggested = suggested.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s*');
+               const combo = `${t.trim} ${t.engine}`;
+               return new RegExp(`\\b${escapedSuggested}\\b`, 'i').test(combo);
+             })
+          );
+        } else if (aiExcludedTrims && aiExcludedTrims.length > 0) {
+          matchedTrims = availableTrims.filter(t => 
+             !aiExcludedTrims.some(excluded => {
+               if (!excluded || typeof excluded !== 'string') return false;
+               const escapedExcluded = excluded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s*');
+               const combo = `${t.trim} ${t.engine}`;
+               return new RegExp(`\\b${escapedExcluded}\\b`, 'i').test(combo);
+             })
+          );
+        } else {
+          // If no specific inclusions or exclusions are mentioned, default to selecting all trims
+          matchedTrims = availableTrims;
+        }
+
+        if (matchedTrims.length > 0) {
+          const existing = newSelectedTrims[year] || [];
+          const existingKeys = new Set(existing.map(e => `${e.trim}|||${e.engine}`));
+          const toAdd = matchedTrims.filter(m => !existingKeys.has(`${m.trim}|||${m.engine}`));
+          
+          if (toAdd.length > 0) {
+            newSelectedTrims[year] = [...existing, ...toAdd];
+            anySelected = true;
+          }
+        }
+      });
+
+      if (anySelected) {
+        setSelectedTrimsByYear(newSelectedTrims);
+      }
+    }
+  }, [trimsByYear, aiSuggestedTrims, aiExcludedTrims]);
+
   const handleEditClick = (item, index, prefillAiData = null) => {
     setSelectedItem(item);
     setCurrentListingIndex(index);
@@ -1111,6 +1166,8 @@ export default function CompatibilityDashboard() {
       setSelectedYears([]); setSelectedTrimsByYear({});
       setYearOptions([]); setModelOptions([]);
       setStartYear(''); setEndYear('');
+      setAiSuggestedTrims([]);
+      setAiExcludedTrims([]);
     }
   };
 
@@ -1317,6 +1374,8 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       setEndYear('');
       setNewNotes('');
       setTrimFilterKeyword('');
+      setAiSuggestedTrims([]);
+      setAiExcludedTrims([]);
     } else if (page > 1) {
       // Load previous page and open last item
       setPendingNavigation('last');
@@ -1340,6 +1399,8 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       setEndYear('');
       setNewNotes('');
       setTrimFilterKeyword('');
+      setAiSuggestedTrims([]);
+      setAiExcludedTrims([]);
     } else if (page < totalPages) {
       // Load next page and open first item
       setPendingNavigation('first');

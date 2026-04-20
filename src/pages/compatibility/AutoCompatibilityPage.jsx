@@ -237,6 +237,8 @@ export default function AutoCompatibilityPage() {
   const [endYear, setEndYear] = useState('');
   const [trimFilterKeyword, setTrimFilterKeyword] = useState('');
   const [newNotes, setNewNotes] = useState('');
+  const [aiSuggestedTrims, setAiSuggestedTrims] = useState([]);
+  const [aiExcludedTrims, setAiExcludedTrims] = useState([]);
 
   // History
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -603,6 +605,8 @@ export default function AutoCompatibilityPage() {
     setStartYear('');
     setEndYear('');
     setNewNotes('');
+    setAiSuggestedTrims([]);
+    setAiExcludedTrims([]);
   };
 
   const removeExistingCompatibility = async () => {
@@ -669,6 +673,8 @@ export default function AutoCompatibilityPage() {
       setExpandedYears({});
       setStartYear('');
       setEndYear('');
+      setAiSuggestedTrims(data.suggestedTrims || []);
+      setAiExcludedTrims(data.excludedTrims || []);
 
       const modelsRes = await api.post('/ebay/compatibility/values', {
         sellerId,
@@ -835,6 +841,57 @@ export default function AutoCompatibilityPage() {
       setSelectedTrimsByYear({});
     }
   }, [selectedYears, selectedMake, selectedModel]);
+
+  // Auto-select AI suggested trims when trims by year load
+  useEffect(() => {
+    if (Object.keys(trimsByYear).length > 0) {
+      const newSelectedTrims = { ...selectedTrimsByYear };
+      let anySelected = false;
+
+      Object.keys(trimsByYear).forEach(year => {
+        const availableTrims = trimsByYear[year] || [];
+        let matchedTrims = [];
+        
+        if (aiSuggestedTrims && aiSuggestedTrims.length > 0) {
+          matchedTrims = availableTrims.filter(t => 
+             aiSuggestedTrims.some(suggested => {
+               if (!suggested || typeof suggested !== 'string') return false;
+               const escapedSuggested = suggested.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s*');
+               const combo = `${t.trim} ${t.engine}`;
+               return new RegExp(`\\b${escapedSuggested}\\b`, 'i').test(combo);
+             })
+          );
+        } else if (aiExcludedTrims && aiExcludedTrims.length > 0) {
+          matchedTrims = availableTrims.filter(t => 
+             !aiExcludedTrims.some(excluded => {
+               if (!excluded || typeof excluded !== 'string') return false;
+               const escapedExcluded = excluded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s*');
+               const combo = `${t.trim} ${t.engine}`;
+               return new RegExp(`\\b${escapedExcluded}\\b`, 'i').test(combo);
+             })
+          );
+        } else {
+          // If no specific inclusions or exclusions are mentioned, default to selecting all trims
+          matchedTrims = availableTrims;
+        }
+
+        if (matchedTrims.length > 0) {
+          const existing = newSelectedTrims[year] || [];
+          const existingKeys = new Set(existing.map(e => `${e.trim}|||${e.engine}`));
+          const toAdd = matchedTrims.filter(m => !existingKeys.has(`${m.trim}|||${m.engine}`));
+          
+          if (toAdd.length > 0) {
+            newSelectedTrims[year] = [...existing, ...toAdd];
+            anySelected = true;
+          }
+        }
+      });
+
+      if (anySelected) {
+        setSelectedTrimsByYear(newSelectedTrims);
+      }
+    }
+  }, [trimsByYear, aiSuggestedTrims, aiExcludedTrims]);
 
   const fetchTrims = async (makeVal, modelVal, years) => {
     if (!makeVal || !modelVal || !years || years.length === 0) {
@@ -1081,6 +1138,8 @@ export default function AutoCompatibilityPage() {
       setSelectedTrimsByYear({}); setModelOptions([]); setYearOptions([]);
       setTrimsByYear({}); setExpandedYears({}); setTrimFilterKeyword('');
       setStartYear(''); setEndYear(''); setNewNotes('');
+      setAiSuggestedTrims([]);
+      setAiExcludedTrims([]);
     } else {
       setReviewItem(updatedItems[reviewIndex]);
     }
