@@ -31,6 +31,20 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const statCardSx = {
+    textAlign: 'center',
+    p: 2,
+    borderRadius: 2,
+    bgcolor: 'grey.50',
+    border: '1px solid',
+    borderColor: 'divider',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      bgcolor: 'grey.100',
+      borderColor: 'grey.400'
+    }
+  };
+
   const fetchStats = async () => {
     if (!templateId) return;
     
@@ -66,10 +80,10 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
   }
 
   return (
-    <Paper elevation={2} sx={{ p: 2.5, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+    <Paper elevation={2} sx={{ p: 2.5, mb: 3, bgcolor: 'background.paper', color: 'text.primary' }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Stack direction="row" spacing={1} alignItems="center">
-          <AnalyticsIcon />
+          <AnalyticsIcon color="primary" />
           <Typography variant="h6" fontWeight="600">
             Listing Activity
           </Typography>
@@ -77,46 +91,31 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
         {onViewDetails && (
           <Button 
             size="small" 
-            variant="contained" 
+            variant="outlined" 
             onClick={onViewDetails}
-            sx={{ 
-              bgcolor: 'rgba(255, 255, 255, 0.2)', 
-              color: 'white',
-              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.3)' }
-            }}
           >
             View Details →
           </Button>
         )}
       </Stack>
       
-      <Divider sx={{ mb: 2, borderColor: 'rgba(255, 255, 255, 0.2)' }} />
+      <Divider sx={{ mb: 2 }} />
       
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress size={40} sx={{ color: 'white' }} />
+          <CircularProgress size={40} color="primary" />
         </Box>
       ) : (
         <Grid container spacing={3}>
           <Grid item xs={6} sm={3}>
-            <Box sx={{ 
-              textAlign: 'center', 
-              p: 2, 
-              borderRadius: 2, 
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              transition: 'all 0.3s',
-              '&:hover': { 
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-                transform: 'translateY(-4px)'
-              }
-            }}>
+            <Box sx={statCardSx}>
               <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
-                <CalendarIcon fontSize="small" />
-                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                <CalendarIcon fontSize="small" color="success" />
+                <Typography variant="caption" color="text.secondary">
                   Today
                 </Typography>
               </Stack>
-              <Typography variant="h4" fontWeight="bold">
+              <Typography variant="h4" fontWeight="bold" color="text.primary">
                 {stats?.today || 0}
               </Typography>
               <Chip 
@@ -124,7 +123,7 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
                 size="small" 
                 sx={{ 
                   mt: 1, 
-                  bgcolor: 'rgba(76, 175, 80, 0.8)', 
+                  bgcolor: 'success.main', 
                   color: 'white',
                   fontSize: '0.7rem'
                 }} 
@@ -133,24 +132,14 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
           </Grid>
           
           <Grid item xs={6} sm={3}>
-            <Box sx={{ 
-              textAlign: 'center', 
-              p: 2, 
-              borderRadius: 2, 
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              transition: 'all 0.3s',
-              '&:hover': { 
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-                transform: 'translateY(-4px)'
-              }
-            }}>
+            <Box sx={statCardSx}>
               <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
-                <DateRangeIcon fontSize="small" />
-                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                <DateRangeIcon fontSize="small" color="info" />
+                <Typography variant="caption" color="text.secondary">
                   This Week
                 </Typography>
               </Stack>
-              <Typography variant="h4" fontWeight="bold">
+              <Typography variant="h4" fontWeight="bold" color="text.primary">
                 {stats?.thisWeek || 0}
               </Typography>
               <Chip 
@@ -158,7 +147,7 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
                 size="small" 
                 sx={{ 
                   mt: 1, 
-                  bgcolor: 'rgba(33, 150, 243, 0.8)', 
+                  bgcolor: 'info.main', 
                   color: 'white',
                   fontSize: '0.7rem'
                 }} 
@@ -167,24 +156,14 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
           </Grid>
           
           <Grid item xs={6} sm={3}>
-            <Box sx={{ 
-              textAlign: 'center', 
-              p: 2, 
-              borderRadius: 2, 
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              transition: 'all 0.3s',
-              '&:hover': { 
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-                transform: 'translateY(-4px)'
-              }
-            }}>
+            <Box sx={statCardSx}>
               <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
-                <TrendingUpIcon fontSize="small" />
-                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                <TrendingUpIcon fontSize="small" color="secondary" />
+                <Typography variant="caption" color="text.secondary">
                   This Month
                 </Typography>
               </Stack>
-              <Typography variant="h4" fontWeight="bold">
+              <Typography variant="h4" fontWeight="bold" color="text.primary">
                 {stats?.thisMonth || 0}
               </Typography>
               <Chip 
@@ -192,7 +171,7 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
                 size="small" 
                 sx={{ 
                   mt: 1, 
-                  bgcolor: 'rgba(156, 39, 176, 0.8)', 
+                  bgcolor: 'secondary.main', 
                   color: 'white',
                   fontSize: '0.7rem'
                 }} 
@@ -201,25 +180,14 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
           </Grid>
           
           <Grid item xs={6} sm={3}>
-            <Box sx={{ 
-              textAlign: 'center', 
-              p: 2, 
-              borderRadius: 2, 
-              bgcolor: 'rgba(255, 255, 255, 0.15)',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              transition: 'all 0.3s',
-              '&:hover': { 
-                bgcolor: 'rgba(255, 255, 255, 0.25)',
-                transform: 'translateY(-4px)'
-              }
-            }}>
+            <Box sx={{ ...statCardSx, borderColor: 'primary.light', bgcolor: 'primary.50' }}>
               <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
-                <InventoryIcon fontSize="small" />
-                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                <InventoryIcon fontSize="small" color="primary" />
+                <Typography variant="caption" color="text.secondary">
                   Total Active
                 </Typography>
               </Stack>
-              <Typography variant="h4" fontWeight="bold">
+              <Typography variant="h4" fontWeight="bold" color="text.primary">
                 {stats?.total || 0}
               </Typography>
               <Chip 
@@ -227,7 +195,7 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
                 size="small" 
                 sx={{ 
                   mt: 1, 
-                  bgcolor: 'rgba(255, 255, 255, 0.3)', 
+                  bgcolor: 'primary.main', 
                   color: 'white',
                   fontSize: '0.7rem'
                 }} 
