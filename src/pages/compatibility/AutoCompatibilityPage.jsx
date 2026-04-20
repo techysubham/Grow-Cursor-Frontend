@@ -2262,13 +2262,7 @@ export default function AutoCompatibilityPage() {
                     → Resolved: {reviewItem.resolvedMake} {reviewItem.resolvedModel}
                   </Typography>
                 )}
-                {reviewItem.trimsStrategy && (
-                  <Typography variant="caption" display="block" color="secondary.main" sx={{ mt: 0.5, fontWeight: 500 }}>
-                    {reviewItem.trimsStrategy === 'SPECIFIC_TRIMS' ? '✓ Filtered exactly to trims mentioned in title/description' : 
-                     reviewItem.trimsStrategy === 'EXCLUDED_TRIMS' ? '✓ Selected all trims except explicitly excluded ones' :
-                     '✓ Selected ALL available trims (no specific trims mentioned)'}
-                  </Typography>
-                )}
+
                 {reviewItem.failureReason && (
                   <Typography variant="caption" display="block" color="error.main" sx={{ mt: 0.5 }}>
                     ⚠️ {reviewItem.failureReason}
@@ -2290,26 +2284,51 @@ export default function AutoCompatibilityPage() {
             </Typography>
 
             {/* AI SUGGEST BUTTON */}
-            <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={aiLoading ? <CircularProgress size={14} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 16 }} />}
-                onClick={handleAiSuggest}
-                disabled={aiLoading}
-                sx={{
-                  borderColor: '#7c3aed',
-                  color: '#7c3aed',
-                  '&:hover': { borderColor: '#6d28d9', bgcolor: '#f5f3ff' },
-                  fontWeight: 600,
-                  fontSize: '0.78rem'
-                }}
-              >
-                {aiLoading ? 'Analyzing...' : '✨ AI Suggest'}
-              </Button>
-              <Typography variant="caption" color="textSecondary">
-                Auto-fills Make, Model &amp; Year range from listing title/description
-              </Typography>
+            <Box sx={{ mb: 1.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={aiLoading ? <CircularProgress size={14} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                  onClick={handleAiSuggest}
+                  disabled={aiLoading}
+                  sx={{
+                    borderColor: '#7c3aed',
+                    color: '#7c3aed',
+                    '&:hover': { borderColor: '#6d28d9', bgcolor: '#f5f3ff' },
+                    fontWeight: 600,
+                    fontSize: '0.78rem'
+                  }}
+                >
+                  {aiLoading ? 'Analyzing...' : '✨ AI Suggest'}
+                </Button>
+                <Typography variant="caption" color="textSecondary">
+                  Auto-fills Make, Model &amp; Year range from listing title/description
+                </Typography>
+              </Box>
+              {(reviewItem?.trimsStrategy || (aiSuggestedTrims?.length > 0) || (aiExcludedTrims?.length > 0)) && (
+                (() => {
+                  const isSpecific = (aiSuggestedTrims?.length > 0) || reviewItem?.trimsStrategy === 'SPECIFIC_TRIMS';
+                  const isExcluded = (aiExcludedTrims?.length > 0) || reviewItem?.trimsStrategy === 'EXCLUDED_TRIMS';
+                  
+                  const bgcolor = isSpecific ? '#dcfce7' : isExcluded ? '#ffedd5' : '#e0f2fe';
+                  const borderColor = isSpecific ? '#bbf7d0' : isExcluded ? '#fed7aa' : '#bae6fd';
+                  const textColor = isSpecific ? '#166534' : isExcluded ? '#9a3412' : '#075985';
+                  const iconColor = isSpecific ? '#16a34a' : isExcluded ? '#ea580c' : '#0284c7';
+                  const text = isSpecific ? '✓ Filtered exactly to trims mentioned in title/description' :
+                               isExcluded ? '✓ Selected all trims except explicitly excluded ones' :
+                               '✓ Auto-selected ALL available trims (no specific trims mentioned)';
+
+                  return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', bgcolor, p: 0.75, borderRadius: 1, border: `1px solid ${borderColor}`, mt: 0.5 }}>
+                      <AutoAwesomeIcon sx={{ fontSize: 14, color: iconColor, mr: 0.5 }} />
+                      <Typography variant="caption" sx={{ color: textColor, fontWeight: 600 }}>
+                        {text}
+                      </Typography>
+                    </Box>
+                  );
+                })()
+              )}
             </Box>
 
             {/* Actions Bar */}
