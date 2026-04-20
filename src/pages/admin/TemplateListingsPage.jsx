@@ -4,7 +4,7 @@ import {
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Typography, IconButton, Dialog, DialogTitle, 
   DialogContent, DialogActions, Alert, Pagination, TextField, Tabs, Tab, MenuItem,
-  Chip, CircularProgress, Switch, FormControlLabel, LinearProgress, FormControl,
+  Chip, CircularProgress, Switch, FormControlLabel, LinearProgress, FormControl, Divider,
   InputLabel, Select, Breadcrumbs, Link, Checkbox, OutlinedInput, Tooltip
 } from '@mui/material';
 import { 
@@ -118,6 +118,41 @@ export default function TemplateListingsPage() {
   const [scheduleFromRow, setScheduleFromRow] = useState('');
   const [scheduleToRow, setScheduleToRow] = useState('');
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
+
+  const headerActionButtonSx = {
+    minHeight: 40,
+    px: 1.5,
+    borderRadius: 1.5,
+    boxSizing: 'border-box',
+    whiteSpace: 'nowrap'
+  };
+  const actionToolbarPaperSx = {
+    p: 2,
+    mb: 2,
+    borderRadius: 2,
+    bgcolor: 'grey.50'
+  };
+  const actionSectionSx = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+    minWidth: { xs: '100%', md: 260 },
+    flex: '1 1 260px'
+  };
+  const actionSectionTitleSx = {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.8,
+    color: 'text.secondary',
+    textTransform: 'uppercase'
+  };
+  const actionButtonSx = {
+    minHeight: 40,
+    px: 1.5,
+    borderRadius: 1.5,
+    boxSizing: 'border-box',
+    whiteSpace: 'nowrap'
+  };
 
   const scheduleControlWidth = 148;
   const scheduleColumnSx = {
@@ -1180,8 +1215,8 @@ export default function TemplateListingsPage() {
         />
       )}
 
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Stack direction="row" alignItems="center" spacing={2}>
+      <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', lg: 'center' }} spacing={2} sx={{ mb: 2 }}>
+        <Stack direction="row" alignItems="center" spacing={2} useFlexGap sx={{ flexWrap: 'wrap' }}>
           <Typography variant="h6">
             {template ? `${template.name} - Listings` : 'Template Listings'}
           </Typography>
@@ -1189,123 +1224,188 @@ export default function TemplateListingsPage() {
             <Chip label="Customized" color="primary" size="small" />
           )}
         </Stack>
-        <Stack direction="row" spacing={1} alignItems="center">
-          {fromAsinList && (
-            <>
-              <Button variant="outlined" size="small" onClick={() => {}}>
-                Save As
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                color="primary"
-                onClick={() => {
-                  if (selectedListings.size === 0) {
-                    setError('Please select at least one listing to proceed.');
-                    return;
-                  }
-                  setListDirectlyDialog(true);
-                }}
-              >
-                List Directly ({selectedListings.size})
-              </Button>
-            </>
-          )}
-          {sellerId && templateId && (
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<SettingsIcon />}
-              onClick={fromAsinList ? undefined : () => setCustomizationDialog(true)}
-              disabled={fromAsinList}
-            >
-              Customize Template
+        {fromAsinList && (
+          <Stack direction="row" spacing={1} alignItems="center" useFlexGap sx={{ flexWrap: 'wrap' }}>
+            <Button variant="outlined" size="small" onClick={() => {}} sx={headerActionButtonSx}>
+              Save As
             </Button>
-          )}
-        </Stack>
+            <Button
+              variant="contained"
+              size="small"
+              color="primary"
+              onClick={() => {
+                if (selectedListings.size === 0) {
+                  setError('Please select at least one listing to proceed.');
+                  return;
+                }
+                setListDirectlyDialog(true);
+              }}
+              sx={headerActionButtonSx}
+            >
+              List Directly ({selectedListings.size})
+            </Button>
+          </Stack>
+        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
-      <Stack direction="row" spacing={2} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />} 
-          onClick={handleAddListing}
-          disabled={!sellerId || batchFilter !== 'active' || fromAsinList}
+      <Paper variant="outlined" sx={actionToolbarPaperSx}>
+        <Stack
+          direction={{ xs: 'column', xl: 'row' }}
+          spacing={2.5}
+          useFlexGap
+          divider={<Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', xl: 'block' } }} />}
         >
-          Add Listing
-        </Button>
-        <Button 
-          variant="outlined" 
-          startIcon={<UploadIcon />} 
-          onClick={() => setBulkImportDialog(true)}
-          disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
-        >
-          Bulk Import ASINs
-        </Button>
-        <Button 
-          variant="outlined" 
-          startIcon={<UploadIcon />} 
-          onClick={() => setBulkImportSKUsDialog(true)}
-          disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
-        >
-          Bulk Import SKUs
-        </Button>
-        <Button 
-          variant="outlined" 
-          color="success"
-          onClick={() => setReactivateDialog(true)}
-          disabled={!sellerId || !templateId || fromAsinList}
-        >
-          Relist by SKU
-        </Button>
-        <Button 
-          variant="outlined" 
-          color="error"
-          onClick={() => setDeactivateDialog(true)}
-          disabled={!sellerId || !templateId || fromAsinList}
-        >
-          Deactivate by SKU
-        </Button>
-        <ActionFieldEditor templateId={templateId} sellerId={sellerId} />
-        <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
-          Download CSV
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={() => setHistoryDialog(true)}
-          disabled={downloadHistory.length === 0 || fromAsinList}
-        >
-          Download History ({downloadHistory.length})
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<CalculatorIcon />}
-          onClick={fromAsinList ? undefined : () => setCalculatorDialog(true)}
-          disabled={!pricingConfig || fromAsinList}
-        >
-          Pricing Calculator {isCustomPricing && '(Custom)'}
-        </Button>
-        <Button 
-          variant="outlined" 
-          startIcon={<SettingsIcon />} 
-          onClick={() => setDefaultsDialog(true)}
-          color="primary"
-          disabled={fromAsinList}
-        >
-          Set Defaults
-          {template?.coreFieldDefaults && Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length > 0 && (
-            <Chip 
-              label={Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length} 
-              size="small" 
-              color="primary"
-              sx={{ ml: 1, height: 20 }}
-            />
-          )}
-        </Button>
-      </Stack>
+          <Box sx={actionSectionSx}>
+            <Typography variant="caption" sx={actionSectionTitleSx}>
+              Create & Import
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              <Button 
+                variant="contained" 
+                startIcon={<AddIcon />} 
+                onClick={handleAddListing}
+                disabled={!sellerId || batchFilter !== 'active' || fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Add Listing
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<UploadIcon />} 
+                onClick={() => setBulkImportDialog(true)}
+                disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Bulk Import ASINs
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<UploadIcon />} 
+                onClick={() => setBulkImportSKUsDialog(true)}
+                disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Bulk Import SKUs
+              </Button>
+            </Stack>
+          </Box>
+
+          <Box sx={actionSectionSx}>
+            <Typography variant="caption" sx={actionSectionTitleSx}>
+              Listing Status
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              <Button 
+                variant="outlined" 
+                color="success"
+                onClick={() => setReactivateDialog(true)}
+                disabled={!sellerId || !templateId || fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Relist by SKU
+              </Button>
+              <Button 
+                variant="outlined" 
+                color="error"
+                onClick={() => setDeactivateDialog(true)}
+                disabled={!sellerId || !templateId || fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Deactivate by SKU
+              </Button>
+            </Stack>
+          </Box>
+
+          <Box sx={actionSectionSx}>
+            <Typography variant="caption" sx={actionSectionTitleSx}>
+              Export & Review
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              <ActionFieldEditor
+                templateId={templateId}
+                sellerId={sellerId}
+                buttonProps={{ size: 'small', sx: actionButtonSx }}
+              />
+              <Button
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportCSV}
+                disabled={loading || listings.length === 0}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Download CSV
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setHistoryDialog(true)}
+                disabled={downloadHistory.length === 0 || fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Download History ({downloadHistory.length})
+              </Button>
+            </Stack>
+          </Box>
+
+          <Box sx={actionSectionSx}>
+            <Typography variant="caption" sx={actionSectionTitleSx}>
+              Template Tools
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              {sellerId && templateId && (
+                <Button
+                  variant="outlined"
+                  startIcon={<SettingsIcon />}
+                  onClick={fromAsinList ? undefined : () => setCustomizationDialog(true)}
+                  disabled={fromAsinList}
+                  size="small"
+                  sx={actionButtonSx}
+                >
+                  Customize Template
+                </Button>
+              )}
+              <Button
+                variant="outlined"
+                startIcon={<CalculatorIcon />}
+                onClick={fromAsinList ? undefined : () => setCalculatorDialog(true)}
+                disabled={!pricingConfig || fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Pricing Calculator {isCustomPricing && '(Custom)'}
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<SettingsIcon />} 
+                onClick={() => setDefaultsDialog(true)}
+                color="primary"
+                disabled={fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Set Defaults
+                {template?.coreFieldDefaults && Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length > 0 && (
+                  <Chip 
+                    label={Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length} 
+                    size="small" 
+                    color="primary"
+                    sx={{ ml: 1, height: 20 }}
+                  />
+                )}
+              </Button>
+            </Stack>
+          </Box>
+        </Stack>
+      </Paper>
 
       {/* Schedule block */}
       <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column', maxWidth: '100%' }}>

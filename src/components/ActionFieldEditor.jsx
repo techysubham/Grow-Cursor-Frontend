@@ -13,12 +13,13 @@ import {
 import { Edit as EditIcon } from '@mui/icons-material';
 import api from '../lib/api';
 
-export default function ActionFieldEditor({ templateId, sellerId }) {
+export default function ActionFieldEditor({ templateId, sellerId, buttonProps = {} }) {
   const [open, setOpen] = useState(false);
   const [actionField, setActionField] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const { sx: triggerButtonSx, ...triggerButtonProps } = buttonProps;
 
   useEffect(() => {
     if (open) {
@@ -73,7 +74,9 @@ export default function ActionFieldEditor({ templateId, sellerId }) {
             variant="outlined"
             color="primary"
             startIcon={<EditIcon />}
+            {...triggerButtonProps}
             onClick={() => setOpen(true)}
+            sx={triggerButtonSx}
           >
             eBay Action Field
           </Button>
