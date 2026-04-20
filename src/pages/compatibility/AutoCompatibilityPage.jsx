@@ -1627,9 +1627,9 @@ export default function AutoCompatibilityPage() {
             />
 
             <Tooltip
-              title={hasConflict ? `${activeBatches.length} batch${activeBatches.length !== 1 ? 'es are' : ' is'} currently running. Wait for ${activeBatches.length !== 1 ? 'them' : 'it'} to finish or click the chip above to monitor.` : ''}
+              title={''}
               arrow
-              disableHoverListener={!hasConflict}
+              disableHoverListener={true}
             >
               <span>
                 <Button
@@ -1637,16 +1637,16 @@ export default function AutoCompatibilityPage() {
                   size="large"
                   startIcon={starting ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
                   onClick={handleStart}
-                  disabled={starting || isRunning || hasConflict || !sellerId || !targetDate}
+                  disabled={starting || isRunning || !sellerId || !targetDate}
                   sx={{
-                    bgcolor: hasConflict ? '#d97706' : '#7c3aed',
-                    '&:hover': { bgcolor: hasConflict ? '#b45309' : '#6d28d9' },
+                    bgcolor: '#7c3aed',
+                    '&:hover': { bgcolor: '#6d28d9' },
                     '&.Mui-disabled': { bgcolor: '#e5e7eb', color: '#9ca3af' },
                     fontWeight: 700, px: 4, borderRadius: 2,
                     textTransform: 'none', fontSize: '1rem'
                   }}
                 >
-                  {starting ? 'Starting...' : isRunning ? 'Running...' : hasConflict ? 'Already Running' : 'Run Auto-Compatibility'}
+                  {starting ? 'Starting...' : isRunning ? 'Running...' : 'Run Auto-Compatibility'}
                 </Button>
               </span>
             </Tooltip>
@@ -2043,6 +2043,15 @@ export default function AutoCompatibilityPage() {
                       Resolved → {detailItem.resolvedMake} {detailItem.resolvedModel}
                     </Typography>
                   )}
+                  {detailItem.trimsStrategy && (
+                    <Typography variant="body2" color="secondary.main" sx={{ mt: 0.5, fontWeight: 500 }}>
+                      Trim Selection: {
+                        detailItem.trimsStrategy === 'SPECIFIC_TRIMS' ? 'Filtered to specific trims' : 
+                        detailItem.trimsStrategy === 'EXCLUDED_TRIMS' ? 'All except excluded trims' :
+                        'All available trims included'
+                      }
+                    </Typography>
+                  )}
                   {detailItem.aiSuggestion.allFitments?.length > 1 && (
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="caption" color="textSecondary">All AI fitments found:</Typography>
@@ -2251,6 +2260,13 @@ export default function AutoCompatibilityPage() {
                 {reviewItem.resolvedMake && (
                   <Typography variant="caption" display="block" color="primary.main" sx={{ mt: 0.5 }}>
                     → Resolved: {reviewItem.resolvedMake} {reviewItem.resolvedModel}
+                  </Typography>
+                )}
+                {reviewItem.trimsStrategy && (
+                  <Typography variant="caption" display="block" color="secondary.main" sx={{ mt: 0.5, fontWeight: 500 }}>
+                    {reviewItem.trimsStrategy === 'SPECIFIC_TRIMS' ? '✓ Filtered exactly to trims mentioned in title/description' : 
+                     reviewItem.trimsStrategy === 'EXCLUDED_TRIMS' ? '✓ Selected all trims except explicitly excluded ones' :
+                     '✓ Selected ALL available trims (no specific trims mentioned)'}
                   </Typography>
                 )}
                 {reviewItem.failureReason && (
