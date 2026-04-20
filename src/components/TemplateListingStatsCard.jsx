@@ -23,13 +23,11 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
   const [error, setError] = useState('');
 
   const statCardSx = {
-    textAlign: 'center',
-    p: { xs: 1.1, md: 1.25 },
-    minHeight: { xs: 88, md: 96 },
+    p: { xs: 1, md: 1.15 },
+    minHeight: { xs: 72, md: 78 },
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     borderRadius: `${dashboardTheme.radius.card - 8}px`,
     backgroundColor: theme.palette.background.paper,
     border: '1px solid',
@@ -42,17 +40,31 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
       boxShadow: '0 12px 22px rgba(15, 23, 42, 0.07)'
     }
   };
+  const statMetaSx = {
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 0.45,
+    flex: '1 1 auto'
+  };
   const statHeadingSx = {
-    mb: 0.45
+    minWidth: 0
+  };
+  const statLabelSx = {
+    fontWeight: 700,
+    lineHeight: 1.1,
+    whiteSpace: 'nowrap'
   };
   const statValueSx = {
     fontWeight: 700,
     color: 'text.primary',
-    fontSize: { xs: '1.8rem', md: '1.95rem' },
-    lineHeight: 1.05
+    fontSize: { xs: '1.7rem', md: '1.9rem' },
+    lineHeight: 1,
+    flexShrink: 0,
+    textAlign: 'right'
   };
   const statChipSx = {
-    mt: 0.45,
     height: 22,
     fontSize: '0.68rem',
     border: '1px solid'
@@ -135,97 +147,105 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
         <Grid container spacing={1.25}>
           <Grid item xs={6} sm={3}>
             <Box sx={statCardSx}>
-              <Stack direction="row" spacing={0.75} justifyContent="center" alignItems="center" sx={statHeadingSx}>
-                <CalendarIcon fontSize="small" color="success" />
-                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
-                  Today
-                </Typography>
-              </Stack>
+              <Box sx={statMetaSx}>
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={statHeadingSx}>
+                  <CalendarIcon fontSize="small" color="success" />
+                  <Typography variant="caption" color="text.secondary" sx={statLabelSx}>
+                    Today
+                  </Typography>
+                </Stack>
+                <Chip 
+                  label="Active" 
+                  size="small" 
+                  sx={{ 
+                    ...statChipSx,
+                    bgcolor: dashboardTheme.tones.success.background,
+                    borderColor: dashboardTheme.tones.success.border,
+                    color: dashboardTheme.tones.success.color
+                  }} 
+                />
+              </Box>
               <Typography sx={statValueSx}>
                 {stats?.today || 0}
               </Typography>
-              <Chip 
-                label="Active" 
-                size="small" 
-                sx={{ 
-                  ...statChipSx,
-                  bgcolor: dashboardTheme.tones.success.background,
-                  borderColor: dashboardTheme.tones.success.border,
-                  color: dashboardTheme.tones.success.color
-                }} 
-              />
             </Box>
           </Grid>
           
           <Grid item xs={6} sm={3}>
             <Box sx={statCardSx}>
-              <Stack direction="row" spacing={0.75} justifyContent="center" alignItems="center" sx={statHeadingSx}>
-                <DateRangeIcon fontSize="small" color="info" />
-                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
-                  This Week
-                </Typography>
-              </Stack>
+              <Box sx={statMetaSx}>
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={statHeadingSx}>
+                  <DateRangeIcon fontSize="small" color="info" />
+                  <Typography variant="caption" color="text.secondary" sx={statLabelSx}>
+                    This Week
+                  </Typography>
+                </Stack>
+                <Chip 
+                  label="7 Days" 
+                  size="small" 
+                  sx={{ 
+                    ...statChipSx,
+                    bgcolor: alpha(BRAND_YELLOW, 0.12),
+                    borderColor: alpha(BRAND_YELLOW_DARK, 0.22),
+                    color: BRAND_DARK
+                  }} 
+                />
+              </Box>
               <Typography sx={statValueSx}>
                 {stats?.thisWeek || 0}
               </Typography>
-              <Chip 
-                label="7 Days" 
-                size="small" 
-                sx={{ 
-                  ...statChipSx,
-                  bgcolor: alpha(BRAND_YELLOW, 0.12),
-                  borderColor: alpha(BRAND_YELLOW_DARK, 0.22),
-                  color: BRAND_DARK
-                }} 
-              />
             </Box>
           </Grid>
           
           <Grid item xs={6} sm={3}>
             <Box sx={statCardSx}>
-              <Stack direction="row" spacing={0.75} justifyContent="center" alignItems="center" sx={statHeadingSx}>
-                <TrendingUpIcon fontSize="small" color="secondary" />
-                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
-                  This Month
-                </Typography>
-              </Stack>
+              <Box sx={statMetaSx}>
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={statHeadingSx}>
+                  <TrendingUpIcon fontSize="small" color="secondary" />
+                  <Typography variant="caption" color="text.secondary" sx={statLabelSx}>
+                    This Month
+                  </Typography>
+                </Stack>
+                <Chip 
+                  label="Current" 
+                  size="small" 
+                  sx={{ 
+                    ...statChipSx,
+                    bgcolor: alpha(BRAND_YELLOW, 0.12),
+                    borderColor: alpha(BRAND_YELLOW_DARK, 0.22),
+                    color: BRAND_DARK
+                  }} 
+                />
+              </Box>
               <Typography sx={statValueSx}>
                 {stats?.thisMonth || 0}
               </Typography>
-              <Chip 
-                label="Current" 
-                size="small" 
-                sx={{ 
-                  ...statChipSx,
-                  bgcolor: alpha(BRAND_YELLOW, 0.12),
-                  borderColor: alpha(BRAND_YELLOW_DARK, 0.22),
-                  color: BRAND_DARK
-                }} 
-              />
             </Box>
           </Grid>
           
           <Grid item xs={6} sm={3}>
             <Box sx={{ ...statCardSx, borderColor: alpha(BRAND_YELLOW_DARK, 0.28), backgroundColor: alpha(BRAND_YELLOW, 0.08) }}>
-              <Stack direction="row" spacing={0.75} justifyContent="center" alignItems="center" sx={statHeadingSx}>
-                <InventoryIcon fontSize="small" color="primary" />
-                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
-                  Total Active
-                </Typography>
-              </Stack>
+              <Box sx={statMetaSx}>
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={statHeadingSx}>
+                  <InventoryIcon fontSize="small" color="primary" />
+                  <Typography variant="caption" color="text.secondary" sx={statLabelSx}>
+                    Total Active
+                  </Typography>
+                </Stack>
+                <Chip 
+                  label="All Time" 
+                  size="small" 
+                  sx={{ 
+                    ...statChipSx,
+                    bgcolor: alpha(BRAND_YELLOW, 0.14),
+                    borderColor: alpha(BRAND_YELLOW_DARK, 0.24),
+                    color: BRAND_DARK
+                  }} 
+                />
+              </Box>
               <Typography sx={statValueSx}>
                 {stats?.total || 0}
               </Typography>
-              <Chip 
-                label="All Time" 
-                size="small" 
-                sx={{ 
-                  ...statChipSx,
-                  bgcolor: alpha(BRAND_YELLOW, 0.14),
-                  borderColor: alpha(BRAND_YELLOW_DARK, 0.24),
-                  color: BRAND_DARK
-                }} 
-              />
             </Box>
           </Grid>
         </Grid>
