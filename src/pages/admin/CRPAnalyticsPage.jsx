@@ -145,7 +145,7 @@ export default function CRPAnalyticsPage() {
   const [selectedSeller, setSelectedSeller] = useState('');
   const [selectedMarketplace, setSelectedMarketplace] = useState('');
   const [excludeClient, setExcludeClient] = useState(true);
-  const [excludeLowValue, setExcludeLowValue] = useState(false);
+  const [excludeLowValue, setExcludeLowValue] = useState(true);
   const [dateFilter, setDateFilter] = useState(() => ({
     mode: 'single',
     single: getDefaultSingleDay(),
