@@ -36,14 +36,13 @@ import EastIcon from '@mui/icons-material/East';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import Groups2Icon from '@mui/icons-material/Groups2';
 import PlaceIcon from '@mui/icons-material/Place';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import TuneIcon from '@mui/icons-material/Tune';
 import api from '../../lib/api';
 import { dashboardSignatureTokens } from '../../theme/appTheme';
 
 const STATUS_LABELS = {
     planned: 'Planned',
-    'in-progress': 'In Progress',
+    'in-progress': 'Ongoing',
     completed: 'Completed',
     cancelled: 'Cancelled',
 };
@@ -142,6 +141,51 @@ function formatCardDateTime(value) {
     }).format(date);
 }
 
+function formatRelativeTime(value) {
+    if (!value) return 'just now';
+
+    const timestamp = new Date(value).getTime();
+    if (Number.isNaN(timestamp)) return 'just now';
+
+    const diffMinutes = Math.round((Date.now() - timestamp) / (1000 * 60));
+
+    if (diffMinutes < 1) return 'just now';
+    if (diffMinutes < 60) return `${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
+
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} hr${diffHours === 1 ? '' : 's'} ago`;
+
+    const diffDays = Math.round(diffHours / 24);
+    if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+
+    const diffWeeks = Math.round(diffDays / 7);
+    if (diffWeeks < 5) return `${diffWeeks} wk${diffWeeks === 1 ? '' : 's'} ago`;
+
+    const diffMonths = Math.round(diffDays / 30);
+    if (diffMonths < 12) return `${diffMonths} mo${diffMonths === 1 ? '' : 's'} ago`;
+
+    const diffYears = Math.round(diffDays / 365);
+    return `${diffYears} yr${diffYears === 1 ? '' : 's'} ago`;
+}
+
+function toBulletPoints(value) {
+    const text = String(value || '').trim();
+    if (!text) return [];
+
+    const lines = text
+        .split(/\r?\n+/)
+        .map((line) => line.replace(/^[-*•]\s*/, '').trim())
+        .filter(Boolean);
+
+    if (lines.length > 1) return lines;
+
+    return text
+        .split(/(?:\.\s+|;\s+)/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => (text.includes('.') && !/[.!?]$/.test(part) ? `${part}.` : part));
+}
+
 function getDisplayFirstName(value) {
     const username = String(value || '').trim();
     if (!username) return '';
@@ -178,8 +222,35 @@ function getStatusTone(tokens, status) {
     return tokens.tones.info;
 }
 
+function getStatusDotColor(status) {
+    if (status === 'completed') return '#3FA56A';
+    if (status === 'in-progress') return '#F0A100';
+    if (status === 'cancelled') return '#D85C57';
+    return '#5B7CFA';
+}
+
+function StatusDot({ status, size = 10 }) {
+    return (
+        <Tooltip title={STATUS_LABELS[status] || status}>
+            <Box
+                component="span"
+                aria-label={STATUS_LABELS[status] || status}
+                sx={{
+                    width: size,
+                    height: size,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    bgcolor: getStatusDotColor(status),
+                    boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.28)',
+                }}
+            />
+        </Tooltip>
+    );
+}
+
 function SummaryBlock({ eyebrow, text }) {
-    const hasText = Boolean(text);
+    const bullets = toBulletPoints(text);
+    const hasText = bullets.length > 0;
 
     return (
         <Box>
@@ -196,28 +267,73 @@ function SummaryBlock({ eyebrow, text }) {
             >
                 {eyebrow}
             </Typography>
-            <Typography
-                variant="body2"
-                sx={{
-                    color: hasText ? '#111111' : 'rgba(17, 17, 17, 0.48)',
-                    lineHeight: 1.7,
-                    minHeight: 48,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    fontStyle: hasText ? 'normal' : 'italic',
-                }}
-            >
-                {text || 'No notes added yet.'}
-            </Typography>
+            {hasText ? (
+                <Box
+                    component="ul"
+                    sx={{
+                        m: 0,
+                        pl: 2.4,
+                        minHeight: 48,
+                        color: '#111111',
+                        display: 'grid',
+                        gap: 0.75,
+                    }}
+                >
+                    {bullets.slice(0, 3).map((bullet) => (
+                        <Typography
+                            key={bullet}
+                            component="li"
+                            variant="body2"
+                            sx={{
+                                color: '#111111',
+                                lineHeight: 1.55,
+                                pr: 0.5,
+                            }}
+                        >
+                            {bullet}
+                        </Typography>
+                    ))}
+                </Box>
+            ) : (
+                <Typography
+                    variant="body2"
+                    sx={{
+                        color: 'rgba(17, 17, 17, 0.48)',
+                        lineHeight: 1.7,
+                        minHeight: 48,
+                        fontStyle: 'italic',
+                    }}
+                >
+                    No notes added yet.
+                </Typography>
+            )}
         </Box>
+    );
+}
+
+function DetailBulletBlock({ label, text, emptyText }) {
+    const bullets = toBulletPoints(text);
+
+    return (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="caption" color="text.secondary">{label}</Typography>
+            {bullets.length === 0 ? (
+                <Typography variant="body1" sx={{ mt: 0.75, whiteSpace: 'pre-wrap' }}>{emptyText}</Typography>
+            ) : (
+                <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2.5, display: 'grid', gap: 0.9 }}>
+                    {bullets.map((bullet) => (
+                        <Typography key={bullet} component="li" variant="body1" sx={{ lineHeight: 1.65 }}>
+                            {bullet}
+                        </Typography>
+                    ))}
+                </Box>
+            )}
+        </Paper>
     );
 }
 
 function MeetingCard({ meeting, index, onOpen, onEdit, onDelete, canEdit, tokens }) {
     const theme = useTheme();
-    const tone = getStatusTone(tokens, meeting.status);
     const attendees = Array.isArray(meeting.attendees) ? meeting.attendees : [];
     const metadataIconSx = { fontSize: 18, color: 'rgba(17, 17, 17, 0.56)' };
     const attendeeSummary = summarizeAttendees(attendees);
@@ -230,13 +346,13 @@ function MeetingCard({ meeting, index, onOpen, onEdit, onDelete, canEdit, tokens
                 sx={{
                     height: '100%',
                     borderRadius: `${tokens.radius.card + 6}px`,
-                    backgroundColor: '#FFEE8C',
-                    boxShadow: tokens.shadows.card,
+                    backgroundColor: '#F5F5F7',
+                    boxShadow: `${tokens.shadows.card}, 0 18px 36px rgba(17, 17, 17, 0.08)`,
                     overflow: 'hidden',
                 }}
             >
-                <CardContent sx={{ p: 4 }}>
-                    <Stack spacing={3}>
+                <CardContent sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <Stack spacing={3} sx={{ flexGrow: 1, height: '100%' }}>
                         <Stack spacing={1}>
                             <Stack direction="row" justifyContent="space-between" spacing={1.5} alignItems="flex-start">
                                 <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -252,20 +368,8 @@ function MeetingCard({ meeting, index, onOpen, onEdit, onDelete, canEdit, tokens
                                         >
                                             {meeting.title}
                                         </Typography>
-                                        <Chip
-                                            label={STATUS_LABELS[meeting.status] || meeting.status}
-                                            size="small"
-                                            sx={{
-                                                bgcolor: tone.background,
-                                                border: `1px solid ${tone.border}`,
-                                                color: tone.color,
-                                                fontWeight: 700,
-                                            }}
-                                        />
+                                        <StatusDot status={meeting.status} size={12} />
                                     </Stack>
-                                    <Typography variant="overline" sx={{ display: 'block', mt: 2, color: 'rgba(17, 17, 17, 0.42)', letterSpacing: 1.35, fontSize: '0.68rem' }}>
-                                        Meeting Brief
-                                    </Typography>
                                 </Box>
                                 {canEdit ? (
                                     <Tooltip title="Delete meeting">
@@ -296,7 +400,7 @@ function MeetingCard({ meeting, index, onOpen, onEdit, onDelete, canEdit, tokens
                                     px: 2,
                                     py: 1.5,
                                     borderRadius: 3,
-                                    bgcolor: 'rgba(255,255,255,0.22)',
+                                    bgcolor: 'rgba(255, 255, 255, 0.4)',
                                 }}
                             >
                                 <Grid container spacing={2} alignItems="flex-start">
@@ -373,7 +477,7 @@ function MeetingCard({ meeting, index, onOpen, onEdit, onDelete, canEdit, tokens
                             </Box>
                         </Stack>
 
-                        <Stack spacing={0} divider={<Divider sx={{ borderColor: 'rgba(17, 17, 17, 0.08)' }} />}>
+                        <Stack spacing={0} sx={{ flexGrow: 1 }}>
                             <Box sx={{ pt: 0.25, pb: 2.25 }}>
                                 <SummaryBlock eyebrow="Discussed" text={meeting.discussionSummary} />
                             </Box>
@@ -400,7 +504,7 @@ function MeetingCard({ meeting, index, onOpen, onEdit, onDelete, canEdit, tokens
 
                             <Stack spacing={1.25} alignItems={{ xs: 'flex-start', sm: 'flex-end' }}>
                                 <Typography variant="caption" sx={{ color: 'rgba(17, 17, 17, 0.52)' }}>
-                                    Updated {formatDateTime(meeting.updatedAt)}
+                                    Updated {formatRelativeTime(meeting.updatedAt)}
                                 </Typography>
                                 <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
                                     {canEdit ? (
@@ -669,22 +773,6 @@ export default function MeetingsPage() {
                             {showFilters ? 'Hide Filters' : 'Show Filters'}
                         </Button>
                         <Button
-                            variant="outlined"
-                            startIcon={<RefreshIcon />}
-                            onClick={() => fetchMeetings()}
-                            sx={{
-                                bgcolor: '#FFEE8C',
-                                color: '#111111',
-                                borderColor: 'transparent',
-                                '&:hover': {
-                                    bgcolor: '#F8E47A',
-                                    borderColor: 'transparent',
-                                },
-                            }}
-                        >
-                            Refresh
-                        </Button>
-                        <Button
                             variant="contained"
                             startIcon={<AddIcon />}
                             onClick={openCreateDialog}
@@ -768,7 +856,7 @@ export default function MeetingsPage() {
                         p: 5,
                         textAlign: 'center',
                         borderRadius: `${tokens.radius.card + 4}px`,
-                        backgroundColor: '#FFF7C7',
+                        backgroundColor: '#FFFBE3',
                         boxShadow: tokens.shadows.card,
                     }}
                 >
@@ -976,7 +1064,6 @@ export default function MeetingsPage() {
                         <DialogTitle sx={{ px: 3, pt: 3, pb: 2 }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
                                 <Box>
-                                    <Typography variant="overline" sx={{ color: 'rgba(17, 17, 17, 0.42)', letterSpacing: 1.1 }}>Meeting Brief</Typography>
                                     <Typography variant="h5" sx={{ fontWeight: 900, color: '#111111' }}>{detailMeeting.title}</Typography>
                                 </Box>
                                 <IconButton onClick={() => setDetailMeeting(null)}><CloseIcon /></IconButton>
@@ -985,7 +1072,19 @@ export default function MeetingsPage() {
                         <DialogContent dividers sx={{ px: 3, py: 2.5 }}>
                             <Stack spacing={2.5}>
                                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                    <Chip label={STATUS_LABELS[detailMeeting.status] || detailMeeting.status} />
+                                    <Box
+                                        sx={{
+                                            px: 1.4,
+                                            py: 0.75,
+                                            borderRadius: 999,
+                                            bgcolor: 'rgba(17, 17, 17, 0.05)',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <StatusDot status={detailMeeting.status} size={12} />
+                                    </Box>
                                     <Chip label={formatDateTime(detailMeeting.scheduledFor)} />
                                     <Chip label={`Organizer: ${detailMeeting.organizer?.username || '-'}`} />
                                 </Stack>
@@ -1011,20 +1110,14 @@ export default function MeetingsPage() {
                                     <Typography variant="body1" sx={{ mt: 0.75, whiteSpace: 'pre-wrap' }}>{detailMeeting.agenda || 'No agenda added.'}</Typography>
                                 </Paper>
 
-                                <Paper variant="outlined" sx={{ p: 2 }}>
-                                    <Typography variant="caption" color="text.secondary">Discussed</Typography>
-                                    <Typography variant="body1" sx={{ mt: 0.75, whiteSpace: 'pre-wrap' }}>{detailMeeting.discussionSummary || 'No discussion notes yet.'}</Typography>
-                                </Paper>
+                                <DetailBulletBlock label="Discussed" text={detailMeeting.discussionSummary} emptyText="No discussion notes yet." />
 
                                 <Paper variant="outlined" sx={{ p: 2 }}>
                                     <Typography variant="caption" color="text.secondary">Decisions</Typography>
                                     <Typography variant="body1" sx={{ mt: 0.75, whiteSpace: 'pre-wrap' }}>{detailMeeting.decisions || 'No decisions noted yet.'}</Typography>
                                 </Paper>
 
-                                <Paper variant="outlined" sx={{ p: 2 }}>
-                                    <Typography variant="caption" color="text.secondary">Future Scope</Typography>
-                                    <Typography variant="body1" sx={{ mt: 0.75, whiteSpace: 'pre-wrap' }}>{detailMeeting.futureScope || 'No future scope added yet.'}</Typography>
-                                </Paper>
+                                <DetailBulletBlock label="Future Scope" text={detailMeeting.futureScope} emptyText="No future scope added yet." />
 
                                 <Paper variant="outlined" sx={{ p: 2 }}>
                                     <Typography variant="caption" color="text.secondary">Action Items</Typography>
