@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,7 @@ import {
   Update as UpdateIcon,
   Autorenew as AutorenewIcon
 } from '@mui/icons-material';
+import { Undo as UndoIcon } from '@mui/icons-material';
 import api from '../lib/api.js';
 
 const MARKETPLACE_DOMAINS = {
@@ -70,6 +71,18 @@ function calcActualProfit(buyingPrice, sold) {
   return { A, eBay, ADS, TDS, TCont, Net, AmazonWithTax, Payoneer, AmazonExpense, actualProfit };
 }
 
+function buildInitialEditedItems(items = []) {
+  const initial = {};
+
+  items.forEach(item => {
+    if (item.generatedListing) {
+      initial[item.id] = { ...item.generatedListing };
+    }
+  });
+
+  return initial;
+}
+
 export default function AsinReviewModal({ 
   open, 
   onClose, 
@@ -80,9 +93,11 @@ export default function AsinReviewModal({
   marketplace = 'US'
 }) {
   const amazonDomain = MARKETPLACE_DOMAINS[marketplace] || MARKETPLACE_DOMAINS.US;
+  const wasOpenRef = useRef(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [editedItems, setEditedItems] = useState({});
   const [dismissedItems, setDismissedItems] = useState(new Set());
+  const [dismissHistory, setDismissHistory] = useState([]);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [descriptionViewMode, setDescriptionViewMode] = useState('preview'); // 'code' | 'preview'
@@ -94,8 +109,15 @@ export default function AsinReviewModal({
 
   // Filter out dismissed items
   const activeItems = previewItems.filter(item => !dismissedItems.has(item.id));
-  const currentItem = activeItems[currentIndex];
+  const safeCurrentIndex = activeItems.length > 0
+    ? Math.min(currentIndex, activeItems.length - 1)
+    : 0;
+  const currentItem = activeItems[safeCurrentIndex];
   const itemData = editedItems[currentItem?.id] || currentItem?.generatedListing || {};
+  const lastDismissedId = dismissHistory[dismissHistory.length - 1] || null;
+  const lastDismissedItem = lastDismissedId
+    ? previewItems.find(item => item.id === lastDismissedId)
+    : null;
   const isStartPriceEditing = !!(currentItem?.id && startPriceEditMode[currentItem.id]);
   const startPriceValue = itemData.startPrice ?? '';
   const actualProfitBuyingPrice = parseFloat(currentItem?.sourceData?.price);
@@ -106,19 +128,44 @@ export default function AsinReviewModal({
   const actualProfit = showActualProfit ? calcActualProfit(actualProfitBuyingPrice, actualProfitSoldPrice) : null;
   const actualProfitColor = actualProfit && actualProfit.actualProfit < 300 ? 'error' : 'success';
 
-  // Initialize edited items from preview data
+  // Reset modal-local session state only when the modal opens.
   useEffect(() => {
-    if (previewItems.length > 0) {
-      const initial = {};
-      previewItems.forEach(item => {
-        if (item.generatedListing) {
-          initial[item.id] = { ...item.generatedListing };
-        }
-      });
-      setEditedItems(initial);
+    const justOpened = open && !wasOpenRef.current;
+
+    if (justOpened) {
+      setCurrentIndex(0);
+      setEditedItems(buildInitialEditedItems(previewItems));
+      setDismissedItems(new Set());
+      setDismissHistory([]);
+      setSaving(false);
+      setHasUnsavedChanges(false);
+      setDescriptionViewMode('preview');
+      setAppliedDescTemplates({});
+      setRephrasing({});
       setStartPriceEditMode({});
     }
-  }, [previewItems]);
+
+    wasOpenRef.current = open;
+  }, [open, previewItems]);
+
+  // Merge streamed/generated listings into the editable map without overwriting user edits.
+  useEffect(() => {
+    if (!open || previewItems.length === 0) return;
+
+    setEditedItems(prev => {
+      let changed = false;
+      const next = { ...prev };
+
+      previewItems.forEach(item => {
+        if (item.generatedListing && !next[item.id]) {
+          next[item.id] = { ...item.generatedListing };
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [open, previewItems]);
 
   // Sync Amazon preview window when navigating
   useEffect(() => {
@@ -172,14 +219,14 @@ export default function AsinReviewModal({
   }, [open, currentIndex, activeItems.length, hasUnsavedChanges]);
 
   const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+    if (safeCurrentIndex > 0) {
+      setCurrentIndex(safeCurrentIndex - 1);
     }
   };
 
   const handleNext = () => {
-    if (currentIndex < activeItems.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+    if (safeCurrentIndex < activeItems.length - 1) {
+      setCurrentIndex(safeCurrentIndex + 1);
     }
   };
 
@@ -188,12 +235,27 @@ export default function AsinReviewModal({
     
     // Add to dismissed set
     setDismissedItems(prev => new Set([...prev, currentItem.id]));
+    setDismissHistory(prev => [...prev, currentItem.id]);
     
     // Navigate to next item, or previous if we're at the end
-    if (currentIndex >= activeItems.length - 1 && currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+    if (safeCurrentIndex >= activeItems.length - 1 && safeCurrentIndex > 0) {
+      setCurrentIndex(safeCurrentIndex - 1);
     }
     // If this was the last item, currentIndex stays the same but will show next remaining item
+  };
+
+  const handleUndoDismiss = () => {
+    if (!lastDismissedId) return;
+
+    const nextDismissedItems = new Set(dismissedItems);
+    nextDismissedItems.delete(lastDismissedId);
+
+    const restoredItems = previewItems.filter(item => !nextDismissedItems.has(item.id));
+    const restoredIndex = restoredItems.findIndex(item => item.id === lastDismissedId);
+
+    setDismissedItems(nextDismissedItems);
+    setDismissHistory(prev => prev.slice(0, -1));
+    setCurrentIndex(restoredIndex >= 0 ? restoredIndex : 0);
   };
 
   const handleFieldChange = (field, value, isCustomField = false) => {
@@ -407,11 +469,6 @@ export default function AsinReviewModal({
     }
   };
 
-  if (!currentItem) {
-    return null;
-  }
-
-
   const actualProfitTooltipContent = actualProfit ? (
     <Box sx={{ fontFamily: 'monospace', fontSize: '0.72rem', lineHeight: 1.8, p: 0.5 }}>
       <Box>Bought (Amazon):&nbsp; ${actualProfitBuyingPrice.toFixed(2)}</Box>
@@ -482,7 +539,7 @@ export default function AsinReviewModal({
               </Typography>
             )}
             <Chip 
-              label={`${currentIndex + 1} / ${activeItems.length}`}
+              label={`${activeItems.length > 0 ? safeCurrentIndex + 1 : 0} / ${activeItems.length}`}
               color="primary"
               size="small"
             />
@@ -494,12 +551,14 @@ export default function AsinReviewModal({
                 variant="outlined"
               />
             )}
-            <Chip
-              icon={getStatusIcon(currentItem?.status)}
-              label={currentItem?.status || 'N/A'}
-              color={getStatusColor(currentItem?.status)}
-              size="small"
-            />
+            {currentItem && (
+              <Chip
+                icon={getStatusIcon(currentItem?.status)}
+                label={currentItem?.status || 'N/A'}
+                color={getStatusColor(currentItem?.status)}
+                size="small"
+              />
+            )}
           </Box>
           
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -528,26 +587,52 @@ export default function AsinReviewModal({
             )}
             
             {showAmazonPreview ? (
-              <IconButton
-                color="error"
-                size="small"
-                onClick={handleDismiss}
-                disabled={!currentItem || activeItems.length === 0}
-                title="Dismiss"
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
+              <>
+                <Tooltip title={lastDismissedItem?.asin ? `Undo dismiss (${lastDismissedItem.asin})` : 'Undo dismiss'}>
+                  <span>
+                    <IconButton
+                      color="primary"
+                      size="small"
+                      onClick={handleUndoDismiss}
+                      disabled={!lastDismissedId}
+                    >
+                      <UndoIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <IconButton
+                  color="error"
+                  size="small"
+                  onClick={handleDismiss}
+                  disabled={!currentItem || activeItems.length === 0}
+                  title="Dismiss"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </>
             ) : (
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteIcon />}
-                onClick={handleDismiss}
-                disabled={!currentItem || activeItems.length === 0}
-                size="small"
-              >
-                Dismiss
-              </Button>
+              <>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<UndoIcon />}
+                  onClick={handleUndoDismiss}
+                  disabled={!lastDismissedId}
+                  size="small"
+                >
+                  Undo Dismiss
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleDismiss}
+                  disabled={!currentItem || activeItems.length === 0}
+                  size="small"
+                >
+                  Dismiss
+                </Button>
+              </>
             )}
             {onListDirectly && (
               <Button
@@ -596,303 +681,335 @@ export default function AsinReviewModal({
         <Box sx={{ bgcolor: 'white', px: showAmazonPreview ? 1 : 2, pb: 1 }}>
           <LinearProgress 
             variant="determinate" 
-            value={activeItems.length > 0 ? ((currentIndex + 1) / activeItems.length) * 100 : 0}
+            value={activeItems.length > 0 ? ((safeCurrentIndex + 1) / activeItems.length) * 100 : 0}
             sx={{ height: 8, borderRadius: 1 }}
           />
         </Box>
 
-        {/* Duplicate Notification */}
-        {currentItem?.status === 'duplicate_updateable' && (
-          <Box sx={{ px: showAmazonPreview ? 1 : 2, pt: showAmazonPreview ? 1 : 2 }}>
-            <Alert severity="info" sx={{ mb: 1 }}>
-              <Stack spacing={0.5}>
-                <Typography variant="body2" fontWeight="bold">
-                  📝 Editing Existing Listing
+        {activeItems.length === 0 ? (
+          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: showAmazonPreview ? 2 : 4 }}>
+            <Paper sx={{ p: 4, width: '100%', maxWidth: 520, textAlign: 'center' }}>
+              <Stack spacing={2} alignItems="center">
+                <Typography variant="h6">
+                  All ASINs are currently dismissed
                 </Typography>
-                <Typography variant="caption">
-                  You are editing an existing ASIN. Make any changes needed and click Save to update.
+                <Typography variant="body2" color="text.secondary">
+                  Restore the last dismissed ASIN to continue reviewing this batch.
                 </Typography>
-                {currentItem.warnings?.map((warning, idx) => (
-                  <Typography key={idx} variant="caption" color="text.secondary">
-                    • {warning}
-                  </Typography>
-                ))}
-              </Stack>
-            </Alert>
-          </Box>
-        )}
-
-        {/* Warnings/Errors (exclude duplicate_updateable warnings since shown above) */}
-        {(currentItem.warnings?.length > 0 || currentItem.errors?.length > 0) && currentItem?.status !== 'duplicate_updateable' && (
-          <Box sx={{ px: showAmazonPreview ? 1 : 2, pt: showAmazonPreview ? 1 : 2 }}>
-            {currentItem.errors?.map((error, idx) => (
-              <Alert key={idx} severity="error" sx={{ mb: 1 }}>
-                {error}
-              </Alert>
-            ))}
-            {currentItem.warnings?.map((warning, idx) => (
-              <Alert key={idx} severity="warning" sx={{ mb: 1 }}>
-                {warning}
-              </Alert>
-            ))}
-          </Box>
-        )}
-
-        {/* Main Content - Split Panel */}
-        <Box sx={{ 
-          flex: 1, 
-          display: 'flex', 
-          gap: showAmazonPreview ? 0 : 2, 
-          p: showAmazonPreview ? 0.5 : 2, 
-          overflow: 'hidden'
-        }}>
-          {/* Left Panel - Amazon Source Data (hidden in split view mode) */}
-          <Paper sx={{ 
-            width: '40%', 
-            p: 2, 
-            overflow: 'auto',
-            bgcolor: '#fafafa',
-            display: showAmazonPreview ? 'none' : undefined
-          }}>
-            <Typography variant="h6" gutterBottom>
-              Amazon Product Data
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-
-            {currentItem.status === 'loading' ? (
-              // Loading skeleton for source data
-              <Stack spacing={2}>
-                <Box>
-                  <Skeleton variant="text" width="30%" />
-                  <Skeleton variant="text" width="60%" />
-                </Box>
-                <Box>
-                  <Skeleton variant="text" width="40%" />
-                  <Skeleton variant="rectangular" height={40} />
-                </Box>
-                <Box>
-                  <Skeleton variant="text" width="30%" />
-                  <Skeleton variant="text" width="50%" />
-                </Box>
-                <Box>
-                  <Skeleton variant="text" width="25%" />
-                  <Skeleton variant="text" width="40%" />
-                </Box>
-                <Box>
-                  <Skeleton variant="rectangular" height={150} />
-                </Box>
-                <Grid container spacing={1}>
-                  <Grid item xs={6}>
-                    <Skeleton variant="rectangular" height={120} />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Skeleton variant="rectangular" height={120} />
-                  </Grid>
-                </Grid>
-              </Stack>
-            ) : currentItem.status === 'duplicate_updateable' ? (
-              // Show metadata for existing listings
-              <Stack spacing={2}>
-                <Alert severity="info" variant="outlined">
-                  <Typography variant="body2" fontWeight="bold" gutterBottom>
-                    Existing Listing
-                  </Typography>
-                  <Typography variant="caption">
-                    This ASIN already exists in your listings. Edit the fields on the right to update it.
-                  </Typography>
-                </Alert>
-
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    ASIN
-                  </Typography>
-                  <Typography variant="body2" fontWeight="bold">
-                    {currentItem.asin}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    SKU
-                  </Typography>
-                  <Typography variant="body2">
-                    {currentItem.sku}
-                  </Typography>
-                </Box>
-
-                {currentItem.warnings?.map((warning, idx) => (
-                  <Box key={idx}>
-                    <Typography variant="caption" color="text.secondary">
-                      {idx === 0 ? 'Status' : ''}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {warning}
-                    </Typography>
-                  </Box>
-                ))}
-              </Stack>
-            ) : currentItem.sourceData ? (
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    ASIN
-                  </Typography>
-                  <Typography variant="body2" fontWeight="bold">
-                    {currentItem.asin}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Original Title
-                  </Typography>
-                  <Typography variant="body2">
-                    {currentItem.sourceData.title}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Brand
-                  </Typography>
-                  <Typography variant="body2">
-                    {currentItem.sourceData.brand}
-                  </Typography>
-                </Box>
-
-                {currentItem.sourceData?.color && (
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Color
-                    </Typography>
-                    <Typography variant="body2">
-                      {currentItem.sourceData.color}
-                    </Typography>
-                  </Box>
+                {dismissedItems.size > 0 && (
+                  <Chip
+                    label={`${dismissedItems.size} dismissed in this session`}
+                    size="small"
+                    variant="outlined"
+                  />
                 )}
-
-                {currentItem.sourceData?.compatibility && (
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Compatibility
-                    </Typography>
-                    <Typography variant="body2">
-                      {currentItem.sourceData.compatibility}
-                    </Typography>
-                  </Box>
-                )}
-
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Price
-                  </Typography>
-                  <Typography variant="body2">
-                    ${currentItem.sourceData.price}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Description
-                  </Typography>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      whiteSpace: 'pre-wrap',
-                      fontSize: '0.875rem',
-                      lineHeight: 1.6
-                    }}
+                <Stack direction="row" spacing={1.5} justifyContent="center">
+                  <Button
+                    variant="contained"
+                    startIcon={<UndoIcon />}
+                    onClick={handleUndoDismiss}
+                    disabled={!lastDismissedId}
                   >
-                    {currentItem.sourceData.description}
-                  </Typography>
-                </Box>
-
-                {currentItem.sourceData?.images?.length > 0 && (
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" gutterBottom>
-                      Images ({currentItem.sourceData.images.length})
+                    Undo Last Dismiss
+                  </Button>
+                  <Button variant="outlined" onClick={handleClose}>
+                    Close
+                  </Button>
+                </Stack>
+              </Stack>
+            </Paper>
+          </Box>
+        ) : (
+          <>
+            {/* Duplicate Notification */}
+            {currentItem?.status === 'duplicate_updateable' && (
+              <Box sx={{ px: showAmazonPreview ? 1 : 2, pt: showAmazonPreview ? 1 : 2 }}>
+                <Alert severity="info" sx={{ mb: 1 }}>
+                  <Stack spacing={0.5}>
+                    <Typography variant="body2" fontWeight="bold">
+                      📝 Editing Existing Listing
                     </Typography>
-                    <Grid container spacing={1} sx={{ mt: 0.5 }}>
-                      {currentItem.sourceData.images.map((img, idx) => (
-                        <Grid item xs={6} key={idx}>
-                          <Box
-                            component="img"
-                            src={img}
-                            sx={{
-                              width: '100%',
-                              height: 120,
-                              objectFit: 'contain',
-                              border: 1,
-                              borderColor: 'divider',
-                              borderRadius: 1,
-                              bgcolor: 'white'
-                            }}
-                          />
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Box>
-                )}
-              </Stack>
-            ) : !currentItem.sourceData ? (
-              <Stack spacing={2}>
-                <Alert severity="info" variant="outlined">
-                  <Typography variant="body2" fontWeight="bold" gutterBottom>
-                    Existing Listing
-                  </Typography>
-                  <Typography variant="caption">
-                    This is an existing listing from the directory. Edit any fields on the right, then click <strong>Save All</strong> to update or <strong>List Directly</strong> to proceed to listing.
-                  </Typography>
+                    <Typography variant="caption">
+                      You are editing an existing ASIN. Make any changes needed and click Save to update.
+                    </Typography>
+                    {currentItem.warnings?.map((warning, idx) => (
+                      <Typography key={idx} variant="caption" color="text.secondary">
+                        • {warning}
+                      </Typography>
+                    ))}
+                  </Stack>
                 </Alert>
-                {currentItem.asin && (
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">ASIN</Typography>
-                    <Typography variant="body2" fontWeight="bold">{currentItem.asin}</Typography>
-                  </Box>
-                )}
-                {currentItem.sku && (
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">SKU</Typography>
-                    <Typography variant="body2">{currentItem.sku}</Typography>
-                  </Box>
-                )}
-              </Stack>
-            ) : (
-              <Alert severity="error">
-                Failed to load Amazon product data
-              </Alert>
+              </Box>
             )}
-          </Paper>
 
-          {/* Right Panel - Generated Listing (Editable) */}
-          <Paper sx={{ 
-            width: showAmazonPreview ? '100%' : '60%', 
-            p: showAmazonPreview ? 1.5 : 2, 
-            overflow: 'auto'
-          }}>
-            <Typography variant="h6" gutterBottom>
-              Generated Listing
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
+            {/* Warnings/Errors (exclude duplicate_updateable warnings since shown above) */}
+            {(currentItem.warnings?.length > 0 || currentItem.errors?.length > 0) && currentItem?.status !== 'duplicate_updateable' && (
+              <Box sx={{ px: showAmazonPreview ? 1 : 2, pt: showAmazonPreview ? 1 : 2 }}>
+                {currentItem.errors?.map((error, idx) => (
+                  <Alert key={idx} severity="error" sx={{ mb: 1 }}>
+                    {error}
+                  </Alert>
+                ))}
+                {currentItem.warnings?.map((warning, idx) => (
+                  <Alert key={idx} severity="warning" sx={{ mb: 1 }}>
+                    {warning}
+                  </Alert>
+                ))}
+              </Box>
+            )}
 
-            {currentItem.status === 'loading' ? (
-              // Loading skeleton for generated listing
-              <Stack spacing={2}>
-                <Skeleton variant="rectangular" height={56} />
-                <Skeleton variant="rectangular" height={56} />
-                <Skeleton variant="rectangular" height={56} />
-                <Skeleton variant="rectangular" height={120} />
-                <Skeleton variant="rectangular" height={56} />
-                <Skeleton variant="rectangular" height={56} />
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <CircularProgress />
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    Generating listing for ASIN: {currentItem.asin}
-                  </Typography>
-                </Box>
-              </Stack>
-            ) : currentItem.generatedListing ? (
-              <Stack spacing={2}>
+            {/* Main Content - Split Panel */}
+            <Box sx={{ 
+              flex: 1, 
+              display: 'flex', 
+              gap: showAmazonPreview ? 0 : 2, 
+              p: showAmazonPreview ? 0.5 : 2, 
+              overflow: 'hidden'
+            }}>
+              {/* Left Panel - Amazon Source Data (hidden in split view mode) */}
+              <Paper sx={{ 
+                width: '40%', 
+                p: 2, 
+                overflow: 'auto',
+                bgcolor: '#fafafa',
+                display: showAmazonPreview ? 'none' : undefined
+              }}>
+                <Typography variant="h6" gutterBottom>
+                  Amazon Product Data
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+
+                {currentItem.status === 'loading' ? (
+                  <Stack spacing={2}>
+                    <Box>
+                      <Skeleton variant="text" width="30%" />
+                      <Skeleton variant="text" width="60%" />
+                    </Box>
+                    <Box>
+                      <Skeleton variant="text" width="40%" />
+                      <Skeleton variant="rectangular" height={40} />
+                    </Box>
+                    <Box>
+                      <Skeleton variant="text" width="30%" />
+                      <Skeleton variant="text" width="50%" />
+                    </Box>
+                    <Box>
+                      <Skeleton variant="text" width="25%" />
+                      <Skeleton variant="text" width="40%" />
+                    </Box>
+                    <Box>
+                      <Skeleton variant="rectangular" height={150} />
+                    </Box>
+                    <Grid container spacing={1}>
+                      <Grid item xs={6}>
+                        <Skeleton variant="rectangular" height={120} />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Skeleton variant="rectangular" height={120} />
+                      </Grid>
+                    </Grid>
+                  </Stack>
+                ) : currentItem.status === 'duplicate_updateable' ? (
+                  <Stack spacing={2}>
+                    <Alert severity="info" variant="outlined">
+                      <Typography variant="body2" fontWeight="bold" gutterBottom>
+                        Existing Listing
+                      </Typography>
+                      <Typography variant="caption">
+                        This ASIN already exists in your listings. Edit the fields on the right to update it.
+                      </Typography>
+                    </Alert>
+
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        ASIN
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold">
+                        {currentItem.asin}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        SKU
+                      </Typography>
+                      <Typography variant="body2">
+                        {currentItem.sku}
+                      </Typography>
+                    </Box>
+
+                    {currentItem.warnings?.map((warning, idx) => (
+                      <Box key={idx}>
+                        <Typography variant="caption" color="text.secondary">
+                          {idx === 0 ? 'Status' : ''}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {warning}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                ) : currentItem.sourceData ? (
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        ASIN
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold">
+                        {currentItem.asin}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Original Title
+                      </Typography>
+                      <Typography variant="body2">
+                        {currentItem.sourceData.title}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Brand
+                      </Typography>
+                      <Typography variant="body2">
+                        {currentItem.sourceData.brand}
+                      </Typography>
+                    </Box>
+
+                    {currentItem.sourceData?.color && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Color
+                        </Typography>
+                        <Typography variant="body2">
+                          {currentItem.sourceData.color}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {currentItem.sourceData?.compatibility && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Compatibility
+                        </Typography>
+                        <Typography variant="body2">
+                          {currentItem.sourceData.compatibility}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Price
+                      </Typography>
+                      <Typography variant="body2">
+                        ${currentItem.sourceData.price}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Description
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          whiteSpace: 'pre-wrap',
+                          fontSize: '0.875rem',
+                          lineHeight: 1.6
+                        }}
+                      >
+                        {currentItem.sourceData.description}
+                      </Typography>
+                    </Box>
+
+                    {currentItem.sourceData?.images?.length > 0 && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" gutterBottom>
+                          Images ({currentItem.sourceData.images.length})
+                        </Typography>
+                        <Grid container spacing={1} sx={{ mt: 0.5 }}>
+                          {currentItem.sourceData.images.map((img, idx) => (
+                            <Grid item xs={6} key={idx}>
+                              <Box
+                                component="img"
+                                src={img}
+                                sx={{
+                                  width: '100%',
+                                  height: 120,
+                                  objectFit: 'contain',
+                                  border: 1,
+                                  borderColor: 'divider',
+                                  borderRadius: 1,
+                                  bgcolor: 'white'
+                                }}
+                              />
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </Box>
+                    )}
+                  </Stack>
+                ) : !currentItem.sourceData ? (
+                  <Stack spacing={2}>
+                    <Alert severity="info" variant="outlined">
+                      <Typography variant="body2" fontWeight="bold" gutterBottom>
+                        Existing Listing
+                      </Typography>
+                      <Typography variant="caption">
+                        This is an existing listing from the directory. Edit any fields on the right, then click <strong>Save All</strong> to update or <strong>List Directly</strong> to proceed to listing.
+                      </Typography>
+                    </Alert>
+                    {currentItem.asin && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">ASIN</Typography>
+                        <Typography variant="body2" fontWeight="bold">{currentItem.asin}</Typography>
+                      </Box>
+                    )}
+                    {currentItem.sku && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">SKU</Typography>
+                        <Typography variant="body2">{currentItem.sku}</Typography>
+                      </Box>
+                    )}
+                  </Stack>
+                ) : (
+                  <Alert severity="error">
+                    Failed to load Amazon product data
+                  </Alert>
+                )}
+              </Paper>
+
+              {/* Right Panel - Generated Listing (Editable) */}
+              <Paper sx={{ 
+                width: showAmazonPreview ? '100%' : '60%', 
+                p: showAmazonPreview ? 1.5 : 2, 
+                overflow: 'auto'
+              }}>
+                <Typography variant="h6" gutterBottom>
+                  Generated Listing
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+
+                {currentItem.status === 'loading' ? (
+                  <Stack spacing={2}>
+                    <Skeleton variant="rectangular" height={56} />
+                    <Skeleton variant="rectangular" height={56} />
+                    <Skeleton variant="rectangular" height={56} />
+                    <Skeleton variant="rectangular" height={120} />
+                    <Skeleton variant="rectangular" height={56} />
+                    <Skeleton variant="rectangular" height={56} />
+                    <Box sx={{ textAlign: 'center', py: 4 }}>
+                      <CircularProgress />
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                        Generating listing for ASIN: {currentItem.asin}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                ) : currentItem.generatedListing ? (
+                  <Stack spacing={2}>
                 {/* SKU */}
                 <TextField
                   label="SKU (Custom Label)"
@@ -1160,13 +1277,15 @@ export default function AsinReviewModal({
                   </Alert>
                 )}
               </Stack>
-            ) : (
-              <Alert severity="error">
-                Failed to generate listing data
-              </Alert>
-            )}
-          </Paper>
-        </Box>
+                ) : (
+                  <Alert severity="error">
+                    Failed to generate listing data
+                  </Alert>
+                )}
+              </Paper>
+            </Box>
+          </>
+        )}
 
         {/* Footer - Navigation */}
         <Box sx={{ 
@@ -1181,7 +1300,7 @@ export default function AsinReviewModal({
           <Button
             startIcon={<PrevIcon />}
             onClick={handlePrevious}
-            disabled={currentIndex === 0}
+            disabled={activeItems.length === 0 || safeCurrentIndex === 0}
             size={showAmazonPreview ? 'small' : 'medium'}
           >
             {showAmazonPreview ? 'Prev' : 'Previous'}
@@ -1194,7 +1313,7 @@ export default function AsinReviewModal({
           <Button
             endIcon={<NextIcon />}
             onClick={handleNext}
-            disabled={currentIndex === activeItems.length - 1}
+            disabled={activeItems.length === 0 || safeCurrentIndex === activeItems.length - 1}
             size={showAmazonPreview ? 'small' : 'medium'}
           >
             Next
