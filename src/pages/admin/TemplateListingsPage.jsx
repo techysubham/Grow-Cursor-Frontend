@@ -119,6 +119,28 @@ export default function TemplateListingsPage() {
   const [scheduleToRow, setScheduleToRow] = useState('');
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
 
+  const scheduleControlWidth = 148;
+  const scheduleColumnSx = {
+    width: { xs: '100%', sm: scheduleControlWidth },
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column'
+  };
+  const scheduleLabelSx = {
+    display: 'block',
+    mb: 0.4,
+    fontSize: 11,
+    lineHeight: 1.4
+  };
+  const scheduleInputSx = {
+    height: 40,
+    '& input': { py: 0.6, px: 1, fontSize: 13 }
+  };
+  const scheduleButtonSx = {
+    height: 40,
+    whiteSpace: 'nowrap'
+  };
+
   // List Directly dialog state
   const [listDirectlyDialog, setListDirectlyDialog] = useState(false);
 
@@ -1206,7 +1228,7 @@ export default function TemplateListingsPage() {
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
-      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+      <Stack direction="row" spacing={2} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
         <Button 
           variant="contained" 
           startIcon={<AddIcon />} 
@@ -1247,12 +1269,10 @@ export default function TemplateListingsPage() {
         >
           Deactivate by SKU
         </Button>
-        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-          <ActionFieldEditor templateId={templateId} sellerId={sellerId} />
-          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
-            Download CSV
-          </Button>
-        </Box>
+        <ActionFieldEditor templateId={templateId} sellerId={sellerId} />
+        <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
+          Download CSV
+        </Button>
         <Button
           variant="outlined"
           onClick={() => setHistoryDialog(true)}
@@ -1288,7 +1308,7 @@ export default function TemplateListingsPage() {
       </Stack>
 
       {/* Schedule block */}
-      <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column' }}>
+      <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column', maxWidth: '100%' }}>
           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
             <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
             <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
@@ -1316,9 +1336,9 @@ export default function TemplateListingsPage() {
               );
             })()}
           </Stack>
-          <Stack direction="row" alignItems="flex-end" spacing={1.5}>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+          <Stack direction="row" alignItems="stretch" spacing={1.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 Date
               </Typography>
               <OutlinedInput
@@ -1326,11 +1346,12 @@ export default function TemplateListingsPage() {
                 type="date"
                 value={scheduleDate}
                 onChange={e => setScheduleDate(e.target.value)}
-                sx={{ width: 148, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 Start time (24h)
               </Typography>
               <OutlinedInput
@@ -1341,11 +1362,12 @@ export default function TemplateListingsPage() {
                   const v = e.target.value.replace(/[^0-9:]/g, '');
                   if (v.length <= 5) setScheduleTimeFrom(v);
                 }}
-                sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 Interval (min)
               </Typography>
               <OutlinedInput
@@ -1354,11 +1376,12 @@ export default function TemplateListingsPage() {
                 value={scheduleStep}
                 onChange={e => setScheduleStep(Math.max(1, parseInt(e.target.value) || 1))}
                 inputProps={{ min: 1 }}
-                sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 From row
               </Typography>
               <OutlinedInput
@@ -1368,11 +1391,12 @@ export default function TemplateListingsPage() {
                 value={scheduleFromRow}
                 onChange={e => setScheduleFromRow(e.target.value)}
                 inputProps={{ min: 1 }}
-                sx={{ width: 80, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 To row
               </Typography>
               <OutlinedInput
@@ -1382,30 +1406,42 @@ export default function TemplateListingsPage() {
                 value={scheduleToRow}
                 onChange={e => setScheduleToRow(e.target.value)}
                 inputProps={{ min: 1 }}
-                sx={{ width: 80, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
             <Tooltip title={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) ? 'Fill in date, start time, and interval first' : (scheduleFromRow || scheduleToRow ? `Apply to rows ${scheduleFromRow || 1}–${scheduleToRow || pagination.total}` : `Apply schedule to all ${pagination.total} listings`)}>
-              <span>
+              <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={{ ...scheduleLabelSx, visibility: 'hidden' }} aria-hidden="true">
+                Action
+              </Typography>
+              <span style={{ display: 'block', width: '100%' }}>
                 <Button
                   variant="contained"
                   size="small"
                   startIcon={<ApplyIcon />}
                   disabled={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) || loading}
                   onClick={() => setScheduleConfirmOpen(true)}
-                  sx={{ mb: 0.2, bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}
+                  fullWidth
+                  sx={{ ...scheduleButtonSx, bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}
                 >
                   Apply
                 </Button>
               </span>
+              </Box>
             </Tooltip>
             <Tooltip title="Clear schedule time for all listings in the current view">
+              <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={{ ...scheduleLabelSx, visibility: 'hidden' }} aria-hidden="true">
+                Action
+              </Typography>
               <Button
                 variant="outlined"
                 size="small"
                 color="warning"
                 startIcon={<ClearAllIcon />}
                 disabled={loading}
+                fullWidth
                 onClick={async () => {
                   if (!window.confirm('Clear schedule time for all listings in this view?')) return;
                   try {
@@ -1421,10 +1457,11 @@ export default function TemplateListingsPage() {
                     setError(e.response?.data?.error || 'Failed to clear schedule times');
                   }
                 }}
-                sx={{ mb: 0.2 }}
+                sx={scheduleButtonSx}
               >
                 Clear Schedule
               </Button>
+              </Box>
             </Tooltip>
           </Stack>
         </Paper>

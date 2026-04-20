@@ -6,7 +6,6 @@ import {
   DialogActions,
   TextField,
   Button,
-  IconButton,
   Tooltip,
   Alert,
   Box
@@ -69,9 +68,16 @@ export default function ActionFieldEditor({ templateId, sellerId }) {
   return (
     <>
       <Tooltip title="Edit eBay Action Field">
-        <IconButton onClick={() => setOpen(true)} size="small" color="primary">
-          <EditIcon />
-        </IconButton>
+        <span>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<EditIcon />}
+            onClick={() => setOpen(true)}
+          >
+            eBay Action Field
+          </Button>
+        </span>
       </Tooltip>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
