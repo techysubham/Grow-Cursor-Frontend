@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { alpha, useTheme } from '@mui/material/styles';
 import { 
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Typography, IconButton, Dialog, DialogTitle, 
@@ -34,12 +35,16 @@ import ActionFieldEditor from '../../components/ActionFieldEditor.jsx';
 import TemplateCustomizationDialog from '../../components/TemplateCustomizationDialog.jsx';
 import AsinReviewModal from '../../components/AsinReviewModal.jsx';
 import ListDirectlyDialog from '../../components/ListDirectlyDialog.jsx';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
 
 export default function TemplateListingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const dashboardTheme = theme.customTokens?.dashboardSignature || dashboardSignatureTokens;
   const templateId = searchParams.get('templateId');
   const sellerId = searchParams.get('sellerId');
   const fromAsinList = searchParams.get('fromAsinList') === 'true';
@@ -119,6 +124,53 @@ export default function TemplateListingsPage() {
   const [scheduleToRow, setScheduleToRow] = useState('');
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
 
+  const pageShellSx = {
+    px: { xs: 2, md: 3 },
+    pb: 4,
+    backgroundColor: theme.palette.background.paper
+  };
+  const surfaceCardSx = {
+    borderRadius: `${dashboardTheme.radius.card}px`,
+    border: '1px solid',
+    borderColor: alpha(BRAND_DARK, 0.08),
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: dashboardTheme.shadows.card
+  };
+  const emphasizedSurfaceCardSx = {
+    ...surfaceCardSx,
+    backgroundColor: theme.palette.background.paper
+  };
+  const tableContainerSx = {
+    borderRadius: `${dashboardTheme.radius.card}px`,
+    border: '1px solid',
+    borderColor: alpha(BRAND_DARK, 0.1),
+    boxShadow: dashboardTheme.shadows.table,
+    overflow: 'hidden'
+  };
+  const tableHeaderCellSx = {
+    fontWeight: 700,
+    fontSize: '0.74rem',
+    letterSpacing: 0.55,
+    textTransform: 'uppercase',
+    color: alpha(theme.palette.common.white, 0.96),
+    backgroundColor: BRAND_DARK,
+    borderBottom: 'none'
+  };
+  const tableBodyRowSx = {
+    '& td': {
+      borderBottomColor: dashboardTheme.table.rowBorder
+    },
+    '&:nth-of-type(even) td': {
+      backgroundColor: dashboardTheme.table.rowStripe
+    },
+    '&:hover td': {
+      backgroundColor: `${dashboardTheme.table.rowHover} !important`
+    },
+    '&.Mui-selected td': {
+      backgroundColor: `${alpha(BRAND_YELLOW, 0.16)} !important`
+    }
+  };
+
   const headerActionButtonSx = {
     minHeight: 40,
     px: 1.5,
@@ -127,10 +179,9 @@ export default function TemplateListingsPage() {
     whiteSpace: 'nowrap'
   };
   const actionToolbarPaperSx = {
-    p: 2,
-    mb: 2,
-    borderRadius: 2,
-    bgcolor: 'grey.50'
+    ...emphasizedSurfaceCardSx,
+    p: { xs: 2, md: 2.25 },
+    mb: 2.25
   };
   const actionSectionSx = {
     display: 'flex',
@@ -143,7 +194,7 @@ export default function TemplateListingsPage() {
     fontSize: 11,
     fontWeight: 700,
     letterSpacing: 0.8,
-    color: 'text.secondary',
+    color: BRAND_DARK,
     textTransform: 'uppercase'
   };
   const actionButtonSx = {
@@ -152,6 +203,62 @@ export default function TemplateListingsPage() {
     borderRadius: 1.5,
     boxSizing: 'border-box',
     whiteSpace: 'nowrap'
+  };
+  const yellowOutlinedButtonSx = {
+    ...actionButtonSx,
+    color: BRAND_DARK,
+    borderColor: BRAND_YELLOW_DARK,
+    backgroundColor: alpha(BRAND_YELLOW, 0.08),
+    '&:hover': {
+      borderColor: BRAND_YELLOW_DARK,
+      backgroundColor: alpha(BRAND_YELLOW, 0.18),
+      boxShadow: `0 8px 18px ${alpha(BRAND_YELLOW_DARK, 0.18)}`
+    },
+    '&.Mui-disabled': {
+      borderColor: alpha(BRAND_DARK, 0.16),
+      color: alpha(BRAND_DARK, 0.35),
+      backgroundColor: alpha(BRAND_DARK, 0.03)
+    }
+  };
+  const yellowFilledButtonSx = {
+    ...actionButtonSx,
+    color: BRAND_DARK,
+    backgroundColor: BRAND_YELLOW,
+    boxShadow: `0 10px 20px ${alpha(BRAND_YELLOW_DARK, 0.2)}`,
+    '&:hover': {
+      backgroundColor: BRAND_YELLOW_DARK,
+      boxShadow: `0 12px 22px ${alpha(BRAND_YELLOW_DARK, 0.26)}`
+    },
+    '&.Mui-disabled': {
+      color: alpha(BRAND_DARK, 0.35),
+      backgroundColor: alpha(BRAND_YELLOW, 0.38),
+      boxShadow: 'none'
+    }
+  };
+  const breadcrumbLinkSx = {
+    cursor: 'pointer',
+    textDecoration: 'none',
+    color: BRAND_DARK,
+    fontWeight: 600,
+    '&:hover': {
+      textDecoration: 'none',
+      color: BRAND_YELLOW_DARK
+    }
+  };
+  const breadcrumbCurrentSx = {
+    color: BRAND_DARK,
+    fontWeight: 600,
+    transition: 'color 0.18s ease',
+    '&:hover': {
+      color: BRAND_YELLOW_DARK
+    }
+  };
+  const sellerContextChipSx = {
+    borderColor: BRAND_YELLOW_DARK,
+    backgroundColor: alpha(BRAND_YELLOW, 0.12),
+    color: BRAND_DARK,
+    fontWeight: 600,
+    alignSelf: { xs: 'flex-start', lg: 'flex-end' }
   };
 
   const scheduleControlWidth = 148;
@@ -1182,14 +1289,14 @@ export default function TemplateListingsPage() {
   }
 
   return (
-    <Box>
+    <Box sx={pageShellSx}>
       {/* Breadcrumb Navigation */}
-      <Breadcrumbs sx={{ mb: 2 }}>
+      <Breadcrumbs sx={{ mb: 2.5, '& .MuiBreadcrumbs-separator': { color: alpha(BRAND_DARK, 0.55) } }}>
         <Link 
           component="button"
           variant="body2" 
           onClick={() => navigate('/admin/select-seller')}
-          sx={{ cursor: 'pointer', textDecoration: 'none' }}
+          sx={breadcrumbLinkSx}
         >
           Select Seller
         </Link>
@@ -1197,14 +1304,66 @@ export default function TemplateListingsPage() {
           component="button"
           variant="body2" 
           onClick={() => navigate(`/admin/seller-templates?sellerId=${sellerId}`)}
-          sx={{ cursor: 'pointer', textDecoration: 'none' }}
+          sx={breadcrumbLinkSx}
         >
           {seller?.user?.username || seller?.user?.email || 'Seller'}
         </Link>
-        <Typography color="text.primary" variant="body2">
+        <Typography variant="body2" sx={breadcrumbCurrentSx}>
           {template?.name || 'Template Listings'}
         </Typography>
       </Breadcrumbs>
+
+      <Paper sx={{ ...surfaceCardSx, p: { xs: 2, md: 2.5 }, mb: 2.25 }}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', lg: 'center' }} spacing={2}>
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={1.25} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                {template ? `${template.name} - Listings` : 'Template Listings'}
+              </Typography>
+              {template?._isOverridden && (
+                <Chip label="Customized" color="primary" size="small" />
+              )}
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+              Manage listing creation, imports, exports, scheduling, and template-level tools for this seller-template workspace.
+            </Typography>
+          </Box>
+          {(seller || fromAsinList) && (
+            <Stack spacing={1} alignItems={{ xs: 'flex-start', lg: 'flex-end' }} sx={{ width: { xs: '100%', lg: 'auto' } }}>
+              {seller && (
+                <Chip
+                  label={seller?.user?.username || seller?.user?.email || 'Seller'}
+                  size="small"
+                  variant="outlined"
+                  sx={sellerContextChipSx}
+                />
+              )}
+              {fromAsinList && (
+                <Stack direction="row" spacing={1} alignItems="center" useFlexGap sx={{ flexWrap: 'wrap' }}>
+                  <Button variant="outlined" size="small" onClick={() => {}} sx={headerActionButtonSx}>
+                    Save As
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="primary"
+                    onClick={() => {
+                      if (selectedListings.size === 0) {
+                        setError('Please select at least one listing to proceed.');
+                        return;
+                      }
+                      setListDirectlyDialog(true);
+                    }}
+                    sx={headerActionButtonSx}
+                  >
+                    List Directly ({selectedListings.size})
+                  </Button>
+                </Stack>
+              )}
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
 
       {/* Statistics Card */}
       {templateId && sellerId && (
@@ -1215,39 +1374,6 @@ export default function TemplateListingsPage() {
         />
       )}
 
-      <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', lg: 'center' }} spacing={2} sx={{ mb: 2 }}>
-        <Stack direction="row" alignItems="center" spacing={2} useFlexGap sx={{ flexWrap: 'wrap' }}>
-          <Typography variant="h6">
-            {template ? `${template.name} - Listings` : 'Template Listings'}
-          </Typography>
-          {template?._isOverridden && (
-            <Chip label="Customized" color="primary" size="small" />
-          )}
-        </Stack>
-        {fromAsinList && (
-          <Stack direction="row" spacing={1} alignItems="center" useFlexGap sx={{ flexWrap: 'wrap' }}>
-            <Button variant="outlined" size="small" onClick={() => {}} sx={headerActionButtonSx}>
-              Save As
-            </Button>
-            <Button
-              variant="contained"
-              size="small"
-              color="primary"
-              onClick={() => {
-                if (selectedListings.size === 0) {
-                  setError('Please select at least one listing to proceed.');
-                  return;
-                }
-                setListDirectlyDialog(true);
-              }}
-              sx={headerActionButtonSx}
-            >
-              List Directly ({selectedListings.size})
-            </Button>
-          </Stack>
-        )}
-      </Stack>
-
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
@@ -1256,7 +1382,7 @@ export default function TemplateListingsPage() {
           direction={{ xs: 'column', xl: 'row' }}
           spacing={2.5}
           useFlexGap
-          divider={<Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', xl: 'block' } }} />}
+          divider={<Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', xl: 'block' }, borderColor: alpha(theme.palette.primary.main, 0.12) }} />}
         >
           <Box sx={actionSectionSx}>
             <Typography variant="caption" sx={actionSectionTitleSx}>
@@ -1269,7 +1395,7 @@ export default function TemplateListingsPage() {
                 onClick={handleAddListing}
                 disabled={!sellerId || batchFilter !== 'active' || fromAsinList}
                 size="small"
-                sx={actionButtonSx}
+                sx={yellowFilledButtonSx}
               >
                 Add Listing
               </Button>
@@ -1279,7 +1405,7 @@ export default function TemplateListingsPage() {
                 onClick={() => setBulkImportDialog(true)}
                 disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
                 size="small"
-                sx={actionButtonSx}
+                sx={yellowOutlinedButtonSx}
               >
                 Bulk Import ASINs
               </Button>
@@ -1289,7 +1415,7 @@ export default function TemplateListingsPage() {
                 onClick={() => setBulkImportSKUsDialog(true)}
                 disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
                 size="small"
-                sx={actionButtonSx}
+                sx={yellowOutlinedButtonSx}
               >
                 Bulk Import SKUs
               </Button>
@@ -1332,7 +1458,7 @@ export default function TemplateListingsPage() {
               <ActionFieldEditor
                 templateId={templateId}
                 sellerId={sellerId}
-                buttonProps={{ size: 'small', sx: actionButtonSx }}
+                buttonProps={{ size: 'small', sx: yellowOutlinedButtonSx }}
               />
               <Button
                 variant="outlined"
@@ -1340,7 +1466,7 @@ export default function TemplateListingsPage() {
                 onClick={handleExportCSV}
                 disabled={loading || listings.length === 0}
                 size="small"
-                sx={actionButtonSx}
+                sx={yellowOutlinedButtonSx}
               >
                 Download CSV
               </Button>
@@ -1349,7 +1475,7 @@ export default function TemplateListingsPage() {
                 onClick={() => setHistoryDialog(true)}
                 disabled={downloadHistory.length === 0 || fromAsinList}
                 size="small"
-                sx={actionButtonSx}
+                sx={yellowOutlinedButtonSx}
               >
                 Download History ({downloadHistory.length})
               </Button>
@@ -1368,7 +1494,7 @@ export default function TemplateListingsPage() {
                   onClick={fromAsinList ? undefined : () => setCustomizationDialog(true)}
                   disabled={fromAsinList}
                   size="small"
-                  sx={actionButtonSx}
+                  sx={yellowOutlinedButtonSx}
                 >
                   Customize Template
                 </Button>
@@ -1379,7 +1505,7 @@ export default function TemplateListingsPage() {
                 onClick={fromAsinList ? undefined : () => setCalculatorDialog(true)}
                 disabled={!pricingConfig || fromAsinList}
                 size="small"
-                sx={actionButtonSx}
+                sx={yellowOutlinedButtonSx}
               >
                 Pricing Calculator {isCustomPricing && '(Custom)'}
               </Button>
@@ -1390,15 +1516,25 @@ export default function TemplateListingsPage() {
                 color="primary"
                 disabled={fromAsinList}
                 size="small"
-                sx={actionButtonSx}
+                sx={yellowOutlinedButtonSx}
               >
                 Set Defaults
                 {template?.coreFieldDefaults && Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length > 0 && (
                   <Chip 
                     label={Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length} 
                     size="small" 
-                    color="primary"
-                    sx={{ ml: 1, height: 20 }}
+                    sx={{
+                      ml: 1,
+                      height: 20,
+                      fontWeight: 700,
+                      color: BRAND_DARK,
+                      backgroundColor: alpha(BRAND_YELLOW, 0.95),
+                      border: '1px solid',
+                      borderColor: BRAND_YELLOW_DARK,
+                      '& .MuiChip-label': {
+                        px: 0.9
+                      }
+                    }}
                   />
                 )}
               </Button>
@@ -1408,10 +1544,10 @@ export default function TemplateListingsPage() {
       </Paper>
 
       {/* Schedule block */}
-      <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column', maxWidth: '100%' }}>
+      <Paper variant="outlined" sx={{ ...emphasizedSurfaceCardSx, px: 2, py: 1.2, mb: 2, display: 'inline-flex', flexDirection: 'column', maxWidth: '100%' }}>
           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-            <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
-            <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
+            <CalendarIcon sx={{ fontSize: 15, color: BRAND_DARK }} />
+            <Typography variant="caption" fontWeight={700} letterSpacing={0.8} sx={{ color: BRAND_DARK }}>
               SCHEDULE
             </Typography>
             {scheduleDate && scheduleTimeFrom && scheduleStep >= 1 && pagination.total > 0 && (() => {
@@ -1568,9 +1704,9 @@ export default function TemplateListingsPage() {
 
       {/* Batch Filter */}
       {!fromAsinList && (
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Typography variant="subtitle2">View:</Typography>
+      <Paper sx={{ ...surfaceCardSx, p: 2, mb: 2 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+          <Typography variant="subtitle2" sx={{ color: BRAND_DARK, fontWeight: 700 }}>View:</Typography>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <Select
               value={batchFilter}
@@ -1598,14 +1734,15 @@ export default function TemplateListingsPage() {
       </Paper>
       )}
 
-      <TableContainer component={Paper} sx={{ maxHeight: 600, maxWidth: '100%', overflowX: 'auto' }}>
+      <TableContainer component={Paper} sx={{ ...tableContainerSx, maxHeight: 600, maxWidth: '100%', overflowX: 'auto' }}>
         <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
               {/* Checkbox column */}
-              <TableCell padding="checkbox" sx={{ fontWeight: 'bold', position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 2 }}>
+              <TableCell padding="checkbox" sx={{ ...tableHeaderCellSx, position: 'sticky', left: 0, zIndex: 3 }}>
                 <Checkbox
                   size="small"
+                  sx={{ color: alpha(theme.palette.common.white, 0.75), '&.Mui-checked, &.MuiCheckbox-indeterminate': { color: theme.palette.common.white } }}
                   indeterminate={selectedListings.size > 0 && selectedListings.size < listings.length}
                   checked={listings.length > 0 && selectedListings.size === listings.length}
                   onChange={handleToggleAll}
@@ -1613,19 +1750,19 @@ export default function TemplateListingsPage() {
               </TableCell>
               {/* All 38 core columns */}
               {coreColumns.map(col => (
-                <TableCell key={col.key} sx={{ fontWeight: 'bold', minWidth: col.width }}>
+                <TableCell key={col.key} sx={{ ...tableHeaderCellSx, minWidth: col.width }}>
                   {col.label}
                 </TableCell>
               ))}
               
               {/* Custom columns from template */}
               {template?.customColumns?.map(col => (
-                <TableCell key={col.name} sx={{ fontWeight: 'bold', minWidth: 150 }}>
+                <TableCell key={col.name} sx={{ ...tableHeaderCellSx, minWidth: 150 }}>
                   {col.displayName}
                 </TableCell>
               ))}
               
-              <TableCell align="right" sx={{ fontWeight: 'bold', minWidth: 150, position: 'sticky', right: 0, backgroundColor: 'background.paper', zIndex: 1 }}>
+              <TableCell align="right" sx={{ ...tableHeaderCellSx, minWidth: 150, position: 'sticky', right: 0, zIndex: 3 }}>
                 Actions
               </TableCell>
             </TableRow>
@@ -1633,13 +1770,13 @@ export default function TemplateListingsPage() {
           <TableBody>
             {listings.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={coreColumns.length + (template?.customColumns?.length || 0) + 2} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                <TableCell colSpan={coreColumns.length + (template?.customColumns?.length || 0) + 2} align="center" sx={{ py: 4, color: 'text.secondary', background: dashboardTheme.surfaces.emptyState }}>
                   No listings found. Add one above!
                 </TableCell>
               </TableRow>
             ) : (
               listings.map((listing) => (
-                <TableRow key={listing._id} hover selected={selectedListings.has(listing._id)}>
+                <TableRow key={listing._id} hover selected={selectedListings.has(listing._id)} sx={tableBodyRowSx}>
                   {/* Checkbox cell */}
                   <TableCell padding="checkbox" sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper' }}>
                     <Checkbox

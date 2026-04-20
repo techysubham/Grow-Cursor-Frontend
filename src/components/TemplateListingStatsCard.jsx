@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { alpha, useTheme } from '@mui/material/styles';
 import { 
   Paper, Box, Typography, Grid, Chip, Stack, CircularProgress, 
   Button, Divider 
@@ -11,38 +12,50 @@ import {
   Analytics as AnalyticsIcon
 } from '@mui/icons-material';
 import api from '../lib/api';
-
-const StatBox = ({ label, value, icon: Icon, color = 'primary' }) => (
-  <Box sx={{ textAlign: 'center' }}>
-    <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 0.5 }}>
-      <Icon color={color} fontSize="small" />
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-    </Stack>
-    <Typography variant="h5" color={`${color}.main`} fontWeight="bold">
-      {value !== null && value !== undefined ? value.toLocaleString() : '-'}
-    </Typography>
-  </Box>
-);
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../constants/brandTheme.js';
+import { dashboardSignatureTokens } from '../theme/appTheme.js';
 
 export default function TemplateListingStatsCard({ templateId, sellerId, onViewDetails }) {
+  const theme = useTheme();
+  const dashboardTheme = theme.customTokens?.dashboardSignature || dashboardSignatureTokens;
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const statCardSx = {
     textAlign: 'center',
-    p: 2,
-    borderRadius: 2,
-    bgcolor: 'grey.50',
+    p: { xs: 1.1, md: 1.25 },
+    minHeight: { xs: 88, md: 96 },
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: `${dashboardTheme.radius.card - 8}px`,
+    backgroundColor: theme.palette.background.paper,
     border: '1px solid',
-    borderColor: 'divider',
+    borderColor: alpha(BRAND_DARK, 0.08),
+    boxShadow: '0 8px 18px rgba(15, 23, 42, 0.035)',
     transition: 'all 0.2s ease',
     '&:hover': {
-      bgcolor: 'grey.100',
-      borderColor: 'grey.400'
+      transform: 'translateY(-2px)',
+      borderColor: alpha(BRAND_YELLOW_DARK, 0.28),
+      boxShadow: '0 12px 22px rgba(15, 23, 42, 0.07)'
     }
+  };
+  const statHeadingSx = {
+    mb: 0.45
+  };
+  const statValueSx = {
+    fontWeight: 700,
+    color: 'text.primary',
+    fontSize: { xs: '1.8rem', md: '1.95rem' },
+    lineHeight: 1.05
+  };
+  const statChipSx = {
+    mt: 0.45,
+    height: 22,
+    fontSize: '0.68rem',
+    border: '1px solid'
   };
 
   const fetchStats = async () => {
@@ -73,18 +86,18 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
 
   if (error) {
     return (
-      <Paper elevation={2} sx={{ p: 2, mb: 3, bgcolor: 'error.lighter' }}>
+      <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: `${dashboardTheme.radius.card}px`, border: '1px solid', borderColor: 'error.light', backgroundColor: theme.palette.background.paper }}>
         <Typography color="error" variant="body2">{error}</Typography>
       </Paper>
     );
   }
 
   return (
-    <Paper elevation={2} sx={{ p: 2.5, mb: 3, bgcolor: 'background.paper', color: 'text.primary' }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+    <Paper elevation={0} sx={{ p: { xs: 1.2, md: 1.4 }, mb: 2, borderRadius: `${dashboardTheme.radius.card}px`, border: '1px solid', borderColor: alpha(BRAND_DARK, 0.08), backgroundColor: theme.palette.background.paper, boxShadow: dashboardTheme.shadows.card, color: 'text.primary' }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
         <Stack direction="row" spacing={1} alignItems="center">
-          <AnalyticsIcon color="primary" />
-          <Typography variant="h6" fontWeight="600">
+          <AnalyticsIcon sx={{ color: BRAND_DARK, fontSize: 20 }} />
+          <Typography sx={{ fontSize: '1.05rem', fontWeight: 700 }}>
             Listing Activity
           </Typography>
         </Stack>
@@ -93,39 +106,52 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
             size="small" 
             variant="outlined" 
             onClick={onViewDetails}
+            sx={{
+              minHeight: 32,
+              borderRadius: `${dashboardTheme.radius.pill}px`,
+              px: 1.25,
+              fontSize: '0.8rem',
+              color: BRAND_DARK,
+              borderColor: BRAND_YELLOW_DARK,
+              backgroundColor: alpha(BRAND_YELLOW, 0.08),
+              '&:hover': {
+                borderColor: BRAND_YELLOW_DARK,
+                backgroundColor: alpha(BRAND_YELLOW, 0.18)
+              }
+            }}
           >
             View Details →
           </Button>
         )}
       </Stack>
       
-      <Divider sx={{ mb: 2 }} />
+      <Divider sx={{ mb: 1 }} />
       
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress size={40} color="primary" />
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2.5 }}>
+          <CircularProgress size={34} color="primary" />
         </Box>
       ) : (
-        <Grid container spacing={3}>
+        <Grid container spacing={1.25}>
           <Grid item xs={6} sm={3}>
             <Box sx={statCardSx}>
-              <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={0.75} justifyContent="center" alignItems="center" sx={statHeadingSx}>
                 <CalendarIcon fontSize="small" color="success" />
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
                   Today
                 </Typography>
               </Stack>
-              <Typography variant="h4" fontWeight="bold" color="text.primary">
+              <Typography sx={statValueSx}>
                 {stats?.today || 0}
               </Typography>
               <Chip 
                 label="Active" 
                 size="small" 
                 sx={{ 
-                  mt: 1, 
-                  bgcolor: 'success.main', 
-                  color: 'white',
-                  fontSize: '0.7rem'
+                  ...statChipSx,
+                  bgcolor: dashboardTheme.tones.success.background,
+                  borderColor: dashboardTheme.tones.success.border,
+                  color: dashboardTheme.tones.success.color
                 }} 
               />
             </Box>
@@ -133,23 +159,23 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
           
           <Grid item xs={6} sm={3}>
             <Box sx={statCardSx}>
-              <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={0.75} justifyContent="center" alignItems="center" sx={statHeadingSx}>
                 <DateRangeIcon fontSize="small" color="info" />
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
                   This Week
                 </Typography>
               </Stack>
-              <Typography variant="h4" fontWeight="bold" color="text.primary">
+              <Typography sx={statValueSx}>
                 {stats?.thisWeek || 0}
               </Typography>
               <Chip 
                 label="7 Days" 
                 size="small" 
                 sx={{ 
-                  mt: 1, 
-                  bgcolor: 'info.main', 
-                  color: 'white',
-                  fontSize: '0.7rem'
+                  ...statChipSx,
+                  bgcolor: alpha(BRAND_YELLOW, 0.12),
+                  borderColor: alpha(BRAND_YELLOW_DARK, 0.22),
+                  color: BRAND_DARK
                 }} 
               />
             </Box>
@@ -157,47 +183,47 @@ export default function TemplateListingStatsCard({ templateId, sellerId, onViewD
           
           <Grid item xs={6} sm={3}>
             <Box sx={statCardSx}>
-              <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={0.75} justifyContent="center" alignItems="center" sx={statHeadingSx}>
                 <TrendingUpIcon fontSize="small" color="secondary" />
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
                   This Month
                 </Typography>
               </Stack>
-              <Typography variant="h4" fontWeight="bold" color="text.primary">
+              <Typography sx={statValueSx}>
                 {stats?.thisMonth || 0}
               </Typography>
               <Chip 
                 label="Current" 
                 size="small" 
                 sx={{ 
-                  mt: 1, 
-                  bgcolor: 'secondary.main', 
-                  color: 'white',
-                  fontSize: '0.7rem'
+                  ...statChipSx,
+                  bgcolor: alpha(BRAND_YELLOW, 0.12),
+                  borderColor: alpha(BRAND_YELLOW_DARK, 0.22),
+                  color: BRAND_DARK
                 }} 
               />
             </Box>
           </Grid>
           
           <Grid item xs={6} sm={3}>
-            <Box sx={{ ...statCardSx, borderColor: 'primary.light', bgcolor: 'primary.50' }}>
-              <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
+            <Box sx={{ ...statCardSx, borderColor: alpha(BRAND_YELLOW_DARK, 0.28), backgroundColor: alpha(BRAND_YELLOW, 0.08) }}>
+              <Stack direction="row" spacing={0.75} justifyContent="center" alignItems="center" sx={statHeadingSx}>
                 <InventoryIcon fontSize="small" color="primary" />
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
                   Total Active
                 </Typography>
               </Stack>
-              <Typography variant="h4" fontWeight="bold" color="text.primary">
+              <Typography sx={statValueSx}>
                 {stats?.total || 0}
               </Typography>
               <Chip 
                 label="All Time" 
                 size="small" 
                 sx={{ 
-                  mt: 1, 
-                  bgcolor: 'primary.main', 
-                  color: 'white',
-                  fontSize: '0.7rem'
+                  ...statChipSx,
+                  bgcolor: alpha(BRAND_YELLOW, 0.14),
+                  borderColor: alpha(BRAND_YELLOW_DARK, 0.24),
+                  color: BRAND_DARK
                 }} 
               />
             </Box>
