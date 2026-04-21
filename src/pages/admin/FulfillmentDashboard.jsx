@@ -92,6 +92,8 @@ import {
 } from '../../constants/remarkTemplates';
 import ItemCategoryAssignDialog from '../../components/ItemCategoryAssignDialog.jsx';
 import FulfillmentSkeleton from '../../components/skeletons/FulfillmentSkeleton';
+import SectionCard from '../../components/SectionCard.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 
 // --- IMAGE VIEWER DIALOG ---
@@ -1167,7 +1169,7 @@ const EditableCell = memo(function EditableCell({ value, type = 'text', onSave }
 });
 
 // Sticky header cell style — extracted to avoid re-creating per render
-const HEADER_CELL_SX = { backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 };
+const HEADER_CELL_SX = { ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 };
 const HEADER_CELL_RIGHT_SX = { ...HEADER_CELL_SX, textAlign: 'right' };
 
 const createEmptyDateFilter = () => ({ mode: 'none', single: '', from: '', to: '' });
@@ -1380,7 +1382,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
               variant="contained"
               onClick={handleSearch}
               startIcon={<SearchIcon />}
-              sx={{ minWidth: { xs: '100%', sm: 90 }, height: 40, boxSizing: 'border-box' }}
+              sx={{ ...yellowFilledButtonSx, minWidth: { xs: '100%', sm: 90 }, height: 40 }}
             >
               Search
             </Button>
@@ -1390,7 +1392,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
               size="small"
               variant="outlined"
               onClick={handleClear}
-              sx={{ minWidth: { xs: '100%', sm: 80 }, height: 40, boxSizing: 'border-box' }}
+              sx={{ ...yellowOutlinedButtonSx, minWidth: { xs: '100%', sm: 80 }, height: 40 }}
             >
               Clear
             </Button>
@@ -3101,7 +3103,7 @@ function FulfillmentDashboard() {
         )}
 
         {/* HEADER SECTION - FIXED */}
-        <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 1, sm: 2 }, flexShrink: 0 }}>
+        <SectionCard sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 1, sm: 2 }, flexShrink: 0 }}>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             alignItems={{ xs: 'flex-start', sm: 'center' }}
@@ -3191,13 +3193,13 @@ function FulfillmentDashboard() {
               <Stack direction="row" spacing={1}>
                 <Button
                   variant="contained"
-                  color="primary"
                   startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />)}
                   onClick={pollNewOrders}
                   disabled={loading}
                   size="small"
                   fullWidth
                   sx={{
+                    ...yellowFilledButtonSx,
                     fontSize: { xs: '0.7rem', sm: '0.8rem' },
                     px: { xs: 0.5, sm: 1 }
                   }}
@@ -3207,13 +3209,13 @@ function FulfillmentDashboard() {
 
                 <Button
                   variant="contained"
-                  color="secondary"
                   startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />)}
                   onClick={pollOrderUpdates}
                   disabled={loading}
                   size="small"
                   fullWidth
                   sx={{
+                    ...yellowFilledButtonSx,
                     fontSize: { xs: '0.7rem', sm: '0.8rem' },
                     px: { xs: 0.5, sm: 1 }
                   }}
@@ -3420,24 +3422,22 @@ function FulfillmentDashboard() {
 
                 <Button
                   variant="contained"
-                  color="primary"
                   size="small"
                   startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
                   onClick={pollNewOrders}
                   disabled={loading}
-                  sx={{ minWidth: 120 }}
+                  sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
                 >
                   {loading ? 'Polling...' : 'Poll New Orders'}
                 </Button>
 
                 <Button
                   variant="contained"
-                  color="secondary"
                   size="small"
                   startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
                   onClick={pollOrderUpdates}
                   disabled={loading}
-                  sx={{ minWidth: 120 }}
+                  sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
                 >
                   {loading ? 'Updating...' : 'Poll Order Updates'}
                 </Button>
@@ -3621,17 +3621,17 @@ function FulfillmentDashboard() {
 
 
 
-        </Paper>
+        </SectionCard>
 
         {/* TABLE SECTION */}
         {
           orders.length === 0 && !loading ? (
-            <Paper sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center' }}>
+            <SectionCard sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center' }}>
               <ShoppingCartIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: 'text.secondary', mb: 2 }} />
               <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                 No orders found. Click "Poll New Orders" to fetch orders from all sellers.
               </Typography>
-            </Paper>
+            </SectionCard>
           ) : (
             <>
               {/* MOBILE CARD VIEW */}
@@ -3743,10 +3743,7 @@ function FulfillmentDashboard() {
                       return (
                         <TableRow
                           key={order._id || idx}
-                          sx={{
-                            '&:nth-of-type(odd)': { backgroundColor: 'action.hover' },
-                            '&:hover': { backgroundColor: 'action.selected' },
-                          }}
+                          sx={tableBodyRowSx}
                         >
                           <TableCell>{(currentPage - 1) * ordersPerPage + idx + 1}</TableCell>
                           {visibleColumnsSet.has('seller') && (
@@ -4653,7 +4650,7 @@ function FulfillmentDashboard() {
         {/* Pagination Controls - FIXED AT BOTTOM */}
         {
           !loading && orders.length > 0 && totalPages > 1 && (
-            <Box sx={{
+            <SectionCard sx={{
               py: { xs: 0.75, sm: 1 },
               px: { xs: 1, sm: 2 },
               display: 'flex',
@@ -4664,7 +4661,6 @@ function FulfillmentDashboard() {
               flexShrink: 0,
               borderTop: '1px solid',
               borderColor: 'divider',
-              bgcolor: 'background.paper'
             }}>
               <Typography
                 variant="body2"
@@ -4687,7 +4683,7 @@ function FulfillmentDashboard() {
                 siblingCount={isSmallMobile ? 0 : 1}
                 boundaryCount={isSmallMobile ? 1 : 1}
               />
-            </Box>
+            </SectionCard>
           )
         }
 

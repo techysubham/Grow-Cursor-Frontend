@@ -41,6 +41,8 @@ import InfoIcon from '@mui/icons-material/Info';
 import api from '../../lib/api';
 import ChatModal from '../../components/ChatModal';
 import RemarkTemplateManagerModal from '../../components/RemarkTemplateManagerModal';
+import SectionCard from '../../components/SectionCard.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 import {
   findRemarkTemplateText,
   loadRemarkTemplates,
@@ -499,7 +501,7 @@ export default function AmazonArrivalsPage() {
       </Typography>
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 2, flexShrink: 0 }}>
+      <SectionCard sx={{ p: 2, mb: 2, flexShrink: 0 }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
           <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 200 } }}>
             <InputLabel>Seller</InputLabel>
@@ -582,23 +584,22 @@ export default function AmazonArrivalsPage() {
             variant="outlined"
             onClick={toggleSort}
             startIcon={arrivalSort === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
-            sx={{ minWidth: { xs: '100%', sm: 140 }, height: 40, textTransform: 'none', boxSizing: 'border-box' }}
+            sx={{ ...yellowOutlinedButtonSx, minWidth: { xs: '100%', sm: 140 }, height: 40, textTransform: 'none' }}
           >
             {arrivalSort === 'asc' ? 'Oldest First' : 'Newest First'}
           </Button>
 
           <Button
             variant="outlined"
-            color="primary"
             onClick={fetchOrders}
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             disabled={loading}
-            sx={{ minWidth: { xs: '100%', sm: 100 }, height: 40, boxSizing: 'border-box' }}
+            sx={{ ...yellowOutlinedButtonSx, minWidth: { xs: '100%', sm: 100 }, height: 40 }}
           >
             Refresh
           </Button>
         </Stack>
-      </Paper>
+      </SectionCard>
 
       {/* Loading & Error States */}
       {loading && !orders.length ? (
@@ -608,11 +609,11 @@ export default function AmazonArrivalsPage() {
       ) : error ? (
         <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
       ) : !orders.length ? (
-        <Paper sx={{ p: 4, textAlign: 'center', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <SectionCard sx={{ p: 4, textAlign: 'center', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Typography variant="h6" color="text.secondary">
             No orders with arrival dates found
           </Typography>
-        </Paper>
+        </SectionCard>
       ) : (
         <>
           <TableContainer
@@ -645,10 +646,10 @@ export default function AmazonArrivalsPage() {
             >
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>
                     <Stack direction="row" alignItems="center" spacing={0.5}>
                       <span>Arriving Date</span>
                       <Tooltip title={arrivalSort === 'asc' ? 'Sorted: Oldest First' : 'Sorted: Newest First'}>
@@ -658,18 +659,18 @@ export default function AmazonArrivalsPage() {
                       </Tooltip>
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Account</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Amazon Order ID</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Tracking ID</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Messaging</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Amazon Account</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Amazon Order ID</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Tracking ID</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Messaging</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {orders.map((order, idx) => (
-                  <TableRow key={order._id || idx} hover>
+                  <TableRow key={order._id || idx} hover sx={tableBodyRowSx}>
                     <TableCell>
                       {order.seller?.user?.username || order.seller?.user?.email || order.sellerId || '-'}
                     </TableCell>
@@ -834,7 +835,7 @@ export default function AmazonArrivalsPage() {
             </Table>
           </TableContainer>
 
-          <Paper sx={{
+          <SectionCard sx={{
             py: 1,
             px: 2,
             display: 'flex',
@@ -856,7 +857,7 @@ export default function AmazonArrivalsPage() {
               showLastButton
               size="small"
             />
-          </Paper>
+          </SectionCard>
         </>
       )}
 

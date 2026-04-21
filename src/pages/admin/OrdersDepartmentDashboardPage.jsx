@@ -6,6 +6,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Fade,
   FormControl,
   Grid,
   InputLabel,
@@ -25,10 +26,13 @@ import {
   Typography
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../lib/api';
 import OrdersDashboardSkeleton from '../../components/skeletons/OrdersDashboardSkeleton';
-import { Fade } from '@mui/material';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
+import StatMetricCard from '../../components/StatMetricCard.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyRowSx } from '../../theme/tableStyles.js';
 
 const DASHBOARD_DATE_KEY = 'orders_dashboard_date';
 
@@ -61,32 +65,6 @@ function getTodayPtDateString() {
     month: '2-digit',
     day: '2-digit'
   }).format(new Date());
-}
-
-function KpiCard({ title, value, color = 'primary.main', actionTo, actionLabel }) {
-  return (
-    <Paper sx={{ p: 2, height: '100%' }}>
-      <Stack spacing={1}>
-        <Typography variant="body2" color="text.secondary">
-          {title}
-        </Typography>
-        <Typography variant="h4" fontWeight="bold" sx={{ color }}>
-          {value}
-        </Typography>
-        {actionTo && (
-          <Button
-            size="small"
-            component={Link}
-            to={actionTo}
-            endIcon={<OpenInNewIcon fontSize="small" />}
-            sx={{ width: 'fit-content', mt: 0.5 }}
-          >
-            {actionLabel || 'Open'}
-          </Button>
-        )}
-      </Stack>
-    </Paper>
-  );
 }
 
 export default function OrdersDepartmentDashboardPage() {
@@ -214,20 +192,14 @@ export default function OrdersDepartmentDashboardPage() {
 
   return (
     <Fade in={!loading} timeout={600}>
-    <Box sx={{ p: 3 }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1} sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h4">Orders Department Dashboard</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Snapshot view for fulfillment and compliance workflows
-          </Typography>
-        </Box>
-        <Typography variant="caption" color="text.secondary">
-          Last updated: {fmtDateTimePt(lastUpdatedAt)} PT
-        </Typography>
-      </Stack>
+    <AdminPageShell>
+      <PageHeader
+        title="Orders Department Dashboard"
+        subtitle="Snapshot view for fulfillment and compliance workflows"
+        actions={<Typography variant="caption" color="text.secondary">Last updated: {fmtDateTimePt(lastUpdatedAt)} PT</Typography>}
+      />
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <SectionCard sx={{ p: 2, mb: 2 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }} flexWrap="wrap" useFlexGap>
           <TextField
             label="Date"
@@ -276,7 +248,7 @@ export default function OrdersDepartmentDashboardPage() {
             ))}
           </Stack>
         </Stack>
-      </Paper>
+      </SectionCard>
 
       {errors.map((msg, idx) => (
         <Alert key={idx} severity="warning" sx={{ mb: 1.5 }}>
@@ -286,26 +258,26 @@ export default function OrdersDepartmentDashboardPage() {
 
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={6} md={2}>
-          <KpiCard title="Today Orders" value={overview?.kpis?.todayOrders ?? '-'} actionTo={`/admin/fulfillment?dateSold=${date}`} actionLabel="Open orders" />
+          <StatMetricCard label="Today Orders" value={overview?.kpis?.todayOrders ?? '-'} tone="neutral" actionTo={`/admin/fulfillment?dateSold=${date}`} actionLabel="Open orders" sx={{ height: '100%' }} />
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
-          <KpiCard title="Monthly Δ (Net)" value={overview?.kpis?.monthlyDeltaNet ?? '-'} color={(overview?.kpis?.monthlyDeltaNet || 0) >= 0 ? 'success.main' : 'error.main'} />
+          <StatMetricCard label="Monthly Δ (Net)" value={overview?.kpis?.monthlyDeltaNet ?? '-'} tone={(overview?.kpis?.monthlyDeltaNet || 0) >= 0 ? 'success' : 'danger'} sx={{ height: '100%' }} />
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
-          <KpiCard title="Awaiting Today" value={overview?.kpis?.awaitingToday ?? '-'} actionTo={`/admin/awaiting-sheet?date=${date}`} />
+          <StatMetricCard label="Awaiting Today" value={overview?.kpis?.awaitingToday ?? '-'} tone="warning" actionTo={`/admin/awaiting-sheet?date=${date}`} sx={{ height: '100%' }} />
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
-          <KpiCard title="Arrivals Today" value={overview?.kpis?.arrivalsToday ?? '-'} actionTo={`/admin/amazon-arrivals`} />
+          <StatMetricCard label="Arrivals Today" value={overview?.kpis?.arrivalsToday ?? '-'} tone="info" actionTo="/admin/amazon-arrivals" sx={{ height: '100%' }} />
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
-          <KpiCard title="Unread Today" value={overview?.kpis?.unreadBuyerMessagesToday ?? '-'} color="warning.main" actionTo="/admin/message-received" />
+          <StatMetricCard label="Unread Today" value={overview?.kpis?.unreadBuyerMessagesToday ?? '-'} tone="warning" actionTo="/admin/message-received" sx={{ height: '100%' }} />
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
-          <KpiCard title="Non-Compliant Accounts" value={overview?.kpis?.nonCompliantAccounts ?? '-'} color="error.main" actionTo="/admin/account-health" />
+          <StatMetricCard label="Non-Compliant Accounts" value={overview?.kpis?.nonCompliantAccounts ?? '-'} tone="danger" actionTo="/admin/account-health" sx={{ height: '100%' }} />
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 1.5, mb: 2 }}>
+      <SectionCard sx={{ p: 1.5, mb: 2 }}>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <Typography variant="subtitle2">Top blockers:</Typography>
           {topBlockers.length === 0 && <Chip size="small" label="No blockers for selected filters" />}
@@ -313,27 +285,27 @@ export default function OrdersDepartmentDashboardPage() {
             <Chip key={b.sellerId} size="small" label={`${b.sellerName}: ${b.awaiting} awaiting, ${b.unread} unread`} color="warning" variant="outlined" />
           ))}
         </Stack>
-      </Paper>
+      </SectionCard>
 
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} lg={8}>
-          <Paper sx={{ p: 2 }}>
+          <SectionCard sx={{ p: 2, height: '100%' }}>
             <Typography variant="h6" sx={{ mb: 1 }}>Today&apos;s Orders (Latest 25)</Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Seller</TableCell>
-                    <TableCell>Order ID</TableCell>
-                    <TableCell>Date Sold</TableCell>
-                    <TableCell>Marketplace</TableCell>
-                    <TableCell>Ship By</TableCell>
-                    <TableCell>Tracking</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Seller</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Order ID</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Date Sold</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Marketplace</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Ship By</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Tracking</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {(ordersTable.length > 0 ? ordersTable : overview?.todayOrdersTable || []).map((o) => (
-                    <TableRow key={o._id || o.id || o.orderId}>
+                    <TableRow key={o._id || o.id || o.orderId} sx={tableBodyRowSx}>
                       <TableCell>{o.seller?.user?.username || o.sellerName || '-'}</TableCell>
                       <TableCell>{o.orderId || '-'}</TableCell>
                       <TableCell>{fmtDateTimePt(o.dateSold)}</TableCell>
@@ -350,10 +322,10 @@ export default function OrdersDepartmentDashboardPage() {
                 </TableBody>
               </Table>
             </TableContainer>
-          </Paper>
+          </SectionCard>
         </Grid>
         <Grid item xs={12} lg={4}>
-          <Paper sx={{ p: 2, mb: 2 }}>
+          <SectionCard sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>Needs Attention: Non-Compliant</Typography>
             <Stack spacing={1}>
               {nonCompliantSellerList.length === 0 && <Typography variant="body2" color="text.secondary">No non-compliant sellers in current window.</Typography>}
@@ -366,8 +338,8 @@ export default function OrdersDepartmentDashboardPage() {
                 </Paper>
               ))}
             </Stack>
-          </Paper>
-          <Paper sx={{ p: 2 }}>
+          </SectionCard>
+          <SectionCard sx={{ p: 2 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>Needs Attention: Unread Messages</Typography>
             <Stack spacing={1}>
               {unreadBySeller.length === 0 && <Typography variant="body2" color="text.secondary">No unread buyer messages today.</Typography>}
@@ -380,11 +352,11 @@ export default function OrdersDepartmentDashboardPage() {
                 </Paper>
               ))}
             </Stack>
-          </Paper>
+          </SectionCard>
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <SectionCard sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>Seller-wise Monthly Difference</Typography>
         <TableContainer>
           <Table size="small">
@@ -445,11 +417,11 @@ export default function OrdersDepartmentDashboardPage() {
             </TableBody>
           </Table>
         </TableContainer>
-      </Paper>
+      </SectionCard>
 
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
+          <SectionCard sx={{ p: 2 }}>
             <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
               <Typography variant="h6">Awaiting By Seller</Typography>
               <Button component={Link} to={`/admin/awaiting-sheet?date=${date}`} size="small">Open</Button>
@@ -465,10 +437,10 @@ export default function OrdersDepartmentDashboardPage() {
                 </Paper>
               ))}
             </Stack>
-          </Paper>
+          </SectionCard>
         </Grid>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
+          <SectionCard sx={{ p: 2 }}>
             <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
               <Typography variant="h6">Arrivals By Seller</Typography>
               <Button component={Link} to="/admin/amazon-arrivals" size="small">Open</Button>
@@ -484,10 +456,10 @@ export default function OrdersDepartmentDashboardPage() {
                 </Paper>
               ))}
             </Stack>
-          </Paper>
+          </SectionCard>
         </Grid>
       </Grid>
-    </Box>
+    </AdminPageShell>
     </Fade>
   );
 }

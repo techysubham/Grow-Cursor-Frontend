@@ -40,6 +40,10 @@ import {
 } from 'recharts';
 import api from '../../lib/api';
 import CRPAnalyticsSkeleton from '../../components/skeletons/CRPAnalyticsSkeleton';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 const COLORS = [
   '#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f',
@@ -99,15 +103,11 @@ const BarTooltipContent = ({ active, payload }) => {
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ icon, label, value, sub, color = '#1976d2' }) {
   return (
-    <Paper
-      elevation={0}
+    <SectionCard
       sx={{
         flex: '1 1 0',
         minWidth: 150,
         p: 1.75,
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 2,
         display: 'flex',
         alignItems: 'flex-start',
         gap: 1.5,
@@ -131,7 +131,7 @@ function StatCard({ icon, label, value, sub, color = '#1976d2' }) {
         <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.3, fontSize: '1.1rem' }}>{value}</Typography>
         {sub && <Typography variant="caption" color="text.disabled" sx={{ lineHeight: 1.2, display: 'block' }}>{sub}</Typography>}
       </Box>
-    </Paper>
+    </SectionCard>
   );
 }
 
@@ -209,16 +209,15 @@ export default function CRPAnalyticsPage() {
 
   return (
     <Fade in timeout={600}>
-    <Box sx={{ p: 3 }}>
+    <AdminPageShell>
       {/* ── Page header + inline filters ────────────────────────────────────── */}
       <Stack direction={{ xs: 'column', xl: 'row' }} alignItems={{ xl: 'flex-start' }}
         justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
-        <Box sx={{ flexShrink: 0 }}>
-          <Typography variant="h5" fontWeight={700}>Categorized Order Analytics</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Orders grouped by {groupByLabel.toLowerCase()} assignment · PST timezone
-          </Typography>
-        </Box>
+        <PageHeader
+          title="Categorized Order Analytics"
+          subtitle={`Orders grouped by ${groupByLabel.toLowerCase()} assignment · PST timezone`}
+          sx={{ pt: 0, pb: 0, flexShrink: 0 }}
+        />
 
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <FormControl size="small" sx={{ minWidth: 130 }}>
@@ -303,9 +302,9 @@ export default function CRPAnalyticsPage() {
             sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
           />
 
-          <Button variant="outlined" color="primary" size="small"
+          <Button variant="outlined" size="small"
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-            onClick={fetchAnalytics} disabled={loading} sx={{ height: 40, boxSizing: 'border-box' }}>
+            onClick={fetchAnalytics} disabled={loading} sx={{ ...yellowOutlinedButtonSx, height: 40 }}>
             Refresh
           </Button>
         </Stack>
@@ -360,9 +359,9 @@ export default function CRPAnalyticsPage() {
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
 
             {/* Left: Horizontal bar chart */}
-            <Paper elevation={0} sx={{
+            <SectionCard sx={{
               flex: '3 1 0', minWidth: 0,
-              border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2,
+              p: 2,
             }}>
               <Typography variant="subtitle1" fontWeight={700}>Orders by {groupByLabel}</Typography>
               <Typography variant="caption" color="text.secondary">Sorted by volume · hover for details</Typography>
@@ -398,12 +397,12 @@ export default function CRPAnalyticsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </Box>
-            </Paper>
+            </SectionCard>
 
             {/* Right: Donut + legend table */}
-            <Paper elevation={0} sx={{
+            <SectionCard sx={{
               flex: '2 1 0', minWidth: 280,
-              border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2,
+              p: 2,
               display: 'flex', flexDirection: 'column',
             }}>
               <Typography variant="subtitle1" fontWeight={700}>Share by {groupByLabel}</Typography>
@@ -477,12 +476,12 @@ export default function CRPAnalyticsPage() {
                   </Box>
                 ))}
               </Box>
-            </Paper>
+            </SectionCard>
 
           </Stack>
         </>
       )}
-    </Box>
+    </AdminPageShell>
     </Fade>
   );
 }
