@@ -239,6 +239,9 @@ export default function AutoCompatibilityPage() {
   const [newNotes, setNewNotes] = useState('');
   const [aiSuggestedTrims, setAiSuggestedTrims] = useState([]);
   const [aiExcludedTrims, setAiExcludedTrims] = useState([]);
+  const [aiSuggestedEngines, setAiSuggestedEngines] = useState([]);
+  const [aiExcludedEngines, setAiExcludedEngines] = useState([]);
+  const [aiSelectAllWhenUnfiltered, setAiSelectAllWhenUnfiltered] = useState(false);
 
   // History
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -607,6 +610,9 @@ export default function AutoCompatibilityPage() {
     setNewNotes('');
     setAiSuggestedTrims([]);
     setAiExcludedTrims([]);
+    setAiSuggestedEngines([]);
+    setAiExcludedEngines([]);
+    setAiSelectAllWhenUnfiltered(false);
   };
 
   const removeExistingCompatibility = async () => {
@@ -647,6 +653,11 @@ export default function AutoCompatibilityPage() {
     if (!reviewItem || !sellerId) return;
     setAiLoading(true);
     setLoadingModels(true);
+    setAiSuggestedTrims([]);
+    setAiExcludedTrims([]);
+    setAiSuggestedEngines([]);
+    setAiExcludedEngines([]);
+    setAiSelectAllWhenUnfiltered(false);
     try {
       const { data } = await api.post('/ai/suggest-fitment', {
         title: reviewItem.title || '',
@@ -675,6 +686,9 @@ export default function AutoCompatibilityPage() {
       setEndYear('');
       setAiSuggestedTrims(data.suggestedTrims || []);
       setAiExcludedTrims(data.excludedTrims || []);
+      setAiSuggestedEngines(data.suggestedEngines || []);
+      setAiExcludedEngines(data.excludedEngines || []);
+      setAiSelectAllWhenUnfiltered(true);
 
       const modelsRes = await api.post('/ebay/compatibility/values', {
         sellerId,
@@ -850,10 +864,25 @@ export default function AutoCompatibilityPage() {
 
       Object.keys(trimsByYear).forEach(year => {
         const availableTrims = trimsByYear[year] || [];
-        let matchedTrims = [];
-        
+        let matchedTrims = availableTrims;
+
+        // Determine if we have any active AI filters
+        const activeFilters = (aiSuggestedTrims && aiSuggestedTrims.length > 0) || 
+                              (aiExcludedTrims && aiExcludedTrims.length > 0) || 
+                              (aiSuggestedEngines && aiSuggestedEngines.length > 0) || 
+                              (aiExcludedEngines && aiExcludedEngines.length > 0);
+
+        if (!activeFilters) {
+          if (aiSelectAllWhenUnfiltered) {
+            matchedTrims = [...availableTrims];
+          } else {
+            return;
+          }
+        }
+
+        // Process Trims
         if (aiSuggestedTrims && aiSuggestedTrims.length > 0) {
-          matchedTrims = availableTrims.filter(t => 
+          matchedTrims = matchedTrims.filter(t => 
              aiSuggestedTrims.some(suggested => {
                if (!suggested || typeof suggested !== 'string') return false;
                const escapedSuggested = suggested.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s*');
@@ -862,7 +891,7 @@ export default function AutoCompatibilityPage() {
              })
           );
         } else if (aiExcludedTrims && aiExcludedTrims.length > 0) {
-          matchedTrims = availableTrims.filter(t => 
+          matchedTrims = matchedTrims.filter(t => 
              !aiExcludedTrims.some(excluded => {
                if (!excluded || typeof excluded !== 'string') return false;
                const escapedExcluded = excluded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s*');
@@ -870,9 +899,27 @@ export default function AutoCompatibilityPage() {
                return new RegExp(`\\b${escapedExcluded}\\b`, 'i').test(combo);
              })
           );
-        } else {
-          // If no specific inclusions or exclusions are mentioned, default to selecting all trims
-          matchedTrims = availableTrims;
+        }
+
+        // Process Engines
+        if (aiSuggestedEngines && aiSuggestedEngines.length > 0) {
+          matchedTrims = matchedTrims.filter(t => 
+             aiSuggestedEngines.some(suggested => {
+               if (!suggested || typeof suggested !== 'string') return false;
+               const escapedSuggested = suggested.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s*');
+               const combo = `${t.trim} ${t.engine}`;
+               return new RegExp(`\\b${escapedSuggested}\\b`, 'i').test(combo);
+             })
+          );
+        } else if (aiExcludedEngines && aiExcludedEngines.length > 0) {
+          matchedTrims = matchedTrims.filter(t => 
+             !aiExcludedEngines.some(excluded => {
+               if (!excluded || typeof excluded !== 'string') return false;
+               const escapedExcluded = excluded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s*');
+               const combo = `${t.trim} ${t.engine}`;
+               return new RegExp(`\\b${escapedExcluded}\\b`, 'i').test(combo);
+             })
+          );
         }
 
         if (matchedTrims.length > 0) {
@@ -891,7 +938,7 @@ export default function AutoCompatibilityPage() {
         setSelectedTrimsByYear(newSelectedTrims);
       }
     }
-  }, [trimsByYear, aiSuggestedTrims, aiExcludedTrims]);
+  }, [trimsByYear, aiSuggestedTrims, aiExcludedTrims, aiSuggestedEngines, aiExcludedEngines, aiSelectAllWhenUnfiltered]);
 
   const fetchTrims = async (makeVal, modelVal, years) => {
     if (!makeVal || !modelVal || !years || years.length === 0) {
@@ -1028,10 +1075,13 @@ export default function AutoCompatibilityPage() {
     
     for (const year of selectedYears) {
       const trimsForYear = selectedTrimsByYear[year];
+      const hasAvailableTrimCombos = Array.isArray(trimsByYear[year]) && trimsByYear[year].length > 0;
       // If trims are selected somewhere but this specific year has none checked, skip it.
       // Only fall back to a generic (no-trim) entry when NO trims have been selected at all.
       const yearEntries = (hasAnyTrimsSelected && trimsForYear?.length > 0)
         ? trimsForYear
+        : (aiSelectAllWhenUnfiltered && !hasAvailableTrimCombos)
+          ? [null]
         : hasAnyTrimsSelected
           ? []      // trims selected elsewhere but not for this year → skip this year
           : [null]; // no trims selected anywhere → add year generically
@@ -1140,6 +1190,9 @@ export default function AutoCompatibilityPage() {
       setStartYear(''); setEndYear(''); setNewNotes('');
       setAiSuggestedTrims([]);
       setAiExcludedTrims([]);
+      setAiSuggestedEngines([]);
+      setAiExcludedEngines([]);
+      setAiSelectAllWhenUnfiltered(false);
     } else {
       setReviewItem(updatedItems[reviewIndex]);
     }
@@ -2306,18 +2359,18 @@ export default function AutoCompatibilityPage() {
                   Auto-fills Make, Model &amp; Year range from listing title/description
                 </Typography>
               </Box>
-              {(reviewItem?.trimsStrategy || (aiSuggestedTrims?.length > 0) || (aiExcludedTrims?.length > 0)) && (
+              {(reviewItem?.trimsStrategy || (aiSuggestedTrims?.length > 0) || (aiExcludedTrims?.length > 0) || (aiSuggestedEngines?.length > 0) || (aiExcludedEngines?.length > 0)) && (
                 (() => {
-                  const isSpecific = (aiSuggestedTrims?.length > 0) || reviewItem?.trimsStrategy === 'SPECIFIC_TRIMS';
-                  const isExcluded = (aiExcludedTrims?.length > 0) || reviewItem?.trimsStrategy === 'EXCLUDED_TRIMS';
+                  const isSpecific = (aiSuggestedTrims?.length > 0) || (aiSuggestedEngines?.length > 0) || reviewItem?.trimsStrategy === 'SPECIFIC_TRIMS';
+                  const isExcluded = (aiExcludedTrims?.length > 0) || (aiExcludedEngines?.length > 0) || reviewItem?.trimsStrategy === 'EXCLUDED_TRIMS';
                   
                   const bgcolor = isSpecific ? '#dcfce7' : isExcluded ? '#ffedd5' : '#e0f2fe';
                   const borderColor = isSpecific ? '#bbf7d0' : isExcluded ? '#fed7aa' : '#bae6fd';
                   const textColor = isSpecific ? '#166534' : isExcluded ? '#9a3412' : '#075985';
                   const iconColor = isSpecific ? '#16a34a' : isExcluded ? '#ea580c' : '#0284c7';
-                  const text = isSpecific ? '✓ Filtered exactly to trims mentioned in title/description' :
-                               isExcluded ? '✓ Selected all trims except explicitly excluded ones' :
-                               '✓ Auto-selected ALL available trims (no specific trims mentioned)';
+                  const text = isSpecific ? '✓ Filtered exactly to trims/engines mentioned in title/description' :
+                               isExcluded ? '✓ Selected all available trims/engines except explicitly excluded ones' :
+                               '✓ Auto-selected ALL available trims/engines (no specific ones mentioned)';
 
                   return (
                     <Box sx={{ display: 'flex', alignItems: 'center', bgcolor, p: 0.75, borderRadius: 1, border: `1px solid ${borderColor}`, mt: 0.5 }}>
