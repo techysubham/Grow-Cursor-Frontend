@@ -1734,7 +1734,7 @@ export default function TemplateListingsPage() {
       </Paper>
       )}
 
-      <TableContainer component={Paper} sx={{ ...tableContainerSx, maxHeight: 600, maxWidth: '100%', overflowX: 'auto' }}>
+      <TableContainer component={Paper} sx={{ ...tableContainerSx, maxHeight: 'calc(100vh - 280px)', maxWidth: '100%', overflowX: 'auto', overflowY: 'auto' }}>
         <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
