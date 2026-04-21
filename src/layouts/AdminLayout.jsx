@@ -148,6 +148,7 @@ import AsinDirectoryPage from '../pages/admin/AsinDirectoryPage.jsx';
 import AsinListPage from '../pages/admin/AsinListPage.jsx';
 import UserSellerAssignmentPage from '../pages/admin/UserSellerAssignmentPage.jsx';
 import UserPerformancePage from '../pages/admin/UserPerformancePage.jsx';
+import MonitoringPage from '../pages/admin/MonitoringPage.jsx';
 import AiFitmentUsagePage from '../pages/admin/AiFitmentUsagePage.jsx';
 import ListingStatsPage from '../pages/admin/ListingStatsPage.jsx';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -244,6 +245,7 @@ const COMPONENT_MAP = {
   'OrderAnalytics': OrderAnalyticsPage,
   'CRPAnalytics': CRPAnalyticsPage,
   'Fulfillment': FulfillmentDashboard,
+  'Monitoring': MonitoringPage,
   'AwaitingShipment': AwaitingShipmentPage,
   'AwaitingSheet': AwaitingSheetPage,
   'AmazonArrivals': AmazonArrivalsPage,
@@ -895,6 +897,7 @@ export default function AdminLayout({ user, onLogout }) {
           {/* Additional routes that don't map 1:1 to pages but need to exist */}
           {hasAccess('Fulfillment') && (
             <>
+              <Route path="/monitoring" element={<MonitoringPage />} />
               <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
               <Route path="/cancelled-status" element={<DisputesPage initialTab={3} />} />
               <Route path="/return-requested" element={<DisputesPage initialTab={2} />} />
