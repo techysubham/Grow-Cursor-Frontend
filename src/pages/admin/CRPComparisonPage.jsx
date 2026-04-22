@@ -49,7 +49,7 @@ import api from '../../lib/api.js';
 import AdminPageShell from '../../components/AdminPageShell.jsx';
 import SectionCard from '../../components/SectionCard.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
-import { tableHeaderCellSx, tableBodyRowSx } from '../../theme/tableStyles.js';
+import { tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 const CHART_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#0288d1'];
 const LEVEL_LABELS = {
@@ -319,8 +319,12 @@ function PreviewCell({ side, row, onOpen }) {
         <Chip
           size="small"
           label={`${block.count.toLocaleString()} ${side === 'listings' ? 'listings' : 'orders'}`}
-          color={side === 'listings' ? 'primary' : 'secondary'}
           variant="outlined"
+          sx={{
+            borderColor: '#f0b800',
+            color: '#805900',
+            fontWeight: 600,
+          }}
         />
       </Stack>
 
@@ -561,6 +565,17 @@ export default function CRPComparisonPage() {
             onChange={(_, value) => {
               if (value) setChartLevel(value);
             }}
+            sx={{
+              '& .MuiToggleButton-root': {
+                '&:hover': { backgroundColor: 'rgba(245,200,66,0.12)', borderColor: '#f0b800' },
+              },
+              '& .MuiToggleButton-root.Mui-selected': {
+                backgroundColor: '#f5c842',
+                color: '#1a1a2e',
+                fontWeight: 700,
+                '&:hover': { backgroundColor: '#f0b800' },
+              },
+            }}
           >
             <ToggleButton value="category">Category</ToggleButton>
             <ToggleButton value="range">Range</ToggleButton>
@@ -616,7 +631,7 @@ export default function CRPComparisonPage() {
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={fetchComparison}
             disabled={loading}
-            sx={{ height: 40 }}
+            sx={{ ...yellowOutlinedButtonSx, height: 40 }}
           >
             Refresh
           </Button>

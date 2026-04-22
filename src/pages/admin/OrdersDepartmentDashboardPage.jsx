@@ -32,7 +32,7 @@ import AdminPageShell from '../../components/AdminPageShell.jsx';
 import SectionCard from '../../components/SectionCard.jsx';
 import StatMetricCard from '../../components/StatMetricCard.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
-import { tableHeaderCellSx, tableBodyRowSx } from '../../theme/tableStyles.js';
+import { tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 const DASHBOARD_DATE_KEY = 'orders_dashboard_date';
 
@@ -231,18 +231,19 @@ export default function OrdersDepartmentDashboardPage() {
           </Stack>
           <Button
             variant="outlined"
-            color="primary"
             size="small"
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={loadDashboard}
             disabled={loading}
-            sx={{ height: 40, boxSizing: 'border-box' }}
+            sx={{ ...yellowOutlinedButtonSx, height: 40, boxSizing: 'border-box' }}
           >
             Refresh
           </Button>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             {quickLinks.map((linkItem) => (
-              <Button key={linkItem.to} component={Link} to={linkItem.to} size="small" variant="text">
+              <Button key={linkItem.to} component={Link} to={linkItem.to} size="small" variant="text"
+                sx={{ color: 'text.secondary', '&:hover': { color: '#f0b800', backgroundColor: 'rgba(245,200,66,0.08)' } }}
+              >
                 {linkItem.label}
               </Button>
             ))}

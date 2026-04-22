@@ -282,7 +282,19 @@ export default function CRPAnalyticsPage() {
           </FormControl>
 
           <ToggleButtonGroup value={groupBy} exclusive size="small"
-            onChange={(_, v) => { if (v) setGroupBy(v); }}>
+            onChange={(_, v) => { if (v) setGroupBy(v); }}
+            sx={{
+              '& .MuiToggleButton-root': {
+                '&:hover': { backgroundColor: 'rgba(245,200,66,0.12)', borderColor: '#f0b800' },
+              },
+              '& .MuiToggleButton-root.Mui-selected': {
+                backgroundColor: '#f5c842',
+                color: '#1a1a2e',
+                fontWeight: 700,
+                '&:hover': { backgroundColor: '#f0b800' },
+              },
+            }}
+          >
             <ToggleButton value="category">Category</ToggleButton>
             <ToggleButton value="range">Range</ToggleButton>
             <ToggleButton value="product">Product</ToggleButton>

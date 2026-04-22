@@ -3112,7 +3112,6 @@ function FulfillmentDashboard() {
             sx={{ mb: 2 }}
           >
             <Stack direction="row" alignItems="center" spacing={1}>
-              <LocalShippingIcon color="primary" sx={{ fontSize: { xs: 20, sm: 24 } }} />
               <Typography
                 variant="h5"
                 fontWeight="bold"
@@ -3125,9 +3124,9 @@ function FulfillmentDashboard() {
               {totalOrders > 0 && (
                 <Chip
                   label={`${totalOrders} orders`}
-                  color="primary"
                   variant="filled"
                   size={isSmallMobile ? 'small' : 'medium'}
+                  sx={{ bgcolor: '#f5c842', color: '#1a1a2e', fontWeight: 700 }}
                 />
               )}
               {orders.length > 0 && totalPages > 1 && (
@@ -3139,23 +3138,21 @@ function FulfillmentDashboard() {
                 {orders.length > 0 && (
                   <Button
                     variant="outlined"
-                    color="success"
                     size="small"
                     startIcon={<DownloadIcon />}
                     onClick={handleOpenExportDialog}
-                    sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
+                    sx={{ ...yellowOutlinedButtonSx, fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
                   >
                     {isSmallMobile ? 'CSV' : 'Download CSV'}
                   </Button>
                 )}
                 <Button
                   variant="contained"
-                  color="info"
                   size="small"
                   startIcon={autoMessageLoading ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
                   onClick={handleSendAutoMessages}
                   disabled={autoMessageLoading}
-                  sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
+                  sx={{ ...yellowFilledButtonSx, fontSize: { xs: '0.7rem', sm: '0.8rem' } }}
                 >
                   {isSmallMobile ? 'Auto Msg' : 'Send Auto Messages'}
                 </Button>

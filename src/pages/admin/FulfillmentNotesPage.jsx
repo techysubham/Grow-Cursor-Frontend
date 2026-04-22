@@ -595,10 +595,9 @@ export default function FulfillmentNotesPage() {
         {/* HEADER */}
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <NoteIcon color="primary" />
             <Typography variant="h5" fontWeight="bold">Orders with Fulfillment Notes</Typography>
           </Stack>
-          <Chip label={`${totalOrders} orders`} color="primary" variant="filled" size="small" />
+          <Chip label={`${totalOrders} orders`} variant="filled" size="small" sx={{ bgcolor: '#f5c842', color: '#1a1a2e', fontWeight: 700 }} />
         </Stack>
 
         <Divider sx={{ my: 2 }} />

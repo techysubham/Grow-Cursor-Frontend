@@ -704,9 +704,11 @@ export default function AdminLayout({ user, onLogout }) {
       <AppBar
         position="fixed"
         elevation={0}
+        color="inherit"
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          background: `linear-gradient(160deg, ${BRAND_DARK} 0%, ${BRAND_DARK_ALT} 62%, ${BRAND_DARK_DEEP} 100%)`,
+          backgroundColor: '#0f0f17ff !important',
+          backgroundImage: 'none !important',
           color: BRAND_YELLOW,
           borderBottom: '1px solid rgba(245, 200, 66, 0.22)',
           boxShadow: '0 10px 28px rgba(15, 16, 32, 0.34)'

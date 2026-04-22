@@ -1224,7 +1224,7 @@ export default function AwaitingShipmentPage() {
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="h5" fontWeight="bold">Awaiting Shipment</Typography>
           </Stack>
-          <Chip label={`${totalOrders} awaiting`} color="primary" variant="filled" size="small" />
+          <Chip label={`${totalOrders} awaiting`} variant="filled" size="small" sx={{ bgcolor: '#f5c842', color: '#1a1a2e', fontWeight: 700 }} />
         </Stack>
 
         <Divider sx={{ my: 2 }} />
