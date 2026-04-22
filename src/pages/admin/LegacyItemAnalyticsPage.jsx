@@ -59,6 +59,8 @@ const initialDateFilter = {
 export default function LegacyItemAnalyticsPage() {
   const [legacyItemIdInput, setLegacyItemIdInput] = useState('');
   const [selectedSeller, setSelectedSeller] = useState('');
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('');
+  const [selectedCancelledFilter, setSelectedCancelledFilter] = useState('');
   const [excludeClient, setExcludeClient] = useState(true);
   const [excludeLowValue, setExcludeLowValue] = useState(false);
   const [dateFilter, setDateFilter] = useState(initialDateFilter);
@@ -119,6 +121,14 @@ export default function LegacyItemAnalyticsPage() {
 
       if (selectedSeller) {
         params.sellerId = selectedSeller;
+      }
+
+      if (selectedPaymentStatus) {
+        params.paymentStatus = selectedPaymentStatus;
+      }
+
+      if (selectedCancelledFilter) {
+        params.cancelledFilter = selectedCancelledFilter;
       }
 
       const response = await api.get('/orders/legacy-item-seller-summary', { params });
@@ -256,6 +266,32 @@ export default function LegacyItemAnalyticsPage() {
                     {seller.user?.username || 'Unknown Seller'}
                   </MenuItem>
                 ))}
+              </Select>
+            </FormControl>
+
+            <FormControl sx={{ minWidth: { xs: '100%', sm: 210 } }}>
+              <InputLabel>Payment Status</InputLabel>
+              <Select
+                label="Payment Status"
+                value={selectedPaymentStatus}
+                onChange={(event) => setSelectedPaymentStatus(event.target.value)}
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
+                <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl sx={{ minWidth: { xs: '100%', sm: 210 } }}>
+              <InputLabel>Cancel Filter</InputLabel>
+              <Select
+                label="Cancel Filter"
+                value={selectedCancelledFilter}
+                onChange={(event) => setSelectedCancelledFilter(event.target.value)}
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="cancelled">Cancelled Only</MenuItem>
+                <MenuItem value="not_cancelled">Not Cancelled</MenuItem>
               </Select>
             </FormControl>
 
