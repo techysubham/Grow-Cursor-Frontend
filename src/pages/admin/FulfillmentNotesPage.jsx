@@ -38,6 +38,8 @@ import PersonIcon from '@mui/icons-material/Person';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../lib/api';
 import FulfillmentNotesSkeleton from '../../components/skeletons/FulfillmentNotesSkeleton';
+import SectionCard from '../../components/SectionCard.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 // --- Chat Dialog Component ---
 function ChatDialog({ open, onClose, order }) {
@@ -589,14 +591,13 @@ export default function FulfillmentNotesPage() {
       maxWidth: '100%',
       p: 3
     }}>
-      <Paper sx={{ p: 2, mb: 2, flexShrink: 0 }}>
+      <SectionCard sx={{ p: 2, mb: 2, flexShrink: 0 }}>
         {/* HEADER */}
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <NoteIcon color="primary" />
             <Typography variant="h5" fontWeight="bold">Orders with Fulfillment Notes</Typography>
           </Stack>
-          <Chip label={`${totalOrders} orders`} color="primary" variant="filled" size="small" />
+          <Chip label={`${totalOrders} orders`} variant="filled" size="small" sx={{ bgcolor: '#f5c842', color: '#1a1a2e', fontWeight: 700 }} />
         </Stack>
 
         <Divider sx={{ my: 2 }} />
@@ -631,14 +632,14 @@ export default function FulfillmentNotesPage() {
               placeholder="Search ID..."
             />
 
-            <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ height: 40, boxSizing: 'border-box' }}>Clear</Button>
+            <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ ...yellowOutlinedButtonSx, height: 40 }}>Clear</Button>
           </Stack>
         </Box>
 
         {error && (
           <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
         )}
-      </Paper>
+        </SectionCard>
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
@@ -683,20 +684,20 @@ export default function FulfillmentNotesPage() {
             >
               <TableHead>
                 <TableRow>
-                <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
 
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, minWidth: 150 }}>Delivery Date</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, minWidth: 300 }}>Fulfillment Notes</TableCell>
-                  <TableCell sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100, align: 'center' }}>Chat</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, minWidth: 150 }}>Delivery Date</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, minWidth: 300 }}>Fulfillment Notes</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }} align="center">Chat</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {orders.map((order, idx) => {
                   return (
-                    <TableRow key={order._id || idx} hover>
+                    <TableRow key={order._id || idx} hover sx={tableBodyRowSx}>
                       <TableCell>
                         {order.seller?.user?.username || order.seller?.user?.email || order.sellerId || '-'}
                       </TableCell>

@@ -47,6 +47,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import api from '../../lib/api';
 import ColumnSelector from '../../components/ColumnSelector';
 import ChatModal from '../../components/ChatModal';
+import SectionCard from '../../components/SectionCard.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 import RemarkTemplateManagerModal from '../../components/RemarkTemplateManagerModal';
 import {
   findRemarkTemplateText,
@@ -1216,13 +1218,13 @@ export default function AwaitingShipmentPage() {
       maxWidth: '100%',
       p: 3
     }}>
-      <Paper sx={{ p: 2, mb: 2, flexShrink: 0 }}>
+      <SectionCard sx={{ p: 2, mb: 2, flexShrink: 0 }}>
         {/* HEADER - Refresh button removed as requested */}
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="h5" fontWeight="bold">Awaiting Shipment</Typography>
           </Stack>
-          <Chip label={`${totalOrders} awaiting`} color="primary" variant="filled" size="small" />
+          <Chip label={`${totalOrders} awaiting`} variant="filled" size="small" sx={{ bgcolor: '#f5c842', color: '#1a1a2e', fontWeight: 700 }} />
         </Stack>
 
         <Divider sx={{ my: 2 }} />
@@ -1377,7 +1379,7 @@ export default function AwaitingShipmentPage() {
               sx={{ m: 0, px: 1.5, minHeight: 40, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
             />
 
-            <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ height: 40, boxSizing: 'border-box' }}>Clear</Button>
+            <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ ...yellowOutlinedButtonSx, height: 40 }}>Clear</Button>
 
             <ColumnSelector
               allColumns={ALL_COLUMNS}
@@ -1392,7 +1394,7 @@ export default function AwaitingShipmentPage() {
         {error && (
           <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
         )}
-      </Paper>
+      </SectionCard>
 
       {orders.length === 0 ? (
         <Box sx={{ textAlign: 'center', p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
@@ -1436,7 +1438,7 @@ export default function AwaitingShipmentPage() {
                   {ALL_COLUMNS.filter(c => visibleColumns.includes(c.id)).map(col => (
                     <TableCell
                       key={col.id}
-                      sx={{ backgroundColor: 'primary.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 100 }}
+                      sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}
                     >
                       {col.label}
                     </TableCell>
@@ -1445,7 +1447,7 @@ export default function AwaitingShipmentPage() {
               </TableHead>
               <TableBody>
                 {orders.map((order, idx) => (
-                  <TableRow key={order._id || idx}>
+                  <TableRow key={order._id || idx} sx={tableBodyRowSx}>
                     {ALL_COLUMNS.filter(c => visibleColumns.includes(c.id)).map(col => (
                       <TableCell key={col.id}>
                         {renderCell(order, col.id)}
@@ -1457,7 +1459,7 @@ export default function AwaitingShipmentPage() {
             </Table>
           </TableContainer>
 
-          <Paper sx={{
+          <SectionCard sx={{
             py: 1,
             px: 2,
             display: 'flex',
@@ -1479,7 +1481,7 @@ export default function AwaitingShipmentPage() {
               showLastButton
               size="small"
             />
-          </Paper>
+          </SectionCard>
         </>
       )}
 

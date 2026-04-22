@@ -39,6 +39,8 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../../lib/api';
 import AllOrdersSheetSkeleton from '../../components/skeletons/AllOrdersSheetSkeleton';
+import { yellowOutlinedButtonSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
+import { BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 
 const EXCHANGE_RATE_OPTIONS = [
   { value: 'EBAY_US', label: 'eBay US', channel: 'EBAY' },
@@ -864,6 +866,7 @@ export default function AllOrdersSheetPage() {
             size="small"
             onClick={() => exportToCSV(false)}
             disabled={exportingCSV || orders.length === 0}
+            sx={yellowOutlinedButtonSx}
           >
             {exportingCSV ? 'Exporting...' : 'Download Current Page'}
           </Button>
@@ -872,16 +875,17 @@ export default function AllOrdersSheetPage() {
             size="small"
             onClick={() => setShowExportModal(true)}
             disabled={exportingCSV}
+            sx={yellowOutlinedButtonSx}
           >
             Download by Date Range
           </Button>
           <Button
             variant="outlined"
-            color="primary"
             size="small"
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={loadOrders}
             disabled={loading}
+            sx={yellowOutlinedButtonSx}
           >
             Refresh
           </Button>
@@ -1614,11 +1618,11 @@ export default function AllOrdersSheetPage() {
                 sx={{ 
                   textAlign: 'center', 
                   px: 2, 
-                  borderLeft: '2px solid #1976d2', 
+                  borderLeft: `2px solid ${BRAND_YELLOW_DARK}`, 
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   '&:hover': {
-                    backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                    backgroundColor: `rgba(245,200,66,0.1)`,
                     transform: 'translateY(-2px)'
                   }
                 }}
@@ -1629,7 +1633,7 @@ export default function AllOrdersSheetPage() {
                   items: counts.categoryData
                 })}
               >
-                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: BRAND_YELLOW_DARK }}>
                   {counts.uniqueCategories}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -1640,11 +1644,11 @@ export default function AllOrdersSheetPage() {
                 sx={{ 
                   textAlign: 'center', 
                   px: 2, 
-                  borderLeft: '2px solid #1976d2', 
+                  borderLeft: `2px solid ${BRAND_YELLOW_DARK}`, 
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   '&:hover': {
-                    backgroundColor: 'rgba(46, 125, 50, 0.08)',
+                    backgroundColor: `rgba(245,200,66,0.1)`,
                     transform: 'translateY(-2px)'
                   }
                 }}
@@ -1655,7 +1659,7 @@ export default function AllOrdersSheetPage() {
                   items: counts.rangeData
                 })}
               >
-                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: BRAND_YELLOW_DARK }}>
                   {counts.uniqueRanges}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -1666,11 +1670,11 @@ export default function AllOrdersSheetPage() {
                 sx={{ 
                   textAlign: 'center', 
                   px: 2, 
-                  borderLeft: '2px solid #1976d2', 
+                  borderLeft: `2px solid ${BRAND_YELLOW_DARK}`, 
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   '&:hover': {
-                    backgroundColor: 'rgba(237, 108, 2, 0.08)',
+                    backgroundColor: `rgba(245,200,66,0.1)`,
                     transform: 'translateY(-2px)'
                   }
                 }}
@@ -1681,7 +1685,7 @@ export default function AllOrdersSheetPage() {
                   items: counts.productData
                 })}
               >
-                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: BRAND_YELLOW_DARK }}>
                   {counts.uniqueProducts}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">

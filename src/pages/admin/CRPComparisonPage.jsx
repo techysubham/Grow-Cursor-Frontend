@@ -46,6 +46,10 @@ import {
   Cell,
 } from 'recharts';
 import api from '../../lib/api.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 const CHART_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#0288d1'];
 const LEVEL_LABELS = {
@@ -149,15 +153,11 @@ function MetricCard({ icon, label, value, sub, color, onClick, active = false })
 
 function DateFilterCard({ title, date, onChange }) {
   return (
-    <Paper
-      elevation={0}
+    <SectionCard
       sx={{
         flex: '1 1 0',
         minWidth: 280,
         p: 2,
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 2,
       }}
     >
       <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 0.25 }}>
@@ -177,7 +177,7 @@ function DateFilterCard({ title, date, onChange }) {
           InputLabelProps={{ shrink: true }}
         />
       </Stack>
-    </Paper>
+    </SectionCard>
   );
 }
 
@@ -205,14 +205,10 @@ function SideChart({ title, subtitle, data, colorIndex = 0 }) {
   }));
 
   return (
-    <Paper
-      elevation={0}
+    <SectionCard
       sx={{
         flex: '1 1 0',
         minWidth: 320,
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 2,
         p: 2,
       }}
     >
@@ -306,7 +302,7 @@ function SideChart({ title, subtitle, data, colorIndex = 0 }) {
           </Stack>
         </Box>
       )}
-    </Paper>
+    </SectionCard>
   );
 }
 
@@ -323,8 +319,12 @@ function PreviewCell({ side, row, onOpen }) {
         <Chip
           size="small"
           label={`${block.count.toLocaleString()} ${side === 'listings' ? 'listings' : 'orders'}`}
-          color={side === 'listings' ? 'primary' : 'secondary'}
           variant="outlined"
+          sx={{
+            borderColor: '#f0b800',
+            color: '#805900',
+            fontWeight: 600,
+          }}
         />
       </Stack>
 
@@ -527,7 +527,7 @@ export default function CRPComparisonPage() {
   }, [comparison.rows, rowFilter]);
 
   return (
-    <Box sx={{ p: 3 }}>
+    <AdminPageShell>
       <Stack
         direction={{ xs: 'column', xl: 'row' }}
         justifyContent="space-between"
@@ -535,12 +535,11 @@ export default function CRPComparisonPage() {
         spacing={2}
         sx={{ mb: 2 }}
       >
-        <Box>
-          <Typography variant="h5" fontWeight={700}>CRP Comparison Dashboard</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Compare listing-side CRPs against all-orders CRPs using one selected day per side.
-          </Typography>
-        </Box>
+        <PageHeader
+          title="CRP Comparison Dashboard"
+          subtitle="Compare listing-side CRPs against all-orders CRPs using one selected day per side."
+          sx={{ pt: 0, pb: 0 }}
+        />
 
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <FormControl size="small" sx={{ minWidth: 180 }}>
@@ -565,6 +564,17 @@ export default function CRPComparisonPage() {
             value={chartLevel}
             onChange={(_, value) => {
               if (value) setChartLevel(value);
+            }}
+            sx={{
+              '& .MuiToggleButton-root': {
+                '&:hover': { backgroundColor: 'rgba(245,200,66,0.12)', borderColor: '#f0b800' },
+              },
+              '& .MuiToggleButton-root.Mui-selected': {
+                backgroundColor: '#f5c842',
+                color: '#1a1a2e',
+                fontWeight: 700,
+                '&:hover': { backgroundColor: '#f0b800' },
+              },
             }}
           >
             <ToggleButton value="category">Category</ToggleButton>
@@ -621,7 +631,7 @@ export default function CRPComparisonPage() {
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={fetchComparison}
             disabled={loading}
-            sx={{ height: 40 }}
+            sx={{ ...yellowOutlinedButtonSx, height: 40 }}
           >
             Refresh
           </Button>
@@ -704,12 +714,8 @@ export default function CRPComparisonPage() {
         </Stack>
       ) : null}
 
-      <Paper
-        elevation={0}
+      <SectionCard
         sx={{
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 2,
           overflow: 'hidden',
           mb: 2,
         }}
@@ -736,16 +742,16 @@ export default function CRPComparisonPage() {
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 180 }}>Category</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 180 }}>Range</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 180 }}>Product</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 300 }}>Listings</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 300 }}>Orders</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, minWidth: 180 }}>Category</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, minWidth: 180 }}>Range</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, minWidth: 180 }}>Product</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, minWidth: 300 }}>Listings</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, minWidth: 300 }}>Orders</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredRows.map((row) => (
-                  <TableRow key={row.key} hover>
+                  <TableRow key={row.key} hover sx={tableBodyRowSx}>
                     <TableCell sx={{ verticalAlign: 'top' }}>{row.categoryName}</TableCell>
                     <TableCell sx={{ verticalAlign: 'top' }}>{row.rangeName || '—'}</TableCell>
                     <TableCell sx={{ verticalAlign: 'top' }}>{row.productName || '—'}</TableCell>
@@ -761,7 +767,7 @@ export default function CRPComparisonPage() {
             </Table>
           </TableContainer>
         )}
-      </Paper>
+      </SectionCard>
 
       <Stack direction={{ xs: 'column', xl: 'row' }} spacing={2}>
         <SideChart
@@ -810,16 +816,16 @@ export default function CRPComparisonPage() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>SKU</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>ASIN</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Title</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Created</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>SKU</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>ASIN</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Title</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Created</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Status</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {detailDialog.items.map((item) => (
-                    <TableRow key={item._id} hover>
+                    <TableRow key={item._id} hover sx={tableBodyRowSx}>
                       <TableCell>{item.customLabel || '—'}</TableCell>
                       <TableCell>{item.asin || '—'}</TableCell>
                       <TableCell>{item.title || '—'}</TableCell>
@@ -837,15 +843,15 @@ export default function CRPComparisonPage() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Order ID</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Sold At</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Amount</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Order ID</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Product</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Sold At</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Amount</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {detailDialog.items.map((item) => (
-                    <TableRow key={item._id} hover>
+                    <TableRow key={item._id} hover sx={tableBodyRowSx}>
                       <TableCell>{item.orderId}</TableCell>
                       <TableCell>{item.productName || '—'}</TableCell>
                       <TableCell>{formatDateTime(item.dateSold)}</TableCell>
@@ -872,6 +878,6 @@ export default function CRPComparisonPage() {
           <Button onClick={() => setDetailDialog((prev) => ({ ...prev, open: false }))}>Close</Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPageShell>
   );
 }

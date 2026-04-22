@@ -5,7 +5,7 @@
  *   import { tableHeaderCellSx, tableBodyRowSx, tableContainerSx, tableBodyCellSx } from '../../theme/tableStyles';
  */
 import { alpha } from '@mui/material/styles';
-import { BRAND_DARK, BRAND_YELLOW } from '../constants/brandTheme.js';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../constants/brandTheme.js';
 import { dashboardSignatureTokens } from './appTheme.js';
 
 /** Applied to every <TableCell> inside <TableHead> */
@@ -71,4 +71,53 @@ export const tableIndexBadgeSx = {
   color: dashboardSignatureTokens.table.indexBadgeForeground,
   fontWeight: 700,
   fontSize: '0.875rem',
+};
+
+const _actionButtonBase = {
+  minHeight: 36,
+  px: 1.5,
+  borderRadius: 1.5,
+  boxSizing: 'border-box',
+  whiteSpace: 'nowrap',
+};
+
+/**
+ * Yellow-outlined secondary/utility button — matches the brand yellow accent.
+ * Use for: Refresh, Clear, secondary filter actions.
+ */
+export const yellowOutlinedButtonSx = {
+  ..._actionButtonBase,
+  color: BRAND_DARK,
+  borderColor: BRAND_YELLOW_DARK,
+  backgroundColor: alpha(BRAND_YELLOW, 0.08),
+  '&:hover': {
+    borderColor: BRAND_YELLOW_DARK,
+    backgroundColor: alpha(BRAND_YELLOW, 0.18),
+    boxShadow: `0 8px 18px ${alpha(BRAND_YELLOW_DARK, 0.18)}`,
+  },
+  '&.Mui-disabled': {
+    borderColor: alpha(BRAND_DARK, 0.16),
+    color: alpha(BRAND_DARK, 0.35),
+    backgroundColor: alpha(BRAND_DARK, 0.03),
+  },
+};
+
+/**
+ * Yellow-filled primary/CTA button — matches the brand yellow accent.
+ * Use for: Poll orders, Apply filters, primary data-fetching actions.
+ */
+export const yellowFilledButtonSx = {
+  ..._actionButtonBase,
+  color: BRAND_DARK,
+  backgroundColor: BRAND_YELLOW,
+  boxShadow: `0 10px 20px ${alpha(BRAND_YELLOW_DARK, 0.2)}`,
+  '&:hover': {
+    backgroundColor: BRAND_YELLOW_DARK,
+    boxShadow: `0 12px 22px ${alpha(BRAND_YELLOW_DARK, 0.26)}`,
+  },
+  '&.Mui-disabled': {
+    color: alpha(BRAND_DARK, 0.35),
+    backgroundColor: alpha(BRAND_YELLOW, 0.38),
+    boxShadow: 'none',
+  },
 };
