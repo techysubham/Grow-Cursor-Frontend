@@ -110,6 +110,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import IdeasPage from '../pages/IdeasPage.jsx';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
+import LegacyItemAnalyticsPage from '../pages/admin/LegacyItemAnalyticsPage.jsx';
 import CRPAnalyticsPage from '../pages/admin/CRPAnalyticsPage.jsx';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import SellerAnalyticsPage from '../pages/admin/SellerAnalyticsPage.jsx';
@@ -244,6 +245,7 @@ const flyoutMenuSx = {
 const COMPONENT_MAP = {
   'OrdersDashboard': OrdersDepartmentDashboardPage,
   'OrderAnalytics': OrderAnalyticsPage,
+  'LegacyItemAnalytics': LegacyItemAnalyticsPage,
   'CRPAnalytics': CRPAnalyticsPage,
   'CRPComparison': CRPComparisonPage,
   'Fulfillment': FulfillmentDashboard,
