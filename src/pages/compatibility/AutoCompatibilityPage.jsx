@@ -180,6 +180,49 @@ const getVehicleString = (nameValueList) => {
 // Helper: trim key for uniqueness
 const trimKey = (entry) => `${entry.trim}|||${entry.engine}`;
 
+const getTrimStrategySummary = (item, overrides = {}) => {
+  const { trimsStrategy, aiSuggestion } = item || {};
+  const liveSuggestedTrims = overrides.aiSuggestedTrims || [];
+  const liveExcludedTrims = overrides.aiExcludedTrims || [];
+  const liveSuggestedEngines = overrides.aiSuggestedEngines || [];
+  const liveExcludedEngines = overrides.aiExcludedEngines || [];
+
+  const storedSuggestedTrims = aiSuggestion?.suggestedTrims || [];
+  const storedExcludedTrims = aiSuggestion?.excludedTrims || [];
+  const storedSuggestedEngines = aiSuggestion?.suggestedEngines || [];
+  const storedExcludedEngines = aiSuggestion?.excludedEngines || [];
+
+  const hasLiveSpecific = liveSuggestedTrims.length > 0 || liveSuggestedEngines.length > 0;
+  const hasLiveExcluded = liveExcludedTrims.length > 0 || liveExcludedEngines.length > 0;
+  const hasStoredSpecific = storedSuggestedTrims.length > 0 || storedSuggestedEngines.length > 0;
+  const hasStoredExcluded = storedExcludedTrims.length > 0 || storedExcludedEngines.length > 0;
+  const hasStoredAiSuggestion = Boolean(aiSuggestion);
+
+  let resolvedStrategy = trimsStrategy || null;
+  if (!resolvedStrategy) {
+    if (hasLiveSpecific) resolvedStrategy = 'SPECIFIC_TRIMS';
+    else if (hasLiveExcluded) resolvedStrategy = 'EXCLUDED_TRIMS';
+    else if (hasStoredSpecific) resolvedStrategy = 'SPECIFIC_TRIMS';
+    else if (hasStoredExcluded) resolvedStrategy = 'EXCLUDED_TRIMS';
+    else if (hasStoredAiSuggestion) resolvedStrategy = 'ALL_TRIMS';
+  }
+
+  if (!resolvedStrategy) return null;
+
+  const isSpecific = resolvedStrategy === 'SPECIFIC_TRIMS';
+  const isExcluded = resolvedStrategy === 'EXCLUDED_TRIMS';
+
+  return {
+    bgcolor: isSpecific ? '#dcfce7' : isExcluded ? '#ffedd5' : '#e0f2fe',
+    borderColor: isSpecific ? '#bbf7d0' : isExcluded ? '#fed7aa' : '#bae6fd',
+    textColor: isSpecific ? '#166534' : isExcluded ? '#9a3412' : '#075985',
+    iconColor: isSpecific ? '#16a34a' : isExcluded ? '#ea580c' : '#0284c7',
+    text: isSpecific ? '✓ Filtered exactly to trims/engines mentioned in title/description' :
+      isExcluded ? '✓ Selected all available trims/engines except explicitly excluded ones' :
+      '✓ Auto-selected ALL available trims/engines (no specific ones mentioned)'
+  };
+};
+
 // Format a UTC timestamp for display in IST
 const formatDateIST = (dateString) => {
   if (!dateString) return '\u2014';
@@ -2359,29 +2402,25 @@ export default function AutoCompatibilityPage() {
                   Auto-fills Make, Model &amp; Year range from listing title/description
                 </Typography>
               </Box>
-              {(reviewItem?.trimsStrategy || (aiSuggestedTrims?.length > 0) || (aiExcludedTrims?.length > 0) || (aiSuggestedEngines?.length > 0) || (aiExcludedEngines?.length > 0)) && (
-                (() => {
-                  const isSpecific = (aiSuggestedTrims?.length > 0) || (aiSuggestedEngines?.length > 0) || reviewItem?.trimsStrategy === 'SPECIFIC_TRIMS';
-                  const isExcluded = (aiExcludedTrims?.length > 0) || (aiExcludedEngines?.length > 0) || reviewItem?.trimsStrategy === 'EXCLUDED_TRIMS';
-                  
-                  const bgcolor = isSpecific ? '#dcfce7' : isExcluded ? '#ffedd5' : '#e0f2fe';
-                  const borderColor = isSpecific ? '#bbf7d0' : isExcluded ? '#fed7aa' : '#bae6fd';
-                  const textColor = isSpecific ? '#166534' : isExcluded ? '#9a3412' : '#075985';
-                  const iconColor = isSpecific ? '#16a34a' : isExcluded ? '#ea580c' : '#0284c7';
-                  const text = isSpecific ? '✓ Filtered exactly to trims/engines mentioned in title/description' :
-                               isExcluded ? '✓ Selected all available trims/engines except explicitly excluded ones' :
-                               '✓ Auto-selected ALL available trims/engines (no specific ones mentioned)';
+              {(() => {
+                const trimStrategySummary = getTrimStrategySummary(reviewItem, {
+                  aiSuggestedTrims,
+                  aiExcludedTrims,
+                  aiSuggestedEngines,
+                  aiExcludedEngines
+                });
 
-                  return (
-                    <Box sx={{ display: 'flex', alignItems: 'center', bgcolor, p: 0.75, borderRadius: 1, border: `1px solid ${borderColor}`, mt: 0.5 }}>
-                      <AutoAwesomeIcon sx={{ fontSize: 14, color: iconColor, mr: 0.5 }} />
-                      <Typography variant="caption" sx={{ color: textColor, fontWeight: 600 }}>
-                        {text}
-                      </Typography>
-                    </Box>
-                  );
-                })()
-              )}
+                if (!trimStrategySummary) return null;
+
+                return (
+                  <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: trimStrategySummary.bgcolor, p: 0.75, borderRadius: 1, border: `1px solid ${trimStrategySummary.borderColor}`, mt: 0.5 }}>
+                    <AutoAwesomeIcon sx={{ fontSize: 14, color: trimStrategySummary.iconColor, mr: 0.5 }} />
+                    <Typography variant="caption" sx={{ color: trimStrategySummary.textColor, fontWeight: 600 }}>
+                      {trimStrategySummary.text}
+                    </Typography>
+                  </Box>
+                );
+              })()}
             </Box>
 
             {/* Actions Bar */}
