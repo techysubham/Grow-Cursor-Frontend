@@ -809,46 +809,6 @@ export default function AsinReviewModal({
                       </Grid>
                     </Grid>
                   </Stack>
-                ) : currentItem.status === 'duplicate_updateable' ? (
-                  <Stack spacing={2}>
-                    <Alert severity="info" variant="outlined">
-                      <Typography variant="body2" fontWeight="bold" gutterBottom>
-                        Existing Listing
-                      </Typography>
-                      <Typography variant="caption">
-                        This ASIN already exists in your listings. Edit the fields on the right to update it.
-                      </Typography>
-                    </Alert>
-
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        ASIN
-                      </Typography>
-                      <Typography variant="body2" fontWeight="bold">
-                        {currentItem.asin}
-                      </Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        SKU
-                      </Typography>
-                      <Typography variant="body2">
-                        {currentItem.sku}
-                      </Typography>
-                    </Box>
-
-                    {currentItem.warnings?.map((warning, idx) => (
-                      <Box key={idx}>
-                        <Typography variant="caption" color="text.secondary">
-                          {idx === 0 ? 'Status' : ''}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {warning}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Stack>
                 ) : currentItem.sourceData ? (
                   <Stack spacing={2}>
                     <Box>
