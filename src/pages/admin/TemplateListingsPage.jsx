@@ -166,7 +166,19 @@ export default function TemplateListingsPage() {
     '&:hover td': {
       backgroundColor: `${dashboardTheme.table.rowHover} !important`
     },
+    // Sticky cells must always have a fully-opaque background otherwise the
+    // semi-transparent rowHover / rowStripe colours let scrolled content bleed through.
+    // We override first/last td in every row state with the pre-blended solid equivalent.
+    '&:hover td:first-of-type, &:hover td:last-of-type': {
+      backgroundColor: '#f5f6ff !important'   // white + rgba(37,99,235,0.04) blended
+    },
+    '&:nth-of-type(even) td:first-of-type, &:nth-of-type(even) td:last-of-type': {
+      backgroundColor: `${dashboardTheme.table.rowStripe} !important`
+    },
     '&.Mui-selected td': {
+      backgroundColor: `${alpha(BRAND_YELLOW, 0.16)} !important`
+    },
+    '&.Mui-selected td:first-of-type, &.Mui-selected td:last-of-type': {
       backgroundColor: `${alpha(BRAND_YELLOW, 0.16)} !important`
     }
   };
@@ -1778,7 +1790,7 @@ export default function TemplateListingsPage() {
               listings.map((listing) => (
                 <TableRow key={listing._id} hover selected={selectedListings.has(listing._id)} sx={tableBodyRowSx}>
                   {/* Checkbox cell */}
-                  <TableCell padding="checkbox" sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper' }}>
+                  <TableCell padding="checkbox" sx={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'background.paper' }}>
                     <Checkbox
                       size="small"
                       checked={selectedListings.has(listing._id)}
@@ -1817,7 +1829,7 @@ export default function TemplateListingsPage() {
                     </TableCell>
                   ))}
                   
-                  <TableCell align="right" sx={{ position: 'sticky', right: 0, backgroundColor: 'background.paper' }}>
+                  <TableCell align="right" sx={{ position: 'sticky', right: 0, zIndex: 2, backgroundColor: 'background.paper' }}>
                     <IconButton size="small" onClick={() => handleDuplicateListing(listing)} title="Duplicate">
                       <CopyIcon fontSize="small" />
                     </IconButton>
