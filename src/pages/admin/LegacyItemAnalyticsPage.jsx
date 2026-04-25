@@ -61,8 +61,9 @@ export default function LegacyItemAnalyticsPage() {
   const [selectedSeller, setSelectedSeller] = useState('');
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('');
   const [selectedCancelledFilter, setSelectedCancelledFilter] = useState('');
+  const [ebayMotorsOnly, setEbayMotorsOnly] = useState(false);
   const [excludeClient, setExcludeClient] = useState(true);
-  const [excludeLowValue, setExcludeLowValue] = useState(false);
+  const [excludeLowValue, setExcludeLowValue] = useState(true);
   const [dateFilter, setDateFilter] = useState(initialDateFilter);
   const [sellers, setSellers] = useState([]);
   const [summary, setSummary] = useState(initialSummary);
@@ -93,6 +94,7 @@ export default function LegacyItemAnalyticsPage() {
       setError('');
 
       const params = {
+        ebayMotors: ebayMotorsOnly,
         excludeClient,
         excludeLowValue,
       };
@@ -296,6 +298,10 @@ export default function LegacyItemAnalyticsPage() {
             </FormControl>
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }}>
+              <FormControlLabel
+                control={<Switch checked={ebayMotorsOnly} onChange={(event) => setEbayMotorsOnly(event.target.checked)} />}
+                label="eBay Motors"
+              />
               <FormControlLabel
                 control={<Switch checked={excludeClient} onChange={(event) => setExcludeClient(event.target.checked)} />}
                 label="Exclude Client"
