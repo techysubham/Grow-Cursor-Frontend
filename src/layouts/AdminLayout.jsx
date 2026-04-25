@@ -753,8 +753,8 @@ export default function AdminLayout({ user, onLogout }) {
             <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '0.04em', color: '#fffdf0', lineHeight: 1.1 }}>
               Admin Dashboard
             </Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(245, 200, 66, 0.72)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              Grow Mentality Operations Hub
+              <Typography variant="caption" sx={{ color: 'rgba(245, 200, 66, 0.72)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                Grow Mentality | Nurture Proper for Future
             </Typography>
           </Box>
           <Button
