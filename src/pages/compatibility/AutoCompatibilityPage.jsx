@@ -1259,6 +1259,11 @@ export default function AutoCompatibilityPage() {
     // Must know whose seller token to use — prefer the batch's own seller, fall back to state
     const resolvedSellerId = fullBatch?.seller?._id || sellerId;
     if (!resolvedSellerId) return;
+    // Blur any focused element inside the review dialog before opening the confirmation
+    // dialog. Without this, MUI tries to aria-hide the review dialog's portal while the
+    // "End Listing" button still has focus, producing an aria-hidden warning and a
+    // cascading removeChild crash from competing ScrollLock nodes.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setConfirmEndOpen(true);
   };
 
@@ -2729,7 +2734,7 @@ export default function AutoCompatibilityPage() {
       </Dialog>
 
       {/* END LISTING CONFIRMATION DIALOG */}
-      <Dialog open={confirmEndOpen} onClose={() => setConfirmEndOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={confirmEndOpen} onClose={() => setConfirmEndOpen(false)} maxWidth="xs" fullWidth disableScrollLock>
         <DialogTitle sx={{ color: 'error.main' }}>End Listing on eBay?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 1 }}>
@@ -2756,7 +2761,7 @@ export default function AutoCompatibilityPage() {
       </Dialog>
 
       {/* BULK REVIEW SUMMARY MODAL */}
-      <Dialog open={summaryOpen} onClose={() => setSummaryOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={summaryOpen} onClose={() => setSummaryOpen(false)} maxWidth="md" fullWidth disableScrollLock>
         <DialogTitle sx={{ borderBottom: '1px solid #eee' }}>Bulk Review Summary</DialogTitle>
         <DialogContent sx={{ p: 3 }}>
           {/* Summary Cards */}
