@@ -420,6 +420,15 @@ export default function InternalMessagesPage() {
                 {selectedConversation.isNew && (
                   <Chip label="New Conversation" size="small" color="success" />
                 )}
+                {!isMobile && !isTablet && (
+                  <IconButton
+                    onClick={() => setSelectedConversation(null)}
+                    size="small"
+                    sx={{ color: 'text.disabled', ml: 1 }}
+                  >
+                    <CloseIcon />
+                  </IconButton>
+                )}
               </Stack>
             </Box>
 
@@ -436,7 +445,7 @@ export default function InternalMessagesPage() {
                   )}
 
                   {messages.map((msg) => {
-                    const isMe = msg.sender._id === JSON.parse(localStorage.getItem('user'))?.id;
+                    const isMe = msg.sender?._id === JSON.parse(localStorage.getItem('user'))?.id;
                     return (
                       <Box
                         key={msg._id}
