@@ -13,8 +13,7 @@ import {
   ViewList as ViewListIcon,
   Upload as UploadIcon,
   CheckCircle as ReactivateIcon,
-  Cancel as DeactivateIcon,
-  Person as PersonIcon
+  Cancel as DeactivateIcon
 } from '@mui/icons-material';
 import api from '../../lib/api';
 import BulkImportASINsDialog from '../../components/BulkImportASINsDialog.jsx';
@@ -23,6 +22,9 @@ import BulkReactivateDialog from '../../components/BulkReactivateDialog.jsx';
 import BulkDeactivateDialog from '../../components/BulkDeactivateDialog.jsx';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 // ── Skeleton rows ────────────────────────────────────────────────────────────
 function TableRowSkeleton({ cols = 5 }) {
@@ -52,34 +54,6 @@ export default function SellerTemplatesPage() {
     backgroundColor: theme.palette.background.paper,
     boxShadow: dashboardTheme.shadows.card
   };
-  const tableHeaderCellSx = {
-    fontWeight: 700,
-    fontSize: '0.74rem',
-    letterSpacing: 0.55,
-    textTransform: 'uppercase',
-    color: alpha(theme.palette.common.white, 0.96),
-    backgroundColor: BRAND_DARK,
-    borderBottom: 'none',
-    py: 1.5
-  };
-  const tableBodyRowSx = {
-    '& td': { borderBottomColor: alpha(BRAND_DARK, 0.07) },
-    '&:nth-of-type(even) td': { backgroundColor: dashboardTheme.table.rowStripe },
-    '&:hover td': { backgroundColor: `${dashboardTheme.table.rowHover} !important` }
-  };
-  const yellowFilledButtonSx = {
-    minHeight: 38, px: 2, borderRadius: 1.5,
-    color: BRAND_DARK, backgroundColor: BRAND_YELLOW, fontWeight: 700,
-    boxShadow: `0 6px 16px ${alpha(BRAND_YELLOW_DARK, 0.2)}`,
-    '&:hover': { backgroundColor: BRAND_YELLOW_DARK }
-  };
-  const yellowOutlinedButtonSx = {
-    minHeight: 36, borderRadius: 1.5,
-    color: BRAND_DARK, borderColor: BRAND_YELLOW_DARK, fontWeight: 600,
-    backgroundColor: alpha(BRAND_YELLOW, 0.08),
-    '&:hover': { borderColor: BRAND_YELLOW_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.18) }
-  };
-
   // ── State ─────────────────────────────────────────────────────────────────
   const [seller, setSeller] = useState(null);
   const [templates, setTemplates] = useState([]);
@@ -167,7 +141,7 @@ export default function SellerTemplatesPage() {
   };
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, pb: 4, backgroundColor: theme.palette.background.paper, minHeight: '100vh' }}>
+    <AdminPageShell>
 
       {/* Breadcrumbs */}
       <Breadcrumbs sx={{ mb: 1.5, pt: 2 }}>
@@ -184,37 +158,20 @@ export default function SellerTemplatesPage() {
         </Typography>
       </Breadcrumbs>
 
-      {/* Page Header */}
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Box sx={{
-            width: 40, height: 40, borderRadius: 2, flexShrink: 0,
-            background: `linear-gradient(135deg, ${BRAND_DARK} 0%, ${alpha(BRAND_DARK, 0.8)} 100%)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: `0 4px 12px ${alpha(BRAND_DARK, 0.25)}`
-          }}>
-            <PersonIcon sx={{ color: BRAND_YELLOW, fontSize: 20 }} />
-          </Box>
-          <Box>
-            <Typography variant="h5" fontWeight={800} sx={{ color: BRAND_DARK, letterSpacing: -0.5 }}>
-              {getSellerDisplayName()}'s Templates
-            </Typography>
-            {!loading && (
-              <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.4), fontWeight: 500 }}>
-                {templates.length} template{templates.length !== 1 ? 's' : ''} available
-              </Typography>
-            )}
-          </Box>
-        </Stack>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/admin/select-seller')}
-          sx={yellowOutlinedButtonSx}
-        >
-          Back to Sellers
-        </Button>
-      </Stack>
+      <PageHeader
+        title={`${getSellerDisplayName()}'s Templates`}
+        subtitle={!loading ? `${templates.length} template${templates.length !== 1 ? 's' : ''} available` : undefined}
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/admin/select-seller')}
+            sx={yellowOutlinedButtonSx}
+          >
+            Back to Sellers
+          </Button>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
@@ -398,6 +355,6 @@ export default function SellerTemplatesPage() {
       <BulkImportSKUsDialog open={bulkImportSKUsDialog} onClose={() => setBulkImportSKUsDialog(false)} templateId={selectedTemplateId} sellerId={sellerId} onImportComplete={() => handleDialogSuccess('SKUs imported successfully')} />
       <BulkReactivateDialog open={reactivateDialog} onClose={() => setReactivateDialog(false)} templateId={selectedTemplateId} sellerId={sellerId} onSuccess={() => handleDialogSuccess('Listings reactivated successfully')} />
       <BulkDeactivateDialog open={deactivateDialog} onClose={() => setDeactivateDialog(false)} templateId={selectedTemplateId} sellerId={sellerId} onSuccess={() => handleDialogSuccess('Listings deactivated successfully')} />
-    </Box>
+    </AdminPageShell>
   );
 }

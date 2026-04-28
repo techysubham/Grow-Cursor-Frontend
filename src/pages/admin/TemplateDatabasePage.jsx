@@ -17,6 +17,9 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import api from '../../lib/api';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, tableContainerSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 
 // ── Skeleton loader for grouped seller blocks ────────────────────────────────
 function SellerGroupSkeleton() {
@@ -64,39 +67,6 @@ export default function TemplateDatabasePage() {
     borderColor: alpha(BRAND_DARK, 0.08),
     backgroundColor: theme.palette.background.paper,
     boxShadow: dashboardTheme.shadows.card
-  };
-
-  const tableContainerSx = {
-    borderRadius: `${dashboardTheme.radius.card}px`,
-    border: '1px solid',
-    borderColor: alpha(BRAND_DARK, 0.1),
-    boxShadow: dashboardTheme.shadows.table,
-    overflow: 'hidden'
-  };
-
-  const tableHeaderCellSx = {
-    fontWeight: 700,
-    fontSize: '0.72rem',
-    letterSpacing: 0.55,
-    textTransform: 'uppercase',
-    color: alpha(theme.palette.common.white, 0.96),
-    backgroundColor: BRAND_DARK,
-    borderBottom: 'none',
-    py: 1.5
-  };
-
-  const tableBodyRowSx = {
-    '& td': { borderBottomColor: alpha(BRAND_DARK, 0.07) },
-    '&:nth-of-type(even) td': { backgroundColor: dashboardTheme.table.rowStripe },
-    '&:hover td': { backgroundColor: `${dashboardTheme.table.rowHover} !important` }
-  };
-
-  const yellowFilledButtonSx = {
-    minHeight: 38, px: 2, borderRadius: 1.5,
-    color: BRAND_DARK, backgroundColor: BRAND_YELLOW, fontWeight: 700,
-    boxShadow: `0 6px 16px ${alpha(BRAND_YELLOW_DARK, 0.2)}`,
-    '&:hover': { backgroundColor: BRAND_YELLOW_DARK },
-    '&.Mui-disabled': { color: alpha(BRAND_DARK, 0.35), backgroundColor: alpha(BRAND_YELLOW, 0.38), boxShadow: 'none' }
   };
 
   const activeFilterChipSx = {
@@ -234,55 +204,39 @@ export default function TemplateDatabasePage() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, pb: 4, backgroundColor: theme.palette.background.paper, minHeight: '100vh' }}>
+    <AdminPageShell>
 
-      {/* Page Header */}
-      <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between"
-        alignItems={{ xs: 'stretch', lg: 'center' }} spacing={2} sx={{ mb: 3, pt: 2 }}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Box sx={{
-            width: 40, height: 40, borderRadius: 2,
-            background: `linear-gradient(135deg, ${BRAND_DARK} 0%, ${alpha(BRAND_DARK, 0.8)} 100%)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: `0 4px 12px ${alpha(BRAND_DARK, 0.25)}`
-          }}>
-            <StorageIcon sx={{ color: BRAND_YELLOW, fontSize: 22 }} />
-          </Box>
-          <Box>
-            <Typography variant="h5" fontWeight={800} sx={{ color: BRAND_DARK, letterSpacing: -0.5 }}>
-              Template Listings Database
-            </Typography>
-          </Box>
-        </Stack>
-
-        {/* Stat Chips */}
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          {[
-            { label: `Total: ${stats.total || 0}`, accent: BRAND_YELLOW },
-            { label: `Sellers: ${stats.sellers || 0}`, accent: alpha(BRAND_DARK, 0.12) },
-            { label: `Templates: ${stats.templates || 0}`, accent: alpha(BRAND_DARK, 0.12) },
-          ].map(({ label, accent }) => (
-            <Chip key={label} label={label} size="small" sx={{
-              fontWeight: 700,
-              backgroundColor: accent,
-              color: BRAND_DARK,
-              border: `1px solid ${alpha(BRAND_DARK, 0.15)}`
-            }} />
-          ))}
-          {stats.draft > 0 && (
-            <Chip label={`Draft: ${stats.draft}`} size="small" sx={{
-              fontWeight: 600, backgroundColor: alpha(BRAND_DARK, 0.07), color: BRAND_DARK,
-              border: `1px solid ${alpha(BRAND_DARK, 0.12)}`
-            }} />
-          )}
-          {stats.active > 0 && (
-            <Chip label={`Active: ${stats.active}`} size="small" sx={{
-              fontWeight: 600, backgroundColor: 'rgba(22,163,74,0.12)', color: '#166534',
-              border: '1px solid rgba(22,163,74,0.25)'
-            }} />
-          )}
-        </Stack>
-      </Stack>
+      <PageHeader
+        title="Template Listings Database"
+        actions={
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {[
+              { label: `Total: ${stats.total || 0}`, accent: BRAND_YELLOW },
+              { label: `Sellers: ${stats.sellers || 0}`, accent: alpha(BRAND_DARK, 0.12) },
+              { label: `Templates: ${stats.templates || 0}`, accent: alpha(BRAND_DARK, 0.12) },
+            ].map(({ label, accent }) => (
+              <Chip key={label} label={label} size="small" sx={{
+                fontWeight: 700,
+                backgroundColor: accent,
+                color: BRAND_DARK,
+                border: `1px solid ${alpha(BRAND_DARK, 0.15)}`
+              }} />
+            ))}
+            {stats.draft > 0 && (
+              <Chip label={`Draft: ${stats.draft}`} size="small" sx={{
+                fontWeight: 600, backgroundColor: alpha(BRAND_DARK, 0.07), color: BRAND_DARK,
+                border: `1px solid ${alpha(BRAND_DARK, 0.12)}`
+              }} />
+            )}
+            {stats.active > 0 && (
+              <Chip label={`Active: ${stats.active}`} size="small" sx={{
+                fontWeight: 600, backgroundColor: 'rgba(22,163,74,0.12)', color: '#166534',
+                border: '1px solid rgba(22,163,74,0.25)'
+              }} />
+            )}
+          </Stack>
+        }
+      />
 
       {/* Filter Bar */}
       <Paper sx={{ ...surfaceCardSx, p: 2.5, mb: 3 }}>
@@ -826,6 +780,6 @@ export default function TemplateDatabasePage() {
           <Button onClick={handleCloseDetails} sx={yellowFilledButtonSx}>Close</Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPageShell>
   );
 }

@@ -12,12 +12,14 @@ import {
   ExpandLess as ExpandLessIcon,
   Download as DownloadIcon,
   Person as PersonIcon,
-  CalendarToday as CalendarIcon,
-  BarChart as BarChartIcon
+  CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import api from '../../lib/api';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, tableContainerSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 export default function TemplateListingAnalyticsPage() {
   const [searchParams] = useSearchParams();
@@ -61,60 +63,12 @@ export default function TemplateListingAnalyticsPage() {
     boxShadow: dashboardTheme.shadows.card
   };
 
-  const tableContainerSx = {
-    borderRadius: `${dashboardTheme.radius.card}px`,
-    border: '1px solid',
-    borderColor: alpha(BRAND_DARK, 0.1),
-    boxShadow: dashboardTheme.shadows.table,
-    overflow: 'hidden'
-  };
-
-  const tableHeaderCellSx = {
-    fontWeight: 700,
-    fontSize: '0.74rem',
-    letterSpacing: 0.55,
-    textTransform: 'uppercase',
-    color: alpha(theme.palette.common.white, 0.96),
-    backgroundColor: BRAND_DARK,
-    borderBottom: 'none'
-  };
-
-  const tableBodyRowSx = {
-    '& td': { borderBottomColor: dashboardTheme.table.rowBorder },
-    '&:nth-of-type(even) td': { backgroundColor: dashboardTheme.table.rowStripe },
-    '&:hover td': { backgroundColor: `${dashboardTheme.table.rowHover} !important`, cursor: 'pointer' }
-  };
-
   const breadcrumbLinkSx = {
     cursor: 'pointer',
     textDecoration: 'none',
     color: BRAND_DARK,
     fontWeight: 600,
     '&:hover': { textDecoration: 'none', color: BRAND_YELLOW_DARK }
-  };
-
-  const yellowFilledButtonSx = {
-    minHeight: 40,
-    px: 2,
-    borderRadius: 1.5,
-    color: BRAND_DARK,
-    backgroundColor: BRAND_YELLOW,
-    fontWeight: 700,
-    boxShadow: `0 10px 20px ${alpha(BRAND_YELLOW_DARK, 0.2)}`,
-    '&:hover': { backgroundColor: BRAND_YELLOW_DARK, boxShadow: `0 12px 22px ${alpha(BRAND_YELLOW_DARK, 0.26)}` },
-    '&.Mui-disabled': { color: alpha(BRAND_DARK, 0.35), backgroundColor: alpha(BRAND_YELLOW, 0.38), boxShadow: 'none' }
-  };
-
-  const yellowOutlinedButtonSx = {
-    minHeight: 40,
-    px: 2,
-    borderRadius: 1.5,
-    color: BRAND_DARK,
-    borderColor: BRAND_YELLOW_DARK,
-    fontWeight: 700,
-    backgroundColor: alpha(BRAND_YELLOW, 0.08),
-    '&:hover': { borderColor: BRAND_YELLOW_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.18) },
-    '&.Mui-disabled': { borderColor: alpha(BRAND_DARK, 0.16), color: alpha(BRAND_DARK, 0.35) }
   };
 
   const quickChipSx = (active) => ({
@@ -253,7 +207,7 @@ export default function TemplateListingAnalyticsPage() {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, pb: 4, backgroundColor: theme.palette.background.paper, minHeight: '100vh' }}>
+    <AdminPageShell>
 
       {/* Breadcrumb */}
       <Breadcrumbs sx={{ mb: 2, pt: 2 }}>
@@ -269,38 +223,21 @@ export default function TemplateListingAnalyticsPage() {
         <Typography variant="body2" sx={{ color: BRAND_DARK, fontWeight: 600 }}>Analytics</Typography>
       </Breadcrumbs>
 
-      {/* Page Header */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Box sx={{
-            width: 40, height: 40, borderRadius: 2,
-            background: `linear-gradient(135deg, ${BRAND_DARK} 0%, ${alpha(BRAND_DARK, 0.8)} 100%)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: `0 4px 12px ${alpha(BRAND_DARK, 0.25)}`
-          }}>
-            <BarChartIcon sx={{ color: BRAND_YELLOW, fontSize: 22 }} />
-          </Box>
-          <Box>
-            <Typography variant="h5" fontWeight={800} sx={{ color: BRAND_DARK, letterSpacing: -0.5 }}>
-              Listing Analytics
-            </Typography>
-            {template?.name && (
-              <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.5), fontWeight: 500 }}>
-                {template.name}
-              </Typography>
-            )}
-          </Box>
-        </Stack>
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          onClick={handleExport}
-          disabled={!analytics || analytics.listings?.length === 0}
-          sx={yellowOutlinedButtonSx}
-        >
-          Export CSV
-        </Button>
-      </Stack>
+      <PageHeader
+        title="Listing Analytics"
+        subtitle={template?.name || undefined}
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleExport}
+            disabled={!analytics || analytics.listings?.length === 0}
+            sx={yellowOutlinedButtonSx}
+          >
+            Export CSV
+          </Button>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -657,6 +594,6 @@ export default function TemplateListingAnalyticsPage() {
           </Typography>
         </Box>
       )}
-    </Box>
+    </AdminPageShell>
   );
 }

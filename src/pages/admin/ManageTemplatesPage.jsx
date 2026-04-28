@@ -13,8 +13,7 @@ import {
   Visibility as VisibilityIcon,
   ContentCopy as CopyIcon,
   Publish as PublishIcon,
-  Search as SearchIcon,
-  ViewList as ViewListIcon
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
@@ -23,6 +22,9 @@ import CoreFieldDefaultsForm from '../../components/CoreFieldDefaultsForm.jsx';
 import PricingConfigSection from '../../components/PricingConfigSection.jsx';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, tableContainerSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 // ── Marketplace helpers (derived from customActionField) ─────────────────
 function extractMarketplace(customActionField) {
@@ -55,41 +57,7 @@ export default function ManageTemplatesPage() {
     backgroundColor: theme.palette.background.paper,
     boxShadow: dashboardTheme.shadows.card
   };
-  const tableContainerSx = {
-    borderRadius: `${dashboardTheme.radius.card}px`,
-    border: '1px solid',
-    borderColor: alpha(BRAND_DARK, 0.1),
-    boxShadow: dashboardTheme.shadows.table,
-    overflow: 'hidden'
-  };
-  const tableHeaderCellSx = {
-    fontWeight: 700,
-    fontSize: '0.74rem',
-    letterSpacing: 0.55,
-    textTransform: 'uppercase',
-    color: alpha(theme.palette.common.white, 0.96),
-    backgroundColor: BRAND_DARK,
-    borderBottom: 'none'
-  };
-  const tableBodyRowSx = {
-    '& td': { borderBottomColor: dashboardTheme.table.rowBorder },
-    '&:nth-of-type(even) td': { backgroundColor: dashboardTheme.table.rowStripe },
-    '&:hover td': { backgroundColor: `${dashboardTheme.table.rowHover} !important` }
-  };
-  const yellowFilledButtonSx = {
-    minHeight: 40, px: 2, borderRadius: 1.5,
-    color: BRAND_DARK, backgroundColor: BRAND_YELLOW, fontWeight: 700,
-    boxShadow: `0 8px 18px ${alpha(BRAND_YELLOW_DARK, 0.2)}`,
-    '&:hover': { backgroundColor: BRAND_YELLOW_DARK },
-    '&.Mui-disabled': { color: alpha(BRAND_DARK, 0.35), backgroundColor: alpha(BRAND_YELLOW, 0.38), boxShadow: 'none' }
-  };
-  const yellowOutlinedButtonSx = {
-    minHeight: 36, px: 1.5, borderRadius: 1.5,
-    color: BRAND_DARK, borderColor: BRAND_YELLOW_DARK, fontWeight: 600,
-    backgroundColor: alpha(BRAND_YELLOW, 0.08),
-    '&:hover': { borderColor: BRAND_YELLOW_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.18) },
-    '&.Mui-disabled': { borderColor: alpha(BRAND_DARK, 0.16), color: alpha(BRAND_DARK, 0.35) }
-  };
+
   const filterChipSx = (active) => ({
     fontWeight: 600, fontSize: '0.78rem', borderRadius: 1.5, cursor: 'pointer',
     backgroundColor: active ? BRAND_YELLOW : alpha(BRAND_DARK, 0.06),
@@ -643,22 +611,9 @@ export default function ManageTemplatesPage() {
   };
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, pb: 4, backgroundColor: theme.palette.background.paper, minHeight: '100vh' }}>
+    <AdminPageShell>
 
-      {/* Page Header */}
-      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3, pt: 2 }}>
-        <Box sx={{
-          width: 40, height: 40, borderRadius: 2,
-          background: `linear-gradient(135deg, ${BRAND_DARK} 0%, ${alpha(BRAND_DARK, 0.8)} 100%)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: `0 4px 12px ${alpha(BRAND_DARK, 0.25)}`
-        }}>
-          <ViewListIcon sx={{ color: BRAND_YELLOW, fontSize: 22 }} />
-        </Box>
-        <Typography variant="h5" fontWeight={800} sx={{ color: BRAND_DARK, letterSpacing: -0.5 }}>
-          Manage Listing Templates
-        </Typography>
-      </Stack>
+      <PageHeader title="Manage Listing Templates" />
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
@@ -1351,6 +1306,6 @@ export default function ManageTemplatesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPageShell>
   );
 }
