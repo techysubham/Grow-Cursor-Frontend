@@ -28,6 +28,8 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import GavelIcon from '@mui/icons-material/Gavel';
+import { BRAND_DARK } from '../../constants/brandTheme.js';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
 import ClearIcon from '@mui/icons-material/Clear';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import PaymentIcon from '@mui/icons-material/Payment';
@@ -132,6 +134,7 @@ export default function DisputesPage({ initialTab = 0 }) {
   const [pdSellerFilter, setPdSellerFilter] = useState('');
 
   const [pdReasonFilter, setPdReasonFilter] = useState('');
+  const [pdDateFilter, setPdDateFilter] = useState({ mode: 'all', single: '', from: '', to: '' });
 
   // Column Selectors
   const ALL_INR_COLUMNS = [
@@ -156,8 +159,8 @@ export default function DisputesPage({ initialTab = 0 }) {
     { id: 'buyer', label: 'Buyer' },
     { id: 'amount', label: 'Amount' },
     { id: 'status', label: 'Status' },
-    { id: 'created', label: 'Created (PST)' },
-    { id: 'responseDue', label: 'Response Due (PST)' },
+    { id: 'openedDate', label: 'Created (PST)' },
+    { id: 'closedDate', label: 'Closed Date (PST)' },
     { id: 'logs', label: 'Logs' },
     { id: 'chat', label: 'Chat' },
   ];
@@ -210,7 +213,7 @@ export default function DisputesPage({ initialTab = 0 }) {
       return;
     }
     loadStoredDisputes();
-  }, [pdStatusFilter, pdSellerFilter, pdReasonFilter, dateFilter]);
+  }, [pdStatusFilter, pdSellerFilter, pdReasonFilter, pdDateFilter]);
 
   async function loadStoredCases() {
     setCasesLoading(true);
@@ -249,12 +252,13 @@ export default function DisputesPage({ initialTab = 0 }) {
       if (pdStatusFilter) params.status = pdStatusFilter;
       if (pdSellerFilter) params.sellerId = pdSellerFilter;
       if (pdReasonFilter) params.reason = pdReasonFilter;
-      if (dateFilter.mode === 'single' && dateFilter.single) {
-        params.startDate = dateFilter.single;
-        params.endDate = dateFilter.single;
-      } else if (dateFilter.mode === 'range') {
-        if (dateFilter.from) params.startDate = dateFilter.from;
-        if (dateFilter.to) params.endDate = dateFilter.to;
+      params.dateField = 'openDate';
+      if (pdDateFilter.mode === 'single' && pdDateFilter.single) {
+        params.startDate = pdDateFilter.single;
+        params.endDate = pdDateFilter.single;
+      } else if (pdDateFilter.mode === 'range') {
+        if (pdDateFilter.from) params.startDate = pdDateFilter.from;
+        if (pdDateFilter.to) params.endDate = pdDateFilter.to;
       }
       // mode 'all' = no date params, shows all disputes
       
@@ -402,6 +406,7 @@ export default function DisputesPage({ initialTab = 0 }) {
     setPdStatusFilter('');
     setPdSellerFilter('');
     setPdReasonFilter('');
+    setPdDateFilter({ mode: 'all', single: '', from: '', to: '' });
   };
 
   const handleCopy = (text) => {
@@ -472,7 +477,7 @@ export default function DisputesPage({ initialTab = 0 }) {
   };
 
   const hasActiveInrFilters = inrStatusFilter || inrSellerFilter || inrTypeFilter;
-  const hasActivePdFilters = pdStatusFilter || pdSellerFilter || pdReasonFilter;
+  const hasActivePdFilters = pdStatusFilter || pdSellerFilter || pdReasonFilter || pdDateFilter.mode !== 'all';
 
   // Compute filtered INR cases
   const filteredCases = cases.filter(c => {
@@ -512,26 +517,26 @@ export default function DisputesPage({ initialTab = 0 }) {
   const filteredDisputes = disputes.filter(d => {
     if (pdSellerFilter && d.seller?._id !== pdSellerFilter) return false;
     if (pdStatusFilter && d.paymentDisputeStatus !== pdStatusFilter) return false;
-    if (pdReasonFilter && d.buyerProvidedReason !== pdReasonFilter) return false;
+    if (pdReasonFilter && d.reason !== pdReasonFilter) return false;
     
-    // Date filter
-    if (dateFilter.mode !== 'all') {
+    // Open Date filter
+    if (pdDateFilter.mode !== 'all') {
       const disputeDate = d.openDate ? new Date(d.openDate) : null;
       if (!disputeDate) return false;
       
-      if (dateFilter.mode === 'single' && dateFilter.single) {
-        const filterDate = new Date(dateFilter.single);
+      if (pdDateFilter.mode === 'single' && pdDateFilter.single) {
+        const filterDate = new Date(pdDateFilter.single);
         if (disputeDate.toDateString() !== filterDate.toDateString()) return false;
       }
       
-      if (dateFilter.mode === 'range') {
-        if (dateFilter.from) {
-          const fromDate = new Date(dateFilter.from);
+      if (pdDateFilter.mode === 'range') {
+        if (pdDateFilter.from) {
+          const fromDate = new Date(pdDateFilter.from);
           fromDate.setHours(0, 0, 0, 0);
           if (disputeDate < fromDate) return false;
         }
-        if (dateFilter.to) {
-          const toDate = new Date(dateFilter.to);
+        if (pdDateFilter.to) {
+          const toDate = new Date(pdDateFilter.to);
           toDate.setHours(23, 59, 59, 999);
           if (disputeDate > toDate) return false;
         }
@@ -565,10 +570,10 @@ export default function DisputesPage({ initialTab = 0 }) {
       'Order ID': 'orderId',
       'Seller': (d) => d.seller?.user?.username || '',
       'Buyer': 'buyerUsername',
-      'Reason': 'buyerProvidedReason',
+      'Reason': 'reason',
       'Status': 'paymentDisputeStatus',
       'Opened Date': (d) => formatDate(d.openDate),
-      'Response Due': (d) => formatDate(d.respondByDate),
+      'Closed Date': (d) => formatDate(d.closedDate),
     });
     downloadCSV(csvData, 'Payment_Disputes');
   };
@@ -590,10 +595,10 @@ export default function DisputesPage({ initialTab = 0 }) {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Stack direction="row" alignItems="center" spacing={2} mb={3}>
-        <GavelIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-        <Typography variant="h4">Issues and Resolutions</Typography>
+    <Box sx={{ p: 3, backgroundColor: 'background.default', minHeight: '100vh' }}>
+      <Stack direction="row" alignItems="center" spacing={1.5} mb={3}>
+        <GavelIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+        <Typography variant="h5" fontWeight={700} color="text.primary">Issues and Resolutions</Typography>
       </Stack>
 
       {error && (
@@ -812,35 +817,26 @@ export default function DisputesPage({ initialTab = 0 }) {
             sx={{ 
               maxWidth: '100%',
               overflowX: 'auto',
-              '&::-webkit-scrollbar': {
-                height: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                backgroundColor: '#f1f1f1',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                backgroundColor: '#888',
-                borderRadius: '4px',
-                '&:hover': {
-                  backgroundColor: '#555',
-                },
-              },
+              boxShadow: dashboardSignatureTokens.shadows.table,
+              '&::-webkit-scrollbar': { height: '8px', width: '8px' },
+              '&::-webkit-scrollbar-track': { backgroundColor: '#f1f1f1', borderRadius: '10px' },
+              '&::-webkit-scrollbar-thumb': { backgroundColor: '#888', borderRadius: '10px', '&:hover': { backgroundColor: '#555' } },
             }}
           >
-            <Table size="small" sx={{ minWidth: 1200 }}>
+            <Table size="small" sx={{ minWidth: 1200 }} stickyHeader>
               <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-            {inrVisibleColumns.includes('caseId') && <TableCell><strong>Case ID</strong></TableCell>}
-            {inrVisibleColumns.includes('type') && <TableCell><strong>Type</strong></TableCell>}
-            {inrVisibleColumns.includes('seller') && <TableCell><strong>Seller</strong></TableCell>}
-            {inrVisibleColumns.includes('buyer') && <TableCell><strong>Buyer</strong></TableCell>}
-            {inrVisibleColumns.includes('item') && <TableCell><strong>Item</strong></TableCell>}
-            {inrVisibleColumns.includes('status') && <TableCell><strong>Status</strong></TableCell>}
-            {inrVisibleColumns.includes('claimAmount') && <TableCell><strong>Claim Amount</strong></TableCell>}
-            {inrVisibleColumns.includes('created') && <TableCell><strong>Created (PST)</strong></TableCell>}
-            {inrVisibleColumns.includes('responseDue') && <TableCell><strong>Response Due (PST)</strong></TableCell>}
-            {inrVisibleColumns.includes('logs') && <TableCell><strong>Logs</strong></TableCell>}
-            {inrVisibleColumns.includes('chat') && <TableCell align="center"><strong>Chat</strong></TableCell>}
+                <TableRow>
+            {inrVisibleColumns.includes('caseId') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Case ID</TableCell>}
+            {inrVisibleColumns.includes('type') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Type</TableCell>}
+            {inrVisibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>}
+            {inrVisibleColumns.includes('buyer') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Buyer</TableCell>}
+            {inrVisibleColumns.includes('item') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Item</TableCell>}
+            {inrVisibleColumns.includes('status') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Status</TableCell>}
+            {inrVisibleColumns.includes('claimAmount') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Claim Amount</TableCell>}
+            {inrVisibleColumns.includes('created') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Created (PST)</TableCell>}
+            {inrVisibleColumns.includes('responseDue') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Response Due (PST)</TableCell>}
+            {inrVisibleColumns.includes('logs') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Logs</TableCell>}
+            {inrVisibleColumns.includes('chat') && <TableCell align="center" sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Chat</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -854,7 +850,14 @@ export default function DisputesPage({ initialTab = 0 }) {
                   </TableRow>
                 ) : (
                   filteredCases.map((c) => (
-                    <TableRow key={c._id} hover>
+                    <TableRow 
+                      key={c._id} 
+                      hover
+                      sx={{ 
+                        '&:hover': { backgroundColor: dashboardSignatureTokens.table.rowHover },
+                        borderBottom: `1px solid ${dashboardSignatureTokens.table.rowBorder}`
+                      }}
+                    >
                       {inrVisibleColumns.includes('caseId') && <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
                           <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
@@ -1057,13 +1060,68 @@ export default function DisputesPage({ initialTab = 0 }) {
               >
                 <MenuItem value="">All Reasons</MenuItem>
                 <MenuItem value="ITEM_NOT_RECEIVED">Item Not Received</MenuItem>
+                <MenuItem value="UNAUTHORIZED">Unauthorized</MenuItem>
                 <MenuItem value="UNAUTHORIZED_PAYMENT">Unauthorized Payment</MenuItem>
                 <MenuItem value="ITEM_NOT_AS_DESCRIBED">Item Not as Described</MenuItem>
+                <MenuItem value="NOT_AS_DESCRIBED">Not as Described</MenuItem>
+                <MenuItem value="SIGNIFICANTLY_NOT_AS_DESCRIBED">Significantly Not as Described</MenuItem>
                 <MenuItem value="DUPLICATE_CHARGE">Duplicate Charge</MenuItem>
-                <MenuItem value="MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED">Not as Described</MenuItem>
-                <MenuItem value="MERCHANDISE_OR_SERVICE_NOT_RECEIVED">Not Received</MenuItem>
+                <MenuItem value="MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED">Merch. Not as Described</MenuItem>
+                <MenuItem value="MERCHANDISE_OR_SERVICE_NOT_RECEIVED">Merch. Not Received</MenuItem>
+                <MenuItem value="CREDIT_NOT_PROCESSED">Credit Not Processed</MenuItem>
+                <MenuItem value="CANCELLATION">Cancellation</MenuItem>
+                <MenuItem value="FRAUD">Fraud</MenuItem>
               </Select>
             </FormControl>
+
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Open Date</InputLabel>
+              <Select
+                value={pdDateFilter.mode}
+                onChange={(e) => setPdDateFilter({ mode: e.target.value, single: '', from: '', to: '' })}
+                label="Open Date"
+              >
+                <MenuItem value="all">All</MenuItem>
+                <MenuItem value="single">Single Date</MenuItem>
+                <MenuItem value="range">Date Range</MenuItem>
+              </Select>
+            </FormControl>
+
+            {pdDateFilter.mode === 'single' && (
+              <TextField
+                type="date"
+                size="small"
+                label="Date"
+                value={pdDateFilter.single}
+                onChange={(e) => setPdDateFilter({ ...pdDateFilter, single: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                sx={{ minWidth: 150 }}
+              />
+            )}
+
+            {pdDateFilter.mode === 'range' && (
+              <>
+                <TextField
+                  type="date"
+                  size="small"
+                  label="From"
+                  value={pdDateFilter.from}
+                  onChange={(e) => setPdDateFilter({ ...pdDateFilter, from: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ minWidth: 150 }}
+                />
+                <Typography variant="body2" color="text.secondary">to</Typography>
+                <TextField
+                  type="date"
+                  size="small"
+                  label="To"
+                  value={pdDateFilter.to}
+                  onChange={(e) => setPdDateFilter({ ...pdDateFilter, to: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ minWidth: 150 }}
+                />
+              </>
+            )}
 
             {hasActivePdFilters && (
               <Button
@@ -1086,37 +1144,28 @@ export default function DisputesPage({ initialTab = 0 }) {
         ) : (
           <TableContainer 
             component={Paper}
-            sx={{ 
+            sx={{
               maxWidth: '100%',
               overflowX: 'auto',
-              '&::-webkit-scrollbar': {
-                height: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                backgroundColor: '#f1f1f1',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                backgroundColor: '#888',
-                borderRadius: '4px',
-                '&:hover': {
-                  backgroundColor: '#555',
-                },
-              },
+              boxShadow: dashboardSignatureTokens.shadows.table,
+              '&::-webkit-scrollbar': { height: '8px', width: '8px' },
+              '&::-webkit-scrollbar-track': { backgroundColor: '#f1f1f1', borderRadius: '10px' },
+              '&::-webkit-scrollbar-thumb': { backgroundColor: '#888', borderRadius: '10px', '&:hover': { backgroundColor: '#555' } },
             }}
           >
-            <Table size="small" sx={{ minWidth: 1200 }}>
+            <Table size="small" sx={{ minWidth: 1200 }} stickyHeader>
               <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  {disputeVisibleColumns.includes('disputeId') && <TableCell><strong>Dispute ID</strong></TableCell>}
-                  {disputeVisibleColumns.includes('orderId') && <TableCell><strong>Order ID</strong></TableCell>}
-                  {disputeVisibleColumns.includes('seller') && <TableCell><strong>Seller</strong></TableCell>}
-                  {disputeVisibleColumns.includes('buyer') && <TableCell><strong>Buyer</strong></TableCell>}
-                  {disputeVisibleColumns.includes('reason') && <TableCell><strong>Reason</strong></TableCell>}
-                  {disputeVisibleColumns.includes('status') && <TableCell><strong>Status</strong></TableCell>}
-                  {disputeVisibleColumns.includes('amount') && <TableCell><strong>Amount</strong></TableCell>}
-                  {disputeVisibleColumns.includes('openedDate') && <TableCell><strong>Open Date (PST)</strong></TableCell>}
-                  {disputeVisibleColumns.includes('responseDue') && <TableCell><strong>Respond By (PST)</strong></TableCell>}
-                  {disputeVisibleColumns.includes('outcome') && <TableCell><strong>Resolution</strong></TableCell>}
+                <TableRow>
+                  {disputeVisibleColumns.includes('disputeId') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Dispute ID</TableCell>}
+                  {disputeVisibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>}
+                  {disputeVisibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>}
+                  {disputeVisibleColumns.includes('buyer') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Buyer</TableCell>}
+                  {disputeVisibleColumns.includes('reason') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Reason</TableCell>}
+                  {disputeVisibleColumns.includes('status') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Status</TableCell>}
+                  {disputeVisibleColumns.includes('amount') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Amount</TableCell>}
+                  {disputeVisibleColumns.includes('openedDate') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Open Date (PST)</TableCell>}
+                  {disputeVisibleColumns.includes('closedDate') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Closed Date (PST)</TableCell>}
+                  {disputeVisibleColumns.includes('outcome') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Resolution</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1130,7 +1179,14 @@ export default function DisputesPage({ initialTab = 0 }) {
                   </TableRow>
                 ) : (
                   filteredDisputes.map((d) => (
-                    <TableRow key={d._id} hover>
+                    <TableRow 
+                      key={d._id} 
+                      hover
+                      sx={{ 
+                        '&:hover': { backgroundColor: dashboardSignatureTokens.table.rowHover },
+                        borderBottom: `1px solid ${dashboardSignatureTokens.table.rowBorder}`
+                      }}
+                    >
                       {disputeVisibleColumns.includes('disputeId') && <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
                           <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
@@ -1193,33 +1249,10 @@ export default function DisputesPage({ initialTab = 0 }) {
                           {formatDate(d.openDate)}
                         </Typography>
                       </TableCell>}
-                      {disputeVisibleColumns.includes('responseDue') && <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                          <Typography 
-                            variant="body2" 
-                            fontSize="0.75rem"
-                            color={isResponseOverdue(d.respondByDate) ? 'error' : 'inherit'}
-                            fontWeight={isResponseOverdue(d.respondByDate) || isResponseUrgent(d.respondByDate) ? 'bold' : 'normal'}
-                          >
-                            {formatDate(d.respondByDate)}
-                          </Typography>
-                          {isResponseOverdue(d.respondByDate) && (
-                            <Chip 
-                              label="OVERDUE" 
-                              color="error" 
-                              size="small" 
-                              sx={{ fontSize: '0.6rem', height: 18 }} 
-                            />
-                          )}
-                          {!isResponseOverdue(d.respondByDate) && isResponseUrgent(d.respondByDate) && (
-                            <Chip 
-                              label="URGENT" 
-                              color="warning" 
-                              size="small" 
-                              sx={{ fontSize: '0.6rem', height: 18 }} 
-                            />
-                          )}
-                        </Stack>
+                      {disputeVisibleColumns.includes('closedDate') && <TableCell>
+                        <Typography variant="body2" fontSize="0.75rem">
+                          {d.closedDate ? formatDate(d.closedDate) : '-'}
+                        </Typography>
                       </TableCell>}
                       {disputeVisibleColumns.includes('outcome') && <TableCell>
                         <Typography variant="body2" fontSize="0.75rem">
