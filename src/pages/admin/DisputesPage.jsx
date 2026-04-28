@@ -24,12 +24,17 @@ import {
   Snackbar,
   Tabs,
   Tab,
+  Fade,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import GavelIcon from '@mui/icons-material/Gavel';
 import { BRAND_DARK } from '../../constants/brandTheme.js';
 import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import { tableHeaderCellSx, tableBodyRowSx, tableContainerSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 import ClearIcon from '@mui/icons-material/Clear';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import PaymentIcon from '@mui/icons-material/Payment';
@@ -595,12 +600,8 @@ export default function DisputesPage({ initialTab = 0 }) {
   };
 
   return (
-    <Box sx={{ p: 3, backgroundColor: 'background.default', minHeight: '100vh' }}>
-      <Stack direction="row" alignItems="center" spacing={1.5} mb={3}>
-        <GavelIcon sx={{ fontSize: 28, color: 'primary.main' }} />
-        <Typography variant="h5" fontWeight={700} color="text.primary">Issues and Resolutions</Typography>
-      </Stack>
-
+    <Fade in timeout={600}>
+    <AdminPageShell>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {error}
@@ -622,8 +623,19 @@ export default function DisputesPage({ initialTab = 0 }) {
         </Alert>
       </Snackbar>
 
-      {/* DATE FILTER SECTION */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3, background: dashboardSignatureTokens.surfaces.pageCard }}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', lg: 'center' }} gap={2.5}>
+          <Box>
+            <PageHeader
+              title="Issues and Resolutions"
+              subtitle="Track and manage INR cases, payment disputes, and return requests across all sellers."
+              sx={{ pt: 0, pb: 0 }}
+            />
+          </Box>
+        </Stack>
+
+        {/* DATE FILTER SECTION */}
+        <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap" useFlexGap>
           <FormControl size="small" sx={{ minWidth: 140 }}>
             <InputLabel>Date</InputLabel>
@@ -670,10 +682,11 @@ export default function DisputesPage({ initialTab = 0 }) {
             </>
           )}
         </Stack>
-      </Paper>
+        </Box>
+      </SectionCard>
 
       {/* Tabs */}
-      <Paper sx={{ mb: 3 }}>
+      <SectionCard sx={{ mb: 3, overflow: 'hidden' }}>
         <Tabs 
           value={tabValue} 
           onChange={(e, newValue) => setTabValue(newValue)}
@@ -705,7 +718,7 @@ export default function DisputesPage({ initialTab = 0 }) {
             iconPosition="start"
           />
         </Tabs>
-      </Paper>
+      </SectionCard>
 
       {/* INR Cases Tab */}
       <TabPanel value={tabValue} index={0}>
@@ -714,7 +727,7 @@ export default function DisputesPage({ initialTab = 0 }) {
           <Stack direction="row" spacing={2} alignItems="center">
             <Button
               variant="contained"
-              color="primary"
+              sx={yellowFilledButtonSx}
               startIcon={casesFetching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
               onClick={fetchCasesFromEbay}
               disabled={casesFetching}
@@ -729,7 +742,7 @@ export default function DisputesPage({ initialTab = 0 }) {
           
           <Button
             variant="outlined"
-            color="success"
+            sx={yellowOutlinedButtonSx}
             startIcon={<DownloadIcon />}
             onClick={handleExportINRCases}
             disabled={filteredCases.length === 0}
@@ -746,7 +759,7 @@ export default function DisputesPage({ initialTab = 0 }) {
         </Stack>
 
         {/* Filters */}
-        <Paper sx={{ p: 2, mb: 3 }}>
+        <SectionCard sx={{ p: 2, mb: 3 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <InputLabel>Seller</InputLabel>
@@ -804,7 +817,7 @@ export default function DisputesPage({ initialTab = 0 }) {
               </Button>
             )}
           </Stack>
-        </Paper>
+        </SectionCard>
 
         {/* INR Cases Table */}
         {casesLoading ? (
@@ -815,9 +828,9 @@ export default function DisputesPage({ initialTab = 0 }) {
           <TableContainer 
             component={Paper}
             sx={{ 
+              ...tableContainerSx,
               maxWidth: '100%',
               overflowX: 'auto',
-              boxShadow: dashboardSignatureTokens.shadows.table,
               '&::-webkit-scrollbar': { height: '8px', width: '8px' },
               '&::-webkit-scrollbar-track': { backgroundColor: '#f1f1f1', borderRadius: '10px' },
               '&::-webkit-scrollbar-thumb': { backgroundColor: '#888', borderRadius: '10px', '&:hover': { backgroundColor: '#555' } },
@@ -826,17 +839,17 @@ export default function DisputesPage({ initialTab = 0 }) {
             <Table size="small" sx={{ minWidth: 1200 }} stickyHeader>
               <TableHead>
                 <TableRow>
-            {inrVisibleColumns.includes('caseId') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Case ID</TableCell>}
-            {inrVisibleColumns.includes('type') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Type</TableCell>}
-            {inrVisibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>}
-            {inrVisibleColumns.includes('buyer') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Buyer</TableCell>}
-            {inrVisibleColumns.includes('item') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Item</TableCell>}
-            {inrVisibleColumns.includes('status') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Status</TableCell>}
-            {inrVisibleColumns.includes('claimAmount') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Claim Amount</TableCell>}
-            {inrVisibleColumns.includes('created') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Created (PST)</TableCell>}
-            {inrVisibleColumns.includes('responseDue') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Response Due (PST)</TableCell>}
-            {inrVisibleColumns.includes('logs') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Logs</TableCell>}
-            {inrVisibleColumns.includes('chat') && <TableCell align="center" sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Chat</TableCell>}
+            {inrVisibleColumns.includes('caseId') && <TableCell sx={tableHeaderCellSx}>Case ID</TableCell>}
+            {inrVisibleColumns.includes('type') && <TableCell sx={tableHeaderCellSx}>Type</TableCell>}
+            {inrVisibleColumns.includes('seller') && <TableCell sx={tableHeaderCellSx}>Seller</TableCell>}
+            {inrVisibleColumns.includes('buyer') && <TableCell sx={tableHeaderCellSx}>Buyer</TableCell>}
+            {inrVisibleColumns.includes('item') && <TableCell sx={tableHeaderCellSx}>Item</TableCell>}
+            {inrVisibleColumns.includes('status') && <TableCell sx={tableHeaderCellSx}>Status</TableCell>}
+            {inrVisibleColumns.includes('claimAmount') && <TableCell sx={tableHeaderCellSx}>Claim Amount</TableCell>}
+            {inrVisibleColumns.includes('created') && <TableCell sx={tableHeaderCellSx}>Created (PST)</TableCell>}
+            {inrVisibleColumns.includes('responseDue') && <TableCell sx={tableHeaderCellSx}>Response Due (PST)</TableCell>}
+            {inrVisibleColumns.includes('logs') && <TableCell sx={tableHeaderCellSx}>Logs</TableCell>}
+            {inrVisibleColumns.includes('chat') && <TableCell align="center" sx={tableHeaderCellSx}>Chat</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -853,10 +866,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                     <TableRow 
                       key={c._id} 
                       hover
-                      sx={{ 
-                        '&:hover': { backgroundColor: dashboardSignatureTokens.table.rowHover },
-                        borderBottom: `1px solid ${dashboardSignatureTokens.table.rowBorder}`
-                      }}
+                      sx={tableBodyRowSx}
                     >
                       {inrVisibleColumns.includes('caseId') && <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -981,7 +991,7 @@ export default function DisputesPage({ initialTab = 0 }) {
           <Stack direction="row" spacing={2} alignItems="center">
             <Button
               variant="contained"
-              color="primary"
+              sx={yellowFilledButtonSx}
               startIcon={disputesFetching ? <CircularProgress size={20} color="inherit" />: <RefreshIcon />}
               onClick={fetchDisputesFromEbay}
               disabled={disputesFetching}
@@ -998,7 +1008,7 @@ export default function DisputesPage({ initialTab = 0 }) {
 
             <Button
               variant="outlined"
-              color="success"
+              sx={yellowOutlinedButtonSx}
               startIcon={<DownloadIcon />}
               onClick={handleExportPaymentDisputes}
               disabled={filteredDisputes.length === 0}
@@ -1016,7 +1026,7 @@ export default function DisputesPage({ initialTab = 0 }) {
         </Stack>
 
         {/* Filters */}
-        <Paper sx={{ p: 2, mb: 3 }}>
+        <SectionCard sx={{ p: 2, mb: 3 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <InputLabel>Seller</InputLabel>
@@ -1134,7 +1144,7 @@ export default function DisputesPage({ initialTab = 0 }) {
               </Button>
             )}
           </Stack>
-        </Paper>
+        </SectionCard>
 
         {/* Payment Disputes Table */}
         {disputesLoading ? (
@@ -1145,9 +1155,9 @@ export default function DisputesPage({ initialTab = 0 }) {
           <TableContainer 
             component={Paper}
             sx={{
+              ...tableContainerSx,
               maxWidth: '100%',
               overflowX: 'auto',
-              boxShadow: dashboardSignatureTokens.shadows.table,
               '&::-webkit-scrollbar': { height: '8px', width: '8px' },
               '&::-webkit-scrollbar-track': { backgroundColor: '#f1f1f1', borderRadius: '10px' },
               '&::-webkit-scrollbar-thumb': { backgroundColor: '#888', borderRadius: '10px', '&:hover': { backgroundColor: '#555' } },
@@ -1156,16 +1166,16 @@ export default function DisputesPage({ initialTab = 0 }) {
             <Table size="small" sx={{ minWidth: 1200 }} stickyHeader>
               <TableHead>
                 <TableRow>
-                  {disputeVisibleColumns.includes('disputeId') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Dispute ID</TableCell>}
-                  {disputeVisibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>}
-                  {disputeVisibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>}
-                  {disputeVisibleColumns.includes('buyer') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Buyer</TableCell>}
-                  {disputeVisibleColumns.includes('reason') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Reason</TableCell>}
-                  {disputeVisibleColumns.includes('status') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Status</TableCell>}
-                  {disputeVisibleColumns.includes('amount') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Amount</TableCell>}
-                  {disputeVisibleColumns.includes('openedDate') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Open Date (PST)</TableCell>}
-                  {disputeVisibleColumns.includes('closedDate') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Closed Date (PST)</TableCell>}
-                  {disputeVisibleColumns.includes('outcome') && <TableCell sx={{ backgroundColor: BRAND_DARK, color: '#fff', fontWeight: 700, position: 'sticky', top: 0, zIndex: 100 }}>Resolution</TableCell>}
+                  {disputeVisibleColumns.includes('disputeId') && <TableCell sx={tableHeaderCellSx}>Dispute ID</TableCell>}
+                  {disputeVisibleColumns.includes('orderId') && <TableCell sx={tableHeaderCellSx}>Order ID</TableCell>}
+                  {disputeVisibleColumns.includes('seller') && <TableCell sx={tableHeaderCellSx}>Seller</TableCell>}
+                  {disputeVisibleColumns.includes('buyer') && <TableCell sx={tableHeaderCellSx}>Buyer</TableCell>}
+                  {disputeVisibleColumns.includes('reason') && <TableCell sx={tableHeaderCellSx}>Reason</TableCell>}
+                  {disputeVisibleColumns.includes('status') && <TableCell sx={tableHeaderCellSx}>Status</TableCell>}
+                  {disputeVisibleColumns.includes('amount') && <TableCell sx={tableHeaderCellSx}>Amount</TableCell>}
+                  {disputeVisibleColumns.includes('openedDate') && <TableCell sx={tableHeaderCellSx}>Open Date (PST)</TableCell>}
+                  {disputeVisibleColumns.includes('closedDate') && <TableCell sx={tableHeaderCellSx}>Closed Date (PST)</TableCell>}
+                  {disputeVisibleColumns.includes('outcome') && <TableCell sx={tableHeaderCellSx}>Resolution</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1182,10 +1192,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                     <TableRow 
                       key={d._id} 
                       hover
-                      sx={{ 
-                        '&:hover': { backgroundColor: dashboardSignatureTokens.table.rowHover },
-                        borderBottom: `1px solid ${dashboardSignatureTokens.table.rowBorder}`
-                      }}
+                      sx={tableBodyRowSx}
                     >
                       {disputeVisibleColumns.includes('disputeId') && <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -1320,6 +1327,7 @@ export default function DisputesPage({ initialTab = 0 }) {
           orderId={selectedOrderId}
         />
       )}
-    </Box>
+    </AdminPageShell>
+    </Fade>
   );
 }
