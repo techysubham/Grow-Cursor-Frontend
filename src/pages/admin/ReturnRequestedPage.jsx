@@ -819,7 +819,7 @@ export default function ReturnRequestedPage({
         </Stack>
       </SectionCard>
 
-      {/* Table */}}
+      {/* Table */}
       {loading ? (
         <Box display="flex" justifyContent="center" py={4}>
           <CircularProgress />

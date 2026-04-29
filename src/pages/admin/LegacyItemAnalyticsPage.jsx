@@ -23,7 +23,10 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { alpha, useTheme } from '@mui/material/styles';
 import api from '../../lib/api';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
 import AdminPageShell from '../../components/AdminPageShell.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import SectionCard from '../../components/SectionCard.jsx';
@@ -57,6 +60,21 @@ const initialDateFilter = {
 };
 
 export default function LegacyItemAnalyticsPage() {
+  const theme = useTheme();
+  const dt = theme.customTokens?.dashboardSignature || dashboardSignatureTokens;
+
+  const selectFocusSx = {
+    '& label.Mui-focused': { color: BRAND_YELLOW_DARK },
+    '& .MuiOutlinedInput-root': { '&.Mui-focused fieldset': { borderColor: BRAND_YELLOW_DARK } },
+  };
+  const inputFocusSx = {
+    '& .MuiOutlinedInput-root': {
+      '& .MuiOutlinedInput-notchedOutline': { transition: 'border-color 0.2s ease' },
+      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(BRAND_DARK, 0.35) },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: BRAND_YELLOW_DARK, borderWidth: 2 },
+    },
+  };
+
   const [legacyItemIdInput, setLegacyItemIdInput] = useState('');
   const [selectedSeller, setSelectedSeller] = useState('');
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('');
@@ -191,8 +209,9 @@ export default function LegacyItemAnalyticsPage() {
             sx={{ pt: 0, pb: 0 }}
           />
 
-          <Stack direction={{ xs: 'column', xl: 'row' }} gap={2} sx={{ mt: 2.5 }}>
-            <FormControl sx={{ minWidth: { xs: '100%', sm: 150 } }}>
+          {/* ── Row 1: Date controls + filters ── */}
+          <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap sx={{ mt: 2.5 }}>
+            <FormControl size="small" sx={{ minWidth: 150, ...selectFocusSx }}>
               <InputLabel>Date Mode</InputLabel>
               <Select
                 label="Date Mode"
@@ -212,10 +231,11 @@ export default function LegacyItemAnalyticsPage() {
               <TextField
                 label="Date"
                 type="date"
+                size="small"
                 value={dateFilter.single}
                 onChange={(event) => setDateFilter((previous) => ({ ...previous, single: event.target.value }))}
                 InputLabelProps={{ shrink: true }}
-                sx={{ minWidth: { xs: '100%', sm: 180 } }}
+                sx={{ minWidth: 180, ...inputFocusSx }}
                 helperText="Uses PT day boundaries (America/Los_Angeles, PST/PDT)."
               />
             ) : (
@@ -223,19 +243,21 @@ export default function LegacyItemAnalyticsPage() {
                 <TextField
                   label="From"
                   type="date"
+                  size="small"
                   value={dateFilter.from}
                   onChange={(event) => setDateFilter((previous) => ({ ...previous, from: event.target.value }))}
                   InputLabelProps={{ shrink: true }}
-                  sx={{ minWidth: { xs: '100%', sm: 180 } }}
+                  sx={{ minWidth: 180, ...inputFocusSx }}
                   helperText="PT start day"
                 />
                 <TextField
                   label="To"
                   type="date"
+                  size="small"
                   value={dateFilter.to}
                   onChange={(event) => setDateFilter((previous) => ({ ...previous, to: event.target.value }))}
                   InputLabelProps={{ shrink: true }}
-                  sx={{ minWidth: { xs: '100%', sm: 180 } }}
+                  sx={{ minWidth: 180, ...inputFocusSx }}
                   helperText="PT end day"
                 />
               </>
@@ -243,18 +265,15 @@ export default function LegacyItemAnalyticsPage() {
 
             <TextField
               label="Legacy Item ID"
+              size="small"
               value={legacyItemIdInput}
               onChange={(event) => setLegacyItemIdInput(event.target.value)}
-              placeholder="Optional: filter one legacy item ID"
-              fullWidth
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  handleSearch();
-                }
-              }}
+              placeholder="Optional"
+              sx={{ minWidth: 180, ...inputFocusSx }}
+              onKeyDown={(event) => { if (event.key === 'Enter') handleSearch(); }}
             />
 
-            <FormControl sx={{ minWidth: { xs: '100%', sm: 220 } }}>
+            <FormControl size="small" sx={{ minWidth: 200, ...selectFocusSx }}>
               <InputLabel>Seller</InputLabel>
               <Select
                 label="Seller"
@@ -271,7 +290,7 @@ export default function LegacyItemAnalyticsPage() {
               </Select>
             </FormControl>
 
-            <FormControl sx={{ minWidth: { xs: '100%', sm: 210 } }}>
+            <FormControl size="small" sx={{ minWidth: 190, ...selectFocusSx }}>
               <InputLabel>Payment Status</InputLabel>
               <Select
                 label="Payment Status"
@@ -284,7 +303,7 @@ export default function LegacyItemAnalyticsPage() {
               </Select>
             </FormControl>
 
-            <FormControl sx={{ minWidth: { xs: '100%', sm: 210 } }}>
+            <FormControl size="small" sx={{ minWidth: 180, ...selectFocusSx }}>
               <InputLabel>Cancel Filter</InputLabel>
               <Select
                 label="Cancel Filter"
@@ -296,29 +315,39 @@ export default function LegacyItemAnalyticsPage() {
                 <MenuItem value="not_cancelled">Not Cancelled</MenuItem>
               </Select>
             </FormControl>
+          </Stack>
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }}>
+          {/* ── Row 2: Toggles + action buttons ── */}
+          <Stack direction="row" flexWrap="wrap" gap={2} useFlexGap alignItems="center" sx={{ mt: 1.5 }}>
+            {/* Toggles group */}
+            <Stack direction="row" gap={3} useFlexGap alignItems="center" flexWrap="wrap">
               <FormControlLabel
-                control={<Switch checked={ebayMotorsOnly} onChange={(event) => setEbayMotorsOnly(event.target.checked)} />}
-                label="eBay Motors"
+                sx={{ gap: 0.75, mr: 0 }}
+                control={<Switch checked={ebayMotorsOnly} onChange={(event) => setEbayMotorsOnly(event.target.checked)} size="small" />}
+                label={<Typography variant="body2" sx={{ fontWeight: 500 }}>eBay Motors</Typography>}
               />
               <FormControlLabel
-                control={<Switch checked={excludeClient} onChange={(event) => setExcludeClient(event.target.checked)} />}
-                label="Exclude Client"
+                sx={{ gap: 0.75, mr: 0 }}
+                control={<Switch checked={excludeClient} onChange={(event) => setExcludeClient(event.target.checked)} size="small" />}
+                label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Exclude Client</Typography>}
               />
               <FormControlLabel
-                control={<Switch checked={excludeLowValue} onChange={(event) => setExcludeLowValue(event.target.checked)} />}
-                label="Exclude Low Value"
+                sx={{ gap: 0.75, mr: 0 }}
+                control={<Switch checked={excludeLowValue} onChange={(event) => setExcludeLowValue(event.target.checked)} size="small" />}
+                label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Exclude Low Value</Typography>}
               />
             </Stack>
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
+            <Box sx={{ flex: 1 }} />
+
+            {/* Action buttons group */}
+            <Stack direction="row" spacing={1} alignItems="center">
               <Button
                 variant="contained"
-                startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SearchIcon />}
+                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
                 onClick={handleSearch}
                 disabled={loading}
-                sx={yellowFilledButtonSx}
+                sx={{ ...yellowFilledButtonSx, minWidth: 110 }}
               >
                 Search
               </Button>
@@ -327,7 +356,7 @@ export default function LegacyItemAnalyticsPage() {
                 startIcon={<RefreshIcon />}
                 onClick={handleRefresh}
                 disabled={loading || !hasSearched}
-                sx={yellowOutlinedButtonSx}
+                sx={{ ...yellowOutlinedButtonSx, minWidth: 110 }}
               >
                 Refresh
               </Button>
