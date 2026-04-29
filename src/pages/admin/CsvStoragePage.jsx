@@ -30,6 +30,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import FolderZipIcon from '@mui/icons-material/FolderZip';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { alpha, ThemeProvider, createTheme, useTheme } from '@mui/material/styles';
@@ -356,9 +357,14 @@ export default function CsvStoragePage() {
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h5" fontWeight={600} gutterBottom>
-                CSV Storage
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', p: 1, borderRadius: 2, backgroundColor: alpha(BRAND_YELLOW, 0.2) }}>
+                    <FolderZipIcon sx={{ color: BRAND_YELLOW_DARK, fontSize: 28 }} />
+                </Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: BRAND_DARK, letterSpacing: -0.5 }}>
+                    CSV Storage
+                </Typography>
+            </Stack>
 
             {error && (
                 <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
