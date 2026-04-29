@@ -8,6 +8,7 @@ import {
     TableBody,
     TableCell,
     TableContainer,
+    TableFooter,
     TableHead,
     TableRow,
     Dialog,
@@ -177,6 +178,7 @@ const PayoneerSheetPage = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [loading, setLoading] = useState(false);
     const [pageLoading, setPageLoading] = useState(true);
+    const [totals, setTotals] = useState({ totalAmount: 0, totalBankDeposit: 0 });
 
     // Advanced Filter State
     const [filters, setFilters] = useState({
@@ -194,9 +196,15 @@ const PayoneerSheetPage = () => {
         totalRecords: 0
     });
 
+    // Returns today's date as YYYY-MM-DD in the browser's local timezone (correct for IST users)
+    const todayLocal = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
     const [formData, setFormData] = useState({
         bankAccount: '', // ObjectId of BankAccount
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: todayLocal(),
         amount: '',
         exchangeRate: '',
         store: '',
@@ -257,6 +265,10 @@ const PayoneerSheetPage = () => {
                     totalPages: data.totalPages,
                     totalRecords: data.totalRecords
                 }));
+                setTotals({
+                    totalAmount: data.totalAmount || 0,
+                    totalBankDeposit: data.totalBankDeposit || 0
+                });
             } else {
                 // Fallback for old API response (array)
                 setRecords(data);
@@ -311,7 +323,7 @@ const PayoneerSheetPage = () => {
             // Reset form
             setFormData({
                 bankAccount: '',
-                paymentDate: new Date().toISOString().split('T')[0],
+                paymentDate: todayLocal(),
                 amount: '',
                 exchangeRate: '',
                 store: '',
@@ -703,8 +715,53 @@ const PayoneerSheetPage = () => {
                                 </TableRow>
                             )}
                         </TableBody>
+                        {/* TOTALS FOOTER ROW — covers all pages via backend aggregation */}
+                        {(filters.dateMode === 'single' ? !!filters.singleDate : filters.dateMode === 'range' && (!!filters.dateRange.start || !!filters.dateRange.end)) && (
+                            <TableFooter>
+                                <TableRow sx={{ bgcolor: 'action.selected' }}>
+                                    <TableCell colSpan={3} sx={{ fontWeight: 'bold', borderTop: '2px solid', borderColor: 'divider' }}>
+                                        Total ({pagination.totalRecords} record{pagination.totalRecords !== 1 ? 's' : ''}, all pages)
+                                    </TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', color: 'primary.main', borderTop: '2px solid', borderColor: 'divider' }}>
+                                        ${totals.totalAmount.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell colSpan={2} sx={{ borderTop: '2px solid', borderColor: 'divider' }} />
+                                    <TableCell sx={{ fontWeight: 'bold', color: 'success.main', borderTop: '2px solid', borderColor: 'divider' }}>
+                                        ₹{totals.totalBankDeposit.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell colSpan={3} sx={{ borderTop: '2px solid', borderColor: 'divider' }} />
+                                </TableRow>
+                            </TableFooter>
+                        )}
                     </Table>
                 </TableContainer>
+            )}
+
+            {/* MOBILE TOTALS SUMMARY — shown when date filter is active */}
+            {isMobile && (filters.dateMode === 'single' ? !!filters.singleDate : filters.dateMode === 'range' && (!!filters.dateRange.start || !!filters.dateRange.end)) && (
+                <Paper sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'action.selected' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                        Total — {pagination.totalRecords} record{pagination.totalRecords !== 1 ? 's' : ''} (all pages)
+                    </Typography>
+                    <Stack direction="row" spacing={4}>
+                        <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                                AMOUNT (USD)
+                            </Typography>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                ${totals.totalAmount.toFixed(2)}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                                BANK DEPOSIT (INR)
+                            </Typography>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                                ₹{totals.totalBankDeposit.toFixed(2)}
+                            </Typography>
+                        </Box>
+                    </Stack>
+                </Paper>
             )}
 
             {/* PAGINATION */}
