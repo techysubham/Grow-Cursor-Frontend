@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -32,15 +32,60 @@ import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   BrokenImage as BrokenImageIcon,
-  AddCircle as AddCircleIcon
+  AddCircle as AddCircleIcon,
+  ListAlt as ListAltIcon
 } from '@mui/icons-material';
+import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { alpha, ThemeProvider, createTheme, useTheme } from '@mui/material/styles';
 import api, { getAuthToken } from '../../lib/api.js';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 import AsinReviewModal from '../../components/AsinReviewModal.jsx';
 import { useNavigate } from 'react-router-dom';
 import AsinListCreateDialog from '../../components/AsinListCreateDialog.jsx';
 
 export default function AsinListPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
+
+  // ── Style tokens ──────────────────────────────────────────────────────────
+  const inputFocusSx = {
+    '& label.Mui-focused': { color: BRAND_YELLOW_DARK },
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 1.5,
+      '& .MuiOutlinedInput-notchedOutline': { transition: 'border-color 0.2s ease' },
+      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(BRAND_DARK, 0.35) },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: BRAND_YELLOW_DARK, borderWidth: 2 },
+    },
+    '& input': { accentColor: BRAND_YELLOW_DARK }
+  };
+  const selectFocusSx = {
+    '& label.Mui-focused': { color: BRAND_YELLOW_DARK },
+    '& .MuiOutlinedInput-root': { 
+      borderRadius: 1.5,
+      '&.Mui-focused fieldset': { borderColor: BRAND_YELLOW_DARK } 
+    },
+  };
+  const datePickerTheme = useMemo(() => createTheme(theme, {
+      palette: {
+          primary: { main: BRAND_YELLOW_DARK }
+      }
+  }), [theme]);
+
+  const darkButtonSx = {
+    minHeight: 36, px: 2, borderRadius: 1.5,
+    color: '#fff', backgroundColor: BRAND_DARK, fontWeight: 700,
+    '&:hover': { backgroundColor: alpha(BRAND_DARK, 0.82) },
+    '&.Mui-disabled': { color: alpha('#fff', 0.35), backgroundColor: alpha(BRAND_DARK, 0.38) },
+  };
+  const outlinedButtonSx = {
+    minHeight: 36, px: 2, borderRadius: 1.5,
+    color: BRAND_DARK, borderColor: alpha(BRAND_DARK, 0.3), fontWeight: 600,
+    '&:hover': { borderColor: BRAND_YELLOW_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.08) },
+    '&.Mui-disabled': { borderColor: alpha(BRAND_DARK, 0.15), color: alpha(BRAND_DARK, 0.3) },
+  };
+
   // ── Taxonomy dropdowns ──────────────────────────────────────────────────────
   const [categories, setCategories] = useState([]);
   const [ranges, setRanges] = useState([]);
@@ -316,19 +361,28 @@ export default function AsinListPage() {
   return (
     <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
 
+      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
+        <Box sx={{ display: 'flex', p: 1, borderRadius: 2, backgroundColor: alpha(BRAND_YELLOW, 0.2) }}>
+          <ListAltIcon sx={{ color: BRAND_YELLOW_DARK, fontSize: 28 }} />
+        </Box>
+        <Typography variant="h5" sx={{ fontWeight: 800, color: BRAND_DARK, letterSpacing: -0.5 }}>
+          ASIN Lists
+        </Typography>
+      </Stack>
+
       {/* Feedback */}
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" onClose={() => setSuccess('')}>{success}</Alert>}
 
       {/* ── Filter bar ────────────────────────────────────────────────────────── */}
-      <Paper sx={{ p: 2 }}>
-        <Stack spacing={2}>
+      <Paper elevation={0} sx={{ p: 2.5, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3 }}>
+        <Stack spacing={2.5}>
 
           {/* Row 1: Dropdowns + Keyword + Create Listing */}
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
 
             {/* Category */}
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: 150, ...selectFocusSx }}>
               <InputLabel>Category</InputLabel>
               <Select
                 value={categoryId}
@@ -347,7 +401,7 @@ export default function AsinListPage() {
             {/* Range */}
             <Autocomplete
               size="small"
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 200, ...inputFocusSx }}
               disabled={!categoryId || loadingRanges}
               options={[{ _id: '', name: 'All' }, ...ranges]}
               getOptionLabel={opt => opt.name}
@@ -369,7 +423,7 @@ export default function AsinListPage() {
             />
 
             {/* Product */}
-            <FormControl size="small" sx={{ minWidth: 150 }} disabled={!rangeId}>
+            <FormControl size="small" sx={{ minWidth: 150, ...selectFocusSx }} disabled={!rangeId}>
               <InputLabel>Product</InputLabel>
               <Select
                 value={productId}
@@ -394,7 +448,7 @@ export default function AsinListPage() {
               value={keyword}
               onChange={e => setKeyword(e.target.value)}
               onKeyDown={handleSearchSubmit}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 200, ...inputFocusSx }}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -412,7 +466,7 @@ export default function AsinListPage() {
               startIcon={<AddCircleIcon />}
               disabled={selected.length === 0 || !rangeId}
               onClick={() => setCreateDialog(true)}
-              sx={{ whiteSpace: 'nowrap' }}
+              sx={{ whiteSpace: 'nowrap', ...yellowFilledButtonSx }}
             >
               Create Listing ({selected.length})
             </Button>
@@ -432,7 +486,7 @@ export default function AsinListPage() {
               onChange={e => setPriceMin(e.target.value)}
               onKeyDown={commitPriceFilter}
               onBlur={commitPriceFilter}
-              sx={{ width: 90 }}
+              sx={{ width: 90, ...inputFocusSx }}
               type="number"
             />
             <Typography variant="body2">–</Typography>
@@ -443,7 +497,7 @@ export default function AsinListPage() {
               onChange={e => setPriceMax(e.target.value)}
               onKeyDown={commitPriceFilter}
               onBlur={commitPriceFilter}
-              sx={{ width: 90 }}
+              sx={{ width: 90, ...inputFocusSx }}
               type="number"
             />
 
@@ -452,7 +506,7 @@ export default function AsinListPage() {
             <Typography variant="body2" color="text.secondary" fontWeight={500}>
               Orders Received
             </Typography>
-            <FormControl size="small" sx={{ minWidth: 130 }}>
+            <FormControl size="small" sx={{ minWidth: 130, ...selectFocusSx }}>
               <Select
                 value={ordersComparator}
                 onChange={e => setOrdersComparator(e.target.value)}
@@ -466,7 +520,7 @@ export default function AsinListPage() {
               size="small"
               value={ordersValue}
               onChange={e => setOrdersValue(e.target.value)}
-              sx={{ width: 80 }}
+              sx={{ width: 80, ...inputFocusSx }}
               type="number"
               placeholder="0"
             />
@@ -476,29 +530,34 @@ export default function AsinListPage() {
             <Typography variant="body2" color="text.secondary" fontWeight={500}>
               Moved to List
             </Typography>
-            <TextField
-              size="small"
-              label="From"
-              type="date"
-              value={movedAfter}
-              onChange={e => { setMovedAfter(e.target.value); setPage(0); }}
-              sx={{ width: 145 }}
-              InputLabelProps={{ shrink: true }}
-            />
-            <Typography variant="body2">–</Typography>
-            <TextField
-              size="small"
-              label="To"
-              type="date"
-              value={movedBefore}
-              onChange={e => { setMovedBefore(e.target.value); setPage(0); }}
-              sx={{ width: 145 }}
-              InputLabelProps={{ shrink: true }}
-            />
+            <ThemeProvider theme={datePickerTheme}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="From"
+                  value={movedAfter ? new Date(movedAfter) : null}
+                  onChange={date => {
+                    setMovedAfter(date ? date.toISOString() : '');
+                    setPage(0);
+                  }}
+                  slotProps={{ textField: { size: 'small', sx: { width: 165, ...inputFocusSx } } }}
+                />
+                <Typography variant="body2">–</Typography>
+                <DatePicker
+                  label="To"
+                  value={movedBefore ? new Date(movedBefore) : null}
+                  onChange={date => {
+                    setMovedBefore(date ? date.toISOString() : '');
+                    setPage(0);
+                  }}
+                  slotProps={{ textField: { size: 'small', sx: { width: 165, ...inputFocusSx } } }}
+                />
+              </LocalizationProvider>
+            </ThemeProvider>
             {(movedAfter || movedBefore) && (
               <Button
                 size="small"
                 onClick={() => { setMovedAfter(''); setMovedBefore(''); setPage(0); }}
+                sx={outlinedButtonSx}
               >
                 Clear
               </Button>
@@ -509,46 +568,62 @@ export default function AsinListPage() {
       </Paper>
 
       {/* ── Table ────────────────────────────────────────────────────────────── */}
-      <Paper>
+      <Paper elevation={0} sx={{ border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
         {!rangeId ? (
-          <Box sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
-            <Typography variant="body1">
+          <Box sx={{ py: 8, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <ListAltIcon sx={{ fontSize: 48, color: alpha(BRAND_DARK, 0.12), mb: 1 }} />
+            <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.4) }}>
               Select a Category and Range to view ASINs
             </Typography>
           </Box>
         ) : (
-          <TableContainer>
-            <Table size="small">
-              <TableHead sx={{ bgcolor: 'grey.50' }}>
+          <TableContainer
+            sx={{
+              maxHeight: 'calc(100vh - 400px)',
+              overflow: 'auto',
+              '&::-webkit-scrollbar': { width: '8px', height: '8px' },
+              '&::-webkit-scrollbar-track': { backgroundColor: alpha(BRAND_DARK, 0.04), borderRadius: '10px' },
+              '&::-webkit-scrollbar-thumb': { backgroundColor: alpha(BRAND_DARK, 0.2), borderRadius: '10px', '&:hover': { backgroundColor: alpha(BRAND_DARK, 0.4) } }
+            }}
+          >
+            <Table size="small" stickyHeader>
+              <TableHead sx={{ backgroundColor: BRAND_DARK }}>
                 <TableRow>
-                  <TableCell padding="checkbox">
+                  <TableCell padding="checkbox" sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK }}>
                     <Checkbox
                       checked={isAllSelected}
                       indeterminate={isIndeterminate}
                       onChange={handleSelectAll}
                       size="small"
+                      sx={{ color: alpha('#fff', 0.6), '&.Mui-checked': { color: BRAND_YELLOW }, '&.MuiCheckbox-indeterminate': { color: BRAND_YELLOW } }}
                     />
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: 64 }}>Image</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: 90 }}>Price</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: 130 }}>ASIN</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: 70 }} align="center">Count</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: 80 }} align="center">Orders</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', width: 60 }} align="right">Delete</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK, width: 64 }}>Image</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK }}>Title</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK, width: 90 }}>Price</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK, width: 130 }}>ASIN</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK, width: 70 }} align="center">Count</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK, width: 80 }} align="center">Orders</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK, width: 60 }} align="right">Delete</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                      <CircularProgress size={28} />
+                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                      <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="center">
+                        <CircularProgress size={24} sx={{ color: BRAND_YELLOW_DARK }} />
+                        <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.5), fontWeight: 500 }}>Loading ASINs...</Typography>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ) : asins.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                      No ASINs assigned to this product
+                    <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
+                      <ListAltIcon sx={{ fontSize: 48, color: alpha(BRAND_DARK, 0.12), mb: 1 }} />
+                      <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.4) }}>
+                        No ASINs assigned to this product
+                      </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -561,7 +636,7 @@ export default function AsinListPage() {
                         key={asin._id}
                         hover
                         selected={isSelected}
-                        sx={{ cursor: 'pointer' }}
+                        sx={{ ...tableBodyRowSx, cursor: 'pointer' }}
                         onClick={() => handleSelectRow(asin._id)}
                       >
                         <TableCell padding="checkbox" onClick={e => e.stopPropagation()}>
@@ -569,6 +644,7 @@ export default function AsinListPage() {
                             checked={isSelected}
                             onChange={() => handleSelectRow(asin._id)}
                             size="small"
+                            sx={{ '&.Mui-checked': { color: BRAND_YELLOW_DARK } }}
                           />
                         </TableCell>
 
@@ -653,8 +729,13 @@ export default function AsinListPage() {
                           <Chip
                             label={asin.listingCount || 0}
                             size="small"
-                            color={asin.listingCount > 0 ? 'primary' : 'default'}
-                            variant={asin.listingCount > 0 ? 'filled' : 'outlined'}
+                            sx={{
+                              fontWeight: 700,
+                              ...(asin.listingCount > 0 
+                                ? { backgroundColor: alpha(BRAND_YELLOW, 0.2), color: BRAND_YELLOW_DARK, border: `1px solid ${alpha(BRAND_YELLOW_DARK, 0.3)}` }
+                                : { backgroundColor: alpha(BRAND_DARK, 0.05), color: alpha(BRAND_DARK, 0.4), border: `1px solid ${alpha(BRAND_DARK, 0.1)}` }
+                              )
+                            }}
                           />
                         </TableCell>
 
@@ -686,14 +767,14 @@ export default function AsinListPage() {
 
         {/* Bulk action bar */}
         {selected.length > 0 && (
-          <Toolbar sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-            <Typography variant="subtitle1" sx={{ flex: 1 }}>
-              {selected.length} selected
+          <Toolbar sx={{ backgroundColor: alpha(BRAND_YELLOW, 0.15), borderTop: `1px solid ${alpha(BRAND_YELLOW_DARK, 0.2)}` }}>
+            <Typography variant="subtitle2" sx={{ flex: 1, color: BRAND_DARK, fontWeight: 700 }}>
+              {selected.length} items selected
             </Typography>
             <Button
               startIcon={<DeleteIcon />}
               onClick={handleBulkDelete}
-              sx={{ color: 'inherit' }}
+              sx={darkButtonSx}
             >
               Delete Selected
             </Button>
@@ -702,15 +783,21 @@ export default function AsinListPage() {
 
         {/* Pagination */}
         {rangeId && (
-          <TablePagination
-            component="div"
-            count={total}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[25, 50, 100]}
-          />
+          <Box sx={{ borderTop: `1px solid ${alpha(BRAND_DARK, 0.08)}`, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
+            <TablePagination
+              component="div"
+              count={total}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              rowsPerPageOptions={[25, 50, 100]}
+              sx={{ 
+                '& .MuiTablePagination-select': { ...selectFocusSx },
+                '& .MuiTablePagination-menuItem': { fontSize: '0.875rem' }
+              }}
+            />
+          </Box>
         )}
       </Paper>
 
