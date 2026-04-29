@@ -334,11 +334,34 @@ export default function AllOrdersSheetPage() {
           page: 1,
           limit: 10000, // Large limit to get all orders
           startDate: csvStartDate,
-          endDate: csvEndDate
+          endDate: csvEndDate,
+          excludeCancelled: true
         };
         
         if (selectedSeller) params.sellerId = selectedSeller;
         if (searchMarketplace) params.searchMarketplace = searchMarketplace;
+        if (excludeLowValue) params.excludeLowValue = true;
+        if (excludeNoAmazonAccount) params.excludeNoAmazonAccount = true;
+        if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
+        if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
+        if (searchItemNumber.trim()) params.searchItemNumber = searchItemNumber.trim();
+        if (searchProductName.trim()) params.productName = searchProductName.trim();
+
+        // Profit filter
+        if (profitFilter.mode === 'single' && profitFilter.single !== '') {
+          params.maxProfit = profitFilter.single;
+        } else if (profitFilter.mode === 'range') {
+          if (profitFilter.from !== '') params.minProfit = profitFilter.from;
+          if (profitFilter.to !== '') params.maxProfit = profitFilter.to;
+        }
+
+        // Subtotal filter
+        if (subtotalFilter.mode === 'single' && subtotalFilter.single !== '') {
+          params.maxSubtotal = subtotalFilter.single;
+        } else if (subtotalFilter.mode === 'range') {
+          if (subtotalFilter.from !== '') params.minSubtotal = subtotalFilter.from;
+          if (subtotalFilter.to !== '') params.maxSubtotal = subtotalFilter.to;
+        }
         
         const { data } = await api.get('/ebay/all-orders-usd', { params });
         ordersToExport = data.orders || [];
