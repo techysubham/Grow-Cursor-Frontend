@@ -136,13 +136,14 @@ export default function AllOrdersSheetPage() {
   const [searchProductName, setSearchProductName] = useState(() => getInitialState('searchProductName', ''));
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
   const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
-  const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
-  const [excludeNoAmazonAccount, setExcludeNoAmazonAccount] = useState(() => getInitialState('excludeNoAmazonAccount', false));
+  const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', true));
+  const [excludeNoAmazonAccount, setExcludeNoAmazonAccount] = useState(() => getInitialState('excludeNoAmazonAccount', true));
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(() => getInitialState('currentPage', 1));
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [rawCount, setRawCount] = useState(null);
   const [ordersPerPage] = useState(50);
 
   // Date filter
@@ -251,45 +252,13 @@ export default function AllOrdersSheetPage() {
     loadOrders();
   }, [currentPage]);
 
-  // When filters change, reset to page 1
-  useEffect(() => {
-    const filtersChanged = 
-      prevFilters.current.selectedSeller !== selectedSeller ||
-      prevFilters.current.searchOrderId !== searchOrderId ||
-      prevFilters.current.searchBuyerName !== searchBuyerName ||
-      prevFilters.current.searchItemNumber !== searchItemNumber ||
-      prevFilters.current.searchProductName !== searchProductName ||
-      prevFilters.current.searchMarketplace !== searchMarketplace ||
-      prevFilters.current.excludeLowValue !== excludeLowValue ||
-      prevFilters.current.excludeNoAmazonAccount !== excludeNoAmazonAccount ||
-      JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter) ||
-      JSON.stringify(prevFilters.current.profitFilter) !== JSON.stringify(profitFilter) ||
-      JSON.stringify(prevFilters.current.subtotalFilter) !== JSON.stringify(subtotalFilter);
-    
-    prevFilters.current = {
-      selectedSeller,
-      searchOrderId,
-      searchBuyerName,
-      searchItemNumber,
-      searchProductName,
-      searchMarketplace,
-      excludeLowValue,
-      excludeNoAmazonAccount,
-      dateFilter,
-      profitFilter,
-      subtotalFilter
-    };
-
-    if (!hasFetchedInitialData.current) return;
-
-    if (filtersChanged) {
-      if (currentPage === 1) {
-        loadOrders();
-      } else {
-        setCurrentPage(1);
-      }
+  function handleApplyFilters() {
+    if (currentPage === 1) {
+      loadOrders();
+    } else {
+      setCurrentPage(1);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemNumber, searchMarketplace, excludeLowValue, excludeNoAmazonAccount, dateFilter, profitFilter, subtotalFilter]);
+  }
 
   async function fetchSellers() {
     setError('');
@@ -586,6 +555,7 @@ export default function AllOrdersSheetPage() {
       if (data?.pagination) {
         setTotalPages(data.pagination.totalPages);
         setTotalOrders(data.pagination.totalOrders);
+        setRawCount(data.pagination.rawCount ?? null);
       }
 
       if (data?.counts) {
@@ -950,6 +920,15 @@ export default function AllOrdersSheetPage() {
             }
             label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Hide No Amazon Account</Typography>}
           />
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleApplyFilters}
+            disabled={loading}
+            sx={{ ...yellowFilledButtonSx, ml: 'auto' }}
+          >
+            Apply Filters
+          </Button>
         </Stack>
       </Paper>
 
@@ -1123,6 +1102,15 @@ export default function AllOrdersSheetPage() {
                 sx={{ minWidth: 80 }}
               >
                 CLEAR
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={handleApplyFilters}
+                disabled={loading}
+                sx={yellowFilledButtonSx}
+              >
+                Apply Filters
               </Button>
             </Stack>
           )}
@@ -1588,15 +1576,36 @@ export default function AllOrdersSheetPage() {
         <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" spacing={2}>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                {dateFilter.mode === 'single' ? (
-                  <>Total Results: {orders.length} order{orders.length !== 1 ? 's' : ''}</>
-                ) : (
-                  <>
-                    Showing {orders.length > 0 ? `${(currentPage - 1) * ordersPerPage + 1}-${(currentPage - 1) * ordersPerPage + orders.length}` : '0'} of {totalOrders} order{totalOrders !== 1 ? 's' : ''}
-                  </>
+              <Stack direction="row" spacing={1.5} alignItems="baseline" flexWrap="wrap">
+                <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                  {dateFilter.mode === 'single' ? (
+                    <>Filtered: {orders.length} order{orders.length !== 1 ? 's' : ''}</>
+                  ) : (
+                    <>Filtered: {orders.length > 0 ? `${(currentPage - 1) * ordersPerPage + 1}–${(currentPage - 1) * ordersPerPage + orders.length}` : '0'} of {totalOrders} order{totalOrders !== 1 ? 's' : ''}</>
+                  )}
+                </Typography>
+                {rawCount !== null && (
+                  <Tooltip title="Total orders in this date/seller/marketplace scope before any exclusion filters (matches Fulfillment Dashboard count)">
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: 'text.secondary',
+                        borderLeft: '1px solid #ccc',
+                        pl: 1.5,
+                        cursor: 'default',
+                        fontStyle: 'italic'
+                      }}
+                    >
+                      Raw total: {rawCount}
+                      {rawCount !== totalOrders && (
+                        <Typography component="span" sx={{ ml: 0.5, color: 'warning.main', fontWeight: 'bold', fontStyle: 'normal' }}>
+                          (−{rawCount - totalOrders} excluded)
+                        </Typography>
+                      )}
+                    </Typography>
+                  </Tooltip>
                 )}
-              </Typography>
+              </Stack>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                 {selectedSeller && 'Seller filter active • '}
                 {searchMarketplace && 'Marketplace filter active • '}
