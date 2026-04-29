@@ -116,69 +116,52 @@ export default function AllOrdersSheetPage() {
   const [updatingOrderTotals, setUpdatingOrderTotals] = useState({}); // { orderId: boolean }
   const [confirmOrderTotal, setConfirmOrderTotal] = useState({ open: false, order: null, value: '' });
 
-  // Session storage key for persisting state
-  const STORAGE_KEY = 'all_orders_sheet_state';
-
-  // Helper to get initial state from sessionStorage
-  const getInitialState = (key, defaultValue) => {
-    try {
-      const stored = sessionStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed[key] !== undefined ? parsed[key] : defaultValue;
-      }
-    } catch (e) {
-      console.error('Error reading sessionStorage:', e);
-    }
-    return defaultValue;
-  };
-
   // Search filters
-  const [selectedSeller, setSelectedSeller] = useState(() => getInitialState('selectedSeller', ''));
-  const [searchOrderId, setSearchOrderId] = useState(() => getInitialState('searchOrderId', ''));
-  const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
-  const [searchItemNumber, setSearchItemNumber] = useState(() => getInitialState('searchItemNumber', ''));
-  const [searchProductName, setSearchProductName] = useState(() => getInitialState('searchProductName', ''));
-  const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
-  const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
-  const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', true));
-  const [excludeNoAmazonAccount, setExcludeNoAmazonAccount] = useState(() => getInitialState('excludeNoAmazonAccount', true));
+  const [selectedSeller, setSelectedSeller] = useState('');
+  const [searchOrderId, setSearchOrderId] = useState('');
+  const [searchBuyerName, setSearchBuyerName] = useState('');
+  const [searchItemNumber, setSearchItemNumber] = useState('');
+  const [searchProductName, setSearchProductName] = useState('');
+  const [searchMarketplace, setSearchMarketplace] = useState('');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [excludeLowValue, setExcludeLowValue] = useState(true);
+  const [excludeNoAmazonAccount, setExcludeNoAmazonAccount] = useState(true);
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(() => getInitialState('currentPage', 1));
+  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
   const [rawCount, setRawCount] = useState(null);
   const [ordersPerPage] = useState(50);
 
   // Date filter
-  const [dateFilter, setDateFilter] = useState(() => getInitialState('dateFilter', {
+  const [dateFilter, setDateFilter] = useState({
     mode: 'none',
     single: '',
     from: '',
     to: ''
-  }));
+  });
 
   // Profit filter
-  const [profitFilter, setProfitFilter] = useState(() => getInitialState('profitFilter', {
+  const [profitFilter, setProfitFilter] = useState({
     mode: 'none',
     single: '',
     from: '',
     to: ''
-  }));
+  });
 
   // Subtotal filter
-  const [subtotalFilter, setSubtotalFilter] = useState(() => getInitialState('subtotalFilter', {
+  const [subtotalFilter, setSubtotalFilter] = useState({
     mode: 'none',
     single: '',
     from: '',
     to: ''
-  }));
+  });
 
   // Toggle states for card sections
-  const [showProfitCards, setShowProfitCards] = useState(() => getInitialState('showProfitCards', true));
-  const [showSubtotalCards, setShowSubtotalCards] = useState(() => getInitialState('showSubtotalCards', true));
-  const [showExchangeRate, setShowExchangeRate] = useState(() => getInitialState('showExchangeRate', true));
+  const [showProfitCards, setShowProfitCards] = useState(true);
+  const [showSubtotalCards, setShowSubtotalCards] = useState(true);
+  const [showExchangeRate, setShowExchangeRate] = useState(true);
 
   // Modal state for showing category/range/product names
   const [namesModal, setNamesModal] = useState({
@@ -205,30 +188,9 @@ export default function AllOrdersSheetPage() {
 
   // Persist filter state to sessionStorage
   useEffect(() => {
-    const stateToSave = {
-      selectedSeller,
-      searchOrderId,
-      searchBuyerName,
-      searchItemNumber,
-      searchProductName,
-      searchMarketplace,
-      filtersExpanded,
-      currentPage,
-      dateFilter,
-      profitFilter,
-      subtotalFilter,
-      excludeLowValue,
-      excludeNoAmazonAccount,
-      showProfitCards,
-      showSubtotalCards,
-      showExchangeRate
-    };
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
-    } catch (e) {
-      console.error('Error saving to sessionStorage:', e);
-    }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemNumber, searchProductName, searchMarketplace, filtersExpanded, currentPage, dateFilter, profitFilter, subtotalFilter, excludeLowValue, excludeNoAmazonAccount, showProfitCards, showSubtotalCards, showExchangeRate]);
+    // Clear any stale filter state from previous sessions
+    try { sessionStorage.removeItem('all_orders_sheet_state'); } catch (_) {}
+  }, []);
 
   // Initial load
   useEffect(() => {
