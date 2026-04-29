@@ -65,15 +65,21 @@ export default function AsinDirectoryPage() {
 
   // ── Style tokens ──────────────────────────────────────────────────────────
   const inputFocusSx = {
+    '& label.Mui-focused': { color: BRAND_YELLOW_DARK },
     '& .MuiOutlinedInput-root': {
+      borderRadius: 1.5,
       '& .MuiOutlinedInput-notchedOutline': { transition: 'border-color 0.2s ease' },
       '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(BRAND_DARK, 0.35) },
-      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#b8860b', borderWidth: 2 },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: BRAND_YELLOW_DARK, borderWidth: 2 },
     },
+    '& input': { accentColor: BRAND_YELLOW_DARK }
   };
   const selectFocusSx = {
-    '& label.Mui-focused': { color: '#b8860b' },
-    '& .MuiOutlinedInput-root': { '&.Mui-focused fieldset': { borderColor: '#b8860b' } },
+    '& label.Mui-focused': { color: BRAND_YELLOW_DARK },
+    '& .MuiOutlinedInput-root': { 
+      borderRadius: 1.5,
+      '&.Mui-focused fieldset': { borderColor: BRAND_YELLOW_DARK } 
+    },
   };
   const darkButtonSx = {
     minHeight: 36, px: 2, borderRadius: 1.5,
