@@ -1,9 +1,15 @@
-﻿import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box, Typography, Container, Paper, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  TextField, Select, MenuItem,
+  Select, MenuItem, Stack
 } from '@mui/material';
+import { alpha, ThemeProvider, createTheme, useTheme } from '@mui/material/styles';
+import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { tableHeaderCellSx, tableBodyRowSx } from '../../theme/tableStyles.js';
 import api from '../../lib/api';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -33,6 +39,58 @@ const getQuota = (sellerName, country = 'US') => {
 };
 
 export default function FeedUploadStatsPage() {
+  const theme = useTheme();
+
+  const inputFocusSx = {
+    '& label.Mui-focused': { color: `${BRAND_YELLOW} !important` },
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 1.5,
+      '& fieldset': { transition: 'border-color 0.2s ease' },
+      '&:hover fieldset': { borderColor: `${alpha(BRAND_DARK, 0.35)} !important` },
+      '&.Mui-focused fieldset': { borderColor: `${BRAND_YELLOW} !important`, borderWidth: '2px !important' },
+    },
+    '& input': { accentColor: BRAND_YELLOW }
+  };
+  const selectFocusSx = {
+    borderRadius: 1.5,
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${BRAND_YELLOW} !important`, borderWidth: '2px !important' },
+    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${alpha(BRAND_DARK, 0.35)} !important` },
+  };
+
+  const menuProps = {
+    PaperProps: {
+      sx: {
+        '& .MuiMenuItem-root.Mui-selected': {
+          backgroundColor: alpha(BRAND_YELLOW, 0.2),
+          '&:hover': { backgroundColor: alpha(BRAND_YELLOW, 0.3) }
+        }
+      }
+    }
+  };
+
+  const datePickerTheme = useMemo(() => createTheme({
+    palette: {
+      primary: { 
+        main: BRAND_YELLOW,
+        light: BRAND_YELLOW,
+        dark: BRAND_YELLOW,
+        contrastText: BRAND_DARK
+      },
+    },
+    components: {
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            borderRadius: 12, // 1.5 * 8
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+              borderColor: BRAND_YELLOW,
+            }
+          }
+        }
+      }
+    }
+  }), []);
+
   const [dayDate, setDayDate] = useState(todayStr);
   const [dayStats, setDayStats] = useState([]);
   const [dayLoading, setDayLoading] = useState(true);
@@ -113,20 +171,26 @@ export default function FeedUploadStatsPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
-      <Typography variant="h5" fontWeight={700} sx={{ mb: 3 }}>
-        Feed Upload Success Stats
-      </Typography>
+      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', p: 1, borderRadius: 2, backgroundColor: alpha(BRAND_YELLOW, 0.2) }}>
+          <BarChartIcon sx={{ color: BRAND_YELLOW_DARK, fontSize: 28 }} />
+        </Box>
+        <Typography variant="h5" sx={{ fontWeight: 800, color: BRAND_DARK, letterSpacing: -0.5 }}>
+          Feed Upload Success Stats
+        </Typography>
+      </Stack>
 
       <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
         {/* ── Day-wise ─────────────────────────────────────────────────── */}
-        <Paper sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ px: 3, py: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem">Day-wise</Typography>
+        <Paper elevation={0} sx={{ flex: 1, minWidth: 0, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
+          <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.12)}`, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
+            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem" sx={{ color: BRAND_DARK }}>Day-wise</Typography>
             <Select
               size="small"
               value={dayCountry}
               onChange={(e) => setDayCountry(e.target.value)}
-              sx={{ minWidth: 140 }}
+              sx={{ minWidth: 140, ...selectFocusSx }}
+              MenuProps={menuProps}
             >
               <MenuItem value="ALL">All Countries</MenuItem>
               <MenuItem value="US">US</MenuItem>
@@ -134,14 +198,28 @@ export default function FeedUploadStatsPage() {
               <MenuItem value="AU">AU</MenuItem>
               <MenuItem value="Canada">Canada</MenuItem>
             </Select>
-            <TextField
-              type="date"
-              size="small"
-              value={dayDate}
-              onChange={(e) => { setDayDate(e.target.value); fetchDay(e.target.value, dayCountry); }}
-              InputLabelProps={{ shrink: true }}
-              sx={{ ml: 'auto', width: 170 }}
-            />
+            <Box sx={{ ml: 'auto' }}>
+              <ThemeProvider theme={datePickerTheme}>
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <DatePicker
+                    value={dayDate ? new Date(dayDate) : null}
+                    onChange={(date) => {
+                      if (!date) {
+                        setDayDate('');
+                        return;
+                      }
+                      const y = date.getFullYear();
+                      const m = String(date.getMonth() + 1).padStart(2, '0');
+                      const d = String(date.getDate()).padStart(2, '0');
+                      const isoDate = `${y}-${m}-${d}`;
+                      setDayDate(isoDate);
+                      fetchDay(isoDate, dayCountry);
+                    }}
+                    slotProps={{ textField: { size: 'small', sx: { width: 170 } } }}
+                  />
+                </LocalizationProvider>
+              </ThemeProvider>
+            </Box>
           </Box>
 
           {dayLoading ? (
@@ -153,12 +231,12 @@ export default function FeedUploadStatsPage() {
           ) : (
             <TableContainer>
               <Table>
-                <TableHead>
+                <TableHead sx={{ backgroundColor: BRAND_DARK }}>
                   <TableRow>
-                    <TableCell sx={{ ...headSx, width: 52, pl: 3 }}>#</TableCell>
-                    <TableCell sx={headSx}>Seller</TableCell>
-                    <TableCell sx={headSx}>Country</TableCell>
-                    <TableCell sx={{ ...headSx, pr: 3 }} align="right">Successful Listings</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, width: 52, pl: 3 }}>#</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx }}>Seller</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx }}>Country</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, pr: 3 }} align="right">Successful Listings</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -174,19 +252,19 @@ export default function FeedUploadStatsPage() {
                         <TableRow
                           key={`d-${row.sellerId}-${idx}`}
                           hover
-                          sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}
+                          sx={tableBodyRowSx}
                         >
                           <TableCell sx={{ ...cellSx, color: 'text.disabled', width: 52, pl: 3 }}>{idx + 1}</TableCell>
-                          <TableCell sx={cellSx}>{row.sellerName}</TableCell>
+                          <TableCell sx={{ ...cellSx, fontWeight: 500, color: BRAND_DARK }}>{row.sellerName}</TableCell>
                           <TableCell sx={cellSx}>{row.country || 'US'}</TableCell>
-                          <TableCell align="right" sx={{ ...numCellSx, pr: 3 }}>
+                          <TableCell align="right" sx={{ ...numCellSx, pr: 3, fontWeight: 700, color: BRAND_DARK }}>
                             {row.totalSuccess.toLocaleString()}
                           </TableCell>
                         </TableRow>
                       ))}
-                      <TableRow sx={{ bgcolor: '#f5f5f5', borderTop: '2px solid #e0e0e0' }}>
-                        <TableCell colSpan={3} sx={{ fontWeight: 700, fontSize: '0.9rem', pl: 3, py: 1.6 }}>Total</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.9rem', pr: 3, py: 1.6 }}>
+                      <TableRow sx={{ backgroundColor: alpha(BRAND_YELLOW, 0.15) }}>
+                        <TableCell colSpan={3} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pr: 3, py: 1.6, borderBottom: 'none' }}>
                           {dayTotal.toLocaleString()}
                         </TableCell>
                       </TableRow>
@@ -199,28 +277,43 @@ export default function FeedUploadStatsPage() {
         </Paper>
 
         {/* ── Month-wise ───────────────────────────────────────────────── */}
-        <Paper sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ px: 3, py: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem">Month-wise</Typography>
+        <Paper elevation={0} sx={{ flex: 1, minWidth: 0, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
+          <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.12)}`, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
+            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem" sx={{ color: BRAND_DARK }}>Month-wise</Typography>
             <Select
               size="small"
               value={monthCountry}
               onChange={(e) => setMonthCountry(e.target.value)}
-              sx={{ minWidth: 140 }}
+              sx={{ minWidth: 140, ...selectFocusSx }}
+              MenuProps={menuProps}
             >
               <MenuItem value="US">US</MenuItem>
               <MenuItem value="UK">UK</MenuItem>
               <MenuItem value="AU">AU</MenuItem>
               <MenuItem value="Canada">Canada</MenuItem>
             </Select>
-            <TextField
-              type="month"
-              size="small"
-              value={monthPicker}
-              onChange={(e) => { setMonthPicker(e.target.value); fetchMonth(e.target.value, monthCountry); }}
-              InputLabelProps={{ shrink: true }}
-              sx={{ ml: 'auto', width: 190 }}
-            />
+            <Box sx={{ ml: 'auto' }}>
+              <ThemeProvider theme={datePickerTheme}>
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <DatePicker
+                    views={['month', 'year']}
+                    value={monthPicker ? new Date(`${monthPicker}-01T00:00:00`) : null}
+                    onChange={(date) => {
+                      if (!date) {
+                        setMonthPicker('');
+                        return;
+                      }
+                      const y = date.getFullYear();
+                      const m = String(date.getMonth() + 1).padStart(2, '0');
+                      const ym = `${y}-${m}`;
+                      setMonthPicker(ym);
+                      fetchMonth(ym, monthCountry);
+                    }}
+                    slotProps={{ textField: { size: 'small', sx: { width: 170 } } }}
+                  />
+                </LocalizationProvider>
+              </ThemeProvider>
+            </Box>
           </Box>
 
           {monthLoading ? (
@@ -232,11 +325,11 @@ export default function FeedUploadStatsPage() {
           ) : (
             <TableContainer>
               <Table>
-                <TableHead>
+                <TableHead sx={{ backgroundColor: BRAND_DARK }}>
                   <TableRow>
-                    <TableCell sx={{ ...headSx, width: 52, pl: 3 }}>#</TableCell>
-                    <TableCell sx={headSx}>Seller</TableCell>
-                    <TableCell sx={{ ...headSx, pr: 3 }} align="right">Successful Listings</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, width: 52, pl: 3 }}>#</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx }}>Seller</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, pr: 3 }} align="right">Successful Listings</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -254,14 +347,14 @@ export default function FeedUploadStatsPage() {
                           <TableRow
                             key={`m-${row.sellerId}-${idx}`}
                             hover
-                            sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}
+                            sx={tableBodyRowSx}
                           >
                             <TableCell sx={{ ...cellSx, color: 'text.disabled', width: 52, pl: 3 }}>{idx + 1}</TableCell>
-                            <TableCell sx={cellSx}>{row.sellerName}</TableCell>
-                            <TableCell align="right" sx={{ ...numCellSx, pr: 3 }}>
+                            <TableCell sx={{ ...cellSx, fontWeight: 500, color: BRAND_DARK }}>{row.sellerName}</TableCell>
+                            <TableCell align="right" sx={{ ...numCellSx, pr: 3, fontWeight: 700, color: BRAND_DARK }}>
                               {row.totalSuccess.toLocaleString()}
                               {quota && (
-                                <Typography component="span" sx={{ fontSize: '0.78rem', color: 'text.secondary', ml: 0.5, fontWeight: 400 }}>
+                                <Typography component="span" sx={{ fontSize: '0.78rem', color: alpha(BRAND_DARK, 0.5), ml: 0.5, fontWeight: 500 }}>
                                   / {quota.toLocaleString()}
                                 </Typography>
                               )}
@@ -269,9 +362,9 @@ export default function FeedUploadStatsPage() {
                           </TableRow>
                         );
                       })}
-                      <TableRow sx={{ bgcolor: '#f5f5f5', borderTop: '2px solid #e0e0e0' }}>
-                        <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: '0.9rem', pl: 3, py: 1.6 }}>Total</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.9rem', pr: 3, py: 1.6 }}>
+                      <TableRow sx={{ backgroundColor: alpha(BRAND_YELLOW, 0.15) }}>
+                        <TableCell colSpan={2} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pr: 3, py: 1.6, borderBottom: 'none' }}>
                           {monthTotal.toLocaleString()}
                         </TableCell>
                       </TableRow>
