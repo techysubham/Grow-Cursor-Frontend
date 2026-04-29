@@ -1,24 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
-  Box,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Button,
-  CircularProgress,
-  Alert,
-  Breadcrumbs,
-  Link as MuiLink,
-  Chip,
-  Stack,
-  TextField,
-  InputAdornment
+  Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, Button, Alert, Breadcrumbs, Link as MuiLink,
+  Chip, Stack, TextField, InputAdornment, Skeleton, CircularProgress
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -34,21 +20,50 @@ import BulkImportASINsDialog from '../../components/BulkImportASINsDialog.jsx';
 import BulkImportSKUsDialog from '../../components/BulkImportSKUsDialog.jsx';
 import BulkReactivateDialog from '../../components/BulkReactivateDialog.jsx';
 import BulkDeactivateDialog from '../../components/BulkDeactivateDialog.jsx';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
+
+// ── Skeleton rows ────────────────────────────────────────────────────────────
+function TableRowSkeleton({ cols = 5 }) {
+  return (
+    <TableRow>
+      {Array.from({ length: cols }).map((_, i) => (
+        <TableCell key={i} sx={{ py: 1.5 }}>
+          <Skeleton variant="rounded" height={22} width={i === 0 ? '70%' : i === cols - 1 ? 90 : 60} sx={{ borderRadius: 1.5 }} />
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+}
 
 export default function SellerTemplatesPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [searchParams] = useSearchParams();
   const sellerId = searchParams.get('sellerId');
+  const dashboardTheme = theme.customTokens?.dashboardSignature || dashboardSignatureTokens;
 
+  // ── Style tokens ─────────────────────────────────────────────────────────
+  const surfaceCardSx = {
+    borderRadius: `${dashboardTheme.radius.card}px`,
+    border: '1px solid',
+    borderColor: alpha(BRAND_DARK, 0.08),
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: dashboardTheme.shadows.card
+  };
+  // ── State ─────────────────────────────────────────────────────────────────
   const [seller, setSeller] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [filteredTemplates, setFilteredTemplates] = useState([]);
   const [listingCounts, setListingCounts] = useState({});
   const [loading, setLoading] = useState(false);
+  const [countsLoading, setCountsLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Bulk operation dialogs
+
   const [bulkImportASINsDialog, setBulkImportASINsDialog] = useState(false);
   const [bulkImportSKUsDialog, setBulkImportSKUsDialog] = useState(false);
   const [reactivateDialog, setReactivateDialog] = useState(false);
@@ -57,50 +72,31 @@ export default function SellerTemplatesPage() {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    if (!sellerId) {
-      navigate('/admin/select-seller');
-      return;
-    }
+    if (!sellerId) { navigate('/admin/select-seller'); return; }
     fetchSellerAndTemplates();
   }, [sellerId]);
 
   useEffect(() => {
-    // Filter templates based on search query
     if (searchQuery.trim() === '') {
       setFilteredTemplates(templates);
     } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = templates.filter(template =>
-        template.name?.toLowerCase().includes(query)
-      );
-      setFilteredTemplates(filtered);
+      const q = searchQuery.toLowerCase();
+      setFilteredTemplates(templates.filter(t => t.name?.toLowerCase().includes(q)));
     }
   }, [searchQuery, templates]);
 
   const fetchSellerAndTemplates = async () => {
     try {
       setLoading(true);
-
-      // Fetch seller info and templates in parallel
       const [sellerRes, templatesRes] = await Promise.all([
         api.get('/sellers/all'),
         api.get('/listing-templates')
       ]);
-
       const sellerData = sellerRes.data.find(s => s._id === sellerId);
-      if (!sellerData) {
-        setError('Seller not found');
-        setSeller(null);
-        setTemplates([]);
-        setFilteredTemplates([]);
-        return;
-      }
-
+      if (!sellerData) { setError('Seller not found'); setSeller(null); setTemplates([]); setFilteredTemplates([]); return; }
       setSeller(sellerData);
       setTemplates(templatesRes.data || []);
       setFilteredTemplates(templatesRes.data || []);
-
-      // Fetch listing counts for each template
       fetchListingCounts(templatesRes.data || []);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -111,139 +107,94 @@ export default function SellerTemplatesPage() {
   };
 
   const fetchListingCounts = async (templatesList) => {
+    setCountsLoading(true);
     const counts = {};
-    
-    // Fetch counts in parallel
-    const countPromises = templatesList.map(async (template) => {
+    await Promise.all(templatesList.map(async (template) => {
       try {
-        const { data } = await api.get(
-          `/template-listings?templateId=${template._id}&sellerId=${sellerId}&page=1&limit=1`
-        );
+        const { data } = await api.get(`/template-listings?templateId=${template._id}&sellerId=${sellerId}&page=1&limit=1`);
         counts[template._id] = data.pagination?.total || 0;
-      } catch (err) {
-        console.error(`Error fetching count for template ${template._id}:`, err);
-        counts[template._id] = 0;
-      }
-    });
-
-    await Promise.all(countPromises);
+      } catch { counts[template._id] = 0; }
+    }));
     setListingCounts(counts);
+    setCountsLoading(false);
   };
 
-  const handleAddListings = (templateId) => {
-    navigate(`/admin/template-listings?templateId=${templateId}&sellerId=${sellerId}`);
-  };
+  const handleAddListings = (templateId) => navigate(`/admin/template-listings?templateId=${templateId}&sellerId=${sellerId}`);
 
   const getSellerDisplayName = () => {
     if (!seller) return 'Unknown';
     return seller.user?.username || seller.user?.email || 'Unknown Seller';
   };
-  
+
   const handleOpenBulkDialog = (dialogType, templateId = null) => {
     setSelectedTemplateId(templateId);
-    switch (dialogType) {
-      case 'importASINs':
-        setBulkImportASINsDialog(true);
-        break;
-      case 'importSKUs':
-        setBulkImportSKUsDialog(true);
-        break;
-      case 'reactivate':
-        setReactivateDialog(true);
-        break;
-      case 'deactivate':
-        setDeactivateDialog(true);
-        break;
-    }
+    if (dialogType === 'importASINs') setBulkImportASINsDialog(true);
+    else if (dialogType === 'importSKUs') setBulkImportSKUsDialog(true);
+    else if (dialogType === 'reactivate') setReactivateDialog(true);
+    else if (dialogType === 'deactivate') setDeactivateDialog(true);
   };
-  
+
   const handleDialogSuccess = (message) => {
     setSuccess(message);
     fetchListingCounts(templates);
     setTimeout(() => setSuccess(''), 3000);
   };
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
-    <Box>
-      {/* Breadcrumb Navigation */}
-      <Breadcrumbs sx={{ mb: 2 }}>
+    <AdminPageShell>
+
+      {/* Breadcrumbs */}
+      <Breadcrumbs sx={{ mb: 1.5, pt: 2 }}>
         <MuiLink
           component={Link}
           to="/admin/select-seller"
           underline="hover"
-          color="inherit"
+          sx={{ fontWeight: 600, color: BRAND_DARK, fontSize: '0.85rem', '&:hover': { color: BRAND_YELLOW_DARK } }}
         >
           Select Seller
         </MuiLink>
-        <Typography color="text.primary">{getSellerDisplayName()}</Typography>
+        <Typography sx={{ fontWeight: 600, color: alpha(BRAND_DARK, 0.5), fontSize: '0.85rem' }}>
+          {getSellerDisplayName()}
+        </Typography>
       </Breadcrumbs>
 
-      {/* Header */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h5">
-          {getSellerDisplayName()}'s Templates
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/admin/select-seller')}
-        >
-          Back to Sellers
-        </Button>
-      </Stack>
+      <PageHeader
+        title={`${getSellerDisplayName()}'s Templates`}
+        subtitle={!loading ? `${templates.length} template${templates.length !== 1 ? 's' : ''} available` : undefined}
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/admin/select-seller')}
+            sx={yellowOutlinedButtonSx}
+          >
+            Back to Sellers
+          </Button>
+        }
+      />
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
-      
-      {success && (
-        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess('')}>
-          {success}
-        </Alert>
-      )}
-      
-      {/* Bulk Operation Buttons */}
-      {templates.length > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-            <Button
-              variant="outlined"
-              startIcon={<UploadIcon />}
-              onClick={() => handleOpenBulkDialog('importASINs')}
-            >
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+
+      {/* Bulk Operations Bar */}
+      {!loading && templates.length > 0 && (
+        <Paper sx={{ ...surfaceCardSx, p: 2, mb: 3 }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: alpha(BRAND_DARK, 0.45), display: 'block', mb: 1.5 }}>
+            Bulk Operations
+          </Typography>
+          <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+            <Button variant="outlined" startIcon={<UploadIcon />} onClick={() => handleOpenBulkDialog('importASINs')} sx={yellowOutlinedButtonSx} size="small">
               Bulk Import ASINs
             </Button>
-            <Button
-              variant="outlined"
-              startIcon={<UploadIcon />}
-              onClick={() => handleOpenBulkDialog('importSKUs')}
-            >
+            <Button variant="outlined" startIcon={<UploadIcon />} onClick={() => handleOpenBulkDialog('importSKUs')} sx={yellowOutlinedButtonSx} size="small">
               Bulk Import SKUs
             </Button>
-            <Button
-              variant="outlined"
-              color="success"
-              startIcon={<ReactivateIcon />}
-              onClick={() => handleOpenBulkDialog('reactivate')}
-            >
+            <Button variant="outlined" startIcon={<ReactivateIcon />} onClick={() => handleOpenBulkDialog('reactivate')}
+              size="small" sx={{ ...yellowOutlinedButtonSx, borderColor: 'rgba(22,163,74,0.5)', color: '#166534', backgroundColor: 'rgba(22,163,74,0.06)', '&:hover': { backgroundColor: 'rgba(22,163,74,0.14)', borderColor: '#16a34a' } }}>
               Relist by SKU
             </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeactivateIcon />}
-              onClick={() => handleOpenBulkDialog('deactivate')}
-            >
+            <Button variant="outlined" startIcon={<DeactivateIcon />} onClick={() => handleOpenBulkDialog('deactivate')}
+              size="small" sx={{ ...yellowOutlinedButtonSx, borderColor: 'rgba(220,38,38,0.35)', color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.05)', '&:hover': { backgroundColor: 'rgba(220,38,38,0.12)', borderColor: '#dc2626' } }}>
               Delist by SKU
             </Button>
           </Stack>
@@ -251,131 +202,159 @@ export default function SellerTemplatesPage() {
       )}
 
       {/* Search Bar */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ ...surfaceCardSx, p: 1.5, mb: 3 }}>
         <TextField
           fullWidth
+          size="small"
           placeholder="Search templates by name..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              '& .MuiOutlinedInput-notchedOutline': { transition: 'border-color 0.2s ease' },
+              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(BRAND_DARK, 0.35) },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#b8860b', borderWidth: 2 }
+            }
+          }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchIcon />
+                <SearchIcon sx={{ color: alpha(BRAND_DARK, 0.35), fontSize: 20 }} />
               </InputAdornment>
             ),
           }}
         />
       </Paper>
 
-      {/* Templates Table */}
-      {filteredTemplates.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <ViewListIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            {searchQuery ? 'No templates found matching your search' : 'No templates available'}
+      {/* Templates Table / loading / empty */}
+      {loading ? (
+        <Paper sx={{ ...surfaceCardSx, overflow: 'hidden' }}>
+          <Box sx={{ px: 2.5, py: 1.5, backgroundColor: BRAND_DARK, borderBottom: `2px solid ${BRAND_YELLOW}` }}>
+            <Skeleton variant="text" width={160} height={20} sx={{ bgcolor: alpha('#fff', 0.12) }} />
+          </Box>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                {['Template Name', 'Custom Columns', 'Listings', 'ASIN Automation', 'Actions'].map(h => (
+                  <TableCell key={h} sx={tableHeaderCellSx}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {[1, 2, 3, 4, 5].map(i => <TableRowSkeleton key={i} cols={5} />)}
+            </TableBody>
+          </Table>
+        </Paper>
+
+      ) : filteredTemplates.length === 0 ? (
+        <Paper sx={{ ...surfaceCardSx, p: 5, textAlign: 'center', background: dashboardTheme.surfaces?.emptyState || alpha(BRAND_DARK, 0.02) }}>
+          <ViewListIcon sx={{ fontSize: 56, color: alpha(BRAND_DARK, 0.15), mb: 1.5 }} />
+          <Typography variant="h6" fontWeight={600} sx={{ color: alpha(BRAND_DARK, 0.5) }}>
+            {searchQuery ? 'No templates match your search' : 'No templates available'}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.38), mt: 0.5 }}>
             {searchQuery ? 'Try a different search term' : 'Create a template first from the Manage Templates page'}
           </Typography>
           {searchQuery && (
-            <Button onClick={() => setSearchQuery('')}>
+            <Button onClick={() => setSearchQuery('')}
+              sx={{ mt: 2, color: BRAND_DARK, fontWeight: 600, textDecoration: 'underline', '&:hover': { backgroundColor: 'transparent', textDecoration: 'underline' } }}>
               Clear Search
             </Button>
           )}
         </Paper>
+
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Template Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Custom Columns</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Listings</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>ASIN Automation</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredTemplates.map((template) => (
-                <TableRow key={template._id} hover>
-                  <TableCell>
-                    <Typography variant="body1" fontWeight="medium">
-                      {template.name}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={`${template.customColumns?.length || 0} columns`}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={`${listingCounts[template._id] || 0} listings`}
-                      size="small"
-                      color={listingCounts[template._id] > 0 ? 'primary' : 'default'}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={template.asinAutomation?.enabled ? 'Enabled' : 'Disabled'}
-                      size="small"
-                      color={template.asinAutomation?.enabled ? 'success' : 'default'}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<AddIcon />}
-                      onClick={() => handleAddListings(template._id)}
-                    >
-                      Add Listings
-                    </Button>
-                  </TableCell>
+        <Paper sx={{ ...surfaceCardSx, overflow: 'hidden' }}>
+          {/* Table header bar */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center"
+            sx={{ px: 2.5, py: 1.5, backgroundColor: BRAND_DARK, borderBottom: `2px solid ${BRAND_YELLOW}` }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.5, color: alpha('#fff', 0.95) }}>
+              Templates ({filteredTemplates.length}{filteredTemplates.length !== templates.length ? ` of ${templates.length}` : ''})
+            </Typography>
+            {countsLoading && (
+              <Stack direction="row" spacing={1} alignItems="center">
+                <CircularProgress size={14} sx={{ color: alpha('#fff', 0.6) }} />
+                <Typography variant="caption" sx={{ color: alpha('#fff', 0.5) }}>Loading counts…</Typography>
+              </Stack>
+            )}
+          </Stack>
+
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={tableHeaderCellSx}>Template Name</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Custom Columns</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Listings</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>ASIN Automation</TableCell>
+                  <TableCell align="right" sx={tableHeaderCellSx}>Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {filteredTemplates.map((template) => (
+                  <TableRow key={template._id} hover sx={tableBodyRowSx}>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: BRAND_DARK }}>
+                        {template.name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={`${template.customColumns?.length || 0} columns`}
+                        size="small"
+                        sx={{
+                          fontWeight: 600,
+                          backgroundColor: template.customColumns?.length > 0 ? alpha(BRAND_YELLOW, 0.25) : alpha(BRAND_DARK, 0.06),
+                          color: BRAND_DARK,
+                          border: `1px solid ${template.customColumns?.length > 0 ? BRAND_YELLOW_DARK : alpha(BRAND_DARK, 0.12)}`
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={countsLoading ? '…' : `${listingCounts[template._id] ?? 0} listings`}
+                        size="small"
+                        sx={{
+                          fontWeight: 700,
+                          backgroundColor: listingCounts[template._id] > 0 ? alpha(BRAND_YELLOW, 0.2) : alpha(BRAND_DARK, 0.06),
+                          color: BRAND_DARK,
+                          border: `1px solid ${listingCounts[template._id] > 0 ? BRAND_YELLOW_DARK : alpha(BRAND_DARK, 0.12)}`
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={template.asinAutomation?.enabled ? 'Enabled' : 'Disabled'}
+                        size="small"
+                        sx={template.asinAutomation?.enabled
+                          ? { fontWeight: 700, backgroundColor: 'rgba(22,163,74,0.12)', color: '#166534', border: '1px solid rgba(22,163,74,0.25)' }
+                          : { fontWeight: 600, backgroundColor: alpha(BRAND_DARK, 0.06), color: alpha(BRAND_DARK, 0.5), border: `1px solid ${alpha(BRAND_DARK, 0.12)}` }}
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<AddIcon />}
+                        onClick={() => handleAddListings(template._id)}
+                        sx={yellowFilledButtonSx}
+                      >
+                        Add Listings
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
       )}
-      
-      {/* Bulk Import ASINs Dialog */}
-      <BulkImportASINsDialog
-        open={bulkImportASINsDialog}
-        onClose={() => setBulkImportASINsDialog(false)}
-        templateId={selectedTemplateId}
-        sellerId={sellerId}
-        onImportComplete={() => handleDialogSuccess('ASINs imported successfully')}
-      />
-      
-      {/* Bulk Import SKUs Dialog */}
-      <BulkImportSKUsDialog
-        open={bulkImportSKUsDialog}
-        onClose={() => setBulkImportSKUsDialog(false)}
-        templateId={selectedTemplateId}
-        sellerId={sellerId}
-        onImportComplete={() => handleDialogSuccess('SKUs imported successfully')}
-      />
-      
-      {/* Bulk Reactivate Dialog */}
-      <BulkReactivateDialog
-        open={reactivateDialog}
-        onClose={() => setReactivateDialog(false)}
-        templateId={selectedTemplateId}
-        sellerId={sellerId}
-        onSuccess={() => handleDialogSuccess('Listings reactivated successfully')}
-      />
-      
-      {/* Bulk Deactivate Dialog */}
-      <BulkDeactivateDialog
-        open={deactivateDialog}
-        onClose={() => setDeactivateDialog(false)}
-        templateId={selectedTemplateId}
-        sellerId={sellerId}
-        onSuccess={() => handleDialogSuccess('Listings deactivated successfully')}
-      />
-    </Box>
+
+      {/* Dialogs — logic unchanged */}
+      <BulkImportASINsDialog open={bulkImportASINsDialog} onClose={() => setBulkImportASINsDialog(false)} templateId={selectedTemplateId} sellerId={sellerId} onImportComplete={() => handleDialogSuccess('ASINs imported successfully')} />
+      <BulkImportSKUsDialog open={bulkImportSKUsDialog} onClose={() => setBulkImportSKUsDialog(false)} templateId={selectedTemplateId} sellerId={sellerId} onImportComplete={() => handleDialogSuccess('SKUs imported successfully')} />
+      <BulkReactivateDialog open={reactivateDialog} onClose={() => setReactivateDialog(false)} templateId={selectedTemplateId} sellerId={sellerId} onSuccess={() => handleDialogSuccess('Listings reactivated successfully')} />
+      <BulkDeactivateDialog open={deactivateDialog} onClose={() => setDeactivateDialog(false)} templateId={selectedTemplateId} sellerId={sellerId} onSuccess={() => handleDialogSuccess('Listings deactivated successfully')} />
+    </AdminPageShell>
   );
 }

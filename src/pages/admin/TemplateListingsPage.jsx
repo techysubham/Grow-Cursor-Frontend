@@ -37,6 +37,8 @@ import AsinReviewModal from '../../components/AsinReviewModal.jsx';
 import ListDirectlyDialog from '../../components/ListDirectlyDialog.jsx';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import { tableHeaderCellSx, tableContainerSx } from '../../theme/tableStyles.js';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
 
@@ -124,11 +126,6 @@ export default function TemplateListingsPage() {
   const [scheduleToRow, setScheduleToRow] = useState('');
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
 
-  const pageShellSx = {
-    px: { xs: 2, md: 3 },
-    pb: 4,
-    backgroundColor: theme.palette.background.paper
-  };
   const surfaceCardSx = {
     borderRadius: `${dashboardTheme.radius.card}px`,
     border: '1px solid',
@@ -139,22 +136,6 @@ export default function TemplateListingsPage() {
   const emphasizedSurfaceCardSx = {
     ...surfaceCardSx,
     backgroundColor: theme.palette.background.paper
-  };
-  const tableContainerSx = {
-    borderRadius: `${dashboardTheme.radius.card}px`,
-    border: '1px solid',
-    borderColor: alpha(BRAND_DARK, 0.1),
-    boxShadow: dashboardTheme.shadows.table,
-    overflow: 'hidden'
-  };
-  const tableHeaderCellSx = {
-    fontWeight: 700,
-    fontSize: '0.74rem',
-    letterSpacing: 0.55,
-    textTransform: 'uppercase',
-    color: alpha(theme.palette.common.white, 0.96),
-    backgroundColor: BRAND_DARK,
-    borderBottom: 'none'
   };
   const tableBodyRowSx = {
     '& td': {
@@ -1301,7 +1282,7 @@ export default function TemplateListingsPage() {
   }
 
   return (
-    <Box sx={pageShellSx}>
+    <AdminPageShell>
       {/* Breadcrumb Navigation */}
       <Breadcrumbs sx={{ mb: 2.5, '& .MuiBreadcrumbs-separator': { color: alpha(BRAND_DARK, 0.55) } }}>
         <Link 
@@ -2804,6 +2785,6 @@ export default function TemplateListingsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPageShell>
   );
 }

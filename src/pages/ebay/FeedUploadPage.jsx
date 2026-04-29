@@ -14,8 +14,12 @@ import {
     CircularProgress,
     Stack,
     FormHelperText,
-    Pagination
+    Pagination,
+    useTheme
 } from '@mui/material';
+import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { ThemeProvider, createTheme, alpha } from '@mui/material/styles';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -28,6 +32,8 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Chip from '@mui/material/Chip';
 import api from '../../lib/api';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 
 // Common Feed Types
 const FEED_TYPES = [
@@ -35,6 +41,45 @@ const FEED_TYPES = [
 ];
 
 const FeedUploadPage = () => {
+    const theme = useTheme();
+
+    // ── Style tokens ──────────────────────────────────────────────────────────
+    const inputFocusSx = {
+        '& label.Mui-focused': { color: BRAND_YELLOW_DARK },
+        '& .MuiOutlinedInput-root': {
+            borderRadius: 1.5,
+            '& .MuiOutlinedInput-notchedOutline': { transition: 'border-color 0.2s ease' },
+            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(BRAND_DARK, 0.35) },
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: BRAND_YELLOW_DARK, borderWidth: 2 },
+        },
+        '& input': { accentColor: BRAND_YELLOW_DARK }
+    };
+    const selectFocusSx = {
+        '& label.Mui-focused': { color: BRAND_YELLOW_DARK },
+        '& .MuiOutlinedInput-root': { 
+            borderRadius: 1.5,
+            '&.Mui-focused fieldset': { borderColor: BRAND_YELLOW_DARK } 
+        },
+    };
+    const darkButtonSx = {
+        minHeight: 36, px: 2, borderRadius: 1.5,
+        color: '#fff', backgroundColor: BRAND_DARK, fontWeight: 700,
+        '&:hover': { backgroundColor: alpha(BRAND_DARK, 0.82) },
+        '&.Mui-disabled': { color: alpha('#fff', 0.35), backgroundColor: alpha(BRAND_DARK, 0.38) },
+    };
+    const outlinedButtonSx = {
+        minHeight: 36, px: 2, borderRadius: 1.5,
+        color: BRAND_DARK, borderColor: alpha(BRAND_DARK, 0.3), fontWeight: 600,
+        '&:hover': { borderColor: BRAND_YELLOW_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.08) },
+        '&.Mui-disabled': { borderColor: alpha(BRAND_DARK, 0.15), color: alpha(BRAND_DARK, 0.3) },
+    };
+
+    const datePickerTheme = React.useMemo(() => createTheme(theme, {
+        palette: {
+            primary: { main: BRAND_YELLOW_DARK }
+        }
+    }), [theme]);
+
     const location = useLocation();
     const [selectedFile, setSelectedFile] = useState(null);
     const [feedType, setFeedType] = useState('FX_LISTING');
@@ -56,7 +101,7 @@ const FeedUploadPage = () => {
 
     // Schedule upload state (right panel)
     const [scheduleFile, setScheduleFile] = useState(null);
-    const [scheduleDateTime, setScheduleDateTime] = useState('');
+    const [scheduleDateTime, setScheduleDateTime] = useState(null);
     const [scheduling, setScheduling] = useState(false);
     const [scheduleResult, setScheduleResult] = useState(null);
     const [scheduleError, setScheduleError] = useState(null);
@@ -242,8 +287,8 @@ const FeedUploadPage = () => {
             setScheduleError('Please select a CSV file, seller, and date/time.');
             return;
         }
-        const scheduledDate = new Date(scheduleDateTime);
-        if (isNaN(scheduledDate.getTime()) || scheduledDate <= new Date()) {
+        const scheduledDate = scheduleDateTime;
+        if (!scheduledDate || isNaN(scheduledDate.getTime()) || scheduledDate <= new Date()) {
             setScheduleError('Please select a future date and time.');
             return;
         }
@@ -278,20 +323,25 @@ const FeedUploadPage = () => {
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h4" gutterBottom>
-                eBay Feed Upload
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
+                <Box sx={{ display: 'flex', p: 1, borderRadius: 2, backgroundColor: alpha(BRAND_YELLOW, 0.2) }}>
+                    <CloudUploadIcon sx={{ color: BRAND_YELLOW_DARK, fontSize: 28 }} />
+                </Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: BRAND_DARK, letterSpacing: -0.5 }}>
+                    eBay Feed Upload
+                </Typography>
+            </Stack>
             <Typography variant="body1" color="textSecondary" paragraph>
                 Upload bulk listing files (XML/CSV) to eBay via the Feed API.
             </Typography>
 
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
                 {/* Left: Upload Feed */}
-                <Paper sx={{ p: 3, maxWidth: 560, flex: '0 0 auto' }}>
+                <Paper elevation={0} sx={{ p: 3, maxWidth: 560, flex: '0 0 auto', border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3 }}>
                     <Stack spacing={3}>
 
                         {/* Seller Selection */}
-                        <FormControl fullWidth>
+                        <FormControl fullWidth sx={selectFocusSx}>
                             <InputLabel>Select Seller Account</InputLabel>
                             <Select
                                 value={selectedSeller}
@@ -307,7 +357,7 @@ const FeedUploadPage = () => {
                         </FormControl>
 
                         {/* Feed Type Selection - Fixed to CSV */}
-                        <FormControl fullWidth>
+                        <FormControl fullWidth sx={selectFocusSx}>
                             <InputLabel>Feed Type</InputLabel>
                             <Select
                                 value={feedType}
@@ -325,10 +375,11 @@ const FeedUploadPage = () => {
                             value={schemaVersion}
                             disabled
                             helperText="Fixed to 1.0 for CSV uploads"
+                            sx={inputFocusSx}
                         />
 
                         {/* Country Selection */}
-                        <FormControl fullWidth>
+                        <FormControl fullWidth sx={selectFocusSx}>
                             <InputLabel>Upload Country</InputLabel>
                             <Select
                                 value={country}
@@ -346,13 +397,14 @@ const FeedUploadPage = () => {
                         {/* File Input */}
                         <Box
                             sx={{
-                                border: '2px dashed #ccc',
+                                border: `2px dashed ${alpha(BRAND_DARK, 0.2)}`,
                                 borderRadius: 2,
                                 p: 3,
                                 textAlign: 'center',
                                 cursor: 'pointer',
-                                backgroundColor: '#fafafa',
-                                '&:hover': { backgroundColor: '#f0f0f0' }
+                                backgroundColor: alpha(BRAND_DARK, 0.02),
+                                transition: 'all 0.2s ease',
+                                '&:hover': { backgroundColor: alpha(BRAND_DARK, 0.04), borderColor: BRAND_YELLOW_DARK }
                             }}
                             component="label"
                         >
@@ -362,7 +414,7 @@ const FeedUploadPage = () => {
                                 onChange={handleFileChange}
                                 accept=".csv"
                             />
-                            <CloudUploadIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                            <CloudUploadIcon sx={{ fontSize: 40, color: BRAND_YELLOW_DARK, mb: 1 }} />
                             <Typography variant="h6">
                                 {selectedFile ? selectedFile.name : 'Click to Select CSV File'}
                             </Typography>
@@ -374,11 +426,11 @@ const FeedUploadPage = () => {
                         {/* Upload Button */}
                         <Button
                             variant="contained"
-                            color="primary"
                             size="large"
                             onClick={handleUpload}
                             disabled={uploading || !selectedFile || !selectedSeller}
                             startIcon={uploading && <CircularProgress size={20} color="inherit" />}
+                            sx={yellowFilledButtonSx}
                         >
                             {uploading ? 'Uploading...' : 'Upload Feed'}
                         </Button>
@@ -404,7 +456,7 @@ const FeedUploadPage = () => {
                 </Paper>
 
                 {/* Right: Schedule Upload */}
-                <Paper sx={{ p: 3, flex: '1 1 380px', minWidth: 340 }}>
+                <Paper elevation={0} sx={{ p: 3, flex: '1 1 380px', minWidth: 340, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3 }}>
                     <Stack spacing={3}>
                         <Box>
                             <Typography variant="h6" gutterBottom>Schedule Upload</Typography>
@@ -416,18 +468,19 @@ const FeedUploadPage = () => {
                         {/* Schedule File Input */}
                         <Box
                             sx={{
-                                border: '2px dashed #ccc',
+                                border: `2px dashed ${alpha(BRAND_DARK, 0.2)}`,
                                 borderRadius: 2,
                                 p: 3,
                                 textAlign: 'center',
                                 cursor: 'pointer',
-                                backgroundColor: '#fafafa',
-                                '&:hover': { backgroundColor: '#f0f0f0' }
+                                backgroundColor: alpha(BRAND_DARK, 0.02),
+                                transition: 'all 0.2s ease',
+                                '&:hover': { backgroundColor: alpha(BRAND_DARK, 0.04), borderColor: BRAND_YELLOW_DARK }
                             }}
                             component="label"
                         >
                             <input type="file" hidden onChange={handleScheduleFileChange} accept=".csv" />
-                            <CloudUploadIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                            <CloudUploadIcon sx={{ fontSize: 40, color: BRAND_YELLOW_DARK, mb: 1 }} />
                             <Typography variant="h6">
                                 {scheduleFile ? scheduleFile.name : 'Click to Select CSV File'}
                             </Typography>
@@ -437,27 +490,32 @@ const FeedUploadPage = () => {
                         </Box>
 
                         {/* Date/Time Picker */}
-                        <TextField
-                            label="Schedule Date & Time"
-                            type="datetime-local"
-                            value={scheduleDateTime}
-                            onChange={(e) => {
-                                setScheduleDateTime(e.target.value);
-                                setScheduleError(null);
-                                setScheduleResult(null);
-                            }}
-                            InputLabelProps={{ shrink: true }}
-                            fullWidth
-                        />
+                        <ThemeProvider theme={datePickerTheme}>
+                            <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                <DateTimePicker
+                                    label="Schedule Date & Time"
+                                    value={scheduleDateTime}
+                                    onChange={(newValue) => {
+                                        setScheduleDateTime(newValue);
+                                        setScheduleError(null);
+                                        setScheduleResult(null);
+                                    }}
+                                    minDateTime={new Date()}
+                                    slotProps={{
+                                        textField: { fullWidth: true, sx: inputFocusSx }
+                                    }}
+                                />
+                            </LocalizationProvider>
+                        </ThemeProvider>
 
                         {/* Schedule Button */}
                         <Button
                             variant="contained"
-                            color="secondary"
                             size="large"
                             onClick={handleSchedule}
                             disabled={scheduling || !scheduleFile || !selectedSeller || !scheduleDateTime}
                             startIcon={scheduling ? <CircularProgress size={20} color="inherit" /> : <ScheduleIcon />}
+                            sx={darkButtonSx}
                         >
                             {scheduling ? 'Scheduling...' : 'Schedule Upload'}
                         </Button>
@@ -494,55 +552,49 @@ const FeedUploadPage = () => {
                     </Button>
                 </Stack>
 
-                <TableContainer
-                    component={Paper}
-                    sx={{
-                        maxHeight: 'calc(100vh - 450px)',
-                        overflow: 'auto',
-                        '&::-webkit-scrollbar': {
-                            width: '8px',
-                            height: '8px',
-                        },
-                        '&::-webkit-scrollbar-track': {
-                            backgroundColor: '#f1f1f1',
-                            borderRadius: '10px',
-                        },
-                        '&::-webkit-scrollbar-thumb': {
-                            backgroundColor: '#888',
-                            borderRadius: '10px',
-                            '&:hover': {
-                                backgroundColor: '#555',
-                            },
-                        },
-                    }}
-                >
-                    <Table stickyHeader>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Date</TableCell>
-                                <TableCell>Task ID</TableCell>
-                                <TableCell>File Name</TableCell>
-                                <TableCell>Country</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Result</TableCell>
-                            </TableRow>
-                        </TableHead>
+                <Paper elevation={0} sx={{ border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
+                    <TableContainer
+                        sx={{
+                            maxHeight: 'calc(100vh - 450px)',
+                            overflow: 'auto',
+                            '&::-webkit-scrollbar': { width: '8px', height: '8px' },
+                            '&::-webkit-scrollbar-track': { backgroundColor: alpha(BRAND_DARK, 0.04), borderRadius: '10px' },
+                            '&::-webkit-scrollbar-thumb': { backgroundColor: alpha(BRAND_DARK, 0.2), borderRadius: '10px', '&:hover': { backgroundColor: alpha(BRAND_DARK, 0.4) } }
+                        }}
+                    >
+                        <Table stickyHeader>
+                            <TableHead sx={{ backgroundColor: BRAND_DARK }}>
+                                <TableRow>
+                                    <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK }}>Date</TableCell>
+                                    <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK }}>Task ID</TableCell>
+                                    <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK }}>File Name</TableCell>
+                                    <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK }}>Country</TableCell>
+                                    <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK }}>Status</TableCell>
+                                    <TableCell sx={{ ...tableHeaderCellSx, backgroundColor: BRAND_DARK }}>Result</TableCell>
+                                </TableRow>
+                            </TableHead>
                         <TableBody>
                             {loadingTasks ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center">
-                                        <CircularProgress size={24} />
+                                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                                        <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="center">
+                                            <CircularProgress size={24} sx={{ color: BRAND_YELLOW_DARK }} />
+                                            <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.5), fontWeight: 500 }}>Loading Uploads...</Typography>
+                                        </Stack>
                                     </TableCell>
                                 </TableRow>
                             ) : tasks.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center">
-                                        No recent uploads found.
+                                    <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                                        <CloudUploadIcon sx={{ fontSize: 48, color: alpha(BRAND_DARK, 0.12), mb: 1 }} />
+                                        <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.4) }}>
+                                            No recent uploads found.
+                                        </Typography>
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 tasks.map((task) => (
-                                    <TableRow key={task.taskId}>
+                                    <TableRow key={task.taskId} hover sx={tableBodyRowSx}>
                                         <TableCell>
                                             {new Date(task.creationDate).toLocaleString()}
                                         </TableCell>
@@ -554,25 +606,26 @@ const FeedUploadPage = () => {
                                             <Chip
                                                 label={task.country || 'US'}
                                                 size="small"
-                                                variant="outlined"
-                                                color={
-                                                    task.country === 'US' ? 'primary' :
-                                                        task.country === 'UK' ? 'secondary' :
-                                                            task.country === 'AU' ? 'success' :
-                                                                'info'
-                                                }
+                                                sx={{
+                                                    fontWeight: 700,
+                                                    ...(task.country === 'US' ? { backgroundColor: alpha('#1976d2', 0.1), color: '#0d47a1', border: `1px solid ${alpha('#1976d2', 0.25)}` } :
+                                                        task.country === 'UK' ? { backgroundColor: alpha('#9c27b0', 0.1), color: '#4a148c', border: `1px solid ${alpha('#9c27b0', 0.25)}` } :
+                                                            task.country === 'AU' ? { backgroundColor: alpha('#2e7d32', 0.1), color: '#1b5e20', border: `1px solid ${alpha('#2e7d32', 0.25)}` } :
+                                                                { backgroundColor: alpha('#0288d1', 0.1), color: '#01579b', border: `1px solid ${alpha('#0288d1', 0.25)}` })
+                                                }}
                                             />
                                         </TableCell>
                                         <TableCell>
                                             <Chip
                                                 label={task.status}
-                                                color={
-                                                    task.status === 'COMPLETED' ? 'success' :
-                                                        task.status === 'COMPLETED_WITH_ERROR' ? 'warning' :
-                                                            task.status === 'CREATED' ? 'info' :
-                                                                'error'
-                                                }
                                                 size="small"
+                                                sx={{
+                                                    fontWeight: 700,
+                                                    ...(task.status === 'COMPLETED' ? { backgroundColor: alpha('#2e7d32', 0.1), color: '#1b5e20', border: `1px solid ${alpha('#2e7d32', 0.25)}` } :
+                                                        task.status === 'COMPLETED_WITH_ERROR' ? { backgroundColor: alpha('#ed6c02', 0.1), color: '#e65100', border: `1px solid ${alpha('#ed6c02', 0.25)}` } :
+                                                            task.status === 'CREATED' ? { backgroundColor: alpha('#0288d1', 0.1), color: '#01579b', border: `1px solid ${alpha('#0288d1', 0.25)}` } :
+                                                                { backgroundColor: alpha('#d32f2f', 0.1), color: '#b71c1c', border: `1px solid ${alpha('#d32f2f', 0.25)}` })
+                                                }}
                                             />
                                         </TableCell>
                                         <TableCell>
@@ -618,9 +671,8 @@ const FeedUploadPage = () => {
                             gap: 1.5,
                             py: 2,
                             px: 1,
-                            borderTop: 1,
-                            borderColor: 'divider',
-                            bgcolor: 'background.paper'
+                            borderTop: `1px solid ${alpha(BRAND_DARK, 0.08)}`,
+                            backgroundColor: alpha(BRAND_DARK, 0.02)
                         }}
                     >
                         <Pagination
@@ -630,13 +682,14 @@ const FeedUploadPage = () => {
                             color="primary"
                             showFirstButton
                             showLastButton
+                            sx={{ '& .MuiPaginationItem-root.Mui-selected': { backgroundColor: BRAND_YELLOW, color: BRAND_DARK, fontWeight: 'bold' } }}
                         />
                         <Stack direction="row" alignItems="center" spacing={2}>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.6) }}>
                                 Showing {(currentPage - 1) * rowsPerPage + 1} - {Math.min(currentPage * rowsPerPage, totalTasks)} of {totalTasks} uploads
                             </Typography>
                             <Stack direction="row" alignItems="center" spacing={1}>
-                                <Typography variant="body2" color="text.secondary">Rows per page:</Typography>
+                                <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.6) }}>Rows per page:</Typography>
                                 <Select
                                     size="small"
                                     value={rowsPerPage}
@@ -644,7 +697,7 @@ const FeedUploadPage = () => {
                                         setRowsPerPage(e.target.value);
                                         setCurrentPage(1);
                                     }}
-                                    sx={{ minWidth: 70, height: 32 }}
+                                    sx={{ minWidth: 70, height: 32, ...selectFocusSx }}
                                 >
                                     <MenuItem value={10}>10</MenuItem>
                                     <MenuItem value={25}>25</MenuItem>
@@ -654,6 +707,7 @@ const FeedUploadPage = () => {
                         </Stack>
                     </Box>
                 )}
+                </Paper>
             </Box>
         </Box>
     );

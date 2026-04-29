@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { alpha, useTheme } from '@mui/material/styles';
 import { 
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, 
@@ -19,6 +20,11 @@ import api from '../../lib/api.js';
 import FieldConfigList from '../../components/FieldConfigList.jsx';
 import CoreFieldDefaultsForm from '../../components/CoreFieldDefaultsForm.jsx';
 import PricingConfigSection from '../../components/PricingConfigSection.jsx';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, tableContainerSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 // ── Marketplace helpers (derived from customActionField) ─────────────────
 function extractMarketplace(customActionField) {
@@ -40,6 +46,31 @@ const MARKETPLACE_LABELS = {
 
 export default function ManageTemplatesPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const dashboardTheme = theme.customTokens?.dashboardSignature || dashboardSignatureTokens;
+
+  // ── Shared style tokens ────────────────────────────────────────────────────
+  const surfaceCardSx = {
+    borderRadius: `${dashboardTheme.radius.card}px`,
+    border: '1px solid',
+    borderColor: alpha(BRAND_DARK, 0.08),
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: dashboardTheme.shadows.card
+  };
+
+  const filterChipSx = (active) => ({
+    fontWeight: 600, fontSize: '0.78rem', borderRadius: 1.5, cursor: 'pointer',
+    backgroundColor: active ? BRAND_YELLOW : alpha(BRAND_DARK, 0.06),
+    color: active ? BRAND_DARK : alpha(BRAND_DARK, 0.65),
+    border: `1px solid ${active ? BRAND_YELLOW_DARK : alpha(BRAND_DARK, 0.12)}`,
+    '&:hover': { backgroundColor: active ? BRAND_YELLOW_DARK : alpha(BRAND_DARK, 0.10) }
+  });
+  const textFieldSx = {
+    '& label.Mui-focused': { color: '#b8860b' },
+    '& .MuiOutlinedInput-root': {
+      '&.Mui-focused fieldset': { borderColor: '#b8860b' }
+    }
+  };
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -580,14 +611,16 @@ export default function ManageTemplatesPage() {
   };
 
   return (
-    <Box>
-      <Typography variant="h6" sx={{ mb: 2 }}>Manage Listing Templates</Typography>
+    <AdminPageShell>
+
+      <PageHeader title="Manage Listing Templates" />
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+      {/* Create New Template Card */}
+      <Paper sx={{ ...surfaceCardSx, p: 2.5, mb: 3 }}>
+        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: alpha(BRAND_DARK, 0.5), display: 'block', mb: 1.5 }}>
           Create New Template
         </Typography>
         <Box component="form" onSubmit={handleSubmit}>
@@ -600,12 +633,13 @@ export default function ManageTemplatesPage() {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g., Phone Case Template"
               helperText="All 38 core eBay columns will be automatically included. You can add custom columns below."
+              sx={textFieldSx}
             />
 
             <Box>
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                <Typography variant="subtitle2">Custom Columns</Typography>
-                <Button size="small" startIcon={<AddIcon />} onClick={handleAddColumn}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: BRAND_DARK }}>Custom Columns</Typography>
+                <Button size="small" startIcon={<AddIcon />} onClick={handleAddColumn} sx={yellowOutlinedButtonSx}>
                   Add Column
                 </Button>
               </Stack>
@@ -617,10 +651,10 @@ export default function ManageTemplatesPage() {
               ) : (
                 <Stack spacing={1}>
                   {formData.customColumns.map((col) => (
-                    <Paper key={col.name} variant="outlined" sx={{ p: 1.5 }}>
+                    <Paper key={col.name} variant="outlined" sx={{ p: 1.5, borderColor: alpha(BRAND_DARK, 0.1) }}>
                       <Stack direction="row" justifyContent="space-between" alignItems="center">
                         <Box>
-                          <Typography variant="body2" fontWeight="bold">{col.name}</Typography>
+                          <Typography variant="body2" fontWeight={700} sx={{ color: BRAND_DARK }}>{col.name}</Typography>
                           <Typography variant="caption" color="text.secondary">
                             {col.displayName} • {col.dataType}
                             {col.isRequired && ' • Required'}
@@ -641,7 +675,7 @@ export default function ManageTemplatesPage() {
               type="submit"
               variant="contained"
               disabled={loading}
-              sx={{ mt: 2 }}
+              sx={{ ...yellowFilledButtonSx, mt: 1 }}
             >
               Create Template
             </Button>
@@ -649,9 +683,13 @@ export default function ManageTemplatesPage() {
         </Box>
       </Paper>
 
-      <Paper>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 2, bgcolor: 'grey.100', borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6">
+      {/* Existing Templates Table */}
+      <Paper sx={tableContainerSx}>
+
+        {/* Table Header Bar */}
+        <Stack direction="row" justifyContent="space-between" alignItems="center"
+          sx={{ px: 2.5, py: 1.5, backgroundColor: BRAND_DARK, borderBottom: `2px solid ${BRAND_YELLOW}` }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.5, color: alpha('#fff', 0.95) }}>
             Existing Templates ({filteredTemplates.length}{hasActiveFilters ? ` of ${templates.length}` : ''})
           </Typography>
           <TextField
@@ -659,180 +697,191 @@ export default function ManageTemplatesPage() {
             placeholder="Search by name…"
             value={templateSearch}
             onChange={(e) => setTemplateSearch(e.target.value)}
-            sx={{ width: 320, bgcolor: 'background.paper', borderRadius: 1 }}
+            sx={{
+              width: 260,
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: alpha('#fff', 0.1),
+                borderRadius: 1.5,
+                color: '#fff',
+                '& fieldset': { borderColor: alpha('#fff', 0.25) },
+                '&:hover fieldset': { borderColor: alpha('#fff', 0.5) },
+                '&.Mui-focused fieldset': { borderColor: BRAND_YELLOW }
+              },
+              '& .MuiInputBase-input::placeholder': { color: alpha('#fff', 0.5) }
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon fontSize="small" color="action" />
+                  <SearchIcon fontSize="small" sx={{ color: alpha('#fff', 0.6) }} />
                 </InputAdornment>
               ),
             }}
           />
         </Stack>
 
-        {/* ── Filter Bar ── */}
-        <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
+        {/* Filter Bar */}
+        <Box sx={{ px: 2.5, py: 1.5, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.08)}`, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
           <Stack spacing={1.5}>
 
-            {/* Marketplace chips — only shown when more than one marketplace exists */}
+            {/* Marketplace chips */}
             {availableMarketplaces.length > 1 && (
-              <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-                <Typography variant="caption" color="text.secondary" sx={{ minWidth: 90, fontWeight: 600 }}>
+              <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+                <Typography variant="caption" sx={{ minWidth: 90, fontWeight: 700, color: alpha(BRAND_DARK, 0.5), letterSpacing: 0.4, textTransform: 'uppercase', fontSize: '0.68rem' }}>
                   Marketplace
                 </Typography>
                 {[{ v: 'all', label: 'All' }, ...availableMarketplaces.map(mp => ({ v: mp, label: MARKETPLACE_LABELS[mp] }))].map(({ v, label }) => (
-                  <Chip
-                    key={v}
-                    label={label}
-                    size="small"
-                    variant={marketplaceFilter === v ? 'filled' : 'outlined'}
-                    color={marketplaceFilter === v ? 'primary' : 'default'}
-                    onClick={() => setMarketplaceFilter(v)}
-                    clickable
-                  />
+                  <Chip key={v} label={label} size="small" onClick={() => setMarketplaceFilter(v)} sx={filterChipSx(marketplaceFilter === v)} />
                 ))}
               </Stack>
             )}
 
-            {/* Category dropdown — only shown when templates have category values */}
+            {/* Category dropdown */}
             {availableCategories.length > 0 && (
               <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography variant="caption" color="text.secondary" sx={{ minWidth: 90, fontWeight: 600 }}>
+                <Typography variant="caption" sx={{ minWidth: 90, fontWeight: 700, color: alpha(BRAND_DARK, 0.5), letterSpacing: 0.4, textTransform: 'uppercase', fontSize: '0.68rem' }}>
                   Category
                 </Typography>
                 <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <Select
-                    value={categoryFilter}
-                    onChange={e => setCategoryFilter(e.target.value)}
-                    displayEmpty
-                  >
+                  <Select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} displayEmpty>
                     <MenuItem value="all"><em>All Categories</em></MenuItem>
-                    {availableCategories.map(c => (
-                      <MenuItem key={c} value={c}>{c}</MenuItem>
-                    ))}
+                    {availableCategories.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
                   </Select>
                 </FormControl>
               </Stack>
             )}
 
             {/* Quick toggle chips */}
-            <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-              <Typography variant="caption" color="text.secondary" sx={{ minWidth: 90, fontWeight: 600 }}>
+            <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+              <Typography variant="caption" sx={{ minWidth: 90, fontWeight: 700, color: alpha(BRAND_DARK, 0.5), letterSpacing: 0.4, textTransform: 'uppercase', fontSize: '0.68rem' }}>
                 Quick
               </Typography>
-
               {[{ v: 'all', label: 'All ASIN' }, { v: 'enabled', label: 'ASIN ✓' }, { v: 'disabled', label: 'ASIN ✗' }].map(({ v, label }) => (
-                <Chip key={v} label={label} size="small"
-                  variant={asinFilter === v ? 'filled' : 'outlined'}
-                  color={asinFilter === v ? 'primary' : 'default'}
-                  onClick={() => setAsinFilter(v)} clickable />
+                <Chip key={v} label={label} size="small" onClick={() => setAsinFilter(v)} sx={filterChipSx(asinFilter === v)} />
               ))}
-
               {[{ v: 'all', label: 'All Pricing' }, { v: 'enabled', label: 'Pricing ✓' }, { v: 'disabled', label: 'Pricing ✗' }].map(({ v, label }) => (
-                <Chip key={v} label={label} size="small"
-                  variant={pricingFilter === v ? 'filled' : 'outlined'}
-                  color={pricingFilter === v ? 'primary' : 'default'}
-                  onClick={() => setPricingFilter(v)} clickable />
+                <Chip key={v} label={label} size="small" onClick={() => setPricingFilter(v)} sx={filterChipSx(pricingFilter === v)} />
               ))}
-
               {[{ v: 'all', label: 'All Cols' }, { v: 'yes', label: 'Has Cols' }, { v: 'no', label: 'No Cols' }].map(({ v, label }) => (
-                <Chip key={v} label={label} size="small"
-                  variant={colsFilter === v ? 'filled' : 'outlined'}
-                  color={colsFilter === v ? 'primary' : 'default'}
-                  onClick={() => setColsFilter(v)} clickable />
+                <Chip key={v} label={label} size="small" onClick={() => setColsFilter(v)} sx={filterChipSx(colsFilter === v)} />
               ))}
             </Stack>
 
-            {/* Clear all filters */}
             {hasActiveFilters && (
               <Box>
-                <Button size="small" onClick={clearAllFilters}>Clear all filters</Button>
+                <Button size="small" onClick={clearAllFilters}
+                  sx={{ color: BRAND_DARK, fontWeight: 600, textDecoration: 'underline', p: 0, minWidth: 0, '&:hover': { textDecoration: 'underline', backgroundColor: 'transparent' } }}>
+                  Clear all filters
+                </Button>
               </Box>
             )}
           </Stack>
         </Box>
 
-        <TableContainer>
-          <Table size="small">
-            <TableHead sx={{ bgcolor: 'grey.50' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={tableHeaderCellSx}>Name</TableCell>
+              <TableCell sx={tableHeaderCellSx}>Marketplace</TableCell>
+              <TableCell sx={tableHeaderCellSx}>Custom Columns</TableCell>
+              <TableCell sx={tableHeaderCellSx}>Created</TableCell>
+              <TableCell align="right" sx={tableHeaderCellSx}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading && templates.length === 0 ? (
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Marketplace</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Custom Columns</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Created</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                  <CircularProgress size={28} sx={{ color: BRAND_YELLOW_DARK }} />
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading && templates.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                    <CircularProgress size={28} />
+            ) : templates.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary', background: dashboardTheme.surfaces.emptyState }}>
+                  No templates found. Create one above!
+                </TableCell>
+              </TableRow>
+            ) : filteredTemplates.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary', background: dashboardTheme.surfaces.emptyState }}>
+                  No templates match the current filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredTemplates.map((template) => (
+                <TableRow
+                  key={template._id}
+                  hover
+                  sx={{
+                    ...tableBodyRowSx,
+                    ...(highlightedId === template._id && {
+                      '& td': { backgroundColor: `${alpha(BRAND_YELLOW, 0.18)} !important` }
+                    }),
+                    transition: 'background-color 0.3s ease'
+                  }}
+                >
+                  <TableCell>
+                    <Typography variant="body2" fontWeight={700} sx={{ color: BRAND_DARK }}>
+                      {template.name}
+                    </Typography>
                   </TableCell>
-                </TableRow>
-              ) : templates.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                    No templates found. Create one above!
+                  <TableCell>
+                    <Chip
+                      label={MARKETPLACE_LABELS[extractMarketplace(template.customActionField)] || 'eBay US'}
+                      size="small"
+                      sx={{
+                        fontWeight: 600,
+                        backgroundColor: alpha(BRAND_DARK, 0.07),
+                        color: BRAND_DARK,
+                        border: `1px solid ${alpha(BRAND_DARK, 0.15)}`
+                      }}
+                    />
                   </TableCell>
-                </TableRow>
-              ) : filteredTemplates.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                    No templates match the current filters.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredTemplates.map((template) => (
-                  <TableRow 
-                    key={template._id} 
-                    hover
-                    sx={{
-                      bgcolor: highlightedId === template._id ? 'success.50' : 'transparent',
-                      transition: 'background-color 0.3s ease'
-                    }}
-                  >
-                    <TableCell><strong>{template.name}</strong></TableCell>
-                    <TableCell>
+                  <TableCell>
+                    {template.customColumns?.length > 0 ? (
                       <Chip
-                        label={MARKETPLACE_LABELS[extractMarketplace(template.customActionField)] || 'eBay US'}
+                        label={`${template.customColumns.length} columns`}
                         size="small"
-                        variant="outlined"
+                        sx={{
+                          fontWeight: 700,
+                          backgroundColor: alpha(BRAND_YELLOW, 0.25),
+                          color: BRAND_DARK,
+                          border: `1px solid ${BRAND_YELLOW_DARK}`
+                        }}
                       />
-                    </TableCell>
-                    <TableCell>
-                      {template.customColumns?.length > 0 ? (
-                        <Chip label={`${template.customColumns.length} columns`} size="small" color="primary" variant="outlined" />
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">None</Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">None</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.6) }}>
                       {new Date(template.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell align="right">
-                      <IconButton size="small" onClick={() => handleViewListings(template._id)} title="View Listings">
-                        <VisibilityIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" onClick={() => handleDuplicate(template._id, template.name)} title="Duplicate Template">
-                        <CopyIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" color="success" onClick={() => handleOpenBulkReset(template)} title="Apply Base Template to All Sellers">
-                        <PublishIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" onClick={() => handleEdit(template)} title="Edit Template">
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" color="error" onClick={() => handleDelete(template._id, template.name)} title="Delete Template">
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <IconButton size="small" onClick={() => handleViewListings(template._id)} title="View Listings"
+                      sx={{ '&:hover': { color: BRAND_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.2) } }}>
+                      <VisibilityIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handleDuplicate(template._id, template.name)} title="Duplicate Template"
+                      sx={{ '&:hover': { color: BRAND_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.2) } }}>
+                      <CopyIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" color="success" onClick={() => handleOpenBulkReset(template)} title="Apply Base Template to All Sellers">
+                      <PublishIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handleEdit(template)} title="Edit Template"
+                      sx={{ '&:hover': { color: BRAND_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.2) } }}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" color="error" onClick={() => handleDelete(template._id, template.name)} title="Delete Template">
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </Paper>
 
       {/* Edit Template Dialog */}
@@ -1107,10 +1156,10 @@ export default function ManageTemplatesPage() {
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseEditDialog}>Cancel</Button>
-          <Button onClick={handleUpdate} variant="contained" disabled={loading}>
-            Update
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCloseEditDialog} sx={{ color: alpha(BRAND_DARK, 0.6) }}>Cancel</Button>
+          <Button onClick={handleUpdate} variant="contained" disabled={loading} sx={yellowFilledButtonSx}>
+            Update Template
           </Button>
         </DialogActions>
       </Dialog>
@@ -1173,9 +1222,9 @@ export default function ManageTemplatesPage() {
             </Stack>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setColumnDialog(false); setEditingColumnIndex(null); }}>Cancel</Button>
-          <Button onClick={handleSaveColumn} variant="contained">
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => { setColumnDialog(false); setEditingColumnIndex(null); }} sx={{ color: alpha(BRAND_DARK, 0.6) }}>Cancel</Button>
+          <Button onClick={handleSaveColumn} variant="contained" sx={yellowFilledButtonSx}>
             {editingColumnIndex !== null ? 'Update Column' : 'Add Column'}
           </Button>
         </DialogActions>
@@ -1257,6 +1306,6 @@ export default function ManageTemplatesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPageShell>
   );
 }

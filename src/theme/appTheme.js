@@ -1,5 +1,5 @@
 import { createTheme, alpha } from '@mui/material/styles';
-import { BRAND_DARK } from '../constants/brandTheme.js';
+import { BRAND_DARK, BRAND_YELLOW_DARK } from '../constants/brandTheme.js';
 
 function getButtonPalette(theme, color) {
     if (color && color !== 'inherit' && theme.palette[color]) {
@@ -196,6 +196,13 @@ export function createAppTheme() {
                         borderRadius: 14,
                         backgroundColor: '#c0c0c8',
                         opacity: 1,
+                    },
+                },
+            },
+            MuiCssBaseline: {
+                styleOverrides: {
+                    'input[type="date"], input[type="datetime-local"], input[type="time"]': {
+                        accentColor: BRAND_YELLOW_DARK,
                     },
                 },
             },
