@@ -1,37 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box,
-    Typography,
     Button,
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Divider,
+    IconButton,
+    MenuItem,
+    Pagination,
     Paper,
+    Stack,
     Table,
     TableBody,
     TableCell,
     TableContainer,
-    TableFooter,
     TableHead,
     TableRow,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
     TextField,
-    MenuItem,
-    IconButton,
     Tooltip,
-    Stack,
-    Divider,
-    useTheme,
+    Typography,
     useMediaQuery,
-    Pagination,
-    CircularProgress
+    useTheme,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import api from '../../lib/api';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
+import StatMetricCard from '../../components/StatMetricCard.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyCellSx, tableBodyRowSx, tableContainerSx } from '../../theme/tableStyles.js';
 
 // --- MOBILE PAYONEER CARD COMPONENT ---
 function MobilePayoneerCard({ record, isEditing, renderCell, onEdit, onDelete, onSave, onCancel }) {
@@ -180,13 +185,19 @@ const PayoneerSheetPage = () => {
     const [pageLoading, setPageLoading] = useState(true);
     const [totals, setTotals] = useState({ totalAmount: 0, totalBankDeposit: 0 });
 
-    // Advanced Filter State
-    const [filters, setFilters] = useState({
+    // Empty filter template
+    const emptyFilters = {
         store: '',
-        dateMode: 'none', // 'none', 'single', 'range'
+        dateMode: 'none',
         singleDate: '',
         dateRange: { start: '', end: '' }
-    });
+    };
+
+    // draftFilters — bound to the UI inputs (not sent to server until Apply is clicked)
+    const [draftFilters, setDraftFilters] = useState(emptyFilters);
+
+    // appliedFilters — what's actually sent to the server
+    const [appliedFilters, setAppliedFilters] = useState(emptyFilters);
 
     // Pagination State
     const [pagination, setPagination] = useState({
@@ -229,11 +240,11 @@ const PayoneerSheetPage = () => {
         fetchBankAccounts();
     }, []);
 
-    // Fetch Records when Filters or Page Changes
+    // Fetch Records when appliedFilters or Page Changes (NOT on draftFilters change)
     useEffect(() => {
         fetchRecords();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pagination.page, filters]);
+    }, [pagination.page, appliedFilters]);
 
     const fetchRecords = async () => {
         setLoading(true);
@@ -244,15 +255,15 @@ const PayoneerSheetPage = () => {
             };
 
             // Add Store Filter
-            if (filters.store) params.store = filters.store;
+            if (appliedFilters.store) params.store = appliedFilters.store;
 
             // Add Date Filter based on Mode
-            if (filters.dateMode === 'single' && filters.singleDate) {
-                params.startDate = filters.singleDate;
-                params.endDate = filters.singleDate;
-            } else if (filters.dateMode === 'range') {
-                if (filters.dateRange.start) params.startDate = filters.dateRange.start;
-                if (filters.dateRange.end) params.endDate = filters.dateRange.end;
+            if (appliedFilters.dateMode === 'single' && appliedFilters.singleDate) {
+                params.startDate = appliedFilters.singleDate;
+                params.endDate = appliedFilters.singleDate;
+            } else if (appliedFilters.dateMode === 'range') {
+                if (appliedFilters.dateRange.start) params.startDate = appliedFilters.dateRange.start;
+                if (appliedFilters.dateRange.end) params.endDate = appliedFilters.dateRange.end;
             }
 
             const { data } = await api.get('/payoneer', { params });
@@ -346,6 +357,17 @@ const PayoneerSheetPage = () => {
         } catch (error) {
             console.error(error);
         }
+    };
+
+    const handleApplyFilters = () => {
+        setPagination(prev => ({ ...prev, page: 1 }));
+        setAppliedFilters({ ...draftFilters });
+    };
+
+    const handleClearFilters = () => {
+        setDraftFilters(emptyFilters);
+        setAppliedFilters(emptyFilters);
+        setPagination(prev => ({ ...prev, page: 1 }));
     };
 
     // --- EDITING LOGIC ---
@@ -454,47 +476,48 @@ const PayoneerSheetPage = () => {
         </Box>
     );
 
-    return (
-        <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
-            <Box
-                sx={{
-                    display: 'flex',
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    gap: { xs: 1, sm: 2 },
-                    justifyContent: 'space-between',
-                    alignItems: { xs: 'stretch', sm: 'center' },
-                    mb: { xs: 2, sm: 3 }
-                }}
-            >
-                <Typography variant={isSmallMobile ? 'h6' : 'h5'} sx={{ fontWeight: 'bold' }}>
-                    Payoneer Sheet
-                </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => setOpenDialog(true)}
-                    fullWidth={isSmallMobile}
-                >
-                    Add Record
-                </Button>
-            </Box>
+    const metricCards = [
+        { label: 'Total Records', value: pagination.totalRecords, tone: 'info' },
+        { label: 'Amount (USD)', value: `$${totals.totalAmount.toFixed(2)}`, tone: 'neutral' },
+        { label: 'Bank Deposit (INR)', value: `₹${totals.totalBankDeposit.toFixed(2)}`, tone: 'success' },
+    ];
 
-            {/* ADVANCED FILTERS */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-                <Stack spacing={2}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" flexWrap="wrap">
-                        {/* Store Filter */}
+    return (
+        <AdminPageShell>
+            {/* ── TOP CARD: header + filters + stat metrics ── */}
+            <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+                <Stack
+                    direction={{ xs: 'column', lg: 'row' }}
+                    justifyContent="space-between"
+                    alignItems={{ xs: 'flex-start', lg: 'center' }}
+                    gap={2.5}
+                >
+                    <Box>
+                        <PageHeader
+                            title="Payoneer Sheet"
+                            subtitle="Track Payoneer payments, exchange rates and INR deposits per store."
+                            sx={{ pt: 0, pb: 0 }}
+                        />
+                    </Box>
+
+                    <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1.5}
+                        useFlexGap
+                        flexWrap="wrap"
+                        alignItems="center"
+                        sx={{ width: { xs: '100%', lg: 'auto' } }}
+                    >
+                        {/* Store filter */}
                         <TextField
                             select
                             label="Store"
                             size="small"
-                            value={filters.store}
-                            onChange={(e) => setFilters(prev => ({ ...prev, store: e.target.value }))}
+                            value={draftFilters.store}
+                            onChange={(e) => setDraftFilters(prev => ({ ...prev, store: e.target.value }))}
                             sx={{ minWidth: 150 }}
                         >
-                            <MenuItem value="">
-                                <em>All Stores</em>
-                            </MenuItem>
+                            <MenuItem value=""><em>All Stores</em></MenuItem>
                             {sellers.map((s) => (
                                 <MenuItem key={s._id} value={s._id}>
                                     {s.user?.username || s.user?.email || 'Unknown'}
@@ -502,146 +525,184 @@ const PayoneerSheetPage = () => {
                             ))}
                         </TextField>
 
-                        {/* Date Mode Selector */}
+                        {/* Date mode */}
                         <TextField
                             select
                             label="Date Mode"
                             size="small"
-                            value={filters.dateMode}
-                            onChange={(e) => setFilters(prev => ({ ...prev, dateMode: e.target.value }))}
-                            sx={{ minWidth: 120 }}
+                            value={draftFilters.dateMode}
+                            onChange={(e) => setDraftFilters(prev => ({ ...prev, dateMode: e.target.value }))}
+                            sx={{ minWidth: 130 }}
                         >
                             <MenuItem value="none">None</MenuItem>
                             <MenuItem value="single">Single Date</MenuItem>
                             <MenuItem value="range">Date Range</MenuItem>
                         </TextField>
 
-                        {/* Conditional Date Inputs */}
-                        {filters.dateMode === 'single' && (
+                        {draftFilters.dateMode === 'single' && (
                             <TextField
                                 label="Date"
                                 type="date"
                                 size="small"
                                 InputLabelProps={{ shrink: true }}
-                                value={filters.singleDate}
-                                onChange={(e) => setFilters(prev => ({ ...prev, singleDate: e.target.value }))}
+                                value={draftFilters.singleDate}
+                                onChange={(e) => setDraftFilters(prev => ({ ...prev, singleDate: e.target.value }))}
+                                sx={{ minWidth: 160 }}
                             />
                         )}
-
-                        {filters.dateMode === 'range' && (
+                        {draftFilters.dateMode === 'range' && (
                             <>
                                 <TextField
                                     label="From"
                                     type="date"
                                     size="small"
                                     InputLabelProps={{ shrink: true }}
-                                    value={filters.dateRange.start}
-                                    onChange={(e) => setFilters(prev => ({
+                                    value={draftFilters.dateRange.start}
+                                    onChange={(e) => setDraftFilters(prev => ({
                                         ...prev,
                                         dateRange: { ...prev.dateRange, start: e.target.value }
                                     }))}
+                                    sx={{ minWidth: 160 }}
                                 />
                                 <TextField
                                     label="To"
                                     type="date"
                                     size="small"
                                     InputLabelProps={{ shrink: true }}
-                                    value={filters.dateRange.end}
-                                    onChange={(e) => setFilters(prev => ({
+                                    value={draftFilters.dateRange.end}
+                                    onChange={(e) => setDraftFilters(prev => ({
                                         ...prev,
                                         dateRange: { ...prev.dateRange, end: e.target.value }
                                     }))}
+                                    sx={{ minWidth: 160 }}
                                 />
                             </>
                         )}
 
                         <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<FilterListIcon />}
+                            onClick={handleApplyFilters}
+                            sx={{ whiteSpace: 'nowrap' }}
+                        >
+                            Apply Filters
+                        </Button>
+
+                        <Button
                             variant="outlined"
                             size="small"
-                            onClick={() => {
-                                setFilters({
-                                    store: '',
-                                    dateMode: 'none',
-                                    singleDate: '',
-                                    dateRange: { start: '', end: '' }
-                                });
-                                setPagination(prev => ({ ...prev, page: 1 }));
-                            }}
+                            onClick={handleClearFilters}
+                            sx={{ whiteSpace: 'nowrap' }}
                         >
-                            Clear Filters
+                            Clear
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={() => setOpenDialog(true)}
+                            sx={{ whiteSpace: 'nowrap' }}
+                        >
+                            Add Record
                         </Button>
                     </Stack>
                 </Stack>
-            </Paper>
 
-            {isMobile ? (
-                // MOBILE CARD VIEW
-                <Box sx={{ mt: { xs: 1.5, sm: 2 } }}>
-                    <Stack spacing={1.5}>
-                        {records.map((record) => {
-                            const isEditing = editingId === record._id;
-                            return (
-                                <MobilePayoneerCard
-                                    key={record._id}
-                                    record={record}
-                                    isEditing={isEditing}
-                                    renderCell={renderCell}
-                                    onEdit={() => startEditing(record)}
-                                    onDelete={() => handleDelete(record._id)}
-                                    onSave={saveEdit}
-                                    onCancel={cancelEditing}
-                                />
-                            );
-                        })}
-
-                        {records.length === 0 && !loading && (
-                            <Paper sx={{ p: 2, textAlign: 'center' }}>
-                                <Typography color="text.secondary">
-                                    No records found.
-                                </Typography>
-                            </Paper>
-                        )}
-                    </Stack>
+                {/* Stat metric cards */}
+                <Box
+                    sx={{
+                        mt: 3,
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                        gap: 1.5,
+                    }}
+                >
+                    {metricCards.map((card) => (
+                        <StatMetricCard
+                            key={card.label}
+                            label={card.label}
+                            value={card.value}
+                            tone={card.tone}
+                        />
+                    ))}
                 </Box>
-            ) : (
-                // DESKTOP TABLE VIEW
-                <TableContainer component={Paper}>
-                    <Table size="small">
+            </SectionCard>
+
+            {/* ── LOADING ── */}
+            {loading && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                    <CircularProgress />
+                </Box>
+            )}
+
+            {/* ── MOBILE CARD VIEW ── */}
+            {!loading && isMobile && (
+                <Stack spacing={1.5}>
+                    {records.map((record) => {
+                        const isEditing = editingId === record._id;
+                        return (
+                            <MobilePayoneerCard
+                                key={record._id}
+                                record={record}
+                                isEditing={isEditing}
+                                renderCell={renderCell}
+                                onEdit={() => startEditing(record)}
+                                onDelete={() => handleDelete(record._id)}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                            />
+                        );
+                    })}
+                    {records.length === 0 && (
+                        <Paper sx={{ p: 3, textAlign: 'center' }}>
+                            <Typography color="text.secondary">No records found.</Typography>
+                        </Paper>
+                    )}
+                </Stack>
+            )}
+
+            {/* ── DESKTOP TABLE VIEW ── */}
+            {!loading && !isMobile && (
+                <TableContainer component={Paper} sx={tableContainerSx}>
+                    <Table stickyHeader size="small">
                         <TableHead>
                             <TableRow>
-                                <TableCell>Bank Account</TableCell>
-                                <TableCell>Payment Date</TableCell>
-                                <TableCell>Store</TableCell>
-                                <TableCell>Amount (USD)</TableCell>
-                                <TableCell>Exch. Rate</TableCell>
-                                <TableCell>Actual Rate (+2%)</TableCell>
-                                <TableCell>Bank Deposit (INR)</TableCell>
-                                <TableCell>Period</TableCell>
-                                <TableCell>Profit ($)</TableCell>
-                                <TableCell align="right">Actions</TableCell>
+                                <TableCell sx={tableHeaderCellSx}>Bank Account</TableCell>
+                                <TableCell sx={tableHeaderCellSx}>Payment Date</TableCell>
+                                <TableCell sx={tableHeaderCellSx}>Store</TableCell>
+                                <TableCell sx={tableHeaderCellSx}>Amount (USD)</TableCell>
+                                <TableCell sx={tableHeaderCellSx}>Exch. Rate</TableCell>
+                                <TableCell sx={tableHeaderCellSx}>Actual Rate (+2%)</TableCell>
+                                <TableCell sx={tableHeaderCellSx}>Bank Deposit (INR)</TableCell>
+                                <TableCell sx={tableHeaderCellSx}>Period</TableCell>
+                                <TableCell sx={tableHeaderCellSx}>Profit ($)</TableCell>
+                                <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'right' }}>Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {records.map((record) => {
                                 const isEditing = editingId === record._id;
                                 return (
-                                    <TableRow key={record._id}>
-                                        <TableCell>{renderCell(record, 'bankAccount')}</TableCell>
-                                        <TableCell>{renderCell(record, 'paymentDate', 'date')}</TableCell>
-                                        <TableCell>{renderCell(record, 'store')}</TableCell>
-                                        <TableCell>{renderCell(record, 'amount', 'number')}</TableCell>
-                                        <TableCell>{renderCell(record, 'exchangeRate', 'number')}</TableCell>
+                                    <TableRow key={record._id} hover sx={tableBodyRowSx}>
+                                        <TableCell sx={tableBodyCellSx}>{renderCell(record, 'bankAccount')}</TableCell>
+                                        <TableCell sx={tableBodyCellSx}>{renderCell(record, 'paymentDate', 'date')}</TableCell>
+                                        <TableCell sx={tableBodyCellSx}>{renderCell(record, 'store')}</TableCell>
+                                        <TableCell sx={tableBodyCellSx}>{renderCell(record, 'amount', 'number')}</TableCell>
+                                        <TableCell sx={tableBodyCellSx}>{renderCell(record, 'exchangeRate', 'number')}</TableCell>
 
-                                        {/* Calculated fields are READ-ONLY even in edit mode (server calculates them) */}
-                                        <TableCell sx={{ bgcolor: isEditing ? '#f8f9fa' : 'inherit', color: 'text.secondary' }}>
+                                        {/* Calculated — read-only even in edit mode */}
+                                        <TableCell sx={{ ...tableBodyCellSx, color: 'text.secondary', bgcolor: isEditing ? 'action.hover' : 'inherit' }}>
                                             {isEditing ? 'Auto-calc' : record.actualExchangeRate?.toFixed(4)}
                                         </TableCell>
-                                        <TableCell sx={{ bgcolor: isEditing ? '#f8f9fa' : 'inherit', color: 'text.secondary', fontWeight: 'bold' }}>
+                                        <TableCell sx={{ ...tableBodyCellSx, fontWeight: 700, color: 'success.main', bgcolor: isEditing ? 'action.hover' : 'inherit' }}>
                                             {isEditing ? 'Auto-calc' : record.bankDeposit?.toFixed(2)}
                                         </TableCell>
 
-                                        {/* Period range */}
-                                        <TableCell>
+                                        {/* Period */}
+                                        <TableCell sx={tableBodyCellSx}>
                                             {isEditing ? (
                                                 <Stack spacing={0.5}>
                                                     <TextField
@@ -672,20 +733,19 @@ const PayoneerSheetPage = () => {
                                             )}
                                         </TableCell>
 
-                                        {/* Profit */}
-                                        <TableCell>{renderCell(record, 'profit', 'number')}</TableCell>
+                                        <TableCell sx={tableBodyCellSx}>{renderCell(record, 'profit', 'number')}</TableCell>
 
-                                        <TableCell align="right">
+                                        <TableCell sx={{ ...tableBodyCellSx, textAlign: 'right' }}>
                                             {isEditing ? (
                                                 <>
                                                     <Tooltip title="Save">
-                                                        <IconButton color="primary" onClick={saveEdit}>
-                                                            <SaveIcon />
+                                                        <IconButton color="primary" size="small" onClick={saveEdit}>
+                                                            <SaveIcon fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title="Cancel">
-                                                        <IconButton color="error" onClick={cancelEditing}>
-                                                            <CancelIcon />
+                                                        <IconButton color="error" size="small" onClick={cancelEditing}>
+                                                            <CancelIcon fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
                                                 </>
@@ -693,12 +753,12 @@ const PayoneerSheetPage = () => {
                                                 <>
                                                     <Tooltip title="Edit">
                                                         <IconButton color="primary" size="small" onClick={() => startEditing(record)}>
-                                                            <EditIcon />
+                                                            <EditIcon fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title="Delete">
                                                         <IconButton color="error" size="small" onClick={() => handleDelete(record._id)}>
-                                                            <DeleteIcon />
+                                                            <DeleteIcon fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
                                                 </>
@@ -707,76 +767,33 @@ const PayoneerSheetPage = () => {
                                     </TableRow>
                                 );
                             })}
-                            {records.length === 0 && !loading && (
+                            {records.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={10} align="center">
+                                    <TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                                         No records found.
                                     </TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
-                        {/* TOTALS FOOTER ROW — covers all pages via backend aggregation */}
-                        {(filters.dateMode === 'single' ? !!filters.singleDate : filters.dateMode === 'range' && (!!filters.dateRange.start || !!filters.dateRange.end)) && (
-                            <TableFooter>
-                                <TableRow sx={{ bgcolor: 'action.selected' }}>
-                                    <TableCell colSpan={3} sx={{ fontWeight: 'bold', borderTop: '2px solid', borderColor: 'divider' }}>
-                                        Total ({pagination.totalRecords} record{pagination.totalRecords !== 1 ? 's' : ''}, all pages)
-                                    </TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', color: 'primary.main', borderTop: '2px solid', borderColor: 'divider' }}>
-                                        ${totals.totalAmount.toFixed(2)}
-                                    </TableCell>
-                                    <TableCell colSpan={2} sx={{ borderTop: '2px solid', borderColor: 'divider' }} />
-                                    <TableCell sx={{ fontWeight: 'bold', color: 'success.main', borderTop: '2px solid', borderColor: 'divider' }}>
-                                        ₹{totals.totalBankDeposit.toFixed(2)}
-                                    </TableCell>
-                                    <TableCell colSpan={3} sx={{ borderTop: '2px solid', borderColor: 'divider' }} />
-                                </TableRow>
-                            </TableFooter>
-                        )}
                     </Table>
                 </TableContainer>
             )}
 
-            {/* MOBILE TOTALS SUMMARY — shown when date filter is active */}
-            {isMobile && (filters.dateMode === 'single' ? !!filters.singleDate : filters.dateMode === 'range' && (!!filters.dateRange.start || !!filters.dateRange.end)) && (
-                <Paper sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'action.selected' }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                        Total — {pagination.totalRecords} record{pagination.totalRecords !== 1 ? 's' : ''} (all pages)
-                    </Typography>
-                    <Stack direction="row" spacing={4}>
-                        <Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                                AMOUNT (USD)
-                            </Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                                ${totals.totalAmount.toFixed(2)}
-                            </Typography>
-                        </Box>
-                        <Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                                BANK DEPOSIT (INR)
-                            </Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                                ₹{totals.totalBankDeposit.toFixed(2)}
-                            </Typography>
-                        </Box>
-                    </Stack>
-                </Paper>
+            {/* ── PAGINATION ── */}
+            {!loading && pagination.totalPages > 1 && (
+                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                    <Pagination
+                        count={pagination.totalPages}
+                        page={pagination.page}
+                        onChange={(e, value) => setPagination(prev => ({ ...prev, page: value }))}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                    />
+                </Box>
             )}
 
-            {/* PAGINATION */}
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-                <Pagination
-                    count={pagination.totalPages}
-                    page={pagination.currentPage}
-                    onChange={(e, value) => setPagination(prev => ({ ...prev, page: value }))}
-                    color="primary"
-                    showFirstButton
-                    showLastButton
-                />
-            </Box>
-
-            {/* CREATE DIALOG */}
+            {/* ── CREATE DIALOG ── */}
             <Dialog
                 open={openDialog}
                 onClose={() => setOpenDialog(false)}
@@ -801,7 +818,6 @@ const PayoneerSheetPage = () => {
                             ))}
                         </TextField>
 
-                        {/* Store Name Selection */}
                         <TextField
                             select
                             label="Store Name"
@@ -842,8 +858,7 @@ const PayoneerSheetPage = () => {
                             />
                         </Stack>
 
-                        {/* PREVIEW OF CALCULATIONS */}
-                        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f5f5f5' }}>
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'action.hover' }}>
                             <Typography variant="subtitle2" gutterBottom>Calculated Preview:</Typography>
                             <Box display="flex" justifyContent="space-between">
                                 <Typography variant="body2">Actual Rate (+2%): <b>{preview.actualExchangeRate?.toFixed(4)}</b></Typography>
@@ -851,7 +866,6 @@ const PayoneerSheetPage = () => {
                             </Box>
                         </Paper>
 
-                        {/* Period Range */}
                         <Typography variant="subtitle2" sx={{ mb: -1 }}>Period (optional)</Typography>
                         <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
                             <TextField
@@ -872,7 +886,6 @@ const PayoneerSheetPage = () => {
                             />
                         </Stack>
 
-                        {/* Profit */}
                         <TextField
                             label="Profit ($)"
                             type="number"
@@ -897,7 +910,7 @@ const PayoneerSheetPage = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Box>
+        </AdminPageShell>
     );
 };
 
