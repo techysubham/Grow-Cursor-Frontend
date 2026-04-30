@@ -163,9 +163,9 @@ export default function AllOrdersSheetPage() {
   const [filteredTotals, setFilteredTotals] = useState(null);
 
   // Toggle states for card sections
-  const [showProfitCards, setShowProfitCards] = useState(true);
-  const [showSubtotalCards, setShowSubtotalCards] = useState(true);
-  const [showExchangeRate, setShowExchangeRate] = useState(true);
+  const [showProfitCards, setShowProfitCards] = useState(false);
+  const [showSubtotalCards, setShowSubtotalCards] = useState(false);
+  const [showExchangeRate, setShowExchangeRate] = useState(false);
 
   // Modal state for showing category/range/product names
   const [namesModal, setNamesModal] = useState({
@@ -1723,88 +1723,85 @@ export default function AllOrdersSheetPage() {
           <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
             Totals for all {totalOrders} filtered order{totalOrders !== 1 ? 's' : ''} across {totalPages} page{totalPages !== 1 ? 's' : ''}
           </Typography>
-          {/* Primary metrics */}
-          <Stack direction="row" flexWrap="wrap" spacing={1.5} sx={{ mb: 1.5 }}>
+          <Stack direction="row" flexWrap="nowrap" spacing={1.5} sx={{ overflowX: 'auto', pb: 0.5 }}>
             <StatMetricCard
               label="PROFIT (INR)"
               value={`₹${(filteredTotals.profit ?? 0).toFixed(2)}`}
               tone={filteredTotals.profit >= 0 ? 'success' : 'danger'}
-              sx={{ minWidth: 145 }}
+              sx={{ minWidth: 130, flexShrink: 0 }}
             />
             <StatMetricCard
               label="P.Balance (INR)"
               value={`₹${(filteredTotals.pBalanceINR ?? 0).toFixed(2)}`}
               tone="info"
-              sx={{ minWidth: 145 }}
+              sx={{ minWidth: 130, flexShrink: 0 }}
             />
             <StatMetricCard
               label="Amazon Total (INR)"
               value={`₹${(filteredTotals.amazonTotalINR ?? 0).toFixed(2)}`}
               tone="amazon"
-              sx={{ minWidth: 150 }}
+              sx={{ minWidth: 130, flexShrink: 0 }}
             />
             <StatMetricCard
               label="Total CC (INR)"
               value={`₹${(filteredTotals.totalCC ?? 0).toFixed(2)}`}
               tone="warning"
-              sx={{ minWidth: 145 }}
+              sx={{ minWidth: 120, flexShrink: 0 }}
             />
             <StatMetricCard
-              label="Marketplace Fee (INR)"
+              label="Mktplace Fee (INR)"
               value={`₹${(filteredTotals.marketplaceFee ?? 0).toFixed(2)}`}
               tone="neutral"
-              sx={{ minWidth: 160 }}
+              sx={{ minWidth: 130, flexShrink: 0 }}
             />
             <StatMetricCard
               label="IGST (INR)"
               value={`₹${(filteredTotals.igst ?? 0).toFixed(2)}`}
               tone="neutral"
-              sx={{ minWidth: 130 }}
+              sx={{ minWidth: 110, flexShrink: 0 }}
             />
-          </Stack>
-          {/* eBay side metrics */}
-          <Stack direction="row" flexWrap="wrap" spacing={1.5}>
+            <Box sx={{ width: '1px', bgcolor: 'divider', alignSelf: 'stretch', flexShrink: 0 }} />
             <StatMetricCard
               label="Subtotal ($)"
               value={`$${(filteredTotals.subtotal ?? 0).toFixed(2)}`}
               tone="neutral"
-              sx={{ minWidth: 130 }}
+              sx={{ minWidth: 110, flexShrink: 0 }}
             />
             <StatMetricCard
               label="Shipping ($)"
               value={`$${(filteredTotals.shipping ?? 0).toFixed(2)}`}
               tone="shipping"
-              sx={{ minWidth: 130 }}
+              sx={{ minWidth: 110, flexShrink: 0 }}
             />
             <StatMetricCard
               label="Sales Tax ($)"
               value={`$${(filteredTotals.salesTax ?? 0).toFixed(2)}`}
               tone="neutral"
-              sx={{ minWidth: 130 }}
+              sx={{ minWidth: 110, flexShrink: 0 }}
             />
             <StatMetricCard
-              label="Order Earnings ($)"
+              label="Earnings ($)"
               value={`$${(filteredTotals.orderEarnings ?? 0).toFixed(2)}`}
               tone="success"
-              sx={{ minWidth: 150 }}
+              sx={{ minWidth: 120, flexShrink: 0 }}
             />
             <StatMetricCard
               label="TDS ($)"
               value={`$${(filteredTotals.tds ?? 0).toFixed(2)}`}
               tone="neutral"
-              sx={{ minWidth: 110 }}
+              sx={{ minWidth: 90, flexShrink: 0 }}
             />
             <StatMetricCard
               label="NET ($)"
               value={`$${(filteredTotals.net ?? 0).toFixed(2)}`}
               tone="info"
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: 100, flexShrink: 0 }}
             />
             <StatMetricCard
               label="Amazon Total ($)"
               value={`$${(filteredTotals.amazonTotal ?? 0).toFixed(2)}`}
               tone="amazon"
-              sx={{ minWidth: 145 }}
+              sx={{ minWidth: 120, flexShrink: 0 }}
             />
           </Stack>
         </SectionCard>
