@@ -5,12 +5,14 @@ import {
   CircularProgress,
   Divider,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Pagination,
   Paper,
   Select,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -80,11 +82,12 @@ const COLUMNS = [
 ];
 
 const INITIAL_DRAFT = {
-  seller:    '',
-  dateMode:  'none',
-  singleDate: '',
-  dateFrom:  '',
-  dateTo:    '',
+  seller:        '',
+  dateMode:      'none',
+  singleDate:    '',
+  dateFrom:      '',
+  dateTo:        '',
+  excludeClient: true,
 };
 
 export default function MicroOrdersPage() {
@@ -128,6 +131,7 @@ export default function MicroOrdersPage() {
       if (filters.dateMode === 'single' && filters.singleDate) params.date     = filters.singleDate;
       if (filters.dateMode === 'range'  && filters.dateFrom)   params.dateFrom = filters.dateFrom;
       if (filters.dateMode === 'range'  && filters.dateTo)     params.dateTo   = filters.dateTo;
+      params.excludeClient = filters.excludeClient;
 
       const { data } = await api.get('/micro-orders', { params });
       setOrders(data.orders ?? []);
@@ -257,6 +261,20 @@ export default function MicroOrdersPage() {
               />
             </Stack>
           )}
+
+          {/* Exclude Client (Vergo) toggle */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={draft.excludeClient}
+                onChange={(e) => setDraft((d) => ({ ...d, excludeClient: e.target.checked }))}
+                color="primary"
+                size="small"
+              />
+            }
+            label="Exclude Client"
+            sx={{ ml: 0.5, whiteSpace: 'nowrap' }}
+          />
 
           {/* Spacer pushes buttons to the right on wide screens */}
           <Box sx={{ flex: 1 }} />
