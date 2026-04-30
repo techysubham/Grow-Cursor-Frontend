@@ -73,6 +73,7 @@ import ConversationTrackingPage from '../pages/admin/ConversationTrackingPage.js
 import DisputesPage from '../pages/admin/DisputesPage.jsx';
 import AccountHealthReportPage from '../pages/admin/AccountHealthReportPage.jsx';
 import PayoneerSheetPage from '../pages/admin/PayoneerSheetPage.jsx';
+import MicroOrdersPage from '../pages/admin/MicroOrdersPage.jsx';
 import BankAccountsPage from '../pages/admin/BankAccountsPage.jsx';
 import TransactionPage from '../pages/admin/TransactionPage.jsx';
 import ExtraExpensePage from '../pages/admin/ExtraExpensePage.jsx';
@@ -277,6 +278,7 @@ const COMPONENT_MAP = {
   'CsvStorage': CsvStoragePage,
   'ProductResearch': ProductResearchPage,
   'Payoneer': PayoneerSheetPage,
+  'MicroOrders': MicroOrdersPage,
   'BankAccounts': BankAccountsPage,
   'Transactions': TransactionPage,
   'ExtraExpenses': ExtraExpensePage,
