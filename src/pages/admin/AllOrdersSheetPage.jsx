@@ -42,6 +42,7 @@ import AllOrdersSheetSkeleton from '../../components/skeletons/AllOrdersSheetSke
 import AdminPageShell from '../../components/AdminPageShell.jsx';
 import SectionCard from '../../components/SectionCard.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import StatMetricCard from '../../components/StatMetricCard.jsx';
 import { dashboardSignatureTokens } from '../../theme/appTheme.js';
 import { tableHeaderCellSx, tableBodyCellSx, tableBodyRowSx, tableContainerSx, yellowOutlinedButtonSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
@@ -158,10 +159,13 @@ export default function AllOrdersSheetPage() {
     to: ''
   });
 
+  // Cross-page filtered totals (from server aggregation, active when date filter is set)
+  const [filteredTotals, setFilteredTotals] = useState(null);
+
   // Toggle states for card sections
-  const [showProfitCards, setShowProfitCards] = useState(true);
-  const [showSubtotalCards, setShowSubtotalCards] = useState(true);
-  const [showExchangeRate, setShowExchangeRate] = useState(true);
+  const [showProfitCards, setShowProfitCards] = useState(false);
+  const [showSubtotalCards, setShowSubtotalCards] = useState(false);
+  const [showExchangeRate, setShowExchangeRate] = useState(false);
 
   // Modal state for showing category/range/product names
   const [namesModal, setNamesModal] = useState({
@@ -551,6 +555,8 @@ export default function AllOrdersSheetPage() {
       if (data?.counts) {
         setCounts(data.counts);
       }
+
+      setFilteredTotals(data?.filteredTotals || null);
     } catch (e) {
       setOrders([]);
       setCounts({ uniqueCategories: 0, uniqueRanges: 0, uniqueProducts: 0, categoryData: [], rangeData: [], productData: [] });
@@ -1707,6 +1713,96 @@ export default function AllOrdersSheetPage() {
                 color="primary"
               />
             )}
+          </Stack>
+        </SectionCard>
+      )}
+
+      {/* Cross-page Filtered Totals — shown when a date filter is active */}
+      {filteredTotals && dateFilter.mode !== 'none' && (
+        <SectionCard sx={{ p: 2, mb: 2, background: dashboardSignatureTokens.surfaces.pageCard }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Totals for all {totalOrders} filtered order{totalOrders !== 1 ? 's' : ''} across {totalPages} page{totalPages !== 1 ? 's' : ''}
+          </Typography>
+          <Stack direction="row" flexWrap="nowrap" spacing={1.5} sx={{ overflowX: 'auto', pb: 0.5 }}>
+            <StatMetricCard
+              label="PROFIT (INR)"
+              value={`₹${(filteredTotals.profit ?? 0).toFixed(2)}`}
+              tone={filteredTotals.profit >= 0 ? 'success' : 'danger'}
+              sx={{ minWidth: 130, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="P.Balance (INR)"
+              value={`₹${(filteredTotals.pBalanceINR ?? 0).toFixed(2)}`}
+              tone="info"
+              sx={{ minWidth: 130, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Amazon Total (INR)"
+              value={`₹${(filteredTotals.amazonTotalINR ?? 0).toFixed(2)}`}
+              tone="amazon"
+              sx={{ minWidth: 130, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Total CC (INR)"
+              value={`₹${(filteredTotals.totalCC ?? 0).toFixed(2)}`}
+              tone="warning"
+              sx={{ minWidth: 120, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Mktplace Fee (INR)"
+              value={`₹${(filteredTotals.marketplaceFee ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 130, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="IGST (INR)"
+              value={`₹${(filteredTotals.igst ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 110, flexShrink: 0 }}
+            />
+            <Box sx={{ width: '1px', bgcolor: 'divider', alignSelf: 'stretch', flexShrink: 0 }} />
+            <StatMetricCard
+              label="Subtotal ($)"
+              value={`$${(filteredTotals.subtotal ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 110, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Shipping ($)"
+              value={`$${(filteredTotals.shipping ?? 0).toFixed(2)}`}
+              tone="shipping"
+              sx={{ minWidth: 110, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Sales Tax ($)"
+              value={`$${(filteredTotals.salesTax ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 110, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Earnings ($)"
+              value={`$${(filteredTotals.orderEarnings ?? 0).toFixed(2)}`}
+              tone="success"
+              sx={{ minWidth: 120, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="TDS ($)"
+              value={`$${(filteredTotals.tds ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 90, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="NET ($)"
+              value={`$${(filteredTotals.net ?? 0).toFixed(2)}`}
+              tone="info"
+              sx={{ minWidth: 100, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Amazon Total ($)"
+              value={`$${(filteredTotals.amazonTotal ?? 0).toFixed(2)}`}
+              tone="amazon"
+              sx={{ minWidth: 120, flexShrink: 0 }}
+            />
           </Stack>
         </SectionCard>
       )}
