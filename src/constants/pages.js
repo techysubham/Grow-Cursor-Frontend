@@ -81,6 +81,7 @@ export const PAGE_REGISTRY = [
   { id: 'ProductResearch', name: 'Product Research', path: '/research', category: 'listingResearch', defaultRoles: ['superadmin', 'productadmin'] },
 
   // ====== FINANCE & CASH FLOW ======
+  { id: 'MicroOrders', name: 'Micro Orders', path: '/micro-orders', category: 'finance', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
   { id: 'Payoneer', name: 'Payoneer Sheet', path: '/payoneer', category: 'finance', defaultRoles: ['superadmin'] },
   { id: 'BankAccounts', name: 'Bank Accounts', path: '/bank-accounts', category: 'finance', defaultRoles: ['superadmin'] },
   { id: 'Transactions', name: 'Transactions', path: '/transactions', category: 'finance', defaultRoles: ['superadmin'] },
