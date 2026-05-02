@@ -105,6 +105,7 @@ export default function AsinDirectoryPage() {
   const [search, setSearch] = useState('');
 
   const [selected, setSelected] = useState([]);
+  const [selectAllAcrossPages, setSelectAllAcrossPages] = useState(false);
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
 
@@ -128,6 +129,7 @@ export default function AsinDirectoryPage() {
 
   useEffect(() => {
     setSelected([]);
+    setSelectAllAcrossPages(false);
   }, [page, rowsPerPage, search, showMoved, marketplaceFilter, addedByUserId]);
 
   const fetchAsins = async () => {
@@ -266,10 +268,12 @@ export default function AsinDirectoryPage() {
       setSelected(asins.map(a => a._id));
     } else {
       setSelected([]);
+      setSelectAllAcrossPages(false);
     }
   };
 
   const handleSelectOne = (id) => {
+    setSelectAllAcrossPages(false);
     setSelected(prev =>
       prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
     );
@@ -279,6 +283,21 @@ export default function AsinDirectoryPage() {
     navigator.clipboard.writeText(asin);
     setSuccess(`Copied ${asin} to clipboard`);
     setTimeout(() => setSuccess(''), 2000);
+  };
+
+  // Fetch ALL ids matching current filters (for cross-page move)
+  const fetchAllFilteredIds = async () => {
+    const { data } = await api.get('/asin-directory', {
+      params: {
+        page: 1,
+        limit: 99999,
+        search: search || undefined,
+        showMoved: showMoved ? 'true' : undefined,
+        region: marketplaceFilter || undefined,
+        addedByUserId: addedByUserId || undefined
+      }
+    });
+    return (data.asins || []).map(a => a._id);
   };
 
   const handleChangePage = (event, newPage) => {
@@ -368,11 +387,21 @@ export default function AsinDirectoryPage() {
           <Button
             startIcon={<DownloadIcon />}
             variant="contained"
-            onClick={() => setExportDialog(true)}
-            disabled={selected.length === 0}
+            onClick={async () => {
+              if (selectAllAcrossPages) {
+                // Resolve all IDs across pages before opening the dialog
+                try {
+                  const allIds = await fetchAllFilteredIds();
+                  setSelected(allIds);
+                }
+                catch { setError('Failed to fetch all ASINs'); return; }
+              }
+              setExportDialog(true);
+            }}
+            disabled={selected.length === 0 && !selectAllAcrossPages}
             sx={darkButtonSx}
           >
-            Move to List
+            Move to List{selectAllAcrossPages ? ` (${total})` : selected.length > 0 ? ` (${selected.length})` : ''}
           </Button>
 
           {selected.length > 0 && (
@@ -460,6 +489,49 @@ export default function AsinDirectoryPage() {
         </Stack>
       </Paper>
 
+      {/* Cross-page select-all banner */}
+      {selected.length === asins.length && asins.length > 0 && total > asins.length && !selectAllAcrossPages && (
+        <Box sx={{
+          mb: 1.5, px: 2, py: 1,
+          backgroundColor: alpha(BRAND_YELLOW, 0.12),
+          border: `1px solid ${alpha(BRAND_YELLOW_DARK, 0.35)}`,
+          borderRadius: 2,
+          display: 'flex', alignItems: 'center', gap: 1.5
+        }}>
+          <Typography variant="body2" sx={{ color: BRAND_DARK, flex: 1 }}>
+            All <strong>{asins.length}</strong> ASINs on this page are selected.
+          </Typography>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => setSelectAllAcrossPages(true)}
+            sx={{ ...darkButtonSx, minHeight: 28, px: 1.5, fontSize: '0.78rem', backgroundColor: BRAND_YELLOW_DARK, '&:hover': { backgroundColor: BRAND_YELLOW_DARK } }}
+          >
+            Select all {total} ASINs
+          </Button>
+        </Box>
+      )}
+      {selectAllAcrossPages && (
+        <Box sx={{
+          mb: 1.5, px: 2, py: 1,
+          backgroundColor: alpha(BRAND_YELLOW, 0.18),
+          border: `1px solid ${alpha(BRAND_YELLOW_DARK, 0.5)}`,
+          borderRadius: 2,
+          display: 'flex', alignItems: 'center', gap: 1.5
+        }}>
+          <Typography variant="body2" sx={{ color: BRAND_DARK, flex: 1 }}>
+            All <strong>{total}</strong> ASINs matching current filters are selected.
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => { setSelectAllAcrossPages(false); setSelected([]); }}
+            sx={{ ...outlinedButtonSx, minHeight: 28, px: 1.5, fontSize: '0.78rem' }}
+          >
+            Clear selection
+          </Button>
+        </Box>
+      )}
       <Paper elevation={0} sx={{ border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
         <TableContainer>
           <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
