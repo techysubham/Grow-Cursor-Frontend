@@ -6,7 +6,9 @@ import {
   Chip,
   CircularProgress,
   Dialog,
+  DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Fade,
   FormControl,
@@ -15,6 +17,7 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  Snackbar,
   Stack,
   Switch,
   Table,
@@ -102,6 +105,12 @@ export default function LegacyItemAnalyticsPage() {
 
   const [drillDown, setDrillDown] = useState({ open: false, loading: false, orders: [], error: '', meta: null });
   const [chatOrder, setChatOrder] = useState(null);
+
+  const [endListingItemId, setEndListingItemId] = useState('');
+  const [endListingSellerId, setEndListingSellerId] = useState('');
+  const [endListingConfirmOpen, setEndListingConfirmOpen] = useState(false);
+  const [endingListing, setEndingListing] = useState(false);
+  const [endListingSnackbar, setEndListingSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
     const fetchSellers = async () => {
@@ -212,6 +221,29 @@ export default function LegacyItemAnalyticsPage() {
       setDrillDown((prev) => ({ ...prev, loading: false, orders: response.data.orders || [] }));
     } catch (err) {
       setDrillDown((prev) => ({ ...prev, loading: false, error: err?.response?.data?.error || 'Failed to load orders.' }));
+    }
+  };
+
+  const handleEndListingClick = () => {
+    if (!endListingItemId.trim() || !endListingSellerId) return;
+    setEndListingConfirmOpen(true);
+  };
+
+  const confirmEndListing = async () => {
+    setEndListingConfirmOpen(false);
+    setEndingListing(true);
+    try {
+      await api.post('/ebay/end-item', {
+        sellerId: endListingSellerId,
+        itemId: endListingItemId.trim(),
+        endingReason: 'NotAvailable',
+      });
+      setEndListingSnackbar({ open: true, message: 'Listing ended successfully on eBay', severity: 'success' });
+      setEndListingItemId('');
+    } catch (e) {
+      setEndListingSnackbar({ open: true, message: 'Failed to end listing: ' + (e?.response?.data?.error || e.message), severity: 'error' });
+    } finally {
+      setEndingListing(false);
     }
   };
 
@@ -401,6 +433,47 @@ export default function LegacyItemAnalyticsPage() {
                 Refresh
               </Button>
             </Stack>
+          </Stack>
+
+          {/* ── Row 3: End Listing ── */}
+          <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap alignItems="center" sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed', borderColor: 'divider' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', minWidth: 90 }}>End Listing</Typography>
+            <FormControl size="small" sx={{ minWidth: 200, ...selectFocusSx }}>
+              <InputLabel>Seller</InputLabel>
+              <Select
+                label="Seller"
+                value={endListingSellerId}
+                onChange={(e) => setEndListingSellerId(e.target.value)}
+                disabled={sellerLoading}
+              >
+                <MenuItem value=""><em>Select Seller</em></MenuItem>
+                {sellers.map((seller) => (
+                  <MenuItem key={seller._id} value={seller._id}>
+                    {seller.user?.username || 'Unknown Seller'}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Item ID"
+              size="small"
+              value={endListingItemId}
+              onChange={(e) => setEndListingItemId(e.target.value)}
+              placeholder="e.g. 123456789012"
+              sx={{ minWidth: 200, ...inputFocusSx }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleEndListingClick(); }}
+            />
+            <Button
+              variant="contained"
+              color="error"
+              size="small"
+              disabled={!endListingItemId.trim() || !endListingSellerId || endingListing}
+              onClick={handleEndListingClick}
+              startIcon={endingListing ? <CircularProgress size={14} color="inherit" /> : null}
+              sx={{ minWidth: 130, fontWeight: 700 }}
+            >
+              {endingListing ? 'Ending…' : 'End Listing'}
+            </Button>
           </Stack>
 
           {error && (
@@ -707,6 +780,36 @@ export default function LegacyItemAnalyticsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── End Listing Confirmation Dialog ── */}
+      <Dialog open={endListingConfirmOpen} onClose={() => setEndListingConfirmOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>End Listing on eBay?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 1 }}>This will permanently end the eBay listing for item ID:</DialogContentText>
+          <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'error.main' }}>
+            {endListingItemId}
+          </Typography>
+          <DialogContentText sx={{ mt: 1 }}>This action cannot be undone.</DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEndListingConfirmOpen(false)} variant="outlined" size="small">Cancel</Button>
+          <Button onClick={confirmEndListing} variant="contained" color="error" size="small" sx={{ fontWeight: 700 }}>
+            Yes, End Listing
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── End Listing Snackbar ── */}
+      <Snackbar
+        open={endListingSnackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setEndListingSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setEndListingSnackbar((prev) => ({ ...prev, open: false }))} severity={endListingSnackbar.severity} sx={{ width: '100%' }}>
+          {endListingSnackbar.message}
+        </Alert>
+      </Snackbar>
 
       {/* ── Chat Modal ── */}
       {chatOrder && (
