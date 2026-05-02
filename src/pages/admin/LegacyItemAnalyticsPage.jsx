@@ -112,6 +112,14 @@ export default function LegacyItemAnalyticsPage() {
   const [endingListing, setEndingListing] = useState(false);
   const [endListingSnackbar, setEndListingSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
+  const [editSellerId, setEditSellerId] = useState('');
+  const [editItemId, setEditItemId] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editListingConfirmOpen, setEditListingConfirmOpen] = useState(false);
+  const [editingListing, setEditingListing] = useState(false);
+  const [editListingSnackbar, setEditListingSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
   useEffect(() => {
     const fetchSellers = async () => {
       try {
@@ -244,6 +252,31 @@ export default function LegacyItemAnalyticsPage() {
       setEndListingSnackbar({ open: true, message: 'Failed to end listing: ' + (e?.response?.data?.error || e.message), severity: 'error' });
     } finally {
       setEndingListing(false);
+    }
+  };
+
+  const handleEditListingClick = () => {
+    if (!editItemId.trim() || !editSellerId) return;
+    if (!editTitle.trim() && !editPrice) return;
+    setEditListingConfirmOpen(true);
+  };
+
+  const confirmEditListing = async () => {
+    setEditListingConfirmOpen(false);
+    setEditingListing(true);
+    try {
+      const payload = { sellerId: editSellerId, itemId: editItemId.trim() };
+      if (editTitle.trim()) payload.title = editTitle.trim();
+      if (editPrice) payload.price = parseFloat(editPrice);
+      await api.post('/ebay/update-listing', payload);
+      setEditListingSnackbar({ open: true, message: 'Listing updated successfully on eBay', severity: 'success' });
+      setEditItemId('');
+      setEditTitle('');
+      setEditPrice('');
+    } catch (e) {
+      setEditListingSnackbar({ open: true, message: 'Failed to update listing: ' + (e?.response?.data?.error || e.message), severity: 'error' });
+    } finally {
+      setEditingListing(false);
     }
   };
 
@@ -473,6 +506,64 @@ export default function LegacyItemAnalyticsPage() {
               sx={{ minWidth: 130, fontWeight: 700 }}
             >
               {endingListing ? 'Ending…' : 'End Listing'}
+            </Button>
+          </Stack>
+
+          {/* ── Row 4: Edit Listing ── */}
+          <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap alignItems="center" sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed', borderColor: 'divider' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', minWidth: 90 }}>Edit Listing</Typography>
+            <FormControl size="small" sx={{ minWidth: 200, ...selectFocusSx }}>
+              <InputLabel>Seller</InputLabel>
+              <Select
+                label="Seller"
+                value={editSellerId}
+                onChange={(e) => setEditSellerId(e.target.value)}
+                disabled={sellerLoading}
+              >
+                <MenuItem value=""><em>Select Seller</em></MenuItem>
+                {sellers.map((seller) => (
+                  <MenuItem key={seller._id} value={seller._id}>
+                    {seller.user?.username || 'Unknown Seller'}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Item ID"
+              size="small"
+              value={editItemId}
+              onChange={(e) => setEditItemId(e.target.value)}
+              placeholder="e.g. 123456789012"
+              sx={{ minWidth: 200, ...inputFocusSx }}
+            />
+            <TextField
+              label="New Title"
+              size="small"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder="Leave blank to keep current"
+              inputProps={{ maxLength: 80 }}
+              sx={{ minWidth: 280, ...inputFocusSx }}
+            />
+            <TextField
+              label="New Price (USD)"
+              size="small"
+              type="number"
+              value={editPrice}
+              onChange={(e) => setEditPrice(e.target.value)}
+              placeholder="Leave blank to keep current"
+              inputProps={{ min: 0, step: '0.01' }}
+              sx={{ minWidth: 180, ...inputFocusSx }}
+            />
+            <Button
+              variant="contained"
+              size="small"
+              disabled={!editItemId.trim() || !editSellerId || (!editTitle.trim() && !editPrice) || editingListing}
+              onClick={handleEditListingClick}
+              startIcon={editingListing ? <CircularProgress size={14} color="inherit" /> : null}
+              sx={{ minWidth: 130, fontWeight: 700, bgcolor: BRAND_DARK, color: BRAND_YELLOW, '&:hover': { bgcolor: alpha(BRAND_DARK, 0.85) }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}
+            >
+              {editingListing ? 'Saving…' : 'Save Changes'}
             </Button>
           </Stack>
 
@@ -808,6 +899,45 @@ export default function LegacyItemAnalyticsPage() {
       >
         <Alert onClose={() => setEndListingSnackbar((prev) => ({ ...prev, open: false }))} severity={endListingSnackbar.severity} sx={{ width: '100%' }}>
           {endListingSnackbar.message}
+        </Alert>
+      </Snackbar>
+
+      {/* ── Edit Listing Confirmation Dialog ── */}
+      <Dialog open={editListingConfirmOpen} onClose={() => setEditListingConfirmOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Save Listing Changes on eBay?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 1 }}>The following changes will be applied to item:</DialogContentText>
+          <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 700, mb: 1 }}>{editItemId}</Typography>
+          {editTitle.trim() && (
+            <Box sx={{ mb: 0.5 }}>
+              <Typography variant="body2" color="text.secondary" component="span">Title: </Typography>
+              <Typography variant="body2" component="span" sx={{ fontWeight: 600 }}>{editTitle.trim()}</Typography>
+            </Box>
+          )}
+          {editPrice && (
+            <Box>
+              <Typography variant="body2" color="text.secondary" component="span">Price: </Typography>
+              <Typography variant="body2" component="span" sx={{ fontWeight: 600 }}>${parseFloat(editPrice).toFixed(2)}</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditListingConfirmOpen(false)} variant="outlined" size="small">Cancel</Button>
+          <Button onClick={confirmEditListing} variant="contained" size="small" sx={{ fontWeight: 700, bgcolor: BRAND_DARK, color: BRAND_YELLOW, '&:hover': { bgcolor: alpha(BRAND_DARK, 0.85) } }}>
+            Confirm Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Edit Listing Snackbar ── */}
+      <Snackbar
+        open={editListingSnackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setEditListingSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setEditListingSnackbar((prev) => ({ ...prev, open: false }))} severity={editListingSnackbar.severity} sx={{ width: '100%' }}>
+          {editListingSnackbar.message}
         </Alert>
       </Snackbar>
 
