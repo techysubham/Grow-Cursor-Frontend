@@ -456,18 +456,44 @@ export default function AllOrdersSheetPage() {
           order.amazonAccount || '-',
           order.orderId || '-',
           order.buyer?.buyerRegistrationAddress?.fullName || '-',
-          order.arrivingDate || '-'
+          (() => {
+            const d = order.arrivingDate;
+            if (!d) return '-';
+            const s = String(d).trim();
+            // YYYY-MM-DD or YYYY-MM-DDTHH:mm... (ISO / MongoDB string)
+            const m1 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m1) return `${m1[2]}/${m1[3]}/${m1[1]}`;
+            // MM-DD-YYYY (dash-separated, month-first)
+            const m2 = s.match(/^(\d{2})-(\d{2})-(\d{4})/);
+            if (m2) return `${m2[1]}/${m2[2]}/${m2[3]}`;
+            // Already MM/DD/YYYY
+            if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) return s.slice(0, 10);
+            return s;
+          })()
         ];
       });
 
       // Combine headers and rows
+      // Date column indices (0-based): 1=Date Sold, 29=Arriving
+      const DATE_COL_INDICES = new Set([1, 29]);
       const csvContent = [
         headers.join(','),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ...rows.map(row =>
+          row.map((cell, i) => {
+            const s = String(cell);
+            // For date columns, force Excel to treat as text by using ="..." syntax
+            // This prevents Excel from auto-converting MM/DD/YYYY to its own date serial
+            if (DATE_COL_INDICES.has(i) && /^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+              return `="${s}"`;
+            }
+            return `"${s.replace(/"/g, '""')}"`;
+          }).join(',')
+        )
       ].join('\n');
 
-      // Create blob and download
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      // Create blob with UTF-8 BOM so Excel opens with correct encoding
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       
@@ -744,6 +770,7 @@ export default function AllOrdersSheetPage() {
     if (!dateStr) return '-';
     try {
       const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '-';
       
       // Determine timezone based on marketplace
       let timezone = 'America/Los_Angeles'; // Default PT
@@ -751,17 +778,16 @@ export default function AllOrdersSheetPage() {
       else if (marketplaceId === 'EBAY_CA') timezone = 'America/Toronto';
       else if (marketplaceId === 'EBAY_GB') timezone = 'Europe/London';
       
-      // Format date only (no time for All Orders Sheet)
-      const dateOptions = { 
+      // Use formatToParts to guarantee MM/DD/YYYY with slashes regardless of OS locale
+      const formatter = new Intl.DateTimeFormat('en-US', { 
         month: '2-digit', 
         day: '2-digit', 
         year: 'numeric',
         timeZone: timezone
-      };
-      
-      const formattedDate = date.toLocaleDateString('en-US', dateOptions);
-      
-      return formattedDate;
+      });
+      const parts = formatter.formatToParts(date);
+      const p = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+      return `${p.month}/${p.day}/${p.year}`;
     } catch {
       return '-';
     }
@@ -778,7 +804,7 @@ export default function AllOrdersSheetPage() {
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              Select a date range to download all orders within that period.
+              Select a date range to download all orders within that period. All currently active filters will be applied.
             </Typography>
             <TextField
               label="Start Date"
@@ -805,9 +831,39 @@ export default function AllOrdersSheetPage() {
               helperText="Leave empty for default name with date"
               fullWidth
             />
+            {/* Active filters summary */}
+            {(() => {
+              const activeFilters = [];
+              if (selectedSeller) {
+                const sellerObj = sellers.find(s => s._id === selectedSeller);
+                activeFilters.push(`Seller: ${sellerObj?.user?.username || selectedSeller}`);
+              }
+              if (searchMarketplace) activeFilters.push(`Marketplace: ${searchMarketplace.replace('EBAY_', 'eBay ')}`);
+              if (excludeLowValue) activeFilters.push('Excluding low-value orders');
+              if (excludeNoAmazonAccount) activeFilters.push('Excluding no Amazon account');
+              if (searchOrderId.trim()) activeFilters.push(`Order ID: ${searchOrderId.trim()}`);
+              if (searchBuyerName.trim()) activeFilters.push(`Buyer: ${searchBuyerName.trim()}`);
+              if (searchProductName.trim()) activeFilters.push(`Product: ${searchProductName.trim()}`);
+              if (profitFilter.mode === 'range' && (profitFilter.from || profitFilter.to))
+                activeFilters.push(`Profit: ${profitFilter.from || '*'} – ${profitFilter.to || '*'}`);
+              if (subtotalFilter.mode === 'range' && (subtotalFilter.from || subtotalFilter.to))
+                activeFilters.push(`Subtotal: ${subtotalFilter.from || '*'} – ${subtotalFilter.to || '*'}`);
+              if (activeFilters.length === 0) return null;
+              return (
+                <Alert severity="info" icon={false}>
+                  <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>Active filters that will be applied:</Typography>
+                  {activeFilters.map((f, i) => (
+                    <Typography key={i} variant="caption" sx={{ display: 'block' }}>• {f}</Typography>
+                  ))}
+                </Alert>
+              );
+            })()}
             {csvStartDate && csvEndDate && (
-              <Alert severity="info">
-                Will export all orders from {new Date(csvStartDate).toLocaleDateString()} to {new Date(csvEndDate).toLocaleDateString()}
+              <Alert severity="success">
+                Will export orders from{' '}
+                {new Date(csvStartDate + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}{' '}
+                to{' '}
+                {new Date(csvEndDate + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
               </Alert>
             )}
           </Stack>
@@ -842,7 +898,17 @@ export default function AllOrdersSheetPage() {
               <Button
                 variant="outlined"
                 size="small"
-                onClick={() => setShowExportModal(true)}
+                onClick={() => {
+                  // Pre-populate dates from active date filter
+                  if (dateFilter.mode === 'range') {
+                    if (dateFilter.from) setCsvStartDate(dateFilter.from);
+                    if (dateFilter.to) setCsvEndDate(dateFilter.to);
+                  } else if (dateFilter.mode === 'single' && dateFilter.single) {
+                    setCsvStartDate(dateFilter.single);
+                    setCsvEndDate(dateFilter.single);
+                  }
+                  setShowExportModal(true);
+                }}
                 disabled={exportingCSV}
                 sx={{ ...yellowOutlinedButtonSx, height: 40 }}
               >
