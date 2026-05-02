@@ -33,8 +33,10 @@ import {
   ChevronRight as ChevronRightIcon,
   Edit as EditIcon,
   ContentCopy as DuplicateIcon,
-  CallMade as CopyToIcon
+  CallMade as CopyToIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
+import InputAdornment from '@mui/material/InputAdornment';
 import api from '../lib/api.js';
 
 // ── Single panel component ─────────────────────────────────────────────────
@@ -74,6 +76,16 @@ function TaxonomyPanel({
 }) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Reset search when items change (new category/range selected)
+  useEffect(() => {
+    setSearchQuery('');
+  }, [items]);
+
+  const filteredItems = searchQuery.trim()
+    ? items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : items;
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
@@ -87,8 +99,8 @@ function TaxonomyPanel({
     if (e.key === 'Escape') { setAdding(false); setNewName(''); }
   };
 
-  const allSelected = items.length > 0 && selectedIds && selectedIds.size === items.length;
-  const someSelected = selectedIds && selectedIds.size > 0 && selectedIds.size < items.length;
+  const allSelected = filteredItems.length > 0 && selectedIds && selectedIds.size === filteredItems.length;
+  const someSelected = selectedIds && selectedIds.size > 0 && selectedIds.size < filteredItems.length;
 
   return (
     <Box
@@ -134,6 +146,37 @@ function TaxonomyPanel({
         </Stack>
       </Box>
 
+      {/* Search box */}
+      {!disabled && items.length > 0 && (
+        <Box sx={{ px: 1.5, py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={`Search ${title.toLowerCase()}…`}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchQuery('')} edge="end">
+                    <CloseIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': { borderRadius: 1 },
+              '& .MuiOutlinedInput-input': { py: 0.6, fontSize: '0.8rem' },
+            }}
+          />
+        </Box>
+      )}
+
       {/* Inline add field */}
       {adding && (
         <Box sx={{ px: 1.5, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
@@ -172,9 +215,13 @@ function TaxonomyPanel({
           <Box sx={{ py: 4, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">No items yet</Typography>
           </Box>
+        ) : filteredItems.length === 0 ? (
+          <Box sx={{ py: 4, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">No matches for "{searchQuery}"</Typography>
+          </Box>
         ) : (
           <List dense disablePadding>
-            {items.map(item => (
+            {filteredItems.map(item => (
               <Box key={item._id}>
                 {/* ── Normal / edit row ── */}
                 <ListItem disablePadding>
