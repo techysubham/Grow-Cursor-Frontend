@@ -1008,16 +1008,16 @@ export default function AsinReviewModal({
                           </ToggleButtonGroup>
                         </Box>
 
-                        {/* Footer Template Dropdown */}
+                        {/* Footer Template Dropdown + Start Price + Actual Profit */}
                         <Stack
                           direction="row"
-                          alignItems="flex-start"
+                          alignItems="center"
                           justifyContent="space-between"
                           spacing={1.5}
                           sx={{ mb: 1.5, flexWrap: 'wrap' }}
                           useFlexGap
                         >
-                          <FormControl size="small" sx={{ width: 280 }}>
+                          <FormControl size="small" sx={{ width: 280, flexShrink: 0 }}>
                             <InputLabel>Append Footer Template</InputLabel>
                             <Select
                               value={appliedDescTemplates[currentItem?.id] || ''}
@@ -1030,6 +1030,34 @@ export default function AsinReviewModal({
                               ))}
                             </Select>
                           </FormControl>
+
+                          {/* Inline Start Price editor */}
+                          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
+                            <TextField
+                              label="Start Price"
+                              value={startPriceValue}
+                              onChange={(e) => handleFieldChange('startPrice', e.target.value, false)}
+                              size="small"
+                              required
+                              type="number"
+                              disabled={!isStartPriceEditing}
+                              sx={{
+                                width: 130,
+                                '& input::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                                '& input::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                                '& input[type=number]': { MozAppearance: 'textfield' },
+                              }}
+                            />
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={isStartPriceEditing ? handleStartPriceSave : handleStartPriceEdit}
+                              startIcon={isStartPriceEditing ? <SaveIcon fontSize="small" /> : <EditIcon fontSize="small" />}
+                              sx={{ minWidth: 80, height: 40, flexShrink: 0 }}
+                            >
+                              {isStartPriceEditing ? 'Save' : 'Edit'}
+                            </Button>
+                          </Stack>
 
                           {showActualProfit && (
                             <Tooltip
@@ -1127,38 +1155,9 @@ export default function AsinReviewModal({
                     );
                   }
 
-                  // Start Price field — with Actual Profit chip
+                  // Skip startPrice — it's rendered inline in the description toolbar above
                   if (col.name === 'startPrice') {
-                    return (
-                      <Box key="startPrice">
-                        <Stack direction="row" spacing={1} alignItems="flex-start">
-                          <TextField
-                            label={col.label || col.name}
-                            value={startPriceValue}
-                            onChange={(e) => handleFieldChange('startPrice', e.target.value, false)}
-                            size="small"
-                            fullWidth
-                            required
-                            type="number"
-                            disabled={!isStartPriceEditing}
-                            sx={{
-                              '& input::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
-                              '& input::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 },
-                              '& input[type=number]': { MozAppearance: 'textfield' },
-                            }}
-                          />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={isStartPriceEditing ? handleStartPriceSave : handleStartPriceEdit}
-                            startIcon={isStartPriceEditing ? <SaveIcon fontSize="small" /> : <EditIcon fontSize="small" />}
-                            sx={{ minWidth: 86, height: 40, flexShrink: 0 }}
-                          >
-                            {isStartPriceEditing ? 'Save' : 'Edit'}
-                          </Button>
-                        </Stack>
-                      </Box>
-                    );
+                    return null;
                   }
 
                   // Regular fields
