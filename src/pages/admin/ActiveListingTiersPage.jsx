@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
     Box, Typography, Container, Paper, CircularProgress, Alert,
     Chip, Button, Divider, Grid, FormControl, InputLabel,
-    Select, MenuItem
+    Select, MenuItem, LinearProgress
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -10,6 +10,7 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import StorefrontIcon from '@mui/icons-material/Storefront';
+import PublicIcon from '@mui/icons-material/Public';
 import api from '../../lib/api';
 
 const TIERS = [
@@ -44,6 +45,68 @@ function TierCard({ tier, value, total }) {
                 size="small"
                 sx={{ bgcolor: bg, color, fontWeight: 700, border: `1px solid ${color}44` }}
             />
+        </Paper>
+    );
+}
+
+const MP_TIERS = [
+    { key: 'low',  label: 'Low',  color: '#2e7d32', bg: '#e8f5e9' },
+    { key: 'mid',  label: 'Mid',  color: '#ed6c02', bg: '#fff3e0' },
+    { key: 'high', label: 'High', color: '#1565c0', bg: '#e3f2fd' },
+];
+
+function MarketplaceBreakdown({ data, total }) {
+    return (
+        <Paper elevation={1} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e0e0e0', mt: 3 }}>
+            <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <PublicIcon sx={{ color: '#555' }} />
+                <Typography variant="subtitle1" fontWeight={700}>Marketplace Breakdown</Typography>
+                <Typography variant="caption" color="textSecondary">(based on listing currency)</Typography>
+            </Box>
+            <Box display="flex" flexDirection="column" gap={2.4}>
+                {data.map(({ currency, total: mpTotal, label, flag, tiers: mpTiers }) => {
+                    const pct = total > 0 ? Math.round((mpTotal / total) * 100) : 0;
+                    return (
+                        <Box key={currency}>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                                <Box display="flex" alignItems="center" gap={1}>
+                                    <Typography fontSize="1.1rem">{flag}</Typography>
+                                    <Typography variant="body2" fontWeight={600}>{label}</Typography>
+                                    <Typography variant="caption" color="textSecondary">({currency})</Typography>
+                                </Box>
+                                <Box display="flex" alignItems="center" gap={1}>
+                                    <Typography variant="body2" fontWeight={700}>{mpTotal.toLocaleString()}</Typography>
+                                    <Chip label={`${pct}%`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                                </Box>
+                            </Box>
+                            <LinearProgress
+                                variant="determinate"
+                                value={pct}
+                                sx={{
+                                    height: 7, borderRadius: 4,
+                                    bgcolor: '#f0f0f0',
+                                    '& .MuiLinearProgress-bar': { borderRadius: 4 }
+                                }}
+                            />
+                            {/* Per-marketplace tier chips */}
+                            <Box display="flex" gap={0.8} mt={1} flexWrap="wrap">
+                                {MP_TIERS.map(t => (
+                                    <Chip
+                                        key={t.key}
+                                        size="small"
+                                        label={`${t.label}: ${(mpTiers[t.key] ?? 0).toLocaleString()}`}
+                                        sx={{
+                                            height: 22, fontSize: '0.7rem', fontWeight: 700,
+                                            bgcolor: t.bg, color: t.color,
+                                            border: `1px solid ${t.color}44`,
+                                        }}
+                                    />
+                                ))}
+                            </Box>
+                        </Box>
+                    );
+                })}
+            </Box>
         </Paper>
     );
 }
@@ -179,6 +242,7 @@ export default function ActiveListingTiersPage() {
                         </Typography>
                     </Box>
 
+                    {/* Price tier cards */}
                     <Grid container spacing={3}>
                         {TIERS.map(tier => (
                             <Grid item xs={12} sm={4} key={tier.key}>
@@ -190,6 +254,14 @@ export default function ActiveListingTiersPage() {
                             </Grid>
                         ))}
                     </Grid>
+
+                    {/* Marketplace breakdown */}
+                    {result.marketplaceBreakdown?.length > 0 && (
+                        <MarketplaceBreakdown
+                            data={result.marketplaceBreakdown}
+                            total={result.tiers.total}
+                        />
+                    )}
                 </>
             )}
 
