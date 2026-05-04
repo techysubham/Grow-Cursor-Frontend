@@ -105,6 +105,7 @@ export const PAGE_REGISTRY = [
   { id: 'SellingPrivileges', name: 'Seller Privileges', path: '/selling-privileges', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'EbayApiUsage', name: 'eBay API Usage', path: '/ebay-api-usage', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'SellerFunds', name: 'Seller Funds', path: '/seller-funds', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'ActiveListingTiers', name: 'Active Listing Tiers', path: '/active-listing-tiers', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
 
   // ====== HR & MANAGEMENT ======
   { id: 'IdeasAndIssues', name: 'Ideas and Issues', path: '/ideas', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin', 'operationhead', 'listingadmin'] },
