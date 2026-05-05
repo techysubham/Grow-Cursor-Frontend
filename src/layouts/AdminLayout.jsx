@@ -300,6 +300,7 @@ const COMPONENT_MAP = {
   'SellingPrivileges': SellingPrivilegesPage,
   'EbayApiUsage': EbayApiUsagePage,
   'SellerFunds': SellerFundsPage,
+  'ActiveListingTiers': ActiveListingTiersPage,
   'IdeasAndIssues': IdeasPage,
   'TeamChat': InternalMessagesPage,
   'LeaveAdmin': LeaveAdminPage,
