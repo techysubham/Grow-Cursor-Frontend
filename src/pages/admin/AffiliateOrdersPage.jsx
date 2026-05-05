@@ -41,7 +41,6 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
-import SaveIcon from '@mui/icons-material/Save';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -53,10 +52,22 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import PersonIcon from '@mui/icons-material/Person';
 import SettingsIcon from '@mui/icons-material/Settings';
 import api from '../../lib/api';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
 import ColumnSelector from '../../components/ColumnSelector';
+import PageHeader from '../../components/PageHeader.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
 import TemplateManagementModal from '../../components/TemplateManagementModal';
+import AffiliateOrdersPageSkeleton from '../../components/skeletons/AffiliateOrdersPageSkeleton.jsx';
 import { CHAT_TEMPLATES, personalizeTemplate } from '../../constants/chatTemplates';
 import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
+import {
+    tableBodyCellSx,
+    tableBodyRowSx,
+    tableContainerSx,
+    tableHeaderCellSx,
+    yellowFilledButtonSx,
+    yellowOutlinedButtonSx,
+} from '../../theme/tableStyles.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -972,6 +983,29 @@ function TabPanel({ children, value, index }) {
     return value === index ? <Box sx={{ pt: 2 }}>{children}</Box> : null;
 }
 
+const affiliateTabSx = {
+    textTransform: 'none',
+    fontWeight: 700,
+    minHeight: 48,
+    color: 'text.secondary',
+    '&.Mui-selected': {
+        color: 'text.primary',
+    },
+};
+
+const summaryMetricCardSx = {
+    p: 2,
+    minWidth: 180,
+    flex: 1,
+};
+
+function getDataRowSx(overrides = {}) {
+    return {
+        ...tableBodyRowSx,
+        ...overrides,
+    };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1018,6 +1052,12 @@ export default function AffiliateOrdersPage() {
     const [spendOrders, setSpendOrders] = useState([]);
     const [spendOrdersLoading, setSpendOrdersLoading] = useState(false);
     const [spendOrdersError, setSpendOrdersError] = useState('');
+    const initialSellerOptionsResolved = useRef(false);
+    const initialOrdersResolved = useRef(false);
+    const initialBalancesResolved = useRef(false);
+    const initialSummaryResolved = useRef(false);
+    const initialSpendResolved = useRef(false);
+    const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
     // Snackbar
     const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
@@ -1041,6 +1081,18 @@ export default function AffiliateOrdersPage() {
     }, []);
     const isSuperAdmin = currentUser?.role === 'superadmin';
 
+    const maybeFinishInitialLoad = useCallback(() => {
+        if (
+            initialSellerOptionsResolved.current &&
+            initialOrdersResolved.current &&
+            initialBalancesResolved.current &&
+            initialSummaryResolved.current &&
+            initialSpendResolved.current
+        ) {
+            setInitialLoadComplete(true);
+        }
+    }, []);
+
     const amazonAssignedCounts = (summary?.byAmazonAccount || []).reduce((acc, row) => {
         if (!row?.name || row.name === '(Unassigned)') return acc;
         acc[row.name] = row.count || 0;
@@ -1061,13 +1113,17 @@ export default function AffiliateOrdersPage() {
                 setSelectedSeller('');
             }
             setOrders([]);
+            if (!initialOrdersResolved.current) {
+                initialOrdersResolved.current = true;
+                maybeFinishInitialLoad();
+            }
             return;
         }
 
         if (!selectedSeller || !sellerOptions.some((option) => option.value === selectedSeller)) {
             setSelectedSeller(sellerOptions[0].value);
         }
-    }, [selectedSeller, sellerOptions, sellerOptionsLoading]);
+    }, [maybeFinishInitialLoad, selectedSeller, sellerOptions, sellerOptionsLoading]);
 
     // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -1089,8 +1145,12 @@ export default function AffiliateOrdersPage() {
             setOrdersError(err?.response?.data?.error || 'Failed to load seller options');
         } finally {
             setSellerOptionsLoading(false);
+            if (!initialSellerOptionsResolved.current) {
+                initialSellerOptionsResolved.current = true;
+                maybeFinishInitialLoad();
+            }
         }
-    }, [date, excludeLowValue, showDoneEntries]);
+    }, [date, excludeLowValue, maybeFinishInitialLoad, showDoneEntries]);
 
     const fetchOrders = useCallback(async () => {
         if (!selectedSeller) {
@@ -1114,8 +1174,12 @@ export default function AffiliateOrdersPage() {
             setOrdersError(err?.response?.data?.error || 'Failed to load orders');
         } finally {
             setOrdersLoading(false);
+            if (!initialOrdersResolved.current) {
+                initialOrdersResolved.current = true;
+                maybeFinishInitialLoad();
+            }
         }
-    }, [date, excludeLowValue, selectedSeller, showDoneEntries]);
+    }, [date, excludeLowValue, maybeFinishInitialLoad, selectedSeller, showDoneEntries]);
 
     const fetchAmazonAccounts = useCallback(async () => {
         try {
@@ -1134,8 +1198,12 @@ export default function AffiliateOrdersPage() {
             setBalancesError(err?.response?.data?.error || 'Failed to load balances');
         } finally {
             setBalancesLoading(false);
+            if (!initialBalancesResolved.current) {
+                initialBalancesResolved.current = true;
+                maybeFinishInitialLoad();
+            }
         }
-    }, [date, excludeLowValue]);
+    }, [date, excludeLowValue, maybeFinishInitialLoad]);
 
     const fetchSummary = useCallback(async () => {
         setSummaryLoading(true);
@@ -1147,8 +1215,12 @@ export default function AffiliateOrdersPage() {
             setSummaryError(err?.response?.data?.error || 'Failed to load summary');
         } finally {
             setSummaryLoading(false);
+            if (!initialSummaryResolved.current) {
+                initialSummaryResolved.current = true;
+                maybeFinishInitialLoad();
+            }
         }
-    }, [date, excludeLowValue]);
+    }, [date, excludeLowValue, maybeFinishInitialLoad]);
 
     const fetchSpendOrders = useCallback(async () => {
         setSpendOrdersLoading(true);
@@ -1160,8 +1232,12 @@ export default function AffiliateOrdersPage() {
             setSpendOrdersError(err?.response?.data?.error || 'Failed to load spend orders');
         } finally {
             setSpendOrdersLoading(false);
+            if (!initialSpendResolved.current) {
+                initialSpendResolved.current = true;
+                maybeFinishInitialLoad();
+            }
         }
-    }, [date, excludeLowValue]);
+    }, [date, excludeLowValue, maybeFinishInitialLoad]);
 
     useEffect(() => {
         fetchSellerOptions();
@@ -1487,98 +1563,108 @@ export default function AffiliateOrdersPage() {
         notify('success', `Exported ${rowsWithIndex.length} eligible affiliate orders`);
     };
 
+    if (!initialLoadComplete) {
+        return <AffiliateOrdersPageSkeleton showActualSpend={isSuperAdmin} />;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER — Tab 1: Daily Orders
     // ─────────────────────────────────────────────────────────────────────────
 
     const renderTab1 = () => (
         <>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                    <Typography variant="subtitle2" color="text.secondary">
-                        {isDailyOrdersLoading ? 'Loading…' : `${displayedOrders.length} order${displayedOrders.length !== 1 ? 's' : ''} in queue for ${date}`}
-                    </Typography>
-                    {!isDailyOrdersLoading && carryOverCount > 0 && (
-                        <Chip
-                            size="small"
-                            color="warning"
-                            label={`${carryOverCount} carried over`}
-                            sx={{ fontWeight: 600 }}
-                        />
-                    )}
-                    {!isDailyOrdersLoading && sellerGroupCount > 0 && (
-                        <Chip
-                            size="small"
-                            variant="outlined"
-                            label={`${sellerGroupCount} seller group${sellerGroupCount !== 1 ? 's' : ''}`}
-                        />
-                    )}
-                    {!isDailyOrdersLoading && notYetCount > 0 && (
-                        <Chip
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                            label={`${notYetCount} not yet`}
-                        />
-                    )}
-                    {!isDailyOrdersLoading && summary?.ordersDone > 0 && (
-                        <Chip
-                            size="small"
-                            variant="outlined"
-                            color={showDoneEntries ? 'success' : 'default'}
-                            label={showDoneEntries ? `${summary.ordersDone} done shown` : `${summary.ordersDone} done hidden`}
-                        />
-                    )}
+            <SectionCard sx={{ p: 2, mb: 2 }}>
+                <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', lg: 'center' }} sx={{ mb: 1.5, gap: 1.5 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Typography variant="subtitle2" color="text.secondary">
+                            {isDailyOrdersLoading ? 'Loading…' : `${displayedOrders.length} order${displayedOrders.length !== 1 ? 's' : ''} in queue for ${date}`}
+                        </Typography>
+                        {!isDailyOrdersLoading && carryOverCount > 0 && (
+                            <Chip
+                                size="small"
+                                color="warning"
+                                label={`${carryOverCount} carried over`}
+                                sx={{ fontWeight: 600 }}
+                            />
+                        )}
+                        {!isDailyOrdersLoading && sellerGroupCount > 0 && (
+                            <Chip
+                                size="small"
+                                variant="outlined"
+                                label={`${sellerGroupCount} seller group${sellerGroupCount !== 1 ? 's' : ''}`}
+                            />
+                        )}
+                        {!isDailyOrdersLoading && notYetCount > 0 && (
+                            <Chip
+                                size="small"
+                                color="info"
+                                variant="outlined"
+                                label={`${notYetCount} not yet`}
+                            />
+                        )}
+                        {!isDailyOrdersLoading && summary?.ordersDone > 0 && (
+                            <Chip
+                                size="small"
+                                variant="outlined"
+                                color={showDoneEntries ? 'success' : 'default'}
+                                label={showDoneEntries ? `${summary.ordersDone} done shown` : `${summary.ordersDone} done hidden`}
+                            />
+                        )}
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: 'flex-start', lg: 'flex-end' }} flexWrap="wrap" useFlexGap>
+                        <FormControl size="small" sx={{ minWidth: 220, flexShrink: 0 }}>
+                            <InputLabel id="affiliate-seller-filter-label">Seller</InputLabel>
+                            <Select
+                                labelId="affiliate-seller-filter-label"
+                                value={selectedSeller}
+                                label="Seller"
+                                onChange={(e) => setSelectedSeller(e.target.value)}
+                            >
+                                {sellerOptions.map((option) => (
+                                    <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ flexShrink: 0 }}>
+                            <FormControlLabel
+                                control={<Switch size="small" checked={showNotYetFirst} onChange={(e) => setShowNotYetFirst(e.target.checked)} />}
+                                label="Not Yet first"
+                                sx={{ mr: 0.5, '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
+                            />
+                            <FormControlLabel
+                                control={<Switch size="small" checked={showDoneEntries} onChange={(e) => setShowDoneEntries(e.target.checked)} />}
+                                label="Show Done"
+                                sx={{ mr: 0.5, '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
+                            />
+                        </Stack>
+                        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="nowrap" sx={{ flexShrink: 0 }}>
+                            <Button size="small" variant="contained" startIcon={<DownloadIcon />} onClick={handleOpenExportDialog} sx={yellowFilledButtonSx}>
+                                CSV
+                            </Button>
+                            <ColumnSelector
+                                allColumns={DAILY_ORDER_ALL_COLUMNS}
+                                visibleColumns={visibleColumns}
+                                onColumnChange={setVisibleColumns}
+                                onReset={() => setVisibleColumns(DEFAULT_DAILY_VISIBLE_COLUMNS)}
+                                page="affiliate-orders"
+                            />
+                            <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSellerOptions} variant="outlined" sx={yellowOutlinedButtonSx}>Refresh</Button>
+                        </Stack>
+                    </Stack>
                 </Stack>
-                <Stack direction="row" spacing={0.5} alignItems="center">
-                    <FormControl size="small" sx={{ minWidth: 220 }}>
-                        <InputLabel id="affiliate-seller-filter-label">Seller</InputLabel>
-                        <Select
-                            labelId="affiliate-seller-filter-label"
-                            value={selectedSeller}
-                            label="Seller"
-                            onChange={(e) => setSelectedSeller(e.target.value)}
-                        >
-                            {sellerOptions.map((option) => (
-                                <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    <FormControlLabel
-                        control={<Switch size="small" checked={showNotYetFirst} onChange={(e) => setShowNotYetFirst(e.target.checked)} />}
-                        label="Not Yet first"
-                        sx={{ mr: 0.5, '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
-                    />
-                    <FormControlLabel
-                        control={<Switch size="small" checked={showDoneEntries} onChange={(e) => setShowDoneEntries(e.target.checked)} />}
-                        label="Show Done"
-                        sx={{ mr: 0.5, '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
-                    />
-                    <Button size="small" variant="outlined" color="success" startIcon={<DownloadIcon />} onClick={handleOpenExportDialog}>
-                        CSV
-                    </Button>
-                    <ColumnSelector
-                        allColumns={DAILY_ORDER_ALL_COLUMNS}
-                        visibleColumns={visibleColumns}
-                        onColumnChange={setVisibleColumns}
-                        onReset={() => setVisibleColumns(DEFAULT_DAILY_VISIBLE_COLUMNS)}
-                        page="affiliate-orders"
-                    />
-                    <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSellerOptions}>Refresh</Button>
-                </Stack>
-            </Stack>
+            </SectionCard>
 
             {ordersError && <Alert severity="error" sx={{ mb: 1 }}>{ordersError}</Alert>}
 
             {isDailyOrdersLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
             ) : (
-                <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
+                <TableContainer component={SectionCard} sx={{ ...tableContainerSx, overflowX: 'auto' }}>
                     <Table size="small" sx={{ minWidth: 1100 }}>
                         <TableHead>
-                            <TableRow sx={{ bgcolor: '#fce4ec' }}>
+                            <TableRow>
                                 {DAILY_ORDER_ALL_COLUMNS.filter((c) => visibleColumns.includes(c.id)).map((column) => (
-                                    <TableCell key={column.id} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>
+                                    <TableCell key={column.id} sx={tableHeaderCellSx}>
                                         {column.label}
                                     </TableCell>
                                 ))}
@@ -1587,7 +1673,7 @@ export default function AffiliateOrdersPage() {
                         <TableBody>
                             {displayedOrders.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={visibleColumnCount || 1} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                                    <TableCell colSpan={visibleColumnCount || 1} align="center" sx={{ ...tableBodyCellSx, color: 'text.secondary', py: 4 }}>
                                         No orders found for this date.
                                     </TableCell>
                                 </TableRow>
@@ -1607,7 +1693,7 @@ export default function AffiliateOrdersPage() {
                                         <React.Fragment key={`${section.key}-${order._id}`}>
                                             {showSectionHeader && (
                                                 <TableRow>
-                                                    <TableCell colSpan={visibleColumnCount || 1} sx={{ bgcolor: '#f3f4f6', py: 1 }}>
+                                                    <TableCell colSpan={visibleColumnCount || 1} sx={{ ...tableBodyCellSx, bgcolor: '#f6f4ec', py: 1.25 }}>
                                                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                                                             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                                                                 {section.label}
@@ -1619,7 +1705,7 @@ export default function AffiliateOrdersPage() {
                                             )}
                                             {showSellerHeader && (
                                                 <TableRow>
-                                                    <TableCell colSpan={visibleColumnCount || 1} sx={{ bgcolor: '#eef6ff', py: 1.25 }}>
+                                                    <TableCell colSpan={visibleColumnCount || 1} sx={{ ...tableBodyCellSx, bgcolor: '#f3f8ff', py: 1.25 }}>
                                                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                                                             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0d47a1' }}>
                                                                 {sellerName}
@@ -1632,12 +1718,23 @@ export default function AffiliateOrdersPage() {
                                                     </TableCell>
                                                 </TableRow>
                                             )}
-                                            <TableRow hover sx={{ bgcolor: order.isCarryOver ? '#fffdf4' : undefined, '&:nth-of-type(even)': { bgcolor: order.isCarryOver ? '#fff8e1' : '#fafafa' } }}>
+                                            <TableRow hover sx={getDataRowSx(order.isCarryOver ? {
+                                                '& td': {
+                                                    borderBottomColor: 'rgba(18, 18, 18, 0.08)',
+                                                    backgroundColor: '#fffdf4',
+                                                },
+                                                '&:nth-of-type(even) td': {
+                                                    backgroundColor: '#fff8e1',
+                                                },
+                                                '&:hover td': {
+                                                    backgroundColor: '#fff3cd !important',
+                                                },
+                                            } : undefined)}>
                                                 {/* # */}
-                                                {isColVisible('index') && <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{idx + 1}</TableCell>}
+                                                {isColVisible('index') && <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', color: 'text.secondary' }}>{idx + 1}</TableCell>}
 
                                                 {/* Order ID */}
-                                                {isColVisible('orderId') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                                                {isColVisible('orderId') && <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                                                     <Stack direction="row" alignItems="center" spacing={0.5}>
                                                         <span>{order.orderId}</span>
                                                         <Tooltip title="Copy">
@@ -1649,7 +1746,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Product Name */}
-                                                {isColVisible('productName') && <TableCell sx={{ minWidth: 300, maxWidth: 360 }}>
+                                                {isColVisible('productName') && <TableCell sx={{ ...tableBodyCellSx, minWidth: 300, maxWidth: 360, whiteSpace: 'normal' }}>
                                                     <Stack direction="row" spacing={1} alignItems="flex-start">
                                                         {thumbnailImages[order._id] && (
                                                             <Box
@@ -1778,10 +1875,10 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Seller */}
-                                                {isColVisible('seller') && <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{sellerName}</TableCell>}
+                                                {isColVisible('seller') && <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{sellerName}</TableCell>}
 
                                                 {/* Supplier Link */}
-                                                {isColVisible('supplierLink') && <TableCell sx={{ minWidth: 220 }}>
+                                                {isColVisible('supplierLink') && <TableCell sx={{ ...tableBodyCellSx, minWidth: 220 }}>
                                                     <Stack direction="row" alignItems="center" spacing={0.5}>
                                                         <InlineText
                                                             value={order.affiliateLink}
@@ -1799,7 +1896,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Affiliate Links */}
-                                                {isColVisible('affiliateLinks') && <TableCell sx={{ minWidth: 220 }}>
+                                                {isColVisible('affiliateLinks') && <TableCell sx={{ ...tableBodyCellSx, minWidth: 220 }}>
                                                     <Stack direction="row" alignItems="center" spacing={0.5}>
                                                         <InlineText
                                                             value={order.affiliateLinks}
@@ -1817,7 +1914,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Price — editable */}
-                                                {isColVisible('priceUsd') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                {isColVisible('priceUsd') && <TableCell sx={{ ...tableBodyCellSx, whiteSpace: 'nowrap' }}>
                                                     <BalanceNumberCell
                                                         value={order.affiliatePrice ?? null}
                                                         onSave={(v) => patchOrder(order._id, 'affiliatePrice', v)}
@@ -1825,7 +1922,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Amazon Account */}
-                                                {isColVisible('amazonAccount') && <TableCell>
+                                                {isColVisible('amazonAccount') && <TableCell sx={tableBodyCellSx}>
                                                     <Stack direction="row" spacing={0.5} alignItems="center">
                                                         <InlineSelect
                                                             value={order.amazonAccount}
@@ -1853,7 +1950,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Arriving */}
-                                                {isColVisible('arriving') && <TableCell sx={{ minWidth: 130 }}>
+                                                {isColVisible('arriving') && <TableCell sx={{ ...tableBodyCellSx, minWidth: 130 }}>
                                                     <InlineText
                                                         value={order.arrivingDate}
                                                         placeholder="YYYY-MM-DD"
@@ -1862,7 +1959,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Before Tax */}
-                                                {isColVisible('beforeTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                {isColVisible('beforeTax') && <TableCell sx={{ ...tableBodyCellSx, whiteSpace: 'nowrap' }}>
                                                     <BalanceNumberCell
                                                         value={order.beforeTax ?? null}
                                                         onSave={(v) => patchOrder(order._id, 'beforeTax', v)}
@@ -1870,7 +1967,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Estimated Tax */}
-                                                {isColVisible('estimatedTax') && <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                {isColVisible('estimatedTax') && <TableCell sx={{ ...tableBodyCellSx, whiteSpace: 'nowrap' }}>
                                                     <BalanceNumberCell
                                                         value={order.estimatedTax ?? null}
                                                         onSave={(v) => patchOrder(order._id, 'estimatedTax', v)}
@@ -1878,7 +1975,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Az OrderID */}
-                                                {isColVisible('azOrderId') && <TableCell sx={{ minWidth: 150 }}>
+                                                {isColVisible('azOrderId') && <TableCell sx={{ ...tableBodyCellSx, minWidth: 150 }}>
                                                     <InlineText
                                                         value={order.azOrderId}
                                                         placeholder="Amazon order ID"
@@ -1887,7 +1984,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Status */}
-                                                {isColVisible('status') && <TableCell>
+                                                {isColVisible('status') && <TableCell sx={tableBodyCellSx}>
                                                     <FormControl size="small">
                                                         <Select
                                                             value={order.sourcingStatus || 'Not Yet'}
@@ -1913,7 +2010,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Purchaser */}
-                                                {isColVisible('purchaser') && <TableCell>
+                                                {isColVisible('purchaser') && <TableCell sx={tableBodyCellSx}>
                                                     <InlineSelect
                                                         value={order.purchaser}
                                                         options={PURCHASERS}
@@ -1922,7 +2019,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Message Status */}
-                                                {isColVisible('messageStatus') && <TableCell>
+                                                {isColVisible('messageStatus') && <TableCell sx={tableBodyCellSx}>
                                                     <FormControl size="small">
                                                         <Select
                                                             value={order.sourcingMessageStatus || 'Being Processed'}
@@ -1956,7 +2053,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Messaging */}
-                                                {isColVisible('messaging') && <TableCell align="center">
+                                                {isColVisible('messaging') && <TableCell align="center" sx={tableBodyCellSx}>
                                                     <Tooltip title="Send message to buyer">
                                                         <IconButton
                                                             size="small"
@@ -1969,7 +2066,7 @@ export default function AffiliateOrdersPage() {
                                                 </TableCell>}
 
                                                 {/* Notes */}
-                                                {isColVisible('notes') && <TableCell sx={{ minWidth: 160 }}>
+                                                {isColVisible('notes') && <TableCell sx={{ ...tableBodyCellSx, minWidth: 160, whiteSpace: 'normal' }}>
                                                     <InlineText
                                                         value={order.fulfillmentNotes}
                                                         placeholder="Add note…"
@@ -1995,11 +2092,11 @@ export default function AffiliateOrdersPage() {
 
     const renderTab2 = () => (
         <>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, gap: 1, flexWrap: 'wrap' }}>
                 <Typography variant="subtitle2" color="text.secondary">
                     {balancesLoading ? 'Loading…' : `${balances.length} Amazon account${balances.length !== 1 ? 's' : ''}`}
                 </Typography>
-                <Button size="small" startIcon={<RefreshIcon />} onClick={fetchBalances}>Refresh</Button>
+                <Button size="small" startIcon={<RefreshIcon />} onClick={fetchBalances} variant="outlined" sx={yellowOutlinedButtonSx}>Refresh</Button>
             </Stack>
 
             {balancesError && <Alert severity="error" sx={{ mb: 1 }}>{balancesError}</Alert>}
@@ -2007,15 +2104,15 @@ export default function AffiliateOrdersPage() {
             {balancesLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
             ) : (
-                <TableContainer component={Paper} variant="outlined">
+                <TableContainer component={SectionCard} sx={tableContainerSx}>
                     <Table size="small">
                         <TableHead>
-                            <TableRow sx={{ bgcolor: '#e8f5e9' }}>
+                            <TableRow>
                                 {[
                                     'Account Name', 'Total Expense ($)', 'Gift Cards ✓',
                                     'Available Balance ($)', 'Difference ($)', 'Added Balance ($)', 'Note',
                                 ].map((h) => (
-                                    <TableCell key={h} sx={{ fontWeight: 'bold', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                                    <TableCell key={h} sx={tableHeaderCellSx}>
                                         {h}
                                     </TableCell>
                                 ))}
@@ -2024,7 +2121,7 @@ export default function AffiliateOrdersPage() {
                         <TableBody>
                             {balances.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                                    <TableCell colSpan={7} align="center" sx={{ ...tableBodyCellSx, color: 'text.secondary', py: 4 }}>
                                         No Amazon accounts found.
                                     </TableCell>
                                 </TableRow>
@@ -2032,14 +2129,14 @@ export default function AffiliateOrdersPage() {
                             {balances.map((row) => {
                                 const diff = (Number(row.availableBalance) || 0) + (Number(row.addedBalance) || 0) - (Number(row.totalExpense) || 0);
                                 return (
-                                    <TableRow key={row.amazonAccountName} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#f9fbe7' } }}>
+                                    <TableRow key={row.amazonAccountName} hover sx={tableBodyRowSx}>
                                         {/* Account Name */}
-                                        <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem', color: '#1565c0' }}>
+                                        <TableCell sx={{ ...tableBodyCellSx, fontWeight: 600, fontSize: '0.85rem', color: '#1565c0' }}>
                                             {row.amazonAccountName}
                                         </TableCell>
 
                                         {/* Total Expense — read-only, calculated from orders */}
-                                        <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>
+                                        <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 500 }}>
                                             {fmt(row.totalExpense)}
                                             {row.orderCount > 0 && (
                                                 <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
@@ -2049,7 +2146,7 @@ export default function AffiliateOrdersPage() {
                                         </TableCell>
 
                                         {/* Gift Card Status — checkbox */}
-                                        <TableCell align="center">
+                                        <TableCell align="center" sx={tableBodyCellSx}>
                                             <Checkbox
                                                 checked={diff > 0}
                                                 disabled
@@ -2059,7 +2156,7 @@ export default function AffiliateOrdersPage() {
                                         </TableCell>
 
                                         {/* Available Balance — editable number */}
-                                        <TableCell>
+                                        <TableCell sx={tableBodyCellSx}>
                                             <BalanceNumberCell
                                                 value={row.availableBalance}
                                                 onSave={(v) => patchBalance(row.amazonAccountName, 'availableBalance', v)}
@@ -2067,12 +2164,12 @@ export default function AffiliateOrdersPage() {
                                         </TableCell>
 
                                         {/* Difference — auto-calculated */}
-                                        <TableCell sx={{ fontSize: '0.82rem', fontWeight: 600, color: diff < 0 ? 'error.main' : 'success.dark' }}>
+                                        <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 600, color: diff < 0 ? 'error.main' : 'success.dark' }}>
                                             {diff >= 0 ? '+' : ''}{fmt(diff)}
                                         </TableCell>
 
                                         {/* Added Balance — editable number */}
-                                        <TableCell>
+                                        <TableCell sx={tableBodyCellSx}>
                                             <BalanceNumberCell
                                                 value={row.addedBalance}
                                                 onSave={(v) => patchBalance(row.amazonAccountName, 'addedBalance', v)}
@@ -2080,7 +2177,7 @@ export default function AffiliateOrdersPage() {
                                         </TableCell>
 
                                         {/* Note */}
-                                        <TableCell sx={{ minWidth: 160 }}>
+                                        <TableCell sx={{ ...tableBodyCellSx, minWidth: 160, whiteSpace: 'normal' }}>
                                             <InlineText
                                                 value={row.note}
                                                 placeholder="Add note…"
@@ -2103,11 +2200,11 @@ export default function AffiliateOrdersPage() {
 
     const renderTab3 = () => (
         <>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, gap: 1, flexWrap: 'wrap' }}>
                 <Typography variant="subtitle2" color="text.secondary">
                     Summary for {date}
                 </Typography>
-                <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSummary}>Refresh</Button>
+                <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSummary} variant="outlined" sx={yellowOutlinedButtonSx}>Refresh</Button>
             </Stack>
 
             {summaryError && <Alert severity="error" sx={{ mb: 1 }}>{summaryError}</Alert>}
@@ -2118,35 +2215,35 @@ export default function AffiliateOrdersPage() {
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start" flexWrap="wrap">
 
                     {/* Left: Per-Purchaser */}
-                    <Paper variant="outlined" sx={{ p: 2, minWidth: 260 }}>
+                    <SectionCard sx={{ p: 2, minWidth: 260 }}>
                         <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
                             Assigned Orders by Purchaser
                         </Typography>
                         <Table size="small">
                             <TableHead>
-                                <TableRow sx={{ bgcolor: '#fff9c4' }}>
-                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Assigned</TableCell>
+                                <TableRow>
+                                    <TableCell sx={tableHeaderCellSx}>Name</TableCell>
+                                    <TableCell sx={tableHeaderCellSx}>Assigned</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {summary.byPurchaser.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={2} align="center" sx={{ color: 'text.secondary' }}>No assignments yet</TableCell>
+                                        <TableCell colSpan={2} align="center" sx={{ ...tableBodyCellSx, color: 'text.secondary' }}>No assignments yet</TableCell>
                                     </TableRow>
                                 )}
                                 {summary.byPurchaser.map((row) => (
-                                    <TableRow key={row.name} hover>
-                                        <TableCell sx={{ fontSize: '0.82rem', color: '#1565c0', fontWeight: 500 }}>{row.name}</TableCell>
-                                        <TableCell sx={{ fontSize: '0.82rem', fontWeight: 600 }}>{row.count}</TableCell>
+                                    <TableRow key={row.name} hover sx={tableBodyRowSx}>
+                                        <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', color: '#1565c0', fontWeight: 500 }}>{row.name}</TableCell>
+                                        <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 600 }}>{row.count}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
-                    </Paper>
+                    </SectionCard>
 
                     {/* Right: Overall Totals */}
-                    <Paper variant="outlined" sx={{ p: 2, minWidth: 320 }}>
+                    <SectionCard sx={{ p: 2, minWidth: 320 }}>
                         <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
                             Day Totals
                         </Typography>
@@ -2161,43 +2258,43 @@ export default function AffiliateOrdersPage() {
                                     { label: 'Orders Not Done →', value: summary.ordersNotDone, color: '#c62828' },
                                 ].map(({ label, value, color }) => (
                                     <TableRow key={label}>
-                                        <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500, border: 'none', py: 0.5 }}>{label}</TableCell>
-                                        <TableCell sx={{ fontSize: '0.88rem', fontWeight: 700, color, border: 'none', py: 0.5 }}>{value}</TableCell>
+                                        <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 500, borderBottom: 'none', py: 0.5 }}>{label}</TableCell>
+                                        <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.88rem', fontWeight: 700, color, borderBottom: 'none', py: 0.5 }}>{value}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
-                    </Paper>
+                    </SectionCard>
 
-                    <Paper variant="outlined" sx={{ p: 2, minWidth: 360 }}>
+                    <SectionCard sx={{ p: 2, minWidth: 360 }}>
                         <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
                             Amazon Account Assignments (Max {summary.maxOrdersPerAmazonAccount || AMAZON_ACCOUNT_DAILY_LIMIT})
                         </Typography>
                         <Table size="small">
                             <TableHead>
-                                <TableRow sx={{ bgcolor: '#e3f2fd' }}>
-                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Assigned Today</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Carry Over</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Remaining</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="center">Status</TableCell>
+                                <TableRow>
+                                    <TableCell sx={tableHeaderCellSx}>Account</TableCell>
+                                    <TableCell sx={tableHeaderCellSx} align="right">Assigned Today</TableCell>
+                                    <TableCell sx={tableHeaderCellSx} align="right">Carry Over</TableCell>
+                                    <TableCell sx={tableHeaderCellSx} align="right">Remaining</TableCell>
+                                    <TableCell sx={tableHeaderCellSx} align="center">Status</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {!summary.byAmazonAccount || summary.byAmazonAccount.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>No account assignments yet</TableCell>
+                                        <TableCell colSpan={5} align="center" sx={{ ...tableBodyCellSx, color: 'text.secondary' }}>No account assignments yet</TableCell>
                                     </TableRow>
                                 ) : (
                                     summary.byAmazonAccount.map((row) => (
-                                        <TableRow key={row.name} hover>
-                                            <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.name}</TableCell>
-                                            <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>{row.count}</TableCell>
-                                            <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.carryOverCount || 0}</TableCell>
-                                            <TableCell align="right" sx={{ fontSize: '0.82rem' }}>
+                                        <TableRow key={row.name} hover sx={tableBodyRowSx}>
+                                            <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 500 }}>{row.name}</TableCell>
+                                            <TableCell align="right" sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 700 }}>{row.count}</TableCell>
+                                            <TableCell align="right" sx={{ ...tableBodyCellSx, fontSize: '0.82rem' }}>{row.carryOverCount || 0}</TableCell>
+                                            <TableCell align="right" sx={{ ...tableBodyCellSx, fontSize: '0.82rem' }}>
                                                 {row.remaining == null ? '—' : row.remaining}
                                             </TableCell>
-                                            <TableCell align="center">
+                                            <TableCell align="center" sx={tableBodyCellSx}>
                                                 {row.max == null ? (
                                                     <Chip size="small" label="N/A" variant="outlined" />
                                                 ) : row.isFull ? (
@@ -2211,7 +2308,7 @@ export default function AffiliateOrdersPage() {
                                 )}
                             </TableBody>
                         </Table>
-                    </Paper>
+                    </SectionCard>
                 </Stack>
             ) : (
                 <Typography color="text.secondary">No data available.</Typography>
@@ -2230,7 +2327,7 @@ export default function AffiliateOrdersPage() {
                         Gift Card uses before tax. Credit Card uses before tax + estimated tax. Markup and IGST apply to both.
                     </Typography>
                 </Stack>
-                <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSpendOrders}>Refresh</Button>
+                <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSpendOrders} variant="outlined" sx={yellowOutlinedButtonSx}>Refresh</Button>
             </Stack>
 
             {spendOrdersError && <Alert severity="error" sx={{ mb: 1 }}>{spendOrdersError}</Alert>}
@@ -2240,29 +2337,29 @@ export default function AffiliateOrdersPage() {
             ) : (
                 <>
                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
-                        <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
+                        <SectionCard sx={summaryMetricCardSx}>
                             <Typography variant="caption" color="text.secondary">Overall Base Amount</Typography>
                             <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.base)}</Typography>
-                        </Paper>
-                        <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
+                        </SectionCard>
+                        <SectionCard sx={summaryMetricCardSx}>
                             <Typography variant="caption" color="text.secondary">Markup 3.5%</Typography>
                             <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.markup)}</Typography>
-                        </Paper>
-                        <Paper variant="outlined" sx={{ p: 2, minWidth: 180, flex: 1 }}>
+                        </SectionCard>
+                        <SectionCard sx={summaryMetricCardSx}>
                             <Typography variant="caption" color="text.secondary">IGST on Markup 18%</Typography>
                             <Typography variant="h6" fontWeight={700}>${fmt(actualSpendSummary.igstOnMarkup)}</Typography>
-                        </Paper>
-                        <Paper variant="outlined" sx={{ p: 2, minWidth: 220, flex: 1.2, bgcolor: '#f7fbff' }}>
+                        </SectionCard>
+                        <SectionCard sx={{ ...summaryMetricCardSx, minWidth: 220, flex: 1.2, bgcolor: '#f7fbff' }}>
                             <Typography variant="caption" color="text.secondary">Final Actual Spend</Typography>
                             <Typography variant="h5" fontWeight={800} color="primary.main">${fmt(actualSpendSummary.total)}</Typography>
                             <Typography variant="caption" color="text.secondary">
                                 {actualSpendSummary.orderCount} order{actualSpendSummary.orderCount !== 1 ? 's' : ''}
                             </Typography>
-                        </Paper>
+                        </SectionCard>
                     </Stack>
 
                     <Stack direction={{ xs: 'column', xl: 'row' }} spacing={2} sx={{ mb: 2 }}>
-                        <Paper variant="outlined" sx={{ p: 2, flex: 1, bgcolor: '#fff8e1' }}>
+                        <SectionCard sx={{ p: 2, flex: 1, bgcolor: '#fff8e1' }}>
                             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
                                 Gift Cards
                             </Typography>
@@ -2284,9 +2381,9 @@ export default function AffiliateOrdersPage() {
                                     <Typography variant="h6" fontWeight={700} color="warning.dark">${fmt(giftCardSpendSummary.total)}</Typography>
                                 </Box>
                             </Stack>
-                        </Paper>
+                        </SectionCard>
 
-                        <Paper variant="outlined" sx={{ p: 2, flex: 1, bgcolor: '#eef7ff' }}>
+                        <SectionCard sx={{ p: 2, flex: 1, bgcolor: '#eef7ff' }}>
                             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
                                 Credit Cards
                             </Typography>
@@ -2308,35 +2405,35 @@ export default function AffiliateOrdersPage() {
                                     <Typography variant="h6" fontWeight={700} color="primary.main">${fmt(creditCardSpendSummary.total)}</Typography>
                                 </Box>
                             </Stack>
-                        </Paper>
+                        </SectionCard>
                     </Stack>
 
                     <Stack direction={{ xs: 'column', xl: 'row' }} spacing={2} alignItems="flex-start">
-                        <Paper variant="outlined" sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 420 } }}>
+                        <SectionCard sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 420 } }}>
                             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
                                 By Amazon Account
                             </Typography>
                             <Table size="small">
                                 <TableHead>
-                                    <TableRow sx={{ bgcolor: '#e8f1ff' }}>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Type</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Orders</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Final</TableCell>
+                                    <TableRow>
+                                        <TableCell sx={tableHeaderCellSx}>Account</TableCell>
+                                        <TableCell sx={tableHeaderCellSx}>Type</TableCell>
+                                        <TableCell sx={tableHeaderCellSx} align="right">Orders</TableCell>
+                                        <TableCell sx={tableHeaderCellSx} align="right">Final</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {actualSpendByAccount.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={4} align="center" sx={{ color: 'text.secondary' }}>
+                                            <TableCell colSpan={4} align="center" sx={{ ...tableBodyCellSx, color: 'text.secondary' }}>
                                                 No orders available.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         actualSpendByAccount.map((row) => (
-                                            <TableRow key={row.amazonAccount} hover>
-                                                <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
-                                                <TableCell sx={{ fontSize: '0.82rem' }}>
+                                            <TableRow key={row.amazonAccount} hover sx={tableBodyRowSx}>
+                                                <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
+                                                <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem' }}>
                                                     <Chip
                                                         size="small"
                                                         label={(balanceByAccountName[row.amazonAccount]?.addedBalance || 0) > 0 ? 'Gift Card' : 'Credit Card'}
@@ -2344,85 +2441,85 @@ export default function AffiliateOrdersPage() {
                                                         variant="outlined"
                                                     />
                                                 </TableCell>
-                                                <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
-                                                <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
+                                                <TableCell align="right" sx={{ ...tableBodyCellSx, fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
+                                                <TableCell align="right" sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
                                             </TableRow>
                                         ))
                                     )}
                                 </TableBody>
                             </Table>
-                        </Paper>
+                        </SectionCard>
 
-                        <Paper variant="outlined" sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 380 } }}>
+                        <SectionCard sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 380 } }}>
                             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
                                 Gift Card Accounts
                             </Typography>
                             <Table size="small">
                                 <TableHead>
-                                    <TableRow sx={{ bgcolor: '#fff3cd' }}>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Orders</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Final</TableCell>
+                                    <TableRow>
+                                        <TableCell sx={tableHeaderCellSx}>Account</TableCell>
+                                        <TableCell sx={tableHeaderCellSx} align="right">Orders</TableCell>
+                                        <TableCell sx={tableHeaderCellSx} align="right">Final</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {giftCardSpendByAccount.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary' }}>
+                                            <TableCell colSpan={3} align="center" sx={{ ...tableBodyCellSx, color: 'text.secondary' }}>
                                                 No gift card orders.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         giftCardSpendByAccount.map((row) => (
-                                            <TableRow key={row.amazonAccount} hover>
-                                                <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
-                                                <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
-                                                <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
+                                            <TableRow key={row.amazonAccount} hover sx={tableBodyRowSx}>
+                                                <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
+                                                <TableCell align="right" sx={{ ...tableBodyCellSx, fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
+                                                <TableCell align="right" sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
                                             </TableRow>
                                         ))
                                     )}
                                 </TableBody>
                             </Table>
-                        </Paper>
+                        </SectionCard>
 
-                        <Paper variant="outlined" sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 380 } }}>
+                        <SectionCard sx={{ p: 2, minWidth: 320, width: { xs: '100%', xl: 380 } }}>
                             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
                                 Credit Card Accounts
                             </Typography>
                             <Table size="small">
                                 <TableHead>
-                                    <TableRow sx={{ bgcolor: '#dceeff' }}>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }}>Account</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Orders</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.78rem' }} align="right">Final</TableCell>
+                                    <TableRow>
+                                        <TableCell sx={tableHeaderCellSx}>Account</TableCell>
+                                        <TableCell sx={tableHeaderCellSx} align="right">Orders</TableCell>
+                                        <TableCell sx={tableHeaderCellSx} align="right">Final</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {creditCardSpendByAccount.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary' }}>
+                                            <TableCell colSpan={3} align="center" sx={{ ...tableBodyCellSx, color: 'text.secondary' }}>
                                                 No credit card orders.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         creditCardSpendByAccount.map((row) => (
-                                            <TableRow key={row.amazonAccount} hover>
-                                                <TableCell sx={{ fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
-                                                <TableCell align="right" sx={{ fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
-                                                <TableCell align="right" sx={{ fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
+                                            <TableRow key={row.amazonAccount} hover sx={tableBodyRowSx}>
+                                                <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 500 }}>{row.amazonAccount}</TableCell>
+                                                <TableCell align="right" sx={{ ...tableBodyCellSx, fontSize: '0.82rem' }}>{row.orderCount}</TableCell>
+                                                <TableCell align="right" sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 700 }}>${fmt(row.total)}</TableCell>
                                             </TableRow>
                                         ))
                                     )}
                                 </TableBody>
                             </Table>
-                        </Paper>
+                        </SectionCard>
 
-                        <TableContainer component={Paper} variant="outlined" sx={{ flex: 1, overflowX: 'auto' }}>
+                        <TableContainer component={SectionCard} sx={{ ...tableContainerSx, flex: 1, overflowX: 'auto' }}>
                             <Table size="small" sx={{ minWidth: 980 }}>
                                 <TableHead>
-                                    <TableRow sx={{ bgcolor: '#edf7ed' }}>
+                                    <TableRow>
                                         {['#', 'Order ID', 'Product', 'Seller', 'Amazon Account', 'Type', 'Base Amount', 'Markup 3.5%', 'IGST 18% on Markup', 'Final Actual Spend'].map((label) => (
-                                            <TableCell key={label} sx={{ fontWeight: 'bold', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                                            <TableCell key={label} sx={tableHeaderCellSx}>
                                                 {label}
                                             </TableCell>
                                         ))}
@@ -2431,7 +2528,7 @@ export default function AffiliateOrdersPage() {
                                 <TableBody>
                                     {actualSpendRows.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={10} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                                            <TableCell colSpan={10} align="center" sx={{ ...tableBodyCellSx, color: 'text.secondary', py: 4 }}>
                                                 No orders found for this date.
                                             </TableCell>
                                         </TableRow>
@@ -2441,10 +2538,10 @@ export default function AffiliateOrdersPage() {
                                             const productTitle = row.lineItems?.[0]?.title || row.productName || '—';
 
                                             return (
-                                                <TableRow key={row._id} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#fafafa' } }}>
-                                                    <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{row.rowIndex}</TableCell>
-                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.orderId || '—'}</TableCell>
-                                                    <TableCell sx={{ minWidth: 260 }}>
+                                                <TableRow key={row._id} hover sx={tableBodyRowSx}>
+                                                    <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', color: 'text.secondary' }}>{row.rowIndex}</TableCell>
+                                                    <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.orderId || '—'}</TableCell>
+                                                    <TableCell sx={{ ...tableBodyCellSx, minWidth: 260, whiteSpace: 'normal' }}>
                                                         {itemId ? (
                                                             <Link
                                                                 href={`https://www.ebay.com/itm/${itemId}`}
@@ -2475,9 +2572,9 @@ export default function AffiliateOrdersPage() {
                                                             </Typography>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.sellerGroupName || '—'}</TableCell>
-                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.amazonAccount || '—'}</TableCell>
-                                                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                    <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.sellerGroupName || '—'}</TableCell>
+                                                    <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{row.amazonAccount || '—'}</TableCell>
+                                                    <TableCell sx={{ ...tableBodyCellSx, whiteSpace: 'nowrap' }}>
                                                         <Chip
                                                             size="small"
                                                             label={row.paymentType}
@@ -2485,10 +2582,10 @@ export default function AffiliateOrdersPage() {
                                                             variant="outlined"
                                                         />
                                                     </TableCell>
-                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.base)}</TableCell>
-                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.markup)}</TableCell>
-                                                    <TableCell sx={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.igstOnMarkup)}</TableCell>
-                                                    <TableCell sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'success.dark', whiteSpace: 'nowrap' }}>${fmt(row.total)}</TableCell>
+                                                    <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.base)}</TableCell>
+                                                    <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.markup)}</TableCell>
+                                                    <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>${fmt(row.igstOnMarkup)}</TableCell>
+                                                    <TableCell sx={{ ...tableBodyCellSx, fontSize: '0.82rem', fontWeight: 700, color: 'success.dark', whiteSpace: 'nowrap' }}>${fmt(row.total)}</TableCell>
                                                 </TableRow>
                                             );
                                         })
@@ -2507,43 +2604,63 @@ export default function AffiliateOrdersPage() {
     // ─────────────────────────────────────────────────────────────────────────
 
     return (
-        <Box sx={{ p: 2 }}>
-            {/* Header */}
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, gap: 2 }}>
-                <Typography variant="h5" fontWeight="bold">Affiliate Orders</Typography>
-                <Stack direction="row" alignItems="center" spacing={2}>
-                    <FormControlLabel
-                        control={<Switch checked={excludeLowValue} onChange={(e) => setExcludeLowValue(e.target.checked)} />}
-                        label="Exclude < $3"
-                        sx={{ m: 0 }}
-                    />
-                    <TextField
-                        type="date"
-                        size="small"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        label="Date"
-                        InputLabelProps={{ shrink: true }}
-                        sx={{ width: 170 }}
-                    />
-                </Stack>
-            </Stack>
+        <AdminPageShell>
+            <PageHeader
+                title="Affiliate Orders"
+                subtitle="Manage daily sourcing queues, balances, summaries, and actual spend from one workspace."
+            />
 
-            {/* Tabs */}
-            <Paper variant="outlined" sx={{ mb: 0 }}>
+            <SectionCard sx={{ p: 2, mb: 2 }}>
+                <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', lg: 'center' }} spacing={2}>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Chip size="small" color="info" variant="outlined" label={`Date ${date}`} />
+                        <Chip size="small" variant="outlined" label={excludeLowValue ? 'Excluding < $3' : 'Including all values'} />
+                        <Chip size="small" color={showDoneEntries ? 'success' : 'default'} variant="outlined" label={showDoneEntries ? 'Done visible' : 'Done hidden'} />
+                    </Stack>
+
+                    <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap" useFlexGap>
+                        <FormControlLabel
+                            control={<Switch checked={excludeLowValue} onChange={(e) => setExcludeLowValue(e.target.checked)} />}
+                            label="Exclude < $3"
+                            sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: '0.9rem' } }}
+                        />
+                        <TextField
+                            type="date"
+                            size="small"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            label="Date"
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ width: 170 }}
+                        />
+                    </Stack>
+                </Stack>
+            </SectionCard>
+
+            <SectionCard sx={{ mb: 0, overflow: 'hidden' }}>
                 <Tabs
                     value={tab}
                     onChange={(_, v) => setTab(v)}
                     textColor="primary"
                     indicatorColor="primary"
-                    sx={{ borderBottom: '1px solid', borderColor: 'divider' }}
+                    variant="scrollable"
+                    allowScrollButtonsMobile
+                    sx={{
+                        px: 1,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                        '& .MuiTabs-indicator': {
+                            height: 3,
+                            borderRadius: 999,
+                        },
+                    }}
                 >
-                    <Tab label="Daily Orders" />
-                    <Tab label="Gift Card Balances" />
-                    <Tab label="Summary" />
-                    {isSuperAdmin && <Tab label="Actual Spend" />}
+                    <Tab label="Daily Orders" sx={affiliateTabSx} />
+                    <Tab label="Gift Card Balances" sx={affiliateTabSx} />
+                    <Tab label="Summary" sx={affiliateTabSx} />
+                    {isSuperAdmin && <Tab label="Actual Spend" sx={affiliateTabSx} />}
                 </Tabs>
-            </Paper>
+            </SectionCard>
 
             <Box sx={{ mt: 0 }}>
                 <TabPanel value={tab} index={0}>{renderTab1()}</TabPanel>
@@ -2617,7 +2734,7 @@ export default function AffiliateOrdersPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Box>
+        </AdminPageShell>
     );
 }
 

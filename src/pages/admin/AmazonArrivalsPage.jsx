@@ -42,7 +42,7 @@ import api from '../../lib/api';
 import ChatModal from '../../components/ChatModal';
 import RemarkTemplateManagerModal from '../../components/RemarkTemplateManagerModal';
 import SectionCard from '../../components/SectionCard.jsx';
-import { tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
+import { tableContainerSx, tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 import {
   findRemarkTemplateText,
   loadRemarkTemplates,
@@ -489,452 +489,453 @@ export default function AmazonArrivalsPage() {
 
   return (
     <Fade in timeout={600}>
-    <Box sx={{
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      p: 3,
-      overflow: 'hidden'
-    }}>
-      <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-        Amazon Arrivals
-      </Typography>
+      <Box sx={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        p: 3,
+        overflow: 'hidden'
+      }}>
+        <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+          Amazon Arrivals
+        </Typography>
 
-      {/* Filters */}
-      <SectionCard sx={{ p: 2, mb: 2, flexShrink: 0 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 200 } }}>
-            <InputLabel>Seller</InputLabel>
-            <Select
-              value={selectedSeller}
-              label="Seller"
-              onChange={(e) => setSelectedSeller(e.target.value)}
-            >
-              <MenuItem value="">All Sellers</MenuItem>
-              {sellers.map(s => (
-                <MenuItem key={s._id} value={s._id}>
-                  {s.user?.username || s.user?.email}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        {/* Filters */}
+        <SectionCard sx={{ p: 2, mb: 2, flexShrink: 0 }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 200 } }}>
+              <InputLabel>Seller</InputLabel>
+              <Select
+                value={selectedSeller}
+                label="Seller"
+                onChange={(e) => setSelectedSeller(e.target.value)}
+              >
+                <MenuItem value="">All Sellers</MenuItem>
+                {sellers.map(s => (
+                  <MenuItem key={s._id} value={s._id}>
+                    {s.user?.username || s.user?.email}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-          <TextField
-            type="date"
-            size="small"
-            label="Arrival From"
-            value={arrivalDateFrom}
-            onChange={(e) => setArrivalDateFrom(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ minWidth: { xs: '100%', sm: 170 } }}
-          />
-
-          <TextField
-            type="date"
-            size="small"
-            label="Arrival To"
-            value={arrivalDateTo}
-            onChange={(e) => setArrivalDateTo(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ minWidth: { xs: '100%', sm: 170 } }}
-          />
-
-          <TextField
-            size="small"
-            label="Search Order ID"
-            value={searchOrderId}
-            onChange={(e) => setSearchOrderId(e.target.value)}
-            placeholder="Search by order ID..."
-            sx={{ flex: 1, minWidth: { xs: '100%', sm: 200 } }}
-          />
-
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}>
-            <InputLabel>Marketplace</InputLabel>
-            <Select
-              value={searchMarketplace}
-              label="Marketplace"
-              onChange={(e) => setSearchMarketplace(e.target.value)}
-            >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="EBAY_US">US</MenuItem>
-              <MenuItem value="EBAY_ENCA">Canada</MenuItem>
-              <MenuItem value="EBAY_AU">Australia</MenuItem>
-              <MenuItem value="EBAY_GB">UK</MenuItem>
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 200 } }}>
-            <InputLabel>Amazon Account</InputLabel>
-            <Select
-              value={selectedAmazonAccount}
-              label="Amazon Account"
-              onChange={(e) => setSelectedAmazonAccount(e.target.value)}
-            >
-              <MenuItem value="">All Accounts</MenuItem>
-              {amazonAccounts.map(acc => (
-                <MenuItem key={acc._id} value={acc.name}>
-                  {acc.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {/* Sort Toggle Button */}
-          <Button
-            variant="outlined"
-            onClick={toggleSort}
-            startIcon={arrivalSort === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
-            sx={{ ...yellowOutlinedButtonSx, minWidth: { xs: '100%', sm: 140 }, height: 40, textTransform: 'none' }}
-          >
-            {arrivalSort === 'asc' ? 'Oldest First' : 'Newest First'}
-          </Button>
-
-          <Button
-            variant="outlined"
-            onClick={fetchOrders}
-            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-            disabled={loading}
-            sx={{ ...yellowOutlinedButtonSx, minWidth: { xs: '100%', sm: 100 }, height: 40 }}
-          >
-            Refresh
-          </Button>
-        </Stack>
-      </SectionCard>
-
-      {/* Loading & Error States */}
-      {loading && !orders.length ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
-      ) : !orders.length ? (
-        <SectionCard sx={{ p: 4, textAlign: 'center', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Typography variant="h6" color="text.secondary">
-            No orders with arrival dates found
-          </Typography>
-        </SectionCard>
-      ) : (
-        <>
-          <TableContainer
-            component={Paper}
-            sx={{
-              flexGrow: 1,
-              overflow: 'auto',
-              width: '100%',
-              '&::-webkit-scrollbar': {
-                width: '8px',
-                height: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                backgroundColor: '#f1f1f1',
-                borderRadius: '10px',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                backgroundColor: '#888',
-                borderRadius: '10px',
-                '&:hover': {
-                  backgroundColor: '#555',
-                },
-              },
-            }}
-          >
-            <Table
+            <TextField
+              type="date"
               size="small"
-              stickyHeader
-              sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
+              label="Arrival From"
+              value={arrivalDateFrom}
+              onChange={(e) => setArrivalDateFrom(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: { xs: '100%', sm: 170 } }}
+            />
+
+            <TextField
+              type="date"
+              size="small"
+              label="Arrival To"
+              value={arrivalDateTo}
+              onChange={(e) => setArrivalDateTo(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: { xs: '100%', sm: 170 } }}
+            />
+
+            <TextField
+              size="small"
+              label="Search Order ID"
+              value={searchOrderId}
+              onChange={(e) => setSearchOrderId(e.target.value)}
+              placeholder="Search by order ID..."
+              sx={{ flex: 1, minWidth: { xs: '100%', sm: 200 } }}
+            />
+
+            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}>
+              <InputLabel>Marketplace</InputLabel>
+              <Select
+                value={searchMarketplace}
+                label="Marketplace"
+                onChange={(e) => setSearchMarketplace(e.target.value)}
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="EBAY_US">US</MenuItem>
+                <MenuItem value="EBAY_ENCA">Canada</MenuItem>
+                <MenuItem value="EBAY_AU">Australia</MenuItem>
+                <MenuItem value="EBAY_GB">UK</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 200 } }}>
+              <InputLabel>Amazon Account</InputLabel>
+              <Select
+                value={selectedAmazonAccount}
+                label="Amazon Account"
+                onChange={(e) => setSelectedAmazonAccount(e.target.value)}
+              >
+                <MenuItem value="">All Accounts</MenuItem>
+                {amazonAccounts.map(acc => (
+                  <MenuItem key={acc._id} value={acc.name}>
+                    {acc.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Sort Toggle Button */}
+            <Button
+              variant="outlined"
+              onClick={toggleSort}
+              startIcon={arrivalSort === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
+              sx={{ ...yellowOutlinedButtonSx, minWidth: { xs: '100%', sm: 140 }, height: 40, textTransform: 'none' }}
             >
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>
-                    <Stack direction="row" alignItems="center" spacing={0.5}>
-                      <span>Arriving Date</span>
-                      <Tooltip title={arrivalSort === 'asc' ? 'Sorted: Oldest First' : 'Sorted: Newest First'}>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          {arrivalSort === 'asc' ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
-                        </Box>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Amazon Account</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Amazon Order ID</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Tracking ID</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Messaging</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {orders.map((order, idx) => (
-                  <TableRow key={order._id || idx} hover sx={tableBodyRowSx}>
-                    <TableCell>
-                      {order.seller?.user?.username || order.seller?.user?.email || order.sellerId || '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
-                          {order.orderId || order.legacyOrderId || '-'}
-                        </Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleCopy(order.orderId || order.legacyOrderId)}
-                          sx={{ p: 0.5 }}
-                        >
-                          <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
-                        </IconButton>
+              {arrivalSort === 'asc' ? 'Oldest First' : 'Newest First'}
+            </Button>
+
+            <Button
+              variant="outlined"
+              onClick={fetchOrders}
+              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+              disabled={loading}
+              sx={{ ...yellowOutlinedButtonSx, minWidth: { xs: '100%', sm: 100 }, height: 40 }}
+            >
+              Refresh
+            </Button>
+          </Stack>
+        </SectionCard>
+
+        {/* Loading & Error States */}
+        {loading && !orders.length ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        ) : !orders.length ? (
+          <SectionCard sx={{ p: 4, textAlign: 'center', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography variant="h6" color="text.secondary">
+              No orders with arrival dates found
+            </Typography>
+          </SectionCard>
+        ) : (
+          <>
+            <TableContainer
+              component={Paper}
+              sx={{
+                ...tableContainerSx,
+                flexGrow: 1,
+                overflow: 'auto',
+                width: '100%',
+                '&::-webkit-scrollbar': {
+                  width: '8px',
+                  height: '8px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: '#f1f1f1',
+                  borderRadius: '10px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: '#888',
+                  borderRadius: '10px',
+                  '&:hover': {
+                    backgroundColor: '#555',
+                  },
+                },
+              }}
+            >
+              <Table
+                size="small"
+                stickyHeader
+                sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <span>Arriving Date</span>
+                        <Tooltip title={arrivalSort === 'asc' ? 'Sorted: Oldest First' : 'Sorted: Newest First'}>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            {arrivalSort === 'asc' ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
+                          </Box>
+                        </Tooltip>
                       </Stack>
                     </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={order.purchaseMarketplaceId || 'Unknown'}
-                        size="small"
-                        variant="outlined"
-                        color={
-                          order.purchaseMarketplaceId === 'EBAY_US' ? 'primary' :
-                            order.purchaseMarketplaceId === 'EBAY_CA' || order.purchaseMarketplaceId === 'EBAY_ENCA' ? 'secondary' :
-                              order.purchaseMarketplaceId === 'EBAY_AU' ? 'success' :
-                                'default'
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {editingArrivalDate[order._id] !== undefined ? (
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Amazon Account</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Product Name</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Amazon Order ID</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Tracking ID</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Messaging</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {orders.map((order, idx) => (
+                    <TableRow key={order._id || idx} hover sx={tableBodyRowSx}>
+                      <TableCell>
+                        {order.seller?.user?.username || order.seller?.user?.email || order.sellerId || '-'}
+                      </TableCell>
+                      <TableCell>
                         <Stack direction="row" spacing={0.5} alignItems="center">
-                          <TextField
-                            type="date"
-                            size="small"
-                            value={editingArrivalDate[order._id]}
-                            onChange={(e) =>
-                              setEditingArrivalDate(prev => ({ ...prev, [order._id]: e.target.value }))
-                            }
-                            InputLabelProps={{ shrink: true }}
-                            sx={{ minWidth: 145 }}
-                          />
+                          <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
+                            {order.orderId || order.legacyOrderId || '-'}
+                          </Typography>
                           <IconButton
                             size="small"
-                            color="success"
-                            disabled={savingArrivalDateId === order._id}
-                            onClick={() => saveArrivalDate(order)}
-                          >
-                            <CheckIcon sx={{ fontSize: '1rem' }} />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            color="inherit"
-                            disabled={savingArrivalDateId === order._id}
-                            onClick={() => cancelEditArrivalDate(order._id)}
-                          >
-                            <CloseIcon sx={{ fontSize: '1rem' }} />
-                          </IconButton>
-                        </Stack>
-                      ) : (
-                        <Stack direction="row" spacing={0.5} alignItems="center">
-                          <Chip
-                            label={formatArrivingDate(order.arrivingDate)}
-                            size="small"
-                            color={getDateColor(order.arrivingDate)}
-                            sx={{ fontWeight: 600 }}
-                          />
-                          <Tooltip title="Edit arrival date">
-                            <IconButton
-                              size="small"
-                              onClick={() => startEditArrivalDate(order._id, order.arrivingDate)}
-                              sx={{ p: 0.5 }}
-                            >
-                              <EditIcon sx={{ fontSize: '0.95rem' }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {order.amazonAccount || '-'}
-                    </TableCell>
-                    <TableCell sx={{ maxWidth: 300 }}>
-                      <Tooltip title={order.productName || order.lineItems?.[0]?.title || '-'}>
-                        <Typography variant="body2" sx={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          maxWidth: 300
-                        }}>
-                          {order.productName || order.lineItems?.[0]?.title || '-'}
-                        </Typography>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Typography variant="body2" sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {order.azOrderId || '-'}
-                        </Typography>
-                        {order.azOrderId && (
-                          <IconButton
-                            size="small"
-                            onClick={() => handleCopy(order.azOrderId)}
+                            onClick={() => handleCopy(order.orderId || order.legacyOrderId)}
                             sx={{ p: 0.5 }}
                           >
                             <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
                           </IconButton>
-                        )}
-                      </Stack>
-                    </TableCell>
-                    <TableCell sx={{ maxWidth: 260 }}>
-                      <NotesCell
-                        order={order}
-                        onSave={updateSharedOrderNotes}
-                        onNotify={showSnack}
-                        fieldLabel="Tracking ID"
-                        placeholder="Enter tracking ID..."
-                        emptyText="+ Add Tracking ID"
-                      />
-                    </TableCell>
-                    <TableCell sx={{ maxWidth: 260 }}>
-                      <NotesCell
-                        order={order}
-                        onSave={updateFulfillmentNotes}
-                        onNotify={showSnack}
-                        valueKey="fulfillmentNotes"
-                        fieldLabel="Notes"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <FormControl size="small" sx={{ minWidth: 150 }}>
-                        <Select
-                          value={order.remark || ''}
-                          displayEmpty
-                          onChange={(e) => handleRemarkUpdate(order._id, e.target.value)}
-                        >
-                          <MenuItem value="">Select Remark</MenuItem>
-                          {remarkTemplates.map((template) => (
-                            <MenuItem key={template.id} value={template.name}>{template.name}</MenuItem>
-                          ))}
-                          <MenuItem value="__manage_templates__" sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
-                            Manage Templates
-                          </MenuItem>
-                        </Select>
-                      </FormControl>
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      <Tooltip title="Message Buyer">
-                        <IconButton
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={order.purchaseMarketplaceId || 'Unknown'}
                           size="small"
-                          color="primary"
-                          onClick={() => handleOpenMessageDialog(order)}
-                        >
-                          <ChatIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                          variant="outlined"
+                          color={
+                            order.purchaseMarketplaceId === 'EBAY_US' ? 'primary' :
+                              order.purchaseMarketplaceId === 'EBAY_CA' || order.purchaseMarketplaceId === 'EBAY_ENCA' ? 'secondary' :
+                                order.purchaseMarketplaceId === 'EBAY_AU' ? 'success' :
+                                  'default'
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {editingArrivalDate[order._id] !== undefined ? (
+                          <Stack direction="row" spacing={0.5} alignItems="center">
+                            <TextField
+                              type="date"
+                              size="small"
+                              value={editingArrivalDate[order._id]}
+                              onChange={(e) =>
+                                setEditingArrivalDate(prev => ({ ...prev, [order._id]: e.target.value }))
+                              }
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ minWidth: 145 }}
+                            />
+                            <IconButton
+                              size="small"
+                              color="success"
+                              disabled={savingArrivalDateId === order._id}
+                              onClick={() => saveArrivalDate(order)}
+                            >
+                              <CheckIcon sx={{ fontSize: '1rem' }} />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              color="inherit"
+                              disabled={savingArrivalDateId === order._id}
+                              onClick={() => cancelEditArrivalDate(order._id)}
+                            >
+                              <CloseIcon sx={{ fontSize: '1rem' }} />
+                            </IconButton>
+                          </Stack>
+                        ) : (
+                          <Stack direction="row" spacing={0.5} alignItems="center">
+                            <Chip
+                              label={formatArrivingDate(order.arrivingDate)}
+                              size="small"
+                              color={getDateColor(order.arrivingDate)}
+                              sx={{ fontWeight: 600 }}
+                            />
+                            <Tooltip title="Edit arrival date">
+                              <IconButton
+                                size="small"
+                                onClick={() => startEditArrivalDate(order._id, order.arrivingDate)}
+                                sx={{ p: 0.5 }}
+                              >
+                                <EditIcon sx={{ fontSize: '0.95rem' }} />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {order.amazonAccount || '-'}
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 300 }}>
+                        <Tooltip title={order.productName || order.lineItems?.[0]?.title || '-'}>
+                          <Typography variant="body2" sx={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: 300
+                          }}>
+                            {order.productName || order.lineItems?.[0]?.title || '-'}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Typography variant="body2" sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {order.azOrderId || '-'}
+                          </Typography>
+                          {order.azOrderId && (
+                            <IconButton
+                              size="small"
+                              onClick={() => handleCopy(order.azOrderId)}
+                              sx={{ p: 0.5 }}
+                            >
+                              <ContentCopyIcon sx={{ fontSize: '0.875rem' }} />
+                            </IconButton>
+                          )}
+                        </Stack>
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 260 }}>
+                        <NotesCell
+                          order={order}
+                          onSave={updateSharedOrderNotes}
+                          onNotify={showSnack}
+                          fieldLabel="Tracking ID"
+                          placeholder="Enter tracking ID..."
+                          emptyText="+ Add Tracking ID"
+                        />
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 260 }}>
+                        <NotesCell
+                          order={order}
+                          onSave={updateFulfillmentNotes}
+                          onNotify={showSnack}
+                          valueKey="fulfillmentNotes"
+                          fieldLabel="Notes"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormControl size="small" sx={{ minWidth: 150 }}>
+                          <Select
+                            value={order.remark || ''}
+                            displayEmpty
+                            onChange={(e) => handleRemarkUpdate(order._id, e.target.value)}
+                          >
+                            <MenuItem value="">Select Remark</MenuItem>
+                            {remarkTemplates.map((template) => (
+                              <MenuItem key={template.id} value={template.name}>{template.name}</MenuItem>
+                            ))}
+                            <MenuItem value="__manage_templates__" sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
+                              Manage Templates
+                            </MenuItem>
+                          </Select>
+                        </FormControl>
+                      </TableCell>
+                      <TableCell sx={{ textAlign: 'center' }}>
+                        <Tooltip title="Message Buyer">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleOpenMessageDialog(order)}
+                          >
+                            <ChatIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-          <SectionCard sx={{
-            py: 1,
-            px: 2,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: 2,
-            flexShrink: 0,
-            mt: 2
-          }}>
-            <Typography variant="body2" color="text.secondary" fontSize="0.875rem">
-              Showing {orders.length} orders (Page {page} of {totalPages})
-            </Typography>
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              color="primary"
-              showFirstButton
-              showLastButton
-              size="small"
-            />
-          </SectionCard>
-        </>
-      )}
-
-      <Snackbar open={snack.open} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity={snack.severity} sx={{ width: '100%' }}>
-          {snack.message}
-        </Alert>
-      </Snackbar>
-
-      {selectedOrderForMessage && (
-        <ChatModal
-          open={Boolean(selectedOrderForMessage)}
-          onClose={handleCloseMessageDialog}
-          orderId={selectedOrderForMessage.orderId}
-          buyerUsername={selectedOrderForMessage.buyer?.username || selectedOrderForMessage.buyerUsername}
-          buyerName={selectedOrderForMessage.buyer?.buyerRegistrationAddress?.fullName || selectedOrderForMessage.buyerUsername || 'Buyer'}
-          itemId={selectedOrderForMessage.itemNumber || selectedOrderForMessage.lineItems?.[0]?.legacyItemId}
-          title="Amazon Arrival Chat"
-          category="Amazon Arrival"
-          caseStatus={selectedOrderForMessage.messagingStatus || 'Open'}
-        />
-      )}
-
-      <RemarkTemplateManagerModal
-        open={manageRemarkTemplatesOpen}
-        onClose={() => setManageRemarkTemplatesOpen(false)}
-        templates={remarkTemplates}
-        onSaveTemplates={handleSaveRemarkTemplates}
-      />
-
-      <Dialog
-        open={remarkConfirmOpen}
-        onClose={() => {
-          if (!sendingRemarkMessage) {
-            setRemarkConfirmOpen(false);
-            setPendingRemarkUpdate(null);
-          }
-        }}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <ChatIcon color="primary" />
-            <Typography variant="h6">Send Message to Buyer?</Typography>
-          </Stack>
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2}>
-            <Alert severity="info" icon={<InfoIcon />}>
-              You are updating the remark to <strong>"{pendingRemarkUpdate?.remarkValue}"</strong>.
-            </Alert>
-            <Typography variant="body2" color="text.secondary">
-              Send the related message template to the buyer as well?
-            </Typography>
-            <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                {pendingRemarkUpdate && findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue)
-                  ? replaceTemplateVariables(
-                    findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue),
-                    pendingRemarkUpdate.order
-                  )
-                  : ''}
+            <SectionCard sx={{
+              py: 1,
+              px: 2,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 2,
+              flexShrink: 0,
+              mt: 2
+            }}>
+              <Typography variant="body2" color="text.secondary" fontSize="0.875rem">
+                Showing {orders.length} orders (Page {page} of {totalPages})
               </Typography>
-            </Paper>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleSkipRemarkMessage} disabled={sendingRemarkMessage} variant="outlined">
-            No, Just Update Remark
-          </Button>
-          <Button onClick={handleConfirmRemarkMessage} disabled={sendingRemarkMessage} variant="contained">
-            {sendingRemarkMessage ? 'Sending...' : 'Yes, Send Message'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={(e, value) => setPage(value)}
+                color="primary"
+                showFirstButton
+                showLastButton
+                size="small"
+              />
+            </SectionCard>
+          </>
+        )}
+
+        <Snackbar open={snack.open} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+          <Alert severity={snack.severity} sx={{ width: '100%' }}>
+            {snack.message}
+          </Alert>
+        </Snackbar>
+
+        {selectedOrderForMessage && (
+          <ChatModal
+            open={Boolean(selectedOrderForMessage)}
+            onClose={handleCloseMessageDialog}
+            orderId={selectedOrderForMessage.orderId}
+            buyerUsername={selectedOrderForMessage.buyer?.username || selectedOrderForMessage.buyerUsername}
+            buyerName={selectedOrderForMessage.buyer?.buyerRegistrationAddress?.fullName || selectedOrderForMessage.buyerUsername || 'Buyer'}
+            itemId={selectedOrderForMessage.itemNumber || selectedOrderForMessage.lineItems?.[0]?.legacyItemId}
+            title="Amazon Arrival Chat"
+            category="Amazon Arrival"
+            caseStatus={selectedOrderForMessage.messagingStatus || 'Open'}
+          />
+        )}
+
+        <RemarkTemplateManagerModal
+          open={manageRemarkTemplatesOpen}
+          onClose={() => setManageRemarkTemplatesOpen(false)}
+          templates={remarkTemplates}
+          onSaveTemplates={handleSaveRemarkTemplates}
+        />
+
+        <Dialog
+          open={remarkConfirmOpen}
+          onClose={() => {
+            if (!sendingRemarkMessage) {
+              setRemarkConfirmOpen(false);
+              setPendingRemarkUpdate(null);
+            }
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <ChatIcon color="primary" />
+              <Typography variant="h6">Send Message to Buyer?</Typography>
+            </Stack>
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={2}>
+              <Alert severity="info" icon={<InfoIcon />}>
+                You are updating the remark to <strong>"{pendingRemarkUpdate?.remarkValue}"</strong>.
+              </Alert>
+              <Typography variant="body2" color="text.secondary">
+                Send the related message template to the buyer as well?
+              </Typography>
+              <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {pendingRemarkUpdate && findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue)
+                    ? replaceTemplateVariables(
+                      findRemarkTemplateText(remarkTemplates, pendingRemarkUpdate.remarkValue),
+                      pendingRemarkUpdate.order
+                    )
+                    : ''}
+                </Typography>
+              </Paper>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={handleSkipRemarkMessage} disabled={sendingRemarkMessage} variant="outlined">
+              No, Just Update Remark
+            </Button>
+            <Button onClick={handleConfirmRemarkMessage} disabled={sendingRemarkMessage} variant="contained">
+              {sendingRemarkMessage ? 'Sending...' : 'Yes, Send Message'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
     </Fade>
   );
 }
