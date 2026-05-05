@@ -87,6 +87,7 @@ import FeedUploadPage from '../pages/ebay/FeedUploadPage.jsx';
 import SellingPrivilegesPage from '../pages/admin/SellingPrivilegesPage.jsx';
 import EbayApiUsagePage from '../pages/admin/EbayApiUsagePage.jsx';
 import FeedUploadStatsPage from '../pages/admin/FeedUploadStatsPage.jsx';
+import ActiveListingTiersPage from '../pages/admin/ActiveListingTiersPage.jsx';
 import SalaryPage from '../pages/admin/SalaryPage.jsx';
 import SellerFundsPage from '../pages/admin/SellerFundsPage.jsx';
 
@@ -297,6 +298,7 @@ const COMPONENT_MAP = {
   'SellingPrivileges': SellingPrivilegesPage,
   'EbayApiUsage': EbayApiUsagePage,
   'SellerFunds': SellerFundsPage,
+  'ActiveListingTiers': ActiveListingTiersPage,
   'IdeasAndIssues': IdeasPage,
   'TeamChat': InternalMessagesPage,
   'LeaveAdmin': LeaveAdminPage,
