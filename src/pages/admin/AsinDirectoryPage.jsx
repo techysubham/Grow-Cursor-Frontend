@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import useDebounce from '../../hooks/useDebounce';
 import {
   Box,
   Button,
@@ -103,6 +104,7 @@ export default function AsinDirectoryPage() {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
 
   const [selected, setSelected] = useState([]);
   const [selectAllAcrossPages, setSelectAllAcrossPages] = useState(false);
@@ -125,12 +127,12 @@ export default function AsinDirectoryPage() {
   useEffect(() => {
     fetchAsins();
     fetchStats();
-  }, [page, rowsPerPage, search, showMoved, marketplaceFilter, addedByUserId]);
+  }, [page, rowsPerPage, debouncedSearch, showMoved, marketplaceFilter, addedByUserId]);
 
   useEffect(() => {
     setSelected([]);
     setSelectAllAcrossPages(false);
-  }, [page, rowsPerPage, search, showMoved, marketplaceFilter, addedByUserId]);
+  }, [page, rowsPerPage, debouncedSearch, showMoved, marketplaceFilter, addedByUserId]);
 
   const fetchAsins = async () => {
     try {
@@ -139,7 +141,7 @@ export default function AsinDirectoryPage() {
         params: {
           page: page + 1,
           limit: rowsPerPage,
-          search: search || undefined,
+          search: debouncedSearch || undefined,
           showMoved: showMoved ? 'true' : undefined,
           region: marketplaceFilter || undefined,
           addedByUserId: addedByUserId || undefined

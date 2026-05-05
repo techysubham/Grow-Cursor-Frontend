@@ -1,5 +1,5 @@
 // pages/admin/ManageCreditCardsPage.jsx
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Box, Button, Paper, Stack, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, TextField, Typography, 
@@ -7,19 +7,12 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../../lib/api.js';
+import useFetchTable from '../../hooks/useFetchTable';
 
 export default function ManageCreditCardsPage() {
-  const [cards, setCards] = useState([]);
+  const { rows: cards, refetch } = useFetchTable('/credit-cards');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-
-  const fetchCards = () => {
-    api.get('/credit-cards').then(({ data }) => setCards(data)).catch(console.error);
-  };
-
-  useEffect(() => {
-    fetchCards();
-  }, []);
 
   const addCard = async (e) => {
     e.preventDefault();
@@ -27,7 +20,7 @@ export default function ManageCreditCardsPage() {
     try {
       await api.post('/credit-cards', { name });
       setName('');
-      fetchCards();
+      refetch();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to add credit card');
     }
@@ -37,7 +30,7 @@ export default function ManageCreditCardsPage() {
     if(!window.confirm("Are you sure?")) return;
     try {
         await api.delete(`/credit-cards/${id}`);
-        fetchCards();
+        refetch();
     } catch (err) {
         alert("Failed to delete");
     }

@@ -113,6 +113,7 @@ const IdeasPage = lazy(() => import('../pages/IdeasPage.jsx'));
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 const OrderAnalyticsPage = lazy(() => import('../pages/admin/OrderAnalyticsPage.jsx'));
 const LegacyItemAnalyticsPage = lazy(() => import('../pages/admin/LegacyItemAnalyticsPage.jsx'));
+const ActiveListingTiersPage = lazy(() => import('../pages/admin/ActiveListingTiersPage.jsx'));
 const CRPAnalyticsPage = lazy(() => import('../pages/admin/CRPAnalyticsPage.jsx'));
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 const SellerAnalyticsPage = lazy(() => import('../pages/admin/SellerAnalyticsPage.jsx'));
