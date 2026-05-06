@@ -106,6 +106,7 @@ export default function FeedUploadStatsPage() {
 
   // Month picker (separate — driven by the same global filters except date)
   const [monthPicker, setMonthPicker] = useState(currentMonthStr);
+  const [monthCountry, setMonthCountry] = useState('US');
 
   // Filter option lists
   const [sellers, setSellers] = useState([]);
@@ -153,9 +154,17 @@ export default function FeedUploadStatsPage() {
       setMonthLoading(true);
       setMonthError(null);
       const { first, last } = monthBounds(ym);
-      const params = paramOverrides !== null
-        ? { startDate: first, endDate: last, ...paramOverrides }
-        : buildParams({ startDate: first, endDate: last });
+      let params;
+      if (paramOverrides !== null) {
+        params = { startDate: first, endDate: last, ...paramOverrides };
+      } else {
+        const p = {};
+        if (monthCountry !== 'ALL') p.country = monthCountry;
+        if (filterSeller) p.sellerId = filterSeller;
+        if (filterCategory) p.categoryId = filterCategory._id;
+        if (filterRange) p.rangeId = filterRange._id;
+        params = { startDate: first, endDate: last, ...p };
+      }
       const { data } = await api.get('/ebay/feed/upload-stats', { params });
       const map = {};
       data.forEach((r) => {
@@ -478,7 +487,17 @@ export default function FeedUploadStatsPage() {
         <Paper elevation={0} sx={{ flex: 1, minWidth: 0, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
           <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.12)}`, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
             <Typography variant="subtitle1" fontWeight={700} fontSize="1rem" sx={{ color: BRAND_DARK }}>Month-wise</Typography>
-            <Box sx={{ ml: 'auto' }}>
+            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <FormControl size="small" sx={{ minWidth: 130 }}>
+                <InputLabel>Marketplace</InputLabel>
+                <Select value={monthCountry} label="Marketplace" onChange={(e) => setMonthCountry(e.target.value)}>
+                  <MenuItem value="ALL">All</MenuItem>
+                  <MenuItem value="US">US</MenuItem>
+                  <MenuItem value="UK">UK</MenuItem>
+                  <MenuItem value="AU">AU</MenuItem>
+                  <MenuItem value="Canada">Canada</MenuItem>
+                </Select>
+              </FormControl>
               <ThemeProvider theme={datePickerTheme}>
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
@@ -523,7 +542,7 @@ export default function FeedUploadStatsPage() {
                   ) : (
                     <>
                       {monthStats.map((row, idx) => {
-                        const quota = getQuota(row.sellerName, filterCountry === 'ALL' ? 'US' : filterCountry);
+                        const quota = getQuota(row.sellerName, monthCountry === 'ALL' ? 'US' : monthCountry);
                         return (
                           <TableRow
                             key={`m-${row.sellerId}-${idx}`}
