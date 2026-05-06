@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box, Typography, Container, Paper, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Select, MenuItem, Stack, FormControl, InputLabel, Divider,
+  Select, MenuItem, Stack, FormControl, InputLabel, Button,
   ToggleButtonGroup, ToggleButton
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
@@ -13,7 +13,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
-import { tableHeaderCellSx, tableBodyRowSx } from '../../theme/tableStyles.js';
+import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 import api from '../../lib/api';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -121,10 +121,6 @@ export default function FeedUploadStatsPage() {
   const [monthLoading, setMonthLoading] = useState(true);
   const [monthError, setMonthError] = useState(null);
 
-  const [catStats, setCatStats] = useState({ categories: [], ranges: [] });
-  const [catLoading, setCatLoading] = useState(false);
-  const [catError, setCatError] = useState(null);
-
   // ── Build shared query params from global filters ─────────────────
   const buildParams = (extra = {}) => {
     const p = {};
@@ -142,25 +138,11 @@ export default function FeedUploadStatsPage() {
       setDayError(null);
       const params = buildParams({ startDate: from, endDate: to });
       const { data } = await api.get('/ebay/feed/upload-stats', { params });
-      setDayStats([...data].sort((a, b) => (b.totalSuccess || 0) - (a.totalSuccess || 0)));
+      setDayStats([...data].sort((a, b) => (b.date || '').localeCompare(a.date || '')));
     } catch (err) {
       setDayError(err.response?.data?.error || 'Failed to fetch data');
     } finally {
       setDayLoading(false);
-    }
-  };
-
-  const fetchCategoryStats = async (from, to) => {
-    try {
-      setCatLoading(true);
-      setCatError(null);
-      const params = buildParams({ startDate: from, endDate: to });
-      const { data } = await api.get('/ebay/feed/category-stats', { params });
-      setCatStats(data);
-    } catch (err) {
-      setCatError(err.response?.data?.error || 'Failed to fetch category stats');
-    } finally {
-      setCatLoading(false);
     }
   };
 
@@ -186,13 +168,21 @@ export default function FeedUploadStatsPage() {
     }
   };
 
-  // ── Load filter option lists on mount ────────────────────────────
+  // Apply handler — called only when user clicks "Apply Filters"
+  const handleApply = () => {
+    fetchDay(filterFromDate, filterToDate);
+    fetchMonth(monthPicker);
+  };
+
+  // Load filter option lists + initial data on mount
   useEffect(() => {
     api.get('/sellers/all').then(({ data }) => setSellers(data || [])).catch(() => {});
     api.get('/asin-list-categories').then(({ data }) => setFilterCategories(data || [])).catch(() => {});
+    fetchDay(filterFromDate, filterToDate);
+    fetchMonth(monthPicker);
   }, []);
 
-  // Load ranges when category filter changes
+  // Load ranges when category filter changes (dropdown population only — no data fetch)
   useEffect(() => {
     setFilterRange(null);
     if (filterCategory) {
@@ -203,17 +193,6 @@ export default function FeedUploadStatsPage() {
       setFilterRanges([]);
     }
   }, [filterCategory]);
-
-  // Re-fetch day + category stats whenever date range or shared filters change
-  useEffect(() => {
-    fetchDay(filterFromDate, filterToDate);
-    fetchCategoryStats(filterFromDate, filterToDate);
-  }, [filterFromDate, filterToDate, filterSeller, filterCountry, filterCategory, filterRange]);
-
-  // Re-fetch month stats whenever month picker or shared filters change
-  useEffect(() => {
-    fetchMonth(monthPicker);
-  }, [monthPicker, filterSeller, filterCountry, filterCategory, filterRange]);
 
   const dayTotal = dayStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
   const monthTotal = monthStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
@@ -388,6 +367,15 @@ export default function FeedUploadStatsPage() {
               <TextField {...params} label="Range" sx={inputFocusSx} />
             )}
           />
+
+          {/* Apply */}
+          <Button
+            variant="contained"
+            onClick={handleApply}
+            sx={{ ...yellowFilledButtonSx, px: 3, height: 40, flexShrink: 0 }}
+          >
+            Apply Filters
+          </Button>
         </Stack>
       </Paper>
 
@@ -410,6 +398,7 @@ export default function FeedUploadStatsPage() {
                 <TableHead sx={{ backgroundColor: BRAND_DARK }}>
                   <TableRow>
                     <TableCell sx={{ ...tableHeaderCellSx, width: 52, pl: 3 }}>#</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx }}>Date</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx }}>Seller</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx }}>Country</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx }}>Category</TableCell>
@@ -420,7 +409,7 @@ export default function FeedUploadStatsPage() {
                 <TableBody>
                   {dayStats.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
                         No data for this date
                       </TableCell>
                     </TableRow>
@@ -433,6 +422,7 @@ export default function FeedUploadStatsPage() {
                           sx={tableBodyRowSx}
                         >
                           <TableCell sx={{ ...cellSx, color: 'text.disabled', width: 52, pl: 3 }}>{idx + 1}</TableCell>
+                          <TableCell sx={{ ...cellSx }}>{row.date}</TableCell>
                           <TableCell sx={{ ...cellSx, fontWeight: 500, color: BRAND_DARK }}>{row.sellerName}</TableCell>
                           <TableCell sx={cellSx}>{row.country || 'US'}</TableCell>
                           <TableCell sx={cellSx}>{row.categoryName || <Typography component="span" sx={{ color: alpha(BRAND_DARK, 0.35), fontSize: '0.85rem' }}>—</Typography>}</TableCell>
@@ -443,7 +433,7 @@ export default function FeedUploadStatsPage() {
                         </TableRow>
                       ))}
                       <TableRow sx={{ backgroundColor: alpha(BRAND_YELLOW, 0.15) }}>
-                        <TableCell colSpan={5} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
+                        <TableCell colSpan={6} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pr: 3, py: 1.6, borderBottom: 'none' }}>
                           {dayTotal.toLocaleString()}
                         </TableCell>
@@ -533,117 +523,6 @@ export default function FeedUploadStatsPage() {
                         <TableCell colSpan={4} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pr: 3, py: 1.6, borderBottom: 'none' }}>
                           {monthTotal.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    </>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Paper>
-      </Box>
-
-      {/* ── Category / Range Breakdown ────────────────────────────── */}
-      <Box sx={{ mt: 3, display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-        {/* Categories */}
-        <Paper elevation={0} sx={{ flex: 1, minWidth: 0, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
-          <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.12)}`, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
-            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem" sx={{ color: BRAND_DARK }}>
-              By Category
-            </Typography>
-          </Box>
-          {catLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress size={28} /></Box>
-          ) : catError ? (
-            <Alert severity="error" sx={{ m: 2 }}>{catError}</Alert>
-          ) : (
-            <TableContainer>
-              <Table>
-                <TableHead sx={{ backgroundColor: BRAND_DARK }}>
-                  <TableRow>
-                    <TableCell sx={{ ...tableHeaderCellSx, width: 52, pl: 3 }}>#</TableCell>
-                    <TableCell sx={{ ...tableHeaderCellSx }}>Category</TableCell>
-                    <TableCell sx={{ ...tableHeaderCellSx, pr: 3 }} align="right">Successful Listings</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {catStats.categories.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
-                        No category data for this date
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    <>
-                      {catStats.categories.map((row, idx) => (
-                        <TableRow key={`cat-${row.categoryId}`} hover sx={tableBodyRowSx}>
-                          <TableCell sx={{ color: 'text.disabled', width: 52, pl: 3, py: 1.6 }}>{idx + 1}</TableCell>
-                          <TableCell sx={{ py: 1.6, fontWeight: 500, color: BRAND_DARK }}>{row.name}</TableCell>
-                          <TableCell align="right" sx={{ py: 1.6, pr: 3, fontWeight: 700, color: BRAND_DARK }}>
-                            {row.totalSuccess.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow sx={{ backgroundColor: alpha(BRAND_YELLOW, 0.15) }}>
-                        <TableCell colSpan={2} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pr: 3, py: 1.6, borderBottom: 'none' }}>
-                          {catStats.categories.reduce((s, r) => s + r.totalSuccess, 0).toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    </>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Paper>
-
-        {/* Ranges */}
-        <Paper elevation={0} sx={{ flex: 1, minWidth: 0, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
-          <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.12)}`, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
-            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem" sx={{ color: BRAND_DARK }}>
-              By Range
-            </Typography>
-          </Box>
-          {catLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress size={28} /></Box>
-          ) : catError ? (
-            <Alert severity="error" sx={{ m: 2 }}>{catError}</Alert>
-          ) : (
-            <TableContainer>
-              <Table>
-                <TableHead sx={{ backgroundColor: BRAND_DARK }}>
-                  <TableRow>
-                    <TableCell sx={{ ...tableHeaderCellSx, width: 52, pl: 3 }}>#</TableCell>
-                    <TableCell sx={{ ...tableHeaderCellSx }}>Range</TableCell>
-                    <TableCell sx={{ ...tableHeaderCellSx }}>Category</TableCell>
-                    <TableCell sx={{ ...tableHeaderCellSx, pr: 3 }} align="right">Successful Listings</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {catStats.ranges.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
-                        No range data for this date
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    <>
-                      {catStats.ranges.map((row, idx) => (
-                        <TableRow key={`rng-${row.rangeId}`} hover sx={tableBodyRowSx}>
-                          <TableCell sx={{ color: 'text.disabled', width: 52, pl: 3, py: 1.6 }}>{idx + 1}</TableCell>
-                          <TableCell sx={{ py: 1.6, fontWeight: 500, color: BRAND_DARK }}>{row.name}</TableCell>
-                          <TableCell sx={{ py: 1.6, color: alpha(BRAND_DARK, 0.6) }}>{row.categoryName}</TableCell>
-                          <TableCell align="right" sx={{ py: 1.6, pr: 3, fontWeight: 700, color: BRAND_DARK }}>
-                            {row.totalSuccess.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow sx={{ backgroundColor: alpha(BRAND_YELLOW, 0.15) }}>
-                        <TableCell colSpan={3} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pr: 3, py: 1.6, borderBottom: 'none' }}>
-                          {catStats.ranges.reduce((s, r) => s + r.totalSuccess, 0).toLocaleString()}
                         </TableCell>
                       </TableRow>
                     </>
