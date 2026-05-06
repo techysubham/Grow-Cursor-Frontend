@@ -26,7 +26,7 @@ function monthBounds(ym) {
 }
 
 // Sellers with a higher monthly quota (US only)
-const HIGH_QUOTA_SELLERS = ['truxi', 'raveoli_cart', 'techmania'];
+const HIGH_QUOTA_SELLERS = ['truxi', 'raveoli_cart', 'techmania', 'edgevolution'];
 
 // Country-based quotas
 const COUNTRY_QUOTAS = {
