@@ -24,8 +24,8 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
-import useFetchTable from '../../hooks/useFetchTable';
 import useFormDialog from '../../hooks/useFormDialog';
 
 // Mobile card for each expense
@@ -95,21 +95,27 @@ const ExtraExpensePage = () => {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    const { rows: expenses, loading, refetch } = useFetchTable('/extra-expenses');
+    const queryClient = useQueryClient();
+    const { data: expenses = [], isLoading } = useQuery({
+        queryKey: ['/extra-expenses'],
+        queryFn: () => api.get('/extra-expenses').then(r => r.data),
+    });
+
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: ['/extra-expenses'] });
 
     const dialog = useFormDialog(INITIAL_FORM, {
         onSave: (formData, editingId) =>
             editingId
                 ? api.put(`/extra-expenses/${editingId}`, formData)
                 : api.post('/extra-expenses', formData),
-        onAfterSave: refetch,
+        onAfterSave: invalidate,
     });
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this expense?')) return;
         try {
             await api.delete(`/extra-expenses/${id}`);
-            refetch();
+            invalidate();
         } catch (error) {
             alert(error.response?.data?.error || 'Failed to delete');
         }
@@ -120,7 +126,7 @@ const ExtraExpensePage = () => {
         dialog.setFormData({ date: new Date().toISOString().split('T')[0], name: '', amount: '', paidBy: '' });
     };
 
-    if (loading && expenses.length === 0) return (
+    if (isLoading && expenses.length === 0) return (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
             <CircularProgress />
         </Box>
