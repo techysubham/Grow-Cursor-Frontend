@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { lazy, Suspense, useMemo, useState, useEffect } from 'react';
 import { Link, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -31,65 +31,65 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
-import ProductResearchPage from '../pages/admin/ProductResearchPage.jsx';
-import AddListerPage from '../pages/admin/AddListerPage.jsx';
-import ListingManagementPage from '../pages/admin/ListingManagementPage.jsx';
-import ManagePlatformsPage from '../pages/admin/ManagePlatformsPage.jsx';
-import ManageStoresPage from '../pages/admin/ManageStoresPage.jsx';
-import AdminAssignmentsPage from '../pages/admin/AdminAssignmentsPage.jsx';
-import ManageRangesPage from '../pages/admin/ManageRangesPage.jsx';
-import ManageCategoriesPage from '../pages/admin/ManageCategoriesPage.jsx';
-import ListingsSummaryPage from '../pages/admin/ListingsSummaryPage.jsx';
-import UserCredentialsPage from '../pages/admin/UserCredentialsPage.jsx';
-import ListingSheetPage from '../pages/admin/ListingSheetPage.jsx';
+
+// --- Lazy-loaded page components ---
+const ProductResearchPage = lazy(() => import('../pages/admin/ProductResearchPage.jsx'));
+const AddListerPage = lazy(() => import('../pages/admin/AddListerPage.jsx'));
+const ListingManagementPage = lazy(() => import('../pages/admin/ListingManagementPage.jsx'));
+const ManagePlatformsPage = lazy(() => import('../pages/admin/ManagePlatformsPage.jsx'));
+const ManageStoresPage = lazy(() => import('../pages/admin/ManageStoresPage.jsx'));
+const AdminAssignmentsPage = lazy(() => import('../pages/admin/AdminAssignmentsPage.jsx'));
+const ManageRangesPage = lazy(() => import('../pages/admin/ManageRangesPage.jsx'));
+const ManageCategoriesPage = lazy(() => import('../pages/admin/ManageCategoriesPage.jsx'));
+const ListingsSummaryPage = lazy(() => import('../pages/admin/ListingsSummaryPage.jsx'));
+const UserCredentialsPage = lazy(() => import('../pages/admin/UserCredentialsPage.jsx'));
+const ListingSheetPage = lazy(() => import('../pages/admin/ListingSheetPage.jsx'));
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import TaskIcon from '@mui/icons-material/Task';
 import EditIcon from '@mui/icons-material/Edit';
 
-import TaskListPage from '../pages/admin/TaskListPage.jsx';
-import StockLedgerPage from '../pages/admin/StockLedgerPage.jsx';
-import StoreWiseTaskListPage from '../pages/admin/StoreWiseTaskListPage.jsx';
-import StoreTaskDetailPage from '../pages/admin/StoreTaskDetailPage.jsx';
-import StoreDailyTasksPage from '../pages/admin/StoreDailyTasksPage.jsx';
-import ListerInfoPage from '../pages/admin/ListerInfoPage.jsx';
-import ListerInfoDetailPage from '../pages/admin/ListerInfoDetailPage.jsx';
-import AdminTaskList from '../pages/compatibility/AdminTaskList.jsx';
-import EditorDashboard from '../pages/compatibility/EditorDashboard.jsx';
-import ProgressTrackingPage from '../pages/compatibility/ProgressTrackingPage.jsx';
-import CompatibilityBatchHistoryPage from '../pages/compatibility/CompatibilityBatchHistoryPage.jsx';
-import AutoCompatibilityPage from '../pages/compatibility/AutoCompatibilityPage.jsx';
-import AutoCompatReviewHistoryPage from '../pages/compatibility/AutoCompatReviewHistoryPage.jsx';
-import AutoCompatSellerHistoryPage from '../pages/compatibility/AutoCompatSellerHistoryPage.jsx';
+const TaskListPage = lazy(() => import('../pages/admin/TaskListPage.jsx'));
+const StockLedgerPage = lazy(() => import('../pages/admin/StockLedgerPage.jsx'));
+const StoreWiseTaskListPage = lazy(() => import('../pages/admin/StoreWiseTaskListPage.jsx'));
+const StoreTaskDetailPage = lazy(() => import('../pages/admin/StoreTaskDetailPage.jsx'));
+const StoreDailyTasksPage = lazy(() => import('../pages/admin/StoreDailyTasksPage.jsx'));
+const ListerInfoPage = lazy(() => import('../pages/admin/ListerInfoPage.jsx'));
+const ListerInfoDetailPage = lazy(() => import('../pages/admin/ListerInfoDetailPage.jsx'));
+const AdminTaskList = lazy(() => import('../pages/compatibility/AdminTaskList.jsx'));
+const EditorDashboard = lazy(() => import('../pages/compatibility/EditorDashboard.jsx'));
+const ProgressTrackingPage = lazy(() => import('../pages/compatibility/ProgressTrackingPage.jsx'));
+const CompatibilityBatchHistoryPage = lazy(() => import('../pages/compatibility/CompatibilityBatchHistoryPage.jsx'));
+const AutoCompatibilityPage = lazy(() => import('../pages/compatibility/AutoCompatibilityPage.jsx'));
+const AutoCompatReviewHistoryPage = lazy(() => import('../pages/compatibility/AutoCompatReviewHistoryPage.jsx'));
+const AutoCompatSellerHistoryPage = lazy(() => import('../pages/compatibility/AutoCompatSellerHistoryPage.jsx'));
 
-import FulfillmentDashboard from '../pages/admin/FulfillmentDashboard.jsx';
-import AllOrdersSheetPage from '../pages/admin/AllOrdersSheetPage.jsx';
-import PriceChangeHistoryPage from '../pages/admin/PriceChangeHistoryPage.jsx';
-import AwaitingShipmentPage from '../pages/admin/AwaitingShipmentPage.jsx';
-import AwaitingSheetPage from '../pages/admin/AwaitingSheetPage.jsx';
-import AmazonArrivalsPage from '../pages/admin/AmazonArrivalsPage.jsx';
-import FulfillmentNotesPage from '../pages/admin/FulfillmentNotesPage.jsx';
-import ConversationTrackingPage from '../pages/admin/ConversationTrackingPage.jsx';
+const FulfillmentDashboard = lazy(() => import('../pages/admin/FulfillmentDashboard.jsx'));
+const AllOrdersSheetPage = lazy(() => import('../pages/admin/AllOrdersSheetPage.jsx'));
+const PriceChangeHistoryPage = lazy(() => import('../pages/admin/PriceChangeHistoryPage.jsx'));
+const AwaitingShipmentPage = lazy(() => import('../pages/admin/AwaitingShipmentPage.jsx'));
+const AwaitingSheetPage = lazy(() => import('../pages/admin/AwaitingSheetPage.jsx'));
+const AmazonArrivalsPage = lazy(() => import('../pages/admin/AmazonArrivalsPage.jsx'));
+const FulfillmentNotesPage = lazy(() => import('../pages/admin/FulfillmentNotesPage.jsx'));
+const ConversationTrackingPage = lazy(() => import('../pages/admin/ConversationTrackingPage.jsx'));
 // CancelledStatusPage is now embedded in Issues and Resolutions (DisputesPage)
-import DisputesPage from '../pages/admin/DisputesPage.jsx';
-import AccountHealthReportPage from '../pages/admin/AccountHealthReportPage.jsx';
-import PayoneerSheetPage from '../pages/admin/PayoneerSheetPage.jsx';
-import MicroOrdersPage from '../pages/admin/MicroOrdersPage.jsx';
-import BankAccountsPage from '../pages/admin/BankAccountsPage.jsx';
-import TransactionPage from '../pages/admin/TransactionPage.jsx';
-import ExtraExpensePage from '../pages/admin/ExtraExpensePage.jsx';
-//import MessageReceivedPage from '../pages/admin/MessageReceivedPage.jsx';
-import AboutMePage from '../pages/AboutMePage.jsx';
-import EmployeeDetailsPage from '../pages/admin/EmployeeDetailsPage.jsx';
-import EmployeeManagementPage from '../pages/admin/EmployeeManagementPage.jsx';
-import BuyerChatPage from '../pages/admin/BuyerChatPage.jsx';
-import RangeAnalyzerPage from '../pages/admin/RangeAnalyzerPage.jsx';
-import FeedUploadPage from '../pages/ebay/FeedUploadPage.jsx';
-import SellingPrivilegesPage from '../pages/admin/SellingPrivilegesPage.jsx';
-import EbayApiUsagePage from '../pages/admin/EbayApiUsagePage.jsx';
-import FeedUploadStatsPage from '../pages/admin/FeedUploadStatsPage.jsx';
-import ActiveListingTiersPage from '../pages/admin/ActiveListingTiersPage.jsx';
-import SalaryPage from '../pages/admin/SalaryPage.jsx';
-import SellerFundsPage from '../pages/admin/SellerFundsPage.jsx';
+const DisputesPage = lazy(() => import('../pages/admin/DisputesPage.jsx'));
+const AccountHealthReportPage = lazy(() => import('../pages/admin/AccountHealthReportPage.jsx'));
+const PayoneerSheetPage = lazy(() => import('../pages/admin/PayoneerSheetPage.jsx'));
+const MicroOrdersPage = lazy(() => import('../pages/admin/MicroOrdersPage.jsx'));
+const BankAccountsPage = lazy(() => import('../pages/admin/BankAccountsPage.jsx'));
+const TransactionPage = lazy(() => import('../pages/admin/TransactionPage.jsx'));
+const ExtraExpensePage = lazy(() => import('../pages/admin/ExtraExpensePage.jsx'));
+const AboutMePage = lazy(() => import('../pages/AboutMePage.jsx'));
+const EmployeeDetailsPage = lazy(() => import('../pages/admin/EmployeeDetailsPage.jsx'));
+const EmployeeManagementPage = lazy(() => import('../pages/admin/EmployeeManagementPage.jsx'));
+const BuyerChatPage = lazy(() => import('../pages/admin/BuyerChatPage.jsx'));
+const RangeAnalyzerPage = lazy(() => import('../pages/admin/RangeAnalyzerPage.jsx'));
+const FeedUploadPage = lazy(() => import('../pages/ebay/FeedUploadPage.jsx'));
+const SellingPrivilegesPage = lazy(() => import('../pages/admin/SellingPrivilegesPage.jsx'));
+const EbayApiUsagePage = lazy(() => import('../pages/admin/EbayApiUsagePage.jsx'));
+const FeedUploadStatsPage = lazy(() => import('../pages/admin/FeedUploadStatsPage.jsx'));
+const SalaryPage = lazy(() => import('../pages/admin/SalaryPage.jsx'));
+const SellerFundsPage = lazy(() => import('../pages/admin/SellerFundsPage.jsx'));
 
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -98,72 +98,75 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import MoneyOffIcon from '@mui/icons-material/MoneyOff';
-import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboard.jsx';
-import EditListingsDashboard from '../pages/listings/EditListingsDashboard.jsx';
+const CompatibilityDashboard = lazy(() => import('../pages/compatibility/CompatibilityDashboard.jsx'));
+const EditListingsDashboard = lazy(() => import('../pages/listings/EditListingsDashboard.jsx'));
 
-import ConversationManagementPage from '../pages/admin/ConversationManagementPage.jsx';
-import ManageAmazonAccountsPage from '../pages/admin/ManageAmazonAccountsPage.jsx';
-import InternalMessagesPage from '../pages/admin/InternalMessagesPage.jsx';
-import InternalMessagesAdminPage from '../pages/admin/InternalMessagesAdminPage.jsx';
-import ManageCreditCardsPage from '../pages/admin/ManageCreditCardsPage.jsx';
-import ManageCreditCardNamesPage from '../pages/admin/ManageCreditCardNamesPage.jsx';
-import AffiliateOrdersPage from '../pages/admin/AffiliateOrdersPage.jsx';
+const ConversationManagementPage = lazy(() => import('../pages/admin/ConversationManagementPage.jsx'));
+const ManageAmazonAccountsPage = lazy(() => import('../pages/admin/ManageAmazonAccountsPage.jsx'));
+const InternalMessagesPage = lazy(() => import('../pages/admin/InternalMessagesPage.jsx'));
+const InternalMessagesAdminPage = lazy(() => import('../pages/admin/InternalMessagesAdminPage.jsx'));
+const ManageCreditCardsPage = lazy(() => import('../pages/admin/ManageCreditCardsPage.jsx'));
+const ManageCreditCardNamesPage = lazy(() => import('../pages/admin/ManageCreditCardNamesPage.jsx'));
+const AffiliateOrdersPage = lazy(() => import('../pages/admin/AffiliateOrdersPage.jsx'));
 import LinkIcon from '@mui/icons-material/Link';
-import IdeasPage from '../pages/IdeasPage.jsx';
+const IdeasPage = lazy(() => import('../pages/IdeasPage.jsx'));
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
-import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
-import LegacyItemAnalyticsPage from '../pages/admin/LegacyItemAnalyticsPage.jsx';
-import CRPAnalyticsPage from '../pages/admin/CRPAnalyticsPage.jsx';
+const OrderAnalyticsPage = lazy(() => import('../pages/admin/OrderAnalyticsPage.jsx'));
+const LegacyItemAnalyticsPage = lazy(() => import('../pages/admin/LegacyItemAnalyticsPage.jsx'));
+const ActiveListingTiersPage = lazy(() => import('../pages/admin/ActiveListingTiersPage.jsx'));
+const CRPAnalyticsPage = lazy(() => import('../pages/admin/CRPAnalyticsPage.jsx'));
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import SellerAnalyticsPage from '../pages/admin/SellerAnalyticsPage.jsx';
-import OrdersDepartmentDashboardPage from '../pages/admin/OrdersDepartmentDashboardPage.jsx';
+const SellerAnalyticsPage = lazy(() => import('../pages/admin/SellerAnalyticsPage.jsx'));
+const OrdersDepartmentDashboardPage = lazy(() => import('../pages/admin/OrdersDepartmentDashboardPage.jsx'));
 // WorksheetPage is now embedded in Issues and Resolutions (DisputesPage)
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ChatIcon from '@mui/icons-material/Chat';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import AmazonLookupPage from '../pages/admin/AmazonLookupPage.jsx';
+const AmazonLookupPage = lazy(() => import('../pages/admin/AmazonLookupPage.jsx'));
 import SearchIcon from '@mui/icons-material/Search';
-import ManageProductUmbrellasPage from '../pages/admin/ManageProductUmbrellasPage.jsx';
+const ManageProductUmbrellasPage = lazy(() => import('../pages/admin/ManageProductUmbrellasPage.jsx'));
 import UmbrellaIcon from '@mui/icons-material/Umbrella';
-import ASINStoragePage from '../pages/admin/ASINStoragePage.jsx';
+const ASINStoragePage = lazy(() => import('../pages/admin/ASINStoragePage.jsx'));
 import StorageIcon from '@mui/icons-material/Storage';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import LayersIcon from '@mui/icons-material/Layers';
-import ColumnCreatorPage from '../pages/admin/ColumnCreatorPage.jsx';
+const ColumnCreatorPage = lazy(() => import('../pages/admin/ColumnCreatorPage.jsx'));
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
-import ManageTemplatesPage from '../pages/admin/ManageTemplatesPage.jsx';
-import TemplateListingsPage from '../pages/admin/TemplateListingsPage.jsx';
-import TemplateListingAnalyticsPage from '../pages/admin/TemplateListingAnalyticsPage.jsx';
-import SelectSellerPage from '../pages/admin/SelectSellerPage.jsx';
-import SellerTemplatesPage from '../pages/admin/SellerTemplatesPage.jsx';
-import ListingDirectoryPage from '../pages/admin/ListingDirectoryPage.jsx';
-import TemplateDirectoryPage from '../pages/admin/TemplateDirectoryPage.jsx';
-import TemplateDatabasePage from '../pages/admin/TemplateDatabasePage.jsx';
-import CsvStoragePage from '../pages/admin/CsvStoragePage.jsx';
+const ManageTemplatesPage = lazy(() => import('../pages/admin/ManageTemplatesPage.jsx'));
+const TemplateListingsPage = lazy(() => import('../pages/admin/TemplateListingsPage.jsx'));
+const TemplateListingAnalyticsPage = lazy(() => import('../pages/admin/TemplateListingAnalyticsPage.jsx'));
+const SelectSellerPage = lazy(() => import('../pages/admin/SelectSellerPage.jsx'));
+const SellerTemplatesPage = lazy(() => import('../pages/admin/SellerTemplatesPage.jsx'));
+const ListingDirectoryPage = lazy(() => import('../pages/admin/ListingDirectoryPage.jsx'));
+const TemplateDirectoryPage = lazy(() => import('../pages/admin/TemplateDirectoryPage.jsx'));
+const TemplateDatabasePage = lazy(() => import('../pages/admin/TemplateDatabasePage.jsx'));
+const CsvStoragePage = lazy(() => import('../pages/admin/CsvStoragePage.jsx'));
 import DescriptionIcon from '@mui/icons-material/Description';
 import HomeIcon from '@mui/icons-material/Home';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import LeaveManagementPage from '../pages/LeaveManagementPage.jsx';
-import LeaveAdminPage from '../pages/admin/LeaveAdminPage.jsx';
-import AttendanceAdminPage from '../pages/admin/AttendanceAdminPage.jsx';
+const LeaveManagementPage = lazy(() => import('../pages/LeaveManagementPage.jsx'));
+const LeaveAdminPage = lazy(() => import('../pages/admin/LeaveAdminPage.jsx'));
+const AttendanceAdminPage = lazy(() => import('../pages/admin/AttendanceAdminPage.jsx'));
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import AsinDirectoryPage from '../pages/admin/AsinDirectoryPage.jsx';
-import AsinListPage from '../pages/admin/AsinListPage.jsx';
-import CRPComparisonPage from '../pages/admin/CRPComparisonPage.jsx';
-import UserSellerAssignmentPage from '../pages/admin/UserSellerAssignmentPage.jsx';
-import MeetingsPage from '../pages/admin/MeetingsPage.jsx';
-import UserPerformancePage from '../pages/admin/UserPerformancePage.jsx';
-import AiFitmentUsagePage from '../pages/admin/AiFitmentUsagePage.jsx';
-import ListingStatsPage from '../pages/admin/ListingStatsPage.jsx';
+const AsinDirectoryPage = lazy(() => import('../pages/admin/AsinDirectoryPage.jsx'));
+const AsinListPage = lazy(() => import('../pages/admin/AsinListPage.jsx'));
+const CRPComparisonPage = lazy(() => import('../pages/admin/CRPComparisonPage.jsx'));
+const UserSellerAssignmentPage = lazy(() => import('../pages/admin/UserSellerAssignmentPage.jsx'));
+const MeetingsPage = lazy(() => import('../pages/admin/MeetingsPage.jsx'));
+const UserPerformancePage = lazy(() => import('../pages/admin/UserPerformancePage.jsx'));
+const AiFitmentUsagePage = lazy(() => import('../pages/admin/AiFitmentUsagePage.jsx'));
+const ListingStatsPage = lazy(() => import('../pages/admin/ListingStatsPage.jsx'));
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import SecurityIcon from '@mui/icons-material/Security';
 
-import PageAccessManagementPage from '../pages/admin/PageAccessManagementPage.jsx';
-import PageAccessAuditLogPage from '../pages/admin/PageAccessAuditLogPage.jsx';
-import UserPasswordManagementPage from '../pages/admin/UserPasswordManagementPage.jsx';
+const PageAccessManagementPage = lazy(() => import('../pages/admin/PageAccessManagementPage.jsx'));
+const PageAccessAuditLogPage = lazy(() => import('../pages/admin/PageAccessAuditLogPage.jsx'));
+const UserPasswordManagementPage = lazy(() => import('../pages/admin/UserPasswordManagementPage.jsx'));
 
+import PageLoader from '../components/PageLoader.jsx';
+import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import usePageAccess from '../hooks/usePageAccess';
 import { PAGE_REGISTRY, PAGE_CATEGORIES, SUBMENUS } from '../constants/pages';
 import { BRAND_DARK, BRAND_DARK_ALT, BRAND_DARK_DEEP, BRAND_SIDEBAR_YELLOW, BRAND_SIDEBAR_YELLOW_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../constants/brandTheme';
@@ -880,6 +883,8 @@ export default function AdminLayout({ user, onLogout }) {
       </Box>
       <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${sidebarOpen ? drawerWidth : 56}px)` }, transition: 'width 0.2s' }}>
         <Toolbar />
+        <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Ideas & Issues - accessible to ALL roles */}
           <Route path="/ideas" element={<IdeasPage />} />
@@ -933,6 +938,8 @@ export default function AdminLayout({ user, onLogout }) {
           {/* Default redirect */}
           <Route path="*" element={<Navigate to={getDefaultRedirect()} replace />} />
         </Routes>
+        </Suspense>
+        </ErrorBoundary>
       </Box>
     </Box>
   );

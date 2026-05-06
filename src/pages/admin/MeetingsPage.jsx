@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import useDebounce from '../../hooks/useDebounce';
 import {
     Alert,
     alpha,
@@ -573,6 +574,14 @@ export default function MeetingsPage() {
     const [editingMeeting, setEditingMeeting] = useState(null);
     const [formOpen, setFormOpen] = useState(false);
     const [filters, setFilters] = useState({ search: '', status: 'all', organizerId: '' });
+    const debouncedSearch = useDebounce(filters.search, 400);
+    const isFirstRender = useRef(true);
+
+    useEffect(() => {
+        if (isFirstRender.current) { isFirstRender.current = false; return; }
+        fetchMeetings({ ...filters, search: debouncedSearch });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [debouncedSearch]);
     const [form, setForm] = useState(EMPTY_FORM);
 
     const userMap = useMemo(() => new Map(users.map((user) => [user._id, user])), [users]);
@@ -663,7 +672,9 @@ export default function MeetingsPage() {
     const handleFilterChange = (field, value) => {
         const nextFilters = { ...filters, [field]: value };
         setFilters(nextFilters);
-        fetchMeetings(nextFilters);
+        if (field !== 'search') {
+            fetchMeetings(nextFilters);
+        }
     };
 
     const handleActionItemChange = (index, field, value) => {

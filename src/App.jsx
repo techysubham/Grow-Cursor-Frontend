@@ -1,22 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import LoginPage from './pages/LoginPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
-import ProductResearchPage from './pages/admin/ProductResearchPage.jsx';
-import AddListerPage from './pages/admin/AddListerPage.jsx';
-import ListingAnalyticsPage from './pages/admin/ListingAnalyticsPage.jsx';
-import ListerDashboard from './pages/lister/ListerDashboard.jsx';
-import RangeAnalyzerPage from './pages/admin/RangeAnalyzerPage.jsx';
-import SellerEbayPage from './pages/SellerProfilePage.jsx';
-import AboutMePage from './pages/AboutMePage.jsx';
-import MessageReceivedPage from './pages/admin/MessageReceivedPage.jsx';
-import PayoneerSheetPage from './pages/admin/PayoneerSheetPage.jsx';
-import BankAccountsPage from './pages/admin/BankAccountsPage.jsx';
-import TransactionPage from './pages/admin/TransactionPage.jsx';
-import SalaryPage from './pages/admin/SalaryPage.jsx';
-import IdeasPage from './pages/IdeasPage.jsx';
+import PageLoader from './components/PageLoader.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
+
+// Lazy-loaded pages for route-level code splitting
+const ListerDashboard = lazy(() => import('./pages/lister/ListerDashboard.jsx'));
+const RangeAnalyzerPage = lazy(() => import('./pages/admin/RangeAnalyzerPage.jsx'));
+const SellerEbayPage = lazy(() => import('./pages/SellerProfilePage.jsx'));
+const AboutMePage = lazy(() => import('./pages/AboutMePage.jsx'));
+const IdeasPage = lazy(() => import('./pages/IdeasPage.jsx'));
 
 import { setAuthToken } from './lib/api'
 import { AttendanceProvider } from './context/AttendanceContext';
@@ -156,6 +152,8 @@ export default function App() {
           <AttendanceModal />
           <TimerPausedModal />
           <AttendanceTimer />
+          <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage onLogin={login} />} />
@@ -212,14 +210,20 @@ export default function App() {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
+          </ErrorBoundary>
         </AttendanceProvider>
       ) : (
+        <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage onLogin={login} />} />
           <Route path="/ideas" element={<IdeasPage />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
+        </Suspense>
+        </ErrorBoundary>
       )}
     </ThemeProvider>
   );

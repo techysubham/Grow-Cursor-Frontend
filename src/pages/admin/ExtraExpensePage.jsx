@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -17,6 +16,7 @@ import {
     TextField,
     IconButton,
     Stack,
+    Alert,
     useMediaQuery,
     useTheme,
     CircularProgress
@@ -24,7 +24,9 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import useFormDialog from '../../hooks/useFormDialog';
 
 // Mobile card for each expense
 const MobileExpenseCard = ({ expense, onEdit, onDelete }) => {
@@ -86,89 +88,45 @@ const MobileExpenseCard = ({ expense, onEdit, onDelete }) => {
     );
 };
 
+const INITIAL_FORM = { date: '', name: '', amount: '', paidBy: '' };
+
 const ExtraExpensePage = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    const [expenses, setExpenses] = useState([]);
-    const [openDialog, setOpenDialog] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [pageLoading, setPageLoading] = useState(true);
-    const [editingId, setEditingId] = useState(null);
-
-    const [formData, setFormData] = useState({
-        date: new Date().toISOString().split('T')[0],
-        name: '',
-        amount: '',
-        paidBy: ''
+    const queryClient = useQueryClient();
+    const { data: expenses = [], isLoading } = useQuery({
+        queryKey: ['/extra-expenses'],
+        queryFn: () => api.get('/extra-expenses').then(r => r.data),
     });
 
-    useEffect(() => {
-        fetchExpenses();
-    }, []);
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: ['/extra-expenses'] });
 
-    const fetchExpenses = async () => {
-        try {
-            const { data } = await api.get('/extra-expenses');
-            setExpenses(data);
-        } catch (error) {
-            console.error('Error fetching expenses:', error);
-        } finally {
-            setPageLoading(false);
-        }
-    };
-
-    const handleSubmit = async () => {
-        try {
-            setLoading(true);
-            if (editingId) {
-                await api.put(`/extra-expenses/${editingId}`, formData);
-            } else {
-                await api.post('/extra-expenses', formData);
-            }
-            handleClose();
-            fetchExpenses();
-        } catch (error) {
-            alert('Failed to save: ' + (error.response?.data?.error || error.message));
-        } finally {
-            setLoading(false);
-        }
-    };
+    const dialog = useFormDialog(INITIAL_FORM, {
+        onSave: (formData, editingId) =>
+            editingId
+                ? api.put(`/extra-expenses/${editingId}`, formData)
+                : api.post('/extra-expenses', formData),
+        onAfterSave: invalidate,
+    });
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this expense?')) return;
         try {
             await api.delete(`/extra-expenses/${id}`);
-            fetchExpenses();
+            invalidate();
         } catch (error) {
             alert(error.response?.data?.error || 'Failed to delete');
         }
     };
 
-    const startEdit = (expense) => {
-        setEditingId(expense._id);
-        setFormData({
-            date: expense.date ? expense.date.split('T')[0] : '',
-            name: expense.name,
-            amount: expense.amount,
-            paidBy: expense.paidBy
-        });
-        setOpenDialog(true);
+    const handleOpenCreate = () => {
+        dialog.openCreate();
+        dialog.setFormData({ date: new Date().toISOString().split('T')[0], name: '', amount: '', paidBy: '' });
     };
 
-    const handleClose = () => {
-        setOpenDialog(false);
-        setEditingId(null);
-        setFormData({
-            date: new Date().toISOString().split('T')[0],
-            name: '',
-            amount: '',
-            paidBy: ''
-        });
-    };
-
-    if (pageLoading) return (
+    if (isLoading && expenses.length === 0) return (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
             <CircularProgress />
         </Box>
@@ -187,7 +145,7 @@ const ExtraExpensePage = () => {
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    onClick={() => setOpenDialog(true)}
+                    onClick={handleOpenCreate}
                     fullWidth={isMobile}
                 >
                     Add Expense
@@ -208,7 +166,12 @@ const ExtraExpensePage = () => {
                             <MobileExpenseCard
                                 key={expense._id}
                                 expense={expense}
-                                onEdit={() => startEdit(expense)}
+                                onEdit={() => dialog.openEdit(expense, (exp) => ({
+                                    date: exp.date ? exp.date.split('T')[0] : '',
+                                    name: exp.name,
+                                    amount: exp.amount,
+                                    paidBy: exp.paidBy,
+                                }))}
                                 onDelete={() => handleDelete(expense._id)}
                             />
                         ))}
@@ -238,7 +201,12 @@ const ExtraExpensePage = () => {
                                 </TableCell>
                                 <TableCell>{expense.paidBy}</TableCell>
                                 <TableCell align="right">
-                                    <IconButton size="small" onClick={() => startEdit(expense)} color="primary">
+                                    <IconButton size="small" onClick={() => dialog.openEdit(expense, (exp) => ({
+                                        date: exp.date ? exp.date.split('T')[0] : '',
+                                        name: exp.name,
+                                        amount: exp.amount,
+                                        paidBy: exp.paidBy,
+                                    }))} color="primary">
                                         <EditIcon />
                                     </IconButton>
                                     <IconButton size="small" onClick={() => handleDelete(expense._id)} color="error">
@@ -258,51 +226,52 @@ const ExtraExpensePage = () => {
 
             {/* ADD / EDIT DIALOG */}
             <Dialog
-                open={openDialog}
-                onClose={handleClose}
+                open={dialog.open}
+                onClose={dialog.handleClose}
                 fullScreen={isSmallMobile}
                 fullWidth
                 maxWidth="sm"
             >
-                <DialogTitle>{editingId ? 'Edit Expense' : 'Add Extra Expense'}</DialogTitle>
+                <DialogTitle>{dialog.editingId ? 'Edit Expense' : 'Add Extra Expense'}</DialogTitle>
                 <DialogContent sx={{ minWidth: { xs: 'auto', sm: 300 } }}>
                     <Box display="flex" flexDirection="column" gap={2} mt={1}>
+                        {dialog.saveError && <Alert severity="error">{dialog.saveError}</Alert>}
                         <TextField
                             label="Date"
                             type="date"
                             fullWidth
                             InputLabelProps={{ shrink: true }}
-                            value={formData.date}
-                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                            value={dialog.formData.date}
+                            onChange={(e) => dialog.setFormData({ ...dialog.formData, date: e.target.value })}
                         />
 
                         <TextField
                             label="Name of Expenditure"
                             fullWidth
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            value={dialog.formData.name}
+                            onChange={(e) => dialog.setFormData({ ...dialog.formData, name: e.target.value })}
                         />
 
                         <TextField
                             label="Amount"
                             type="number"
                             fullWidth
-                            value={formData.amount}
-                            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                            value={dialog.formData.amount}
+                            onChange={(e) => dialog.setFormData({ ...dialog.formData, amount: e.target.value })}
                         />
 
                         <TextField
                             label="Paid By"
                             fullWidth
-                            value={formData.paidBy}
-                            onChange={(e) => setFormData({ ...formData, paidBy: e.target.value })}
+                            value={dialog.formData.paidBy}
+                            onChange={(e) => dialog.setFormData({ ...dialog.formData, paidBy: e.target.value })}
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleClose}>Cancel</Button>
-                    <Button onClick={handleSubmit} variant="contained" disabled={loading}>
-                        {loading ? 'Saving...' : 'Save'}
+                    <Button onClick={dialog.handleClose}>Cancel</Button>
+                    <Button onClick={dialog.handleSave} variant="contained" disabled={dialog.saving}>
+                        {dialog.saving ? 'Saving...' : 'Save'}
                     </Button>
                 </DialogActions>
             </Dialog>
