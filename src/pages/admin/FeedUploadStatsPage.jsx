@@ -155,9 +155,9 @@ export default function FeedUploadStatsPage() {
       const { data } = await api.get('/ebay/feed/upload-stats', { params });
       const map = {};
       data.forEach((r) => {
-        const key = `${r.sellerName}||${r.categoryName || ''}||${r.rangeName || ''}`;
+        const key = r.sellerName;
         if (!map[key])
-          map[key] = { sellerId: r.sellerId, sellerName: r.sellerName, categoryName: r.categoryName || '', rangeName: r.rangeName || '', totalSuccess: 0 };
+          map[key] = { sellerId: r.sellerId, sellerName: r.sellerName, totalSuccess: 0 };
         map[key].totalSuccess += r.totalSuccess || 0;
       });
       setMonthStats(Object.values(map).sort((a, b) => b.totalSuccess - a.totalSuccess));
@@ -482,15 +482,13 @@ export default function FeedUploadStatsPage() {
                   <TableRow>
                     <TableCell sx={{ ...tableHeaderCellSx, width: 52, pl: 3 }}>#</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx }}>Seller</TableCell>
-                    <TableCell sx={{ ...tableHeaderCellSx }}>Category</TableCell>
-                    <TableCell sx={{ ...tableHeaderCellSx }}>Range</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx, pr: 3 }} align="right">Successful Listings</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {monthStats.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
+                      <TableCell colSpan={3} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
                         No data for this month
                       </TableCell>
                     </TableRow>
@@ -506,8 +504,6 @@ export default function FeedUploadStatsPage() {
                           >
                             <TableCell sx={{ ...cellSx, color: 'text.disabled', width: 52, pl: 3 }}>{idx + 1}</TableCell>
                             <TableCell sx={{ ...cellSx, fontWeight: 500, color: BRAND_DARK }}>{row.sellerName}</TableCell>
-                            <TableCell sx={cellSx}>{row.categoryName || <Typography component="span" sx={{ color: alpha(BRAND_DARK, 0.35), fontSize: '0.85rem' }}>—</Typography>}</TableCell>
-                            <TableCell sx={cellSx}>{row.rangeName || <Typography component="span" sx={{ color: alpha(BRAND_DARK, 0.35), fontSize: '0.85rem' }}>—</Typography>}</TableCell>
                             <TableCell align="right" sx={{ ...numCellSx, pr: 3, fontWeight: 700, color: BRAND_DARK }}>
                               {row.totalSuccess.toLocaleString()}
                               {quota && (
@@ -520,7 +516,7 @@ export default function FeedUploadStatsPage() {
                         );
                       })}
                       <TableRow sx={{ backgroundColor: alpha(BRAND_YELLOW, 0.15) }}>
-                        <TableCell colSpan={4} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
+                        <TableCell colSpan={2} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pr: 3, py: 1.6, borderBottom: 'none' }}>
                           {monthTotal.toLocaleString()}
                         </TableCell>
