@@ -99,6 +99,14 @@ const FeedUploadPage = () => {
     const [totalTasks, setTotalTasks] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
+    // Category / Range / Product selection
+    const [categories, setCategories] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [ranges, setRanges] = useState([]);
+    const [selectedRange, setSelectedRange] = useState('');
+    const [products, setProducts] = useState([]);
+    const [selectedProduct, setSelectedProduct] = useState('');
+
     // Schedule upload state (right panel)
     const [scheduleFile, setScheduleFile] = useState(null);
     const [scheduleDateTime, setScheduleDateTime] = useState(null);
@@ -112,6 +120,61 @@ const FeedUploadPage = () => {
             setSelectedFile(location.state.csvFile);
         }
     }, []);
+
+    // Fetch Categories on mount
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await api.get('/asin-list-categories');
+                setCategories(res.data || []);
+            } catch (err) {
+                console.error('Failed to fetch categories', err);
+            }
+        };
+        fetchCategories();
+    }, []);
+
+    // Fetch Ranges when category changes
+    useEffect(() => {
+        if (!selectedCategory) {
+            setRanges([]);
+            setSelectedRange('');
+            setProducts([]);
+            setSelectedProduct('');
+            return;
+        }
+        const fetchRanges = async () => {
+            try {
+                const res = await api.get('/asin-list-ranges', { params: { categoryId: selectedCategory } });
+                setRanges(res.data || []);
+                setSelectedRange('');
+                setProducts([]);
+                setSelectedProduct('');
+            } catch (err) {
+                console.error('Failed to fetch ranges', err);
+            }
+        };
+        fetchRanges();
+    }, [selectedCategory]);
+
+    // Fetch Products when range changes
+    useEffect(() => {
+        if (!selectedRange) {
+            setProducts([]);
+            setSelectedProduct('');
+            return;
+        }
+        const fetchProducts = async () => {
+            try {
+                const res = await api.get('/asin-list-products', { params: { rangeId: selectedRange } });
+                setProducts(res.data || []);
+                setSelectedProduct('');
+            } catch (err) {
+                console.error('Failed to fetch products', err);
+            }
+        };
+        fetchProducts();
+    }, [selectedRange]);
 
     // Fetch Sellers on mount
     useEffect(() => {
@@ -220,6 +283,9 @@ const FeedUploadPage = () => {
         formData.append('feedType', feedType);
         formData.append('schemaVersion', schemaVersion);
         formData.append('country', country);
+        if (selectedCategory) formData.append('categoryId', selectedCategory);
+        if (selectedRange) formData.append('rangeId', selectedRange);
+        if (selectedProduct) formData.append('productId', selectedProduct);
 
         try {
             const response = await api.post('/ebay/feed/upload', formData, {
@@ -377,6 +443,51 @@ const FeedUploadPage = () => {
                             helperText="Fixed to 1.0 for CSV uploads"
                             sx={inputFocusSx}
                         />
+
+                        {/* Category Selection */}
+                        <FormControl fullWidth sx={selectFocusSx}>
+                            <InputLabel>Category (optional)</InputLabel>
+                            <Select
+                                value={selectedCategory}
+                                label="Category (optional)"
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                            >
+                                <MenuItem value=""><em>None</em></MenuItem>
+                                {categories.map((cat) => (
+                                    <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+
+                        {/* Range Selection */}
+                        <FormControl fullWidth sx={selectFocusSx} disabled={!selectedCategory}>
+                            <InputLabel>Range (optional)</InputLabel>
+                            <Select
+                                value={selectedRange}
+                                label="Range (optional)"
+                                onChange={(e) => setSelectedRange(e.target.value)}
+                            >
+                                <MenuItem value=""><em>None</em></MenuItem>
+                                {ranges.map((rng) => (
+                                    <MenuItem key={rng._id} value={rng._id}>{rng.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+
+                        {/* Product Selection */}
+                        <FormControl fullWidth sx={selectFocusSx} disabled={!selectedRange}>
+                            <InputLabel>Product (optional)</InputLabel>
+                            <Select
+                                value={selectedProduct}
+                                label="Product (optional)"
+                                onChange={(e) => setSelectedProduct(e.target.value)}
+                            >
+                                <MenuItem value=""><em>None</em></MenuItem>
+                                {products.map((prd) => (
+                                    <MenuItem key={prd._id} value={prd._id}>{prd.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
 
                         {/* Country Selection */}
                         <FormControl fullWidth sx={selectFocusSx}>
