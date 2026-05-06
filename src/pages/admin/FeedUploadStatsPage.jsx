@@ -16,8 +16,8 @@ import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/bra
 import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 import api from '../../lib/api';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const currentMonthStr = () => new Date().toISOString().slice(0, 7);
+const todayStr = new Date().toISOString().slice(0, 10);
+const currentMonthStr = new Date().toISOString().slice(0, 7);
 
 function monthBounds(ym) {
   const [y, m] = ym.split('-').map(Number);
@@ -132,11 +132,13 @@ export default function FeedUploadStatsPage() {
   };
 
   // ── Fetch functions ───────────────────────────────────────────────
-  const fetchDay = async (from, to) => {
+  const fetchDay = async (from, to, paramOverrides = null) => {
     try {
       setDayLoading(true);
       setDayError(null);
-      const params = buildParams({ startDate: from, endDate: to });
+      const params = paramOverrides !== null
+        ? { startDate: from, endDate: to, ...paramOverrides }
+        : buildParams({ startDate: from, endDate: to });
       const { data } = await api.get('/ebay/feed/upload-stats', { params });
       setDayStats([...data].sort((a, b) => (b.date || '').localeCompare(a.date || '')));
     } catch (err) {
@@ -146,12 +148,14 @@ export default function FeedUploadStatsPage() {
     }
   };
 
-  const fetchMonth = async (ym) => {
+  const fetchMonth = async (ym, paramOverrides = null) => {
     try {
       setMonthLoading(true);
       setMonthError(null);
       const { first, last } = monthBounds(ym);
-      const params = buildParams({ startDate: first, endDate: last });
+      const params = paramOverrides !== null
+        ? { startDate: first, endDate: last, ...paramOverrides }
+        : buildParams({ startDate: first, endDate: last });
       const { data } = await api.get('/ebay/feed/upload-stats', { params });
       const map = {};
       data.forEach((r) => {
@@ -183,6 +187,10 @@ export default function FeedUploadStatsPage() {
     setFilterToDate(todayStr);
     setFilterCategory(null);
     setFilterRange(null);
+    setMonthPicker(currentMonthStr);
+    // Fetch with no filter constraints (bypass stale state)
+    fetchDay(todayStr, todayStr, {});
+    fetchMonth(currentMonthStr, {});
   };
 
   // Load filter option lists + initial data on mount
