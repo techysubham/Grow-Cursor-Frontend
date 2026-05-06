@@ -174,6 +174,17 @@ export default function FeedUploadStatsPage() {
     fetchMonth(monthPicker);
   };
 
+  // Clear all filters to defaults and re-fetch
+  const handleClearFilters = () => {
+    setDateMode('single');
+    setFilterSeller('');
+    setFilterCountry('ALL');
+    setFilterFromDate(todayStr);
+    setFilterToDate(todayStr);
+    setFilterCategory(null);
+    setFilterRange(null);
+  };
+
   // Load filter option lists + initial data on mount
   useEffect(() => {
     api.get('/sellers/all').then(({ data }) => setSellers(data || [])).catch(() => {});
@@ -375,6 +386,15 @@ export default function FeedUploadStatsPage() {
             sx={{ ...yellowFilledButtonSx, px: 3, height: 40, flexShrink: 0 }}
           >
             Apply Filters
+          </Button>
+
+          {/* Clear */}
+          <Button
+            variant="outlined"
+            onClick={handleClearFilters}
+            sx={{ height: 40, flexShrink: 0, textTransform: 'none', fontWeight: 600, borderColor: alpha(BRAND_DARK, 0.25), color: alpha(BRAND_DARK, 0.65), '&:hover': { borderColor: BRAND_DARK, backgroundColor: alpha(BRAND_DARK, 0.05) } }}
+          >
+            Clear Filters
           </Button>
         </Stack>
       </Paper>
