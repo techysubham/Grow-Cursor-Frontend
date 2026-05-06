@@ -961,10 +961,25 @@ export default function AsinReviewModal({
                     <Skeleton variant="rectangular" height={120} />
                     <Skeleton variant="rectangular" height={56} />
                     <Skeleton variant="rectangular" height={56} />
-                    <Box sx={{ textAlign: 'center', py: 4 }}>
-                      <CircularProgress />
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                        Generating listing for ASIN: {currentItem.asin}
+                    <Box sx={{ pt: 2 }}>
+                      <LinearProgress variant="indeterminate" sx={{ borderRadius: 1, mb: 1.5 }} />
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          size="small"
+                          label="1. Fetching data"
+                          color={currentItem.progressStage === 'fetching' || currentItem.progressStage === 'generating' ? 'primary' : 'default'}
+                          variant={currentItem.progressStage === 'generating' ? 'outlined' : 'filled'}
+                        />
+                        <Typography variant="caption" color="text.disabled">→</Typography>
+                        <Chip
+                          size="small"
+                          label="2. Generating with AI"
+                          color={currentItem.progressStage === 'generating' ? 'primary' : 'default'}
+                          variant={currentItem.progressStage === 'generating' ? 'filled' : 'outlined'}
+                        />
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        Please be patient — this may take a moment.
                       </Typography>
                     </Box>
                   </Stack>

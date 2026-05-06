@@ -297,6 +297,7 @@ export default function AsinListPage() {
       asin: a.asin,
       sku: '',
       status: 'loading',
+      progressStage: null,
       generatedListing: null,
       warnings: [],
       errors: []
@@ -323,7 +324,11 @@ export default function AsinListPage() {
       }
       try {
         const payload = JSON.parse(event.data);
-        if (payload.type === 'item') {
+        if (payload.type === 'progress') {
+          setPreviewItems(prev =>
+            prev.map(p => p.id === payload.id ? { ...p, progressStage: payload.stage } : p)
+          );
+        } else if (payload.type === 'item') {
           setPreviewItems(prev =>
             prev.map(p => p.id === payload.item.id ? payload.item : p)
           );
