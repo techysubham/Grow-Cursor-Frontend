@@ -3,6 +3,40 @@
  * Converts array of objects to CSV and triggers download
  */
 
+export function csvText(value) {
+  return {
+    value,
+    __csvType: 'text'
+  };
+}
+
+function isCsvTextCell(value) {
+  return Boolean(value && typeof value === 'object' && value.__csvType === 'text');
+}
+
+function formatCSVCell(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  if (isCsvTextCell(value)) {
+    const escapedValue = String(value.value ?? '').replace(/"/g, '""');
+    return `"=""${escapedValue}"""`;
+  }
+
+  if (typeof value === 'object') {
+    value = JSON.stringify(value);
+  }
+
+  const stringValue = String(value);
+
+  if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+
+  return stringValue;
+}
+
 export function downloadCSV(data, filename) {
   if (!data || data.length === 0) {
     alert('No data to export');
@@ -16,34 +50,12 @@ export function downloadCSV(data, filename) {
   const csvContent = [
     headers.join(','),
     ...data.map(row =>
-      headers.map(header => {
-        let value = row[header];
-        
-        // Handle null/undefined
-        if (value === null || value === undefined) {
-          return '';
-        }
-        
-        // Convert objects/arrays to JSON string
-        if (typeof value === 'object') {
-          value = JSON.stringify(value);
-        }
-        
-        // Convert to string
-        value = String(value);
-        
-        // Escape quotes and wrap in quotes if contains comma, quote, or newline
-        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        
-        return value;
-      }).join(',')
+      headers.map(header => formatCSVCell(row[header])).join(',')
     )
   ].join('\n');
 
   // Trigger download
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\ufeff', csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.href = url;
@@ -62,8 +74,8 @@ export function prepareCSVData(items, fieldMapping) {
     const row = {};
     Object.entries(fieldMapping).forEach(([csvHeader, accessor]) => {
       // accessor can be a string (field name) or function (custom transformation)
-      row[csvHeader] = typeof accessor === 'function' 
-        ? accessor(item) 
+      row[csvHeader] = typeof accessor === 'function'
+        ? accessor(item)
         : item[accessor];
     });
     return row;

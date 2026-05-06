@@ -38,12 +38,13 @@ import ClearIcon from '@mui/icons-material/Clear';
 import ChatIcon from '@mui/icons-material/Chat';
 import DownloadIcon from '@mui/icons-material/Download';
 import api from '../../lib/api';
-import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
+import { csvText, downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ChatModal from '../../components/ChatModal';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
 import ColumnSelector from '../../components/ColumnSelector';
 import SectionCard from '../../components/SectionCard.jsx';
 import { tableHeaderCellSx, tableBodyRowSx, tableContainerSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
+import IssuesResolutionTabSkeleton from '../../components/skeletons/IssuesResolutionTabSkeleton.jsx';
 
 // LogsCell component for editable logs field with save functionality
 function LogsCell({ value, onSave, id }) {
@@ -131,7 +132,7 @@ export default function ReturnRequestedPage({
 
   const [returns, setReturns] = useState([]);
   const [sellers, setSellers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
   const [selectedReturn, setSelectedReturn] = useState(null);
@@ -538,10 +539,10 @@ export default function ReturnRequestedPage({
       }
 
       const csvData = prepareCSVData(exportData, {
-        'Return ID': 'returnId',
-        'Order ID': 'orderId',
+        'Return ID': (r) => csvText(r.returnId || ''),
+        'Order ID': (r) => csvText(r.orderId || ''),
         'Product Name': 'productName',
-        'Date Sold': (r) => r.dateSold ? new Date(r.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+        'Date Sold': (r) => csvText(r.dateSold ? new Date(r.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : ''),
         'Seller': (r) => r.seller?.user?.username || '',
         'Buyer': 'buyerUsername',
         'Reason': (r) => {
@@ -552,8 +553,8 @@ export default function ReturnRequestedPage({
         'eBay Status': 'ebayStatus',
         'Amazon Status': 'amazonStatus',
         'RMA Number': 'RMANumber',
-        'Created Date': (r) => r.creationDate ? new Date(r.creationDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
-        'Response Due': (r) => r.responseDate ? new Date(r.responseDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+        'Created Date': (r) => csvText(r.creationDate ? new Date(r.creationDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : ''),
+        'Response Due': (r) => csvText(r.responseDate ? new Date(r.responseDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : ''),
         'Logs': 'logs',
       });
 
@@ -568,6 +569,10 @@ export default function ReturnRequestedPage({
       setExportLoading(false);
     }
   };
+
+  if (loading && returns.length === 0) {
+    return <IssuesResolutionTabSkeleton />;
+  }
 
   return (
     <Box

@@ -39,7 +39,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../lib/api';
 import FulfillmentNotesSkeleton from '../../components/skeletons/FulfillmentNotesSkeleton';
 import SectionCard from '../../components/SectionCard.jsx';
-import { tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
+import { tableContainerSx, tableHeaderCellSx, tableBodyRowSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 // --- Chat Dialog Component ---
 function ChatDialog({ open, onClose, order }) {
@@ -142,11 +142,11 @@ function ChatDialog({ open, onClose, order }) {
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', position: 'relative' }}>
-        <Stack 
-          direction="row" 
-          spacing={1} 
-          alignItems="center" 
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', position: 'relative' }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
           sx={{ position: 'absolute', top: 12, right: 12 }}
         >
           <Chip
@@ -166,10 +166,10 @@ function ChatDialog({ open, onClose, order }) {
           </IconButton>
         </Stack>
 
-        <Stack spacing={1.5} sx={{ pr: 12 }}> 
-        <Stack direction="row" alignItems="center" spacing={3} sx={{ mt: 0.5 }}>
+        <Stack spacing={1.5} sx={{ pr: 12 }}>
+          <Stack direction="row" alignItems="center" spacing={3} sx={{ mt: 0.5 }}>
             <Box>
-            <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+              <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
                 Buyer Name
               </Typography>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1 }}>
@@ -180,7 +180,7 @@ function ChatDialog({ open, onClose, order }) {
             <Divider orientation="vertical" flexItem sx={{ height: 20, alignSelf: 'center', opacity: 0.5 }} />
 
             <Box>
-            <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+              <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
                 Username
               </Typography>
               <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', px: 0.5, borderRadius: 0.5 }}>
@@ -209,9 +209,9 @@ function ChatDialog({ open, onClose, order }) {
               label={`Order #: ${order?.orderId}`}
               size="small"
               variant="outlined"
-              sx={{ 
-                borderRadius: 1, 
-                height: 22, 
+              sx={{
+                borderRadius: 1,
+                height: 22,
                 fontSize: '0.7rem',
                 color: 'text.secondary',
                 borderColor: 'divider',
@@ -237,17 +237,17 @@ function ChatDialog({ open, onClose, order }) {
               )}
 
               {messages.map((msg) => (
-                <Box 
-                key={msg._id} 
-                sx={{ 
-                  alignSelf: msg.sender === 'SELLER' ? 'flex-end' : 'flex-start',
-                  maxWidth: '70%'
+                <Box
+                  key={msg._id}
+                  sx={{
+                    alignSelf: msg.sender === 'SELLER' ? 'flex-end' : 'flex-start',
+                    maxWidth: '70%'
                   }}
                 >
                   <Paper
                     elevation={1}
-                    sx={{ 
-                      p: 1.5, 
+                    sx={{
+                      p: 1.5,
                       bgcolor: msg.sender === 'SELLER' ? '#1976d2' : '#ffffff',
                       color: msg.sender === 'SELLER' ? '#fff' : 'text.primary',
                       borderRadius: 2,
@@ -264,13 +264,13 @@ function ChatDialog({ open, onClose, order }) {
                             component="img"
                             src={url}
                             alt="Attachment"
-                            sx={{ 
-                              width: 100, 
-                              height: 100, 
-                              objectFit: 'cover', 
-                              borderRadius: 1, 
-                              cursor: 'pointer', 
-                              border: '1px solid #ccc' 
+                            sx={{
+                              width: 100,
+                              height: 100,
+                              objectFit: 'cover',
+                              borderRadius: 1,
+                              cursor: 'pointer',
+                              border: '1px solid #ccc'
                             }}
                             onClick={() => window.open(url, '_blank')}
                           />
@@ -308,10 +308,10 @@ function ChatDialog({ open, onClose, order }) {
             disabled={sending}
             size="small"
           />
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             sx={{ px: 3 }}
-            endIcon={sending ? <CircularProgress size={20} color="inherit"/> : <SendIcon />}
+            endIcon={sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
             onClick={handleSendMessage}
             disabled={sending || !newMessage.trim()}
           >
@@ -366,17 +366,17 @@ function NotesCell({ order, onSave, onNotify }) {
           disabled={saving}
         />
         <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-          <Button 
-            size="small" 
-            variant="contained" 
+          <Button
+            size="small"
+            variant="contained"
             onClick={handleSave}
             disabled={saving}
           >
             {saving ? 'Saving...' : 'Save'}
           </Button>
-          <Button 
-            size="small" 
-            variant="outlined" 
+          <Button
+            size="small"
+            variant="outlined"
             onClick={handleCancel}
             disabled={saving}
           >
@@ -389,11 +389,11 @@ function NotesCell({ order, onSave, onNotify }) {
 
   return (
     <Tooltip title={order.fulfillmentNotes || 'Click to add note'} arrow placement="left">
-      <Box 
+      <Box
         onClick={() => setEditing(true)}
-        sx={{ 
-          maxWidth: 300, 
-          overflow: 'hidden', 
+        sx={{
+          maxWidth: 300,
+          overflow: 'hidden',
           textOverflow: 'ellipsis',
           bgcolor: 'transparent',
           p: 1,
@@ -406,7 +406,7 @@ function NotesCell({ order, onSave, onNotify }) {
         }}
       >
         <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-        {order.fulfillmentNotes || 'Click to add note'}
+          {order.fulfillmentNotes || 'Click to add note'}
         </Typography>
       </Box>
     </Tooltip>
@@ -555,7 +555,7 @@ export default function FulfillmentNotesPage() {
     setLoading(true);
 
     try {
-      const params = { 
+      const params = {
         hasFulfillmentNotes: true,
         page: page,
         limit: 50
@@ -582,220 +582,221 @@ export default function FulfillmentNotesPage() {
 
   return (
     <Fade in timeout={600}>
-    <Box sx={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      height: 'calc(100vh - 100px)',
-      overflow: 'hidden',
-      width: '100%',
-      maxWidth: '100%',
-      p: 3
-    }}>
-      <SectionCard sx={{ p: 2, mb: 2, flexShrink: 0 }}>
-        {/* HEADER */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Typography variant="h5" fontWeight="bold">Orders with Fulfillment Notes</Typography>
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: 'calc(100vh - 100px)',
+        overflow: 'hidden',
+        width: '100%',
+        maxWidth: '100%',
+        p: 3
+      }}>
+        <SectionCard sx={{ p: 2, mb: 2, flexShrink: 0 }}>
+          {/* HEADER */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography variant="h5" fontWeight="bold">Orders with Fulfillment Notes</Typography>
+            </Stack>
+            <Chip label={`${totalOrders} orders`} variant="filled" size="small" sx={{ bgcolor: '#f5c842', color: '#1a1a2e', fontWeight: 700 }} />
           </Stack>
-          <Chip label={`${totalOrders} orders`} variant="filled" size="small" sx={{ bgcolor: '#f5c842', color: '#1a1a2e', fontWeight: 700 }} />
-        </Stack>
 
-        <Divider sx={{ my: 2 }} />
+          <Divider sx={{ my: 2 }} />
 
-        {/* FILTERS SECTION */}
-        <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-            {/* 1. SELLER FILTER */}
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel id="seller-select-label">Select Seller</InputLabel>
-              <Select
-                labelId="seller-select-label"
-                value={selectedSeller}
-                label="Select Seller"
-                onChange={handleSellerChange}
-              >
-                <MenuItem value=""><em>All Sellers</em></MenuItem>
-                {sellers.map((s) => (
-                  <MenuItem key={s._id} value={s._id}>
-                    {s.user?.username || s.user?.email || s._id}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+          {/* FILTERS SECTION */}
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+              {/* 1. SELLER FILTER */}
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <InputLabel id="seller-select-label">Select Seller</InputLabel>
+                <Select
+                  labelId="seller-select-label"
+                  value={selectedSeller}
+                  label="Select Seller"
+                  onChange={handleSellerChange}
+                >
+                  <MenuItem value=""><em>All Sellers</em></MenuItem>
+                  {sellers.map((s) => (
+                    <MenuItem key={s._id} value={s._id}>
+                      {s.user?.username || s.user?.email || s._id}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-            {/* 2. ORDER ID */}
-            <TextField
-              size="small"
-              label="Order ID"
-              value={searchOrderId}
-              onChange={(e) => setSearchOrderId(e.target.value)}
-              placeholder="Search ID..."
-            />
+              {/* 2. ORDER ID */}
+              <TextField
+                size="small"
+                label="Order ID"
+                value={searchOrderId}
+                onChange={(e) => setSearchOrderId(e.target.value)}
+                placeholder="Search ID..."
+              />
 
-            <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ ...yellowOutlinedButtonSx, height: 40 }}>Clear</Button>
-          </Stack>
-        </Box>
+              <Button variant="outlined" onClick={handleClearFilters} size="small" sx={{ ...yellowOutlinedButtonSx, height: 40 }}>Clear</Button>
+            </Stack>
+          </Box>
 
-        {error && (
-          <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
-        )}
+          {error && (
+            <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
+          )}
         </SectionCard>
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
-          <CircularProgress />
-        </Box>
-      ) : orders.length === 0 ? (
-        <Box sx={{ textAlign: 'center', p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <NoteIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1, opacity: 0.5 }} />
-          <Typography variant="body1" color="text.secondary">
-            No orders with fulfillment notes found.
-          </Typography>
-        </Box>
-      ) : (
-        <>
-          <TableContainer 
-            component={Paper}
-            sx={{ 
-              flexGrow: 1, 
-              overflow: 'auto',
-              width: '100%',
-              '&::-webkit-scrollbar': {
-                width: '8px',
-                height: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                backgroundColor: '#f1f1f1',
-                borderRadius: '10px',
-                '&::-webkit-scrollbar-thumb': {
-                backgroundColor: '#888',
-                borderRadius: '10px',
-                '&:hover': {
-                  backgroundColor: '#555', 
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
+            <CircularProgress />
+          </Box>
+        ) : orders.length === 0 ? (
+          <Box sx={{ textAlign: 'center', p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+            <NoteIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1, opacity: 0.5 }} />
+            <Typography variant="body1" color="text.secondary">
+              No orders with fulfillment notes found.
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <TableContainer
+              component={Paper}
+              sx={{
+                ...tableContainerSx,
+                flexGrow: 1,
+                overflow: 'auto',
+                width: '100%',
+                '&::-webkit-scrollbar': {
+                  width: '8px',
+                  height: '8px',
                 },
-              },
-              },
-            }}
-          >
-            <Table 
-              size="small" 
-              stickyHeader
-              sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: '#f1f1f1',
+                  borderRadius: '10px',
+                  '&::-webkit-scrollbar-thumb': {
+                    backgroundColor: '#888',
+                    borderRadius: '10px',
+                    '&:hover': {
+                      backgroundColor: '#555',
+                    },
+                  },
+                },
+              }}
             >
-              <TableHead>
-                <TableRow>
-                <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
+              <Table
+                size="small"
+                stickyHeader
+                sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Seller</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Order ID</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Marketplace</TableCell>
 
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, minWidth: 150 }}>Delivery Date</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, minWidth: 300 }}>Fulfillment Notes</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }} align="center">Chat</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {orders.map((order, idx) => {
-                  return (
-                    <TableRow key={order._id || idx} hover sx={tableBodyRowSx}>
-                      <TableCell>
-                        {order.seller?.user?.username || order.seller?.user?.email || order.sellerId || '-'}
-                      </TableCell>
-                      <TableCell>
-                      <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
-                      {order.orderId || order.legacyOrderId || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                      <Chip 
-                          label={order.purchaseMarketplaceId || 'Unknown'} 
-                          size="small" 
-                          variant="outlined"
-                          color={
-                            order.purchaseMarketplaceId === 'EBAY_US' ? 'primary' :
-                            order.purchaseMarketplaceId === 'EBAY_CA' || order.purchaseMarketplaceId === 'EBAY_ENCA' ? 'secondary' :
-                            order.purchaseMarketplaceId === 'EBAY_AU' ? 'success' :
-                            'default'
-                          }
-                        />
-                      </TableCell>
-
-                      <TableCell>
-                      <Tooltip title={order.buyer?.buyerRegistrationAddress?.fullName || '-'} arrow>
-                          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
-                            {order.buyer?.buyerRegistrationAddress?.fullName || '-'}
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Buyer Name</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, minWidth: 150 }}>Delivery Date</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, minWidth: 300 }}>Fulfillment Notes</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }} align="center">Chat</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {orders.map((order, idx) => {
+                    return (
+                      <TableRow key={order._id || idx} hover sx={tableBodyRowSx}>
+                        <TableCell>
+                          {order.seller?.user?.username || order.seller?.user?.email || order.sellerId || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight="medium" sx={{ color: 'primary.main' }}>
+                            {order.orderId || order.legacyOrderId || '-'}
                           </Typography>
-                        </Tooltip>
-                      </TableCell>
-
-                      <TableCell>
-                        {formatDeliveryDate(order)}
-                      </TableCell>
-
-                      <TableCell>
-                        <NotesCell 
-                          order={order} 
-                          onSave={handleSaveNote} 
-                          onNotify={showNotification} 
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Tooltip title="Message Buyer">
-                          <IconButton
-                            color="primary"
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={order.purchaseMarketplaceId || 'Unknown'}
                             size="small"
-                            onClick={() => handleOpenMessageDialog(order)}
-                          >
-                            <ChatIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                            variant="outlined"
+                            color={
+                              order.purchaseMarketplaceId === 'EBAY_US' ? 'primary' :
+                                order.purchaseMarketplaceId === 'EBAY_CA' || order.purchaseMarketplaceId === 'EBAY_ENCA' ? 'secondary' :
+                                  order.purchaseMarketplaceId === 'EBAY_AU' ? 'success' :
+                                    'default'
+                            }
+                          />
+                        </TableCell>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, flexShrink: 0 }}>
-              <Pagination
-                count={totalPages}
-                page={page}
-                onChange={(e, value) => setPage(value)}
-                color="primary"
-              />
-            </Box>
-          )}
-        </>
-      )}
+                        <TableCell>
+                          <Tooltip title={order.buyer?.buyerRegistrationAddress?.fullName || '-'} arrow>
+                            <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
+                              {order.buyer?.buyerRegistrationAddress?.fullName || '-'}
+                            </Typography>
+                          </Tooltip>
+                        </TableCell>
 
-      {/* Chat Dialog */}
-      {selectedOrderForMessage && (
-        <ChatDialog 
-          open={messageModalOpen} 
-          onClose={handleCloseMessageDialog} 
-          order={selectedOrderForMessage} 
-        />
-      )}
+                        <TableCell>
+                          {formatDeliveryDate(order)}
+                        </TableCell>
 
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={() => setSnackbarOpen(false)} 
-          severity={snackbarSeverity}
-          sx={{ width: '100%' }}
+                        <TableCell>
+                          <NotesCell
+                            order={order}
+                            onSave={handleSaveNote}
+                            onNotify={showNotification}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Message Buyer">
+                            <IconButton
+                              color="primary"
+                              size="small"
+                              onClick={() => handleOpenMessageDialog(order)}
+                            >
+                              <ChatIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, flexShrink: 0 }}>
+                <Pagination
+                  count={totalPages}
+                  page={page}
+                  onChange={(e, value) => setPage(value)}
+                  color="primary"
+                />
+              </Box>
+            )}
+          </>
+        )}
+
+        {/* Chat Dialog */}
+        {selectedOrderForMessage && (
+          <ChatDialog
+            open={messageModalOpen}
+            onClose={handleCloseMessageDialog}
+            order={selectedOrderForMessage}
+          />
+        )}
+
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={4000}
+          onClose={() => setSnackbarOpen(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         >
-          {snackbarMsg}
-        </Alert>
-      </Snackbar>
-    </Box>
+          <Alert
+            onClose={() => setSnackbarOpen(false)}
+            severity={snackbarSeverity}
+            sx={{ width: '100%' }}
+          >
+            {snackbarMsg}
+          </Alert>
+        </Snackbar>
+      </Box>
     </Fade>
   );
 }

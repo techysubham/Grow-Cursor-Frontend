@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -37,6 +37,10 @@ import api from '../../lib/api';
 import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
 import BBECalculatorModal from '../../components/BBECalculatorModal';
+import SectionCard from '../../components/SectionCard.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import AccountHealthReportSkeleton from '../../components/skeletons/AccountHealthReportSkeleton.jsx';
+import { tableContainerSx, tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 function TabPanel({ children, value, index }) {
   return (
@@ -84,6 +88,22 @@ export default function AccountHealthReportPage() {
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [initialCalcSales, setInitialCalcSales] = useState(0);
   const [initialCalcSnad, setInitialCalcSnad] = useState(0);
+  const initialSellersResolved = useRef(false);
+  const initialOverviewResolved = useRef(false);
+  const initialDetailsResolved = useRef(false);
+  const initialWindowsResolved = useRef(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  const maybeFinishInitialLoad = () => {
+    if (
+      initialSellersResolved.current &&
+      initialOverviewResolved.current &&
+      initialDetailsResolved.current &&
+      initialWindowsResolved.current
+    ) {
+      setInitialLoadComplete(true);
+    }
+  };
 
   // Fetch sellers on mount
   useEffect(() => {
@@ -94,9 +114,17 @@ export default function AccountHealthReportPage() {
         setSellers(sellerList);
         if (!sellerFilter && sellerList.length > 0) {
           setSellerFilter(sellerList[0]._id);
+        } else {
+          initialDetailsResolved.current = true;
+          initialWindowsResolved.current = true;
         }
       } catch (e) {
         console.error('Failed to fetch sellers:', e);
+        initialDetailsResolved.current = true;
+        initialWindowsResolved.current = true;
+      } finally {
+        initialSellersResolved.current = true;
+        maybeFinishInitialLoad();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,6 +166,10 @@ export default function AccountHealthReportPage() {
       setError(e.response?.data?.error || e.message);
     } finally {
       setDetailsLoading(false);
+      if (!initialDetailsResolved.current) {
+        initialDetailsResolved.current = true;
+        maybeFinishInitialLoad();
+      }
     }
   }
 
@@ -154,6 +186,10 @@ export default function AccountHealthReportPage() {
       setError(e.response?.data?.error || e.message);
     } finally {
       setWindowsLoading(false);
+      if (!initialWindowsResolved.current) {
+        initialWindowsResolved.current = true;
+        maybeFinishInitialLoad();
+      }
     }
   }
 
@@ -168,6 +204,10 @@ export default function AccountHealthReportPage() {
       setError(e.response?.data?.error || e.message);
     } finally {
       setOverviewLoading(false);
+      if (!initialOverviewResolved.current) {
+        initialOverviewResolved.current = true;
+        maybeFinishInitialLoad();
+      }
     }
   }
 
@@ -421,13 +461,12 @@ export default function AccountHealthReportPage() {
     );
   }, [windows]);
 
+  if (!initialLoadComplete) {
+    return <AccountHealthReportSkeleton />;
+  }
+
   return (
     <Box sx={{ p: 3 }}>
-      <Stack direction="row" alignItems="center" spacing={2} mb={3}>
-        <HealthAndSafetyIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-        <Typography variant="h4">Account Health Report</Typography>
-      </Stack>
-
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {error}
@@ -445,8 +484,19 @@ export default function AccountHealthReportPage() {
         </Alert>
       </Snackbar>
 
+      <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', lg: 'center' }} gap={2.5}>
+          <Box>
+            <PageHeader
+              title="Account Health Report"
+              sx={{ pt: 0, pb: 0 }}
+            />
+          </Box>
+        </Stack>
+      </SectionCard>
+
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <SectionCard sx={{ p: 2, mb: 3 }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Seller</InputLabel>
@@ -502,14 +552,15 @@ export default function AccountHealthReportPage() {
               size="small"
               startIcon={<ClearIcon />}
               onClick={handleClearFilters}
-              color="inherit"
+              sx={yellowOutlinedButtonSx}
             >
               Clear Filters
             </Button>
           )}
 
           <Button
-            variant="outlined"
+            variant="contained"
+            sx={yellowFilledButtonSx}
             startIcon={<RefreshIcon />}
             onClick={() => { loadDetails(); loadEvaluationWindows(); }}
             disabled={detailsLoading || windowsLoading}
@@ -517,10 +568,10 @@ export default function AccountHealthReportPage() {
             Refresh
           </Button>
         </Stack>
-      </Paper>
+      </SectionCard>
 
       {/* Tabs */}
-      <Paper sx={{ mb: 3 }}>
+      <SectionCard sx={{ mb: 3, overflow: 'hidden' }}>
         <Tabs
           value={tabValue}
           onChange={(e, newValue) => setTabValue(newValue)}
@@ -530,14 +581,15 @@ export default function AccountHealthReportPage() {
           <Tab label={`SNAD Details (${details.length})`} />
           <Tab label={`Evaluation Windows (${windows.length})`} />
         </Tabs>
-      </Paper>
+      </SectionCard>
 
       {/* Overview Tab */}
       <TabPanel value={tabValue} index={0}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h6">Account Health Overview - All Sellers</Typography>
           <Button
-            variant="outlined"
+            variant="contained"
+            sx={yellowFilledButtonSx}
             startIcon={<RefreshIcon />}
             onClick={loadOverview}
             disabled={overviewLoading}
@@ -551,15 +603,15 @@ export default function AccountHealthReportPage() {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer component={Paper}>
+          <TableContainer component={Paper} sx={{ ...tableContainerSx, overflow: 'auto' }}>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableCell><strong>Store</strong></TableCell>
-                  <TableCell align="center"><strong>Week 1</strong></TableCell>
-                  <TableCell align="center"><strong>Week 2</strong></TableCell>
-                  <TableCell align="center"><strong>Week 3</strong></TableCell>
-                  <TableCell align="center"><strong>Week 4</strong></TableCell>
+                <TableRow>
+                  <TableCell sx={tableHeaderCellSx}>Store</TableCell>
+                  <TableCell align="center" sx={tableHeaderCellSx}>Week 1</TableCell>
+                  <TableCell align="center" sx={tableHeaderCellSx}>Week 2</TableCell>
+                  <TableCell align="center" sx={tableHeaderCellSx}>Week 3</TableCell>
+                  <TableCell align="center" sx={tableHeaderCellSx}>Week 4</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -571,7 +623,7 @@ export default function AccountHealthReportPage() {
                   </TableRow>
                 ) : (
                   overviewData.map((seller) => (
-                    <TableRow key={seller.sellerId} hover>
+                    <TableRow key={seller.sellerId} hover sx={tableBodyRowSx}>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">{seller.sellerName}</Typography>
                       </TableCell>
@@ -624,7 +676,7 @@ export default function AccountHealthReportPage() {
           />
           <Button
             variant="outlined"
-            color="success"
+            sx={yellowOutlinedButtonSx}
             startIcon={<DownloadIcon />}
             onClick={handleExportDetails}
             disabled={visibleDetails.length === 0}
@@ -641,6 +693,7 @@ export default function AccountHealthReportPage() {
           <TableContainer
             component={Paper}
             sx={{
+              ...tableContainerSx,
               maxWidth: '100%',
               overflowX: 'auto',
               '&::-webkit-scrollbar': { height: '8px' },
@@ -654,15 +707,15 @@ export default function AccountHealthReportPage() {
           >
             <Table size="small" sx={{ minWidth: 1000 }}>
               <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableCell><strong>Order Date</strong></TableCell>
-                  <TableCell><strong>Order ID</strong></TableCell>
-                  <TableCell><strong>Item ID</strong></TableCell>
-                  <TableCell><strong>SNAD Count</strong></TableCell>
-                  <TableCell><strong>Seller Fault</strong></TableCell>
-                  <TableCell><strong>INR</strong></TableCell>
-                  <TableCell><strong>Remark (Expiry)</strong></TableCell>
-                  <TableCell><strong>Seller</strong></TableCell>
+                <TableRow>
+                  <TableCell sx={tableHeaderCellSx}>Order Date</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Order ID</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Item ID</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>SNAD Count</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Seller Fault</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>INR</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Remark (Expiry)</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Seller</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -676,7 +729,7 @@ export default function AccountHealthReportPage() {
                   </TableRow>
                 ) : (
                   visibleDetails.map((d) => (
-                    <TableRow key={d._id} hover>
+                    <TableRow key={d._id} hover sx={tableBodyRowSx}>
                       <TableCell>{formatDate(d.orderDate)}</TableCell>
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -755,10 +808,10 @@ export default function AccountHealthReportPage() {
 
       {/* Evaluation Windows Tab */}
       <TabPanel value={tabValue} index={2}>
-        <Stack direction="row" justifyContent="flex-end" mb={2}>
+        <Stack direction="row" justifyContent="flex-end" mb={2} spacing={2} flexWrap="wrap" useFlexGap>
           <Button
             variant="outlined"
-            color="success"
+            sx={yellowOutlinedButtonSx}
             startIcon={<DownloadIcon />}
             onClick={handleExportWindows}
             disabled={windows.length === 0}
@@ -766,8 +819,8 @@ export default function AccountHealthReportPage() {
             Download CSV ({windows.length})
           </Button>
           <Button
-            variant="outlined"
-            color="primary"
+            variant="contained"
+            sx={yellowFilledButtonSx}
             startIcon={<CalculateIcon />}
             onClick={() => {
               // Pre-fill with the latest window data if available
@@ -787,17 +840,17 @@ export default function AccountHealthReportPage() {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer component={Paper}>
+          <TableContainer component={Paper} sx={{ ...tableContainerSx, overflow: 'auto' }}>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableCell><strong>Evaluation Window</strong></TableCell>
-                  <TableCell><strong>Total Sales</strong></TableCell>
-                  <TableCell><strong>BBE Rate (%)</strong></TableCell>
-                  <TableCell><strong>Market Avg</strong></TableCell>
-                  <TableCell><strong>Store Status</strong></TableCell>
-                  <TableCell><strong>Evaluation Date</strong></TableCell>
-                  <TableCell><strong>Total SNAD Count</strong></TableCell>
+                <TableRow>
+                  <TableCell sx={tableHeaderCellSx}>Evaluation Window</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Total Sales</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>BBE Rate (%)</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Market Avg</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Store Status</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Evaluation Date</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Total SNAD Count</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -820,7 +873,7 @@ export default function AccountHealthReportPage() {
                       return d.toISOString();
                     })();
                     return (
-                      <TableRow key={rowKey} hover>
+                      <TableRow key={rowKey} hover sx={tableBodyRowSx}>
                         <TableCell>
                           <Typography variant="body2">
                             {formatWindowDate(getActualDataWindowStart(w))} - {formatWindowDate(getActualDataWindowEnd(w))}

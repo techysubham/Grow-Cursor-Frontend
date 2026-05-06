@@ -22,8 +22,12 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ListAltIcon from '@mui/icons-material/ListAlt';
+import ClearIcon from '@mui/icons-material/Clear';
 import api from '../../lib/api';
 import ColumnSelector from '../../components/ColumnSelector';
+import SectionCard from '../../components/SectionCard.jsx';
+import { tableBodyRowSx, tableContainerSx, tableHeaderCellSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
+import IssuesResolutionTabSkeleton from '../../components/skeletons/IssuesResolutionTabSkeleton.jsx';
 
 const CATEGORIES = [
   { key: 'cancellations', label: 'Cancellations' },
@@ -203,6 +207,18 @@ export default function WorksheetPage({
     return total > 0 ? total : '-';
   };
 
+  const hasActiveFilters = sellerFilter || dateFilter.mode !== 'all';
+
+  const handleClearFilters = () => {
+    setSellerFilter('');
+    setInternalDateFilter({
+      mode: 'all',
+      single: '',
+      from: '',
+      to: ''
+    });
+  };
+
   const SummaryCard = ({ title, openCount, rate, leftColor, rightColor }) => {
     return (
       <Paper
@@ -242,32 +258,57 @@ export default function WorksheetPage({
     );
   };
 
+  if (loading && statistics.length === 0 && !summary) {
+    return <IssuesResolutionTabSkeleton showSummaryCards />;
+  }
+
   return (
     <Box sx={embedded ? {} : { p: 3 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Worksheet
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+
+      <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} mb={2} alignItems={{ xs: 'flex-start', lg: 'center' }} justifyContent="space-between">
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Button
+            variant="contained"
+            sx={yellowFilledButtonSx}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+            onClick={fetchStatistics}
+            disabled={loading}
+          >
+            {loading ? 'Refreshing...' : 'Refresh Worksheet'}
+          </Button>
+          <Typography variant="caption" color="text.secondary">
+            Daily overview of cancellations, returns, INR & disputes, and inquiries, based on Pacific Time.
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Daily overview of cancellations, returns, INR & disputes, and inquiries. Dates and filters are based on Pacific Time.
-          </Typography>
-        </Box>
-        <Chip
-          icon={<ListAltIcon />}
-          label={`${totalCount} Total Items`}
-          color="primary"
-          sx={{ fontSize: '1rem', px: 1, py: 2.5 }}
-        />
+        </Stack>
+
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Chip
+            icon={<ListAltIcon />}
+            label={`${totalCount} Total Items`}
+            color="primary"
+            variant="outlined"
+          />
+          <ColumnSelector
+            allColumns={ALL_COLUMNS}
+            visibleColumns={visibleColumns}
+            onColumnChange={setVisibleColumns}
+            onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
+            page="worksheet"
+          />
+        </Stack>
       </Stack>
 
-      {hideDateFilter && (
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-          {/* Seller Filter */}
+      <SectionCard sx={{ p: 2, mb: 3 }}>
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel id="seller-filter-label-embedded">Seller</InputLabel>
+            <InputLabel id={hideDateFilter ? 'seller-filter-label-embedded' : 'seller-filter-label'}>Seller</InputLabel>
             <Select
-              labelId="seller-filter-label-embedded"
+              labelId={hideDateFilter ? 'seller-filter-label-embedded' : 'seller-filter-label'}
               value={sellerFilter}
               label="Seller"
               onChange={(e) => setSellerFilter(e.target.value)}
@@ -280,114 +321,73 @@ export default function WorksheetPage({
               ))}
             </Select>
           </FormControl>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={fetchStatistics}
-            disabled={loading}
-            size="small"
-          >
-            Refresh
-          </Button>
-          <ColumnSelector
-              allColumns={ALL_COLUMNS}
-              visibleColumns={visibleColumns}
-              onColumnChange={setVisibleColumns}
-              onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
-              page="worksheet"
-          />
-        </Stack>
-      )}
 
-      {!hideDateFilter && (
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" flexWrap="wrap">
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="date-mode-label">Date Mode</InputLabel>
-              <Select
-                labelId="date-mode-label"
-                value={dateFilter.mode}
-                label="Date Mode"
-                onChange={(e) => setInternalDateFilter(prev => ({ ...prev, mode: e.target.value }))}
-              >
-                <MenuItem value="all">All</MenuItem>
-                <MenuItem value="single">Single Day</MenuItem>
-                <MenuItem value="range">Date Range</MenuItem>
-              </Select>
-            </FormControl>
+          {!hideDateFilter && (
+            <>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel id="date-mode-label">Date Mode</InputLabel>
+                <Select
+                  labelId="date-mode-label"
+                  value={dateFilter.mode}
+                  label="Date Mode"
+                  onChange={(e) => setInternalDateFilter(prev => ({ ...prev, mode: e.target.value }))}
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="single">Single Day</MenuItem>
+                  <MenuItem value="range">Date Range</MenuItem>
+                </Select>
+              </FormControl>
 
-            {/* Seller Filter */}
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="seller-filter-label">Seller</InputLabel>
-              <Select
-                labelId="seller-filter-label"
-                value={sellerFilter}
-                label="Seller"
-                onChange={(e) => setSellerFilter(e.target.value)}
-              >
-                <MenuItem value="">All Sellers</MenuItem>
-                {sellers.map((s) => (
-                  <MenuItem key={s._id} value={s._id}>
-                    {s.user?.username || s._id}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {dateFilter.mode === 'single' && (
-              <TextField
-                label="Date"
-                type="date"
-                value={dateFilter.single}
-                onChange={(e) => setInternalDateFilter(prev => ({ ...prev, single: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
-                size="small"
-                sx={{ minWidth: 200 }}
-              />
-            )}
-
-            {dateFilter.mode === 'range' && (
-              <>
+              {dateFilter.mode === 'single' && (
                 <TextField
-                  label="From"
+                  label="Date"
                   type="date"
-                  value={dateFilter.from}
-                  onChange={(e) => setInternalDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                  value={dateFilter.single}
+                  onChange={(e) => setInternalDateFilter(prev => ({ ...prev, single: e.target.value }))}
                   InputLabelProps={{ shrink: true }}
                   size="small"
                   sx={{ minWidth: 200 }}
                 />
-                <TextField
-                  label="To"
-                  type="date"
-                  value={dateFilter.to}
-                  onChange={(e) => setInternalDateFilter(prev => ({ ...prev, to: e.target.value }))}
-                  InputLabelProps={{ shrink: true }}
-                  size="small"
-                  sx={{ minWidth: 200 }}
-                />
-              </>
-            )}
+              )}
 
+              {dateFilter.mode === 'range' && (
+                <>
+                  <TextField
+                    label="From"
+                    type="date"
+                    value={dateFilter.from}
+                    onChange={(e) => setInternalDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                    size="small"
+                    sx={{ minWidth: 200 }}
+                  />
+                  <TextField
+                    label="To"
+                    type="date"
+                    value={dateFilter.to}
+                    onChange={(e) => setInternalDateFilter(prev => ({ ...prev, to: e.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                    size="small"
+                    sx={{ minWidth: 200 }}
+                  />
+                </>
+              )}
+
+            </>
+          )}
+
+          {hasActiveFilters && (
             <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={fetchStatistics}
-              disabled={loading}
               size="small"
+              startIcon={<ClearIcon />}
+              onClick={handleClearFilters}
+              color="inherit"
             >
-              Refresh
+              Clear Filters
             </Button>
-            <ColumnSelector
-                allColumns={ALL_COLUMNS}
-                visibleColumns={visibleColumns}
-                onColumnChange={setVisibleColumns}
-                onReset={() => setVisibleColumns(ALL_COLUMNS.map(c => c.id))}
-                page="worksheet"
-            />
-          </Stack>
-        </Paper>
-      )}
+          )}
+        </Stack>
+      </SectionCard>
 
       {/* Summary Cards */}
       {summary && (
@@ -427,27 +427,22 @@ export default function WorksheetPage({
         </Stack>
       )}
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+        <SectionCard sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
-        </Box>
+        </SectionCard>
       ) : (
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer sx={{ maxHeight: 'calc(100vh - 400px)' }}>
+        <Paper elevation={0} sx={{ width: '100%', overflow: 'hidden', boxShadow: 'none', border: 'none', backgroundColor: 'transparent' }}>
+          <TableContainer sx={{ ...tableContainerSx, boxShadow: 'none', maxHeight: 'calc(100vh - 400px)', overflow: 'auto' }}>
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
                   {visibleColumns.includes('date') && <TableCell
                     sx={{
+                      ...tableHeaderCellSx,
                       fontWeight: 'bold',
-                      bgcolor: 'primary.main',
-                      color: 'white',
+                      backgroundColor: tableHeaderCellSx.backgroundColor,
+                      color: tableHeaderCellSx.color,
                       minWidth: 120,
                       height: HEADER_ROW_ONE_HEIGHT,
                       py: 0.5,
@@ -465,9 +460,10 @@ export default function WorksheetPage({
                       align="center"
                       colSpan={category.key === 'inquiries' ? 1 : STATUS_COLUMNS.length}
                       sx={{
+                        ...tableHeaderCellSx,
                         fontWeight: 'bold',
-                        bgcolor: 'primary.main',
-                        color: 'white',
+                        backgroundColor: tableHeaderCellSx.backgroundColor,
+                        color: tableHeaderCellSx.color,
                         height: HEADER_ROW_ONE_HEIGHT,
                         py: 0.5,
                         borderLeft: '8px solid white',
@@ -483,9 +479,10 @@ export default function WorksheetPage({
                 <TableRow>
                   {visibleColumns.includes('date') && <TableCell
                     sx={{
+                      ...tableHeaderCellSx,
                       fontWeight: 'bold',
-                      bgcolor: 'primary.dark',
-                      color: 'white',
+                      backgroundColor: tableHeaderCellSx.backgroundColor,
+                      color: tableHeaderCellSx.color,
                       position: 'sticky',
                       top: HEADER_ROW_ONE_HEIGHT,
                       left: 0,
@@ -499,9 +496,10 @@ export default function WorksheetPage({
                           key={`${category.key}-total`}
                           align="center"
                           sx={{
+                            ...tableHeaderCellSx,
                             fontWeight: 'bold',
-                            bgcolor: 'primary.dark',
-                            color: 'white',
+                            backgroundColor: tableHeaderCellSx.backgroundColor,
+                            color: tableHeaderCellSx.color,
                             fontSize: '0.75rem',
                             borderLeft: '8px solid white',
                             position: 'sticky',
@@ -517,9 +515,10 @@ export default function WorksheetPage({
                             key={`${category.key}-${status.key}`}
                             align="center"
                             sx={{
+                              ...tableHeaderCellSx,
                               fontWeight: 'bold',
-                              bgcolor: 'primary.dark',
-                              color: 'white',
+                              backgroundColor: tableHeaderCellSx.backgroundColor,
+                              color: tableHeaderCellSx.color,
                               fontSize: '0.75rem',
                               borderLeft: index === 0 ? '8px solid white' : 'none',
                               position: 'sticky',
@@ -547,7 +546,7 @@ export default function WorksheetPage({
                 ) : (
                   <>
                     {tableData.map((row) => (
-                      <TableRow key={row.date} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                      <TableRow key={row.date} hover sx={tableBodyRowSx}>
                         {visibleColumns.includes('date') && <TableCell
                           sx={{
                             fontWeight: 'medium',
@@ -601,7 +600,7 @@ export default function WorksheetPage({
                       </TableRow>
                     ))}
 
-                    <TableRow sx={{ bgcolor: 'grey.100' }}>
+                    <TableRow sx={{ ...tableBodyRowSx, bgcolor: 'grey.100' }}>
                       {visibleColumns.includes('date') && <TableCell
                         sx={{
                           fontWeight: 'bold',
