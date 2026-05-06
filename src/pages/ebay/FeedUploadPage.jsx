@@ -17,6 +17,7 @@ import {
     Pagination,
     useTheme
 } from '@mui/material';
+import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ThemeProvider, createTheme, alpha } from '@mui/material/styles';
@@ -24,6 +25,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import AddIcon from '@mui/icons-material/Add';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -34,6 +36,8 @@ import Chip from '@mui/material/Chip';
 import api from '../../lib/api';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
+
+const filterOpts = createFilterOptions();
 
 // Common Feed Types
 const FEED_TYPES = [
@@ -106,6 +110,9 @@ const FeedUploadPage = () => {
     const [selectedRange, setSelectedRange] = useState('');
     const [products, setProducts] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState('');
+    const [creatingCategory, setCreatingCategory] = useState(false);
+    const [creatingRange, setCreatingRange] = useState(false);
+    const [creatingProduct, setCreatingProduct] = useState(false);
 
     // Schedule upload state (right panel)
     const [scheduleFile, setScheduleFile] = useState(null);
@@ -445,49 +452,171 @@ const FeedUploadPage = () => {
                         />
 
                         {/* Category Selection */}
-                        <FormControl fullWidth sx={selectFocusSx}>
-                            <InputLabel>Category (optional)</InputLabel>
-                            <Select
-                                value={selectedCategory}
-                                label="Category (optional)"
-                                onChange={(e) => setSelectedCategory(e.target.value)}
-                            >
-                                <MenuItem value=""><em>None</em></MenuItem>
-                                {categories.map((cat) => (
-                                    <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                        <Autocomplete
+                            options={categories}
+                            getOptionLabel={(opt) => (typeof opt === 'string' ? opt : (opt.name || ''))}
+                            value={categories.find(c => c._id === selectedCategory) || null}
+                            onChange={async (_, newValue) => {
+                                if (newValue?.__isCreate__) {
+                                    const name = newValue.__inputValue__?.trim();
+                                    if (!name) return;
+                                    try {
+                                        setCreatingCategory(true);
+                                        const res = await api.post('/asin-list-categories', { name });
+                                        const created = res.data;
+                                        setCategories(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+                                        setSelectedCategory(created._id);
+                                    } catch (err) {
+                                        console.error('Failed to create category', err);
+                                    } finally {
+                                        setCreatingCategory(false);
+                                    }
+                                } else {
+                                    setSelectedCategory(newValue?._id || '');
+                                }
+                            }}
+                            filterOptions={(options, params) => {
+                                const filtered = filterOpts(options, params);
+                                const { inputValue } = params;
+                                filtered.unshift({
+                                    __isCreate__: true,
+                                    __inputValue__: inputValue,
+                                    name: inputValue.trim() ? `Create "${inputValue.trim()}"` : 'Add New Category',
+                                    _id: '__create_cat__'
+                                });
+                                return filtered;
+                            }}
+                            isOptionEqualToValue={(opt, val) => opt._id === val._id}
+                            loading={creatingCategory}
+                            renderOption={(props, option) => (
+                                <li {...props} key={option._id}>
+                                    {option.__isCreate__
+                                        ? <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: BRAND_YELLOW_DARK, fontWeight: 600 }}><AddIcon fontSize="small" />{option.name}</Box>
+                                        : option.name
+                                    }
+                                </li>
+                            )}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Category (optional)"
+                                    sx={inputFocusSx}
+                                    InputProps={{ ...params.InputProps, endAdornment: <>{creatingCategory && <CircularProgress size={16} sx={{ mr: 1 }} />}{params.InputProps.endAdornment}</> }}
+                                />
+                            )}
+                        />
 
                         {/* Range Selection */}
-                        <FormControl fullWidth sx={selectFocusSx} disabled={!selectedCategory}>
-                            <InputLabel>Range (optional)</InputLabel>
-                            <Select
-                                value={selectedRange}
-                                label="Range (optional)"
-                                onChange={(e) => setSelectedRange(e.target.value)}
-                            >
-                                <MenuItem value=""><em>None</em></MenuItem>
-                                {ranges.map((rng) => (
-                                    <MenuItem key={rng._id} value={rng._id}>{rng.name}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                        <Autocomplete
+                            options={ranges}
+                            disabled={!selectedCategory}
+                            getOptionLabel={(opt) => (typeof opt === 'string' ? opt : (opt.name || ''))}
+                            value={ranges.find(r => r._id === selectedRange) || null}
+                            onChange={async (_, newValue) => {
+                                if (newValue?.__isCreate__) {
+                                    const name = newValue.__inputValue__?.trim();
+                                    if (!name) return;
+                                    try {
+                                        setCreatingRange(true);
+                                        const res = await api.post('/asin-list-ranges', { name, categoryId: selectedCategory });
+                                        const created = res.data;
+                                        setRanges(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+                                        setSelectedRange(created._id);
+                                    } catch (err) {
+                                        console.error('Failed to create range', err);
+                                    } finally {
+                                        setCreatingRange(false);
+                                    }
+                                } else {
+                                    setSelectedRange(newValue?._id || '');
+                                }
+                            }}
+                            filterOptions={(options, params) => {
+                                const filtered = filterOpts(options, params);
+                                const { inputValue } = params;
+                                filtered.unshift({
+                                    __isCreate__: true,
+                                    __inputValue__: inputValue,
+                                    name: inputValue.trim() ? `Create "${inputValue.trim()}"` : 'Add New Range',
+                                    _id: '__create_rng__'
+                                });
+                                return filtered;
+                            }}
+                            isOptionEqualToValue={(opt, val) => opt._id === val._id}
+                            loading={creatingRange}
+                            renderOption={(props, option) => (
+                                <li {...props} key={option._id}>
+                                    {option.__isCreate__
+                                        ? <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: BRAND_YELLOW_DARK, fontWeight: 600 }}><AddIcon fontSize="small" />{option.name}</Box>
+                                        : option.name
+                                    }
+                                </li>
+                            )}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Range (optional)"
+                                    sx={inputFocusSx}
+                                    InputProps={{ ...params.InputProps, endAdornment: <>{creatingRange && <CircularProgress size={16} sx={{ mr: 1 }} />}{params.InputProps.endAdornment}</> }}
+                                />
+                            )}
+                        />
 
                         {/* Product Selection */}
-                        <FormControl fullWidth sx={selectFocusSx} disabled={!selectedRange}>
-                            <InputLabel>Product (optional)</InputLabel>
-                            <Select
-                                value={selectedProduct}
-                                label="Product (optional)"
-                                onChange={(e) => setSelectedProduct(e.target.value)}
-                            >
-                                <MenuItem value=""><em>None</em></MenuItem>
-                                {products.map((prd) => (
-                                    <MenuItem key={prd._id} value={prd._id}>{prd.name}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                        <Autocomplete
+                            options={products}
+                            disabled={!selectedRange}
+                            getOptionLabel={(opt) => (typeof opt === 'string' ? opt : (opt.name || ''))}
+                            value={products.find(p => p._id === selectedProduct) || null}
+                            onChange={async (_, newValue) => {
+                                if (newValue?.__isCreate__) {
+                                    const name = newValue.__inputValue__?.trim();
+                                    if (!name) return;
+                                    try {
+                                        setCreatingProduct(true);
+                                        const res = await api.post('/asin-list-products', { name, rangeId: selectedRange, categoryId: selectedCategory });
+                                        const created = res.data;
+                                        setProducts(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+                                        setSelectedProduct(created._id);
+                                    } catch (err) {
+                                        console.error('Failed to create product', err);
+                                    } finally {
+                                        setCreatingProduct(false);
+                                    }
+                                } else {
+                                    setSelectedProduct(newValue?._id || '');
+                                }
+                            }}
+                            filterOptions={(options, params) => {
+                                const filtered = filterOpts(options, params);
+                                const { inputValue } = params;
+                                filtered.unshift({
+                                    __isCreate__: true,
+                                    __inputValue__: inputValue,
+                                    name: inputValue.trim() ? `Create "${inputValue.trim()}"` : 'Add New Product',
+                                    _id: '__create_prd__'
+                                });
+                                return filtered;
+                            }}
+                            isOptionEqualToValue={(opt, val) => opt._id === val._id}
+                            loading={creatingProduct}
+                            renderOption={(props, option) => (
+                                <li {...props} key={option._id}>
+                                    {option.__isCreate__
+                                        ? <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: BRAND_YELLOW_DARK, fontWeight: 600 }}><AddIcon fontSize="small" />{option.name}</Box>
+                                        : option.name
+                                    }
+                                </li>
+                            )}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Product (optional)"
+                                    sx={inputFocusSx}
+                                    InputProps={{ ...params.InputProps, endAdornment: <>{creatingProduct && <CircularProgress size={16} sx={{ mr: 1 }} />}{params.InputProps.endAdornment}</> }}
+                                />
+                            )}
+                        />
 
                         {/* Country Selection */}
                         <FormControl fullWidth sx={selectFocusSx}>
