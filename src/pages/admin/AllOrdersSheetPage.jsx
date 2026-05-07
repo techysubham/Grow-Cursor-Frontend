@@ -1154,6 +1154,59 @@ export default function AllOrdersSheetPage() {
                 </>
               )}
 
+              {/* Subtotal Filter Mode Selector */}
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel id="subtotal-mode-label">Subtotal Filter</InputLabel>
+                <Select
+                  labelId="subtotal-mode-label"
+                  value={subtotalFilter.mode}
+                  label="Subtotal Filter"
+                  onChange={(e) => setSubtotalFilter(prev => ({ ...prev, mode: e.target.value }))}
+                >
+                  <MenuItem value="none">None</MenuItem>
+                  <MenuItem value="single">≤ Value</MenuItem>
+                  <MenuItem value="range">Range</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Single Subtotal Input (less than or equal) */}
+              {subtotalFilter.mode === 'single' && (
+                <TextField
+                  size="small"
+                  label="Max Subtotal ($)"
+                  type="number"
+                  value={subtotalFilter.single}
+                  onChange={(e) => setSubtotalFilter(prev => ({ ...prev, single: e.target.value }))}
+                  placeholder="e.g. 50"
+                  sx={{ width: 150 }}
+                  helperText="Show subtotal ≤ this value"
+                />
+              )}
+
+              {/* Range Inputs for Subtotal */}
+              {subtotalFilter.mode === 'range' && (
+                <>
+                  <TextField
+                    size="small"
+                    label="Min Subtotal ($)"
+                    type="number"
+                    value={subtotalFilter.from}
+                    onChange={(e) => setSubtotalFilter(prev => ({ ...prev, from: e.target.value }))}
+                    placeholder="e.g. 10"
+                    sx={{ width: 150 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Max Subtotal ($)"
+                    type="number"
+                    value={subtotalFilter.to}
+                    onChange={(e) => setSubtotalFilter(prev => ({ ...prev, to: e.target.value }))}
+                    placeholder="e.g. 100"
+                    sx={{ width: 150 }}
+                  />
+                </>
+              )}
+
               {/* Clear Button */}
               <Button
                 size="small"
