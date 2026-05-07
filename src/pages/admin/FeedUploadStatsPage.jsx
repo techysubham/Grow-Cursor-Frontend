@@ -43,6 +43,26 @@ const getQuota = (sellerName, country = 'US') => {
   return isHighQuota ? quotas.high : quotas.normal;
 };
 
+function CategoryTick({ x, y, payload, drillCategory, onSelect }) {
+  const isActive = drillCategory?.name === payload.value;
+  return (
+    <g transform={`translate(${x},${y})`} style={{ cursor: 'pointer' }} onClick={() => onSelect(payload.value)}>
+      <text
+        x={0}
+        y={0}
+        dy={4}
+        textAnchor="end"
+        fontSize={12}
+        fontWeight={isActive ? 700 : 400}
+        fill={isActive ? BRAND_YELLOW_DARK : BRAND_DARK}
+        style={{ textDecoration: isActive ? 'underline' : 'none' }}
+      >
+        {payload.value}
+      </text>
+    </g>
+  );
+}
+
 function MetricMiniCard({ label, value, sub }) {
   return (
     <Box sx={{ px: 2.5, py: 2, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}`, backgroundColor: alpha(BRAND_YELLOW, 0.06), minWidth: 130 }}>
@@ -494,7 +514,7 @@ export default function FeedUploadStatsPage() {
               {/* Category bar chart */}
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: alpha(BRAND_DARK, 0.5), mb: 1.5, display: 'block', textTransform: 'uppercase', letterSpacing: 0.6, fontSize: '0.7rem' }}>
-                  By Category — click a bar to drill in
+                  By Category — click a bar or name to drill in
                 </Typography>
                 <ResponsiveContainer width="100%" height={Math.max(200, categoryStats.categories.length * 42 + 16)}>
                   <BarChart
@@ -503,7 +523,21 @@ export default function FeedUploadStatsPage() {
                     margin={{ left: 0, right: 64, top: 0, bottom: 0 }}
                   >
                     <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 12, fill: BRAND_DARK }} />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={160}
+                      tick={(props) => (
+                        <CategoryTick
+                          {...props}
+                          drillCategory={drillCategory}
+                          onSelect={(name) => {
+                            const cat = categoryStats.categories.find((c) => c.name === name);
+                            setDrillCategory(drillCategory?.name === name ? null : { name, categoryId: cat?.categoryId });
+                          }}
+                        />
+                      )}
+                    />
                     <RechartsTooltip
                       formatter={(v) => [v.toLocaleString(), 'Successful Listings']}
                       contentStyle={{ borderRadius: 8, fontSize: '0.82rem' }}
