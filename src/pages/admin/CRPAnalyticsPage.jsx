@@ -145,6 +145,7 @@ export default function CRPAnalyticsPage() {
 
   const [drillPath, setDrillPath] = useState([]);
   const [drillData, setDrillData] = useState([]);
+  const [drillTicketTiers, setDrillTicketTiers] = useState(null);
   const [drillLoading, setDrillLoading] = useState(false);
   const drillRef = useRef(null);
 
@@ -162,7 +163,7 @@ export default function CRPAnalyticsPage() {
 
   useEffect(() => { fetchSellers(); }, []);
   useEffect(() => { fetchAnalytics(); }, [dateFilter, selectedSeller, selectedMarketplace, excludeClient, excludeLowValue, groupBy]);
-  useEffect(() => { setDrillPath([]); setDrillData([]); }, [dateFilter, selectedSeller, selectedMarketplace, excludeClient, excludeLowValue, groupBy]);
+  useEffect(() => { setDrillPath([]); setDrillData([]); setDrillTicketTiers(null); }, [dateFilter, selectedSeller, selectedMarketplace, excludeClient, excludeLowValue, groupBy]);
 
   const fetchSellers = async () => {
     try {
@@ -240,8 +241,10 @@ export default function CRPAnalyticsPage() {
       }
       const res = await api.get('/orders/crp-analytics', { params });
       const results = res.data?.items ?? [];
+      const tiers = res.data?.ticketTiers ?? { low: 0, mid: 0, high: 0, extra_high: 0 };
       const total = results.reduce((s, r) => s + r.count, 0);
       setDrillData(results.map(r => ({ ...r, percentage: total > 0 ? ((r.count / total) * 100).toFixed(1) : '0.0' })));
+      setDrillTicketTiers(tiers);
     } catch (e) { console.error('Error fetching drill-down data:', e); }
     finally { setDrillLoading(false); }
   };
@@ -548,7 +551,7 @@ export default function CRPAnalyticsPage() {
                   </Breadcrumbs>
                 </Stack>
                 <Button size="small" startIcon={<CloseIcon sx={{ fontSize: 13 }} />}
-                  onClick={() => { setDrillPath([]); setDrillData([]); }}
+                  onClick={() => { setDrillPath([]); setDrillData([]); setDrillTicketTiers(null); }}
                   sx={{ color: alpha('#fff', 0.55), fontSize: '0.72rem', fontWeight: 500, minHeight: 28, px: 1, '&:hover': { bgcolor: alpha('#fff', 0.08), color: '#fff' } }}>
                   Clear
                 </Button>
@@ -569,6 +572,24 @@ export default function CRPAnalyticsPage() {
                 ) : drillData.length === 0 ? (
                   <Alert severity="info">No {drillLevelLabel.toLowerCase()} data found within this selection.</Alert>
                 ) : (
+                  <>
+                    {/* Drill ticket tiers */}
+                    {drillTicketTiers && (
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+                        <MetricCard
+                          icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$0-30</Typography>}
+                          label="Low Ticket" value={drillTicketTiers.low.toLocaleString()} sub="subtotal < $30" tone="shipping" />
+                        <MetricCard
+                          icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$30-60</Typography>}
+                          label="Mid Ticket" value={drillTicketTiers.mid.toLocaleString()} sub="$30-$59" tone="success" />
+                        <MetricCard
+                          icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$60-100</Typography>}
+                          label="High Ticket" value={drillTicketTiers.high.toLocaleString()} sub="$60-$99" tone="amazon" />
+                        <MetricCard
+                          icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$100+</Typography>}
+                          label="Extra High Ticket" value={drillTicketTiers.extra_high.toLocaleString()} sub="subtotal >= $100" tone="danger" />
+                      </Stack>
+                    )}
                   <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
                     {/* Drill bar chart */}
                     <SectionCard sx={{ flex: '3 1 0', minWidth: 0, p: 2 }}>
@@ -614,6 +635,7 @@ export default function CRPAnalyticsPage() {
                       )}
                     </SectionCard>
                   </Stack>
+                  </>
                 )}
               </Box>
             </Box>
