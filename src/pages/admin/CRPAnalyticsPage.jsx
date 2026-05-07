@@ -1,28 +1,27 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Box,
   Breadcrumbs,
-  Chip,
-  Paper,
-  Typography,
-  CircularProgress,
-  Alert,
-  TextField,
   Button,
-  Stack,
+  CircularProgress,
+  Fade,
   FormControl,
   FormControlLabel,
   InputLabel,
-  Select,
+  LinearProgress,
+  Link,
   MenuItem,
+  Paper,
+  Select,
+  Stack,
   Switch,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Divider,
-  LinearProgress,
-  Fade,
-  Link,
+  Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -37,10 +36,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  PieChart,
-  Pie,
   Cell,
-  Label,
   LabelList,
 } from 'recharts';
 import api from '../../lib/api';
@@ -49,12 +45,16 @@ import AdminPageShell from '../../components/AdminPageShell.jsx';
 import SectionCard from '../../components/SectionCard.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import { yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+
+const T = dashboardSignatureTokens;
 
 const COLORS = [
-  '#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f',
-  '#0288d1', '#388e3c', '#f57c00', '#7b1fa2', '#c62828',
-  '#0097a7', '#558b2f', '#ff8f00', '#ad1457', '#37474f',
-  '#4e342e', '#00695c', '#1565c0', '#e65100', '#4a148c',
+  '#1565c0', '#2e7d32', '#e65100', '#6a1b9a', '#b71c1c',
+  '#00695c', '#1976d2', '#558b2f', '#f57f17', '#ad1457',
+  '#0277bd', '#37474f', '#4e342e', '#1a237e', '#880e4f',
+  '#004d40', '#bf360c', '#4a148c', '#1b5e20', '#0d47a1',
 ];
 
 function formatInputDate(date) {
@@ -63,80 +63,76 @@ function formatInputDate(date) {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
-
 function addDays(date, days) {
-  const nextDate = new Date(date);
-  nextDate.setDate(nextDate.getDate() + days);
-  return nextDate;
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
 }
-
 function getDefaultSingleDay() {
   return formatInputDate(addDays(new Date(), -1));
 }
 
-// ── Donut centre label ────────────────────────────────────────────────────────
-const DonutCenter = ({ viewBox, total }) => {
-  const { cx, cy } = viewBox || {};
-  if (cx == null) return null;
-  return (
-    <g>
-      <text x={cx} y={cy - 6} textAnchor="middle" dominantBaseline="middle"
-        style={{ fontSize: 22, fontWeight: 700, fill: '#1a1a1a' }}>
-        {total.toLocaleString()}
-      </text>
-      <text x={cx} y={cy + 15} textAnchor="middle" dominantBaseline="middle"
-        style={{ fontSize: 11, fill: '#888' }}>
-        orders
-      </text>
-    </g>
-  );
-};
-
-// ── Custom bar tooltip ────────────────────────────────────────────────────────
+// â”€â”€ Tooltip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const BarTooltipContent = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <Paper elevation={3} sx={{ p: 1.5, minWidth: 160 }}>
-      <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>{d.name}</Typography>
+    <Paper elevation={4} sx={{ p: 1.5, minWidth: 160, border: `1px solid ${alpha(BRAND_DARK, 0.08)}` }}>
+      <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5, color: BRAND_DARK }}>{d.name}</Typography>
       <Typography variant="body2" color="text.secondary">{d.count.toLocaleString()} orders</Typography>
-      <Typography variant="body2" color="primary">{d.percentage}% of total</Typography>
+      <Typography variant="body2" sx={{ color: BRAND_YELLOW_DARK, fontWeight: 600 }}>{d.percentage}% of total</Typography>
     </Paper>
   );
 };
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
-function StatCard({ icon, label, value, sub, color = '#1976d2' }) {
+// â”€â”€ Metric card using theme tones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function MetricCard({ icon, label, value, sub, tone = 'info' }) {
+  const t = T.tones[tone] || T.tones.info;
   return (
-    <SectionCard
-      sx={{
-        flex: '1 1 0',
-        minWidth: 150,
-        p: 1.75,
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 1.5,
-      }}
-    >
-      <Box
-        sx={{
-          mt: 0.25,
-          width: 36, height: 36, borderRadius: '10px',
-          bgcolor: color,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-          opacity: 0.9,
-          color: '#fff',
-        }}
-      >
+    <Box sx={{
+      flex: '1 1 0', minWidth: 138, maxWidth: 240,
+      p: '11px 14px',
+      borderRadius: `${T.radius.card}px`,
+      background: t.background,
+      border: `1px solid ${t.border}`,
+      display: 'flex', alignItems: 'center', gap: 1.25,
+    }}>
+      <Box sx={{
+        width: 34, height: 34, borderRadius: '9px',
+        bgcolor: t.color, color: '#fff', opacity: 0.9,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
         {icon}
       </Box>
-      <Box>
-        <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3, display: 'block' }}>{label}</Typography>
-        <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.3, fontSize: '1.1rem' }}>{value}</Typography>
-        {sub && <Typography variant="caption" color="text.disabled" sx={{ lineHeight: 1.2, display: 'block' }}>{sub}</Typography>}
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="caption" sx={{ color: t.color, fontWeight: 600, display: 'block', lineHeight: 1.2, opacity: 0.8 }}>
+          {label}
+        </Typography>
+        <Typography variant="subtitle2" fontWeight={800} sx={{ color: t.color, lineHeight: 1.35, fontSize: '0.98rem' }}>
+          {value}
+        </Typography>
+        {sub && (
+          <Typography variant="caption" sx={{ color: t.color, opacity: 0.58, lineHeight: 1.1, display: 'block' }}>
+            {sub}
+          </Typography>
+        )}
       </Box>
-    </SectionCard>
+    </Box>
+  );
+}
+
+// â”€â”€ Section divider label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function SectionLabel({ children }) {
+  return (
+    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
+      <Typography variant="overline" sx={{
+        color: alpha(BRAND_DARK, 0.42), fontWeight: 700,
+        letterSpacing: 1.2, lineHeight: 1, whiteSpace: 'nowrap', fontSize: '0.67rem',
+      }}>
+        {children}
+      </Typography>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: alpha(BRAND_DARK, 0.08) }} />
+    </Stack>
   );
 }
 
@@ -147,7 +143,6 @@ export default function CRPAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Drill-down state: array of { level:'category'|'range'|'product', id, name }
   const [drillPath, setDrillPath] = useState([]);
   const [drillData, setDrillData] = useState([]);
   const [drillLoading, setDrillLoading] = useState(false);
@@ -167,17 +162,13 @@ export default function CRPAnalyticsPage() {
 
   useEffect(() => { fetchSellers(); }, []);
   useEffect(() => { fetchAnalytics(); }, [dateFilter, selectedSeller, selectedMarketplace, excludeClient, excludeLowValue, groupBy]);
-
-  // Reset drill-down whenever top-level filters change
   useEffect(() => { setDrillPath([]); setDrillData([]); }, [dateFilter, selectedSeller, selectedMarketplace, excludeClient, excludeLowValue, groupBy]);
 
   const fetchSellers = async () => {
     try {
       const res = await api.get('/sellers/all');
       setSellers(res.data || []);
-    } catch (e) {
-      console.error('Error fetching sellers:', e);
-    }
+    } catch (e) { console.error('Error fetching sellers:', e); }
   };
 
   const buildCommonParams = useCallback(() => {
@@ -203,32 +194,21 @@ export default function CRPAnalyticsPage() {
       const results = payload.items ?? [];
       const tiers = payload.ticketTiers ?? { low: 0, mid: 0, high: 0, extra_high: 0 };
       const total = results.reduce((s, r) => s + r.count, 0);
-      setData(results.map(r => ({
-        ...r,
-        percentage: total > 0 ? ((r.count / total) * 100).toFixed(1) : '0.0',
-      })));
+      setData(results.map(r => ({ ...r, percentage: total > 0 ? ((r.count / total) * 100).toFixed(1) : '0.0' })));
       setTicketTiers(tiers);
     } catch (e) {
       console.error('Error fetching CRP analytics:', e);
       setError('Failed to load CRP analytics. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  // Drill into a bar entry. nextLevel = what to group by next, item = the clicked entry.
   const handleBarClick = useCallback(async (item) => {
-    if (!item || !item.id) return; // can't drill into Unassigned
-
-    // Determine which level this click represents based on current groupBy
+    if (!item || !item.id) return;
     const levelMap = { category: 'range', range: 'product' };
     const nextGroupBy = levelMap[groupBy];
-    if (!nextGroupBy) return; // already at product level, nothing to drill
-
-    const clickedLevel = groupBy; // 'category' or 'range'
+    if (!nextGroupBy) return;
+    const clickedLevel = groupBy;
     const newPath = [{ level: clickedLevel, id: item.id, name: item.name, groupBy: nextGroupBy }];
-
-    // If we already have a drill path, replace the last entry if same level, otherwise append
     const existingCategoryStep = drillPath.find(s => s.level === 'category');
     if (clickedLevel === 'category') {
       setDrillPath(newPath);
@@ -237,7 +217,6 @@ export default function CRPAnalyticsPage() {
     } else {
       setDrillPath(newPath);
     }
-
     await fetchDrillData(newPath, nextGroupBy);
     setTimeout(() => drillRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   }, [groupBy, drillPath, buildCommonParams]);
@@ -255,7 +234,6 @@ export default function CRPAnalyticsPage() {
     try {
       setDrillLoading(true);
       const params = { ...buildCommonParams(), groupBy: nextGroupBy };
-      // Apply all path filters
       for (const step of path) {
         if (step.level === 'category') params.categoryId = step.id;
         if (step.level === 'range') params.rangeId = step.id;
@@ -263,31 +241,19 @@ export default function CRPAnalyticsPage() {
       const res = await api.get('/orders/crp-analytics', { params });
       const results = res.data?.items ?? [];
       const total = results.reduce((s, r) => s + r.count, 0);
-      setDrillData(results.map(r => ({
-        ...r,
-        percentage: total > 0 ? ((r.count / total) * 100).toFixed(1) : '0.0',
-      })));
-    } catch (e) {
-      console.error('Error fetching drill-down data:', e);
-    } finally {
-      setDrillLoading(false);
-    }
+      setDrillData(results.map(r => ({ ...r, percentage: total > 0 ? ((r.count / total) * 100).toFixed(1) : '0.0' })));
+    } catch (e) { console.error('Error fetching drill-down data:', e); }
+    finally { setDrillLoading(false); }
   };
 
-  // Navigate breadcrumb: clicking a breadcrumb step trims the path and re-fetches
   const handleBreadcrumbClick = useCallback(async (stepIndex) => {
-    if (stepIndex < 0) {
-      setDrillPath([]);
-      setDrillData([]);
-      return;
-    }
+    if (stepIndex < 0) { setDrillPath([]); setDrillData([]); return; }
     const newPath = drillPath.slice(0, stepIndex + 1);
     setDrillPath(newPath);
-    const lastStep = newPath[newPath.length - 1];
-    await fetchDrillData(newPath, lastStep.groupBy);
+    await fetchDrillData(newPath, newPath[newPath.length - 1].groupBy);
   }, [drillPath, buildCommonParams]);
 
-  // Derived stats
+  // â”€â”€ Derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const totalOrders = data.reduce((s, r) => s + r.count, 0);
   const unassigned = data.find(d => d.name === 'Unassigned');
   const unassignedCount = unassigned?.count ?? 0;
@@ -297,568 +263,365 @@ export default function CRPAnalyticsPage() {
   const topAssigned = data.filter(d => d.name !== 'Unassigned')[0];
   const groupByLabel = { category: 'Category', range: 'Range', product: 'Product' }[groupBy];
   const barHeight = Math.max(240, data.length * 34);
-
-  // Drill-down derived
   const drillTotalOrders = drillData.reduce((s, r) => s + r.count, 0);
   const drillBarHeight = Math.max(180, drillData.length * 34);
   const drillLevelLabel = drillPath.length > 0
-    ? { range: 'Range', product: 'Product' }[drillPath[drillPath.length - 1].groupBy] ?? ''
+    ? ({ range: 'Range', product: 'Product' }[drillPath[drillPath.length - 1].groupBy] ?? '')
     : '';
-
-  // Clickable only when groupBy is category or range and we can drill further
   const canDrillDown = groupBy === 'category' || groupBy === 'range';
+
+  // â”€â”€ Ranked list renderer (shared between main + drill panels) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const renderRankedList = (items, onClickItem, isClickable, colorOffset = 0, activePath = []) => (
+    <Box sx={{ overflowY: 'auto', flex: 1 }}>
+      {/* Column headers */}
+      <Stack direction="row" alignItems="center" sx={{ pb: 0.75, mb: 0.25, borderBottom: `2px solid ${alpha(BRAND_DARK, 0.07)}` }}>
+        <Typography variant="caption" sx={{ minWidth: 26, color: alpha(BRAND_DARK, 0.3), fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.63rem' }}>#</Typography>
+        <Typography variant="caption" sx={{ flex: 1, color: alpha(BRAND_DARK, 0.3), fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.63rem' }}>Name</Typography>
+        <Typography variant="caption" sx={{ minWidth: 44, textAlign: 'right', color: alpha(BRAND_DARK, 0.3), fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.63rem' }}>Orders</Typography>
+        <Typography variant="caption" sx={{ minWidth: 38, textAlign: 'right', color: alpha(BRAND_DARK, 0.3), fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.63rem', mr: isClickable ? 1.5 : 0 }}>Share</Typography>
+      </Stack>
+      {items.map((entry, i) => {
+        const ci = (i + colorOffset) % COLORS.length;
+        const isActive = activePath.length > 0 && activePath[0].id === entry.id;
+        const isDimmed = activePath.length > 0 && colorOffset === 0 && !isActive;
+        return (
+          <Box key={entry.id ?? i}
+            onClick={isClickable && entry.id ? () => onClickItem(entry) : undefined}
+            sx={{
+              py: 0.9,
+              borderBottom: `1px solid ${alpha(BRAND_DARK, 0.04)}`,
+              cursor: isClickable && entry.id ? 'pointer' : 'default',
+              opacity: isDimmed ? 0.35 : 1,
+              borderRadius: 1,
+              px: 0.25,
+              transition: 'background 0.15s, opacity 0.15s',
+              '&:hover': isClickable && entry.id ? { bgcolor: alpha(BRAND_YELLOW, 0.08) } : {},
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.4 }}>
+              <Typography variant="caption" sx={{ minWidth: 26, color: i < 3 ? BRAND_YELLOW_DARK : alpha(BRAND_DARK, 0.28), fontWeight: 700, fontSize: '0.72rem' }}>
+                {i + 1}
+              </Typography>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: COLORS[ci], flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: BRAND_DARK }}>
+                {entry.name}
+              </Typography>
+              <Typography variant="caption" fontWeight={700} sx={{ flexShrink: 0, minWidth: 44, textAlign: 'right', color: BRAND_DARK }}>
+                {entry.count.toLocaleString()}
+              </Typography>
+              <Typography variant="caption" sx={{ flexShrink: 0, minWidth: 38, textAlign: 'right', color: alpha(BRAND_DARK, 0.45) }}>
+                {entry.percentage}%
+              </Typography>
+              {isClickable && entry.id && (
+                <ArrowForwardIosIcon sx={{ fontSize: 9, color: alpha(BRAND_DARK, 0.22), flexShrink: 0 }} />
+              )}
+            </Stack>
+            <Box sx={{ pl: '26px' }}>
+              <LinearProgress
+                variant="determinate"
+                value={Math.min(parseFloat(entry.percentage), 100)}
+                sx={{
+                  height: 3, borderRadius: 2,
+                  bgcolor: alpha(COLORS[ci], 0.14),
+                  '& .MuiLinearProgress-bar': { bgcolor: COLORS[ci], borderRadius: 2 },
+                }}
+              />
+            </Box>
+          </Box>
+        );
+      })}
+    </Box>
+  );
 
   if (loading && data.length === 0) return <CRPAnalyticsSkeleton />;
 
   return (
     <Fade in timeout={600}>
-    <AdminPageShell>
-      {/* ── Page header + inline filters ────────────────────────────────────── */}
-      <Stack direction={{ xs: 'column', xl: 'row' }} alignItems={{ xl: 'flex-start' }}
-        justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+      <AdminPageShell>
+
+        {/* â”€â”€ Page header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <PageHeader
           title="Categorized Order Analytics"
-          subtitle={`Orders grouped by ${groupByLabel.toLowerCase()} assignment · PST timezone`}
-          sx={{ pt: 0, pb: 0, flexShrink: 0 }}
+          subtitle={`Orders grouped by ${groupByLabel.toLowerCase()} · PST timezone`}
+          sx={{ pt: 0, pb: 1.5 }}
         />
 
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-          <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel>Date Mode</InputLabel>
-            <Select value={dateFilter.mode} label="Date Mode"
-              onChange={(e) => setDateFilter((prev) => ({
-                ...prev,
-                mode: e.target.value,
-                single: e.target.value === 'single' && !prev.single ? getDefaultSingleDay() : prev.single,
-              }))}>
-              <MenuItem value="none">None</MenuItem>
-              <MenuItem value="single">Single Day</MenuItem>
-              <MenuItem value="range">Date Range</MenuItem>
-            </Select>
-          </FormControl>
-
-          {dateFilter.mode === 'single' && (
-            <TextField label="Date" type="date" size="small"
-              value={dateFilter.single}
-              onChange={(e) => setDateFilter(p => ({ ...p, single: e.target.value }))}
-              InputLabelProps={{ shrink: true }} sx={{ width: 158 }} />
-          )}
-          {dateFilter.mode === 'range' && (
-            <>
-              <TextField label="From" type="date" size="small"
-                value={dateFilter.from}
+        {/* â”€â”€ Filter bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        <Box sx={{
+          mb: 2.5, p: '10px 14px',
+          borderRadius: `${T.radius.card}px`,
+          background: alpha(BRAND_DARK, 0.03),
+          border: `1px solid ${alpha(BRAND_DARK, 0.08)}`,
+        }}>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+            <FormControl size="small" sx={{ minWidth: 128 }}>
+              <InputLabel>Date Mode</InputLabel>
+              <Select value={dateFilter.mode} label="Date Mode"
+                onChange={(e) => setDateFilter(prev => ({
+                  ...prev, mode: e.target.value,
+                  single: e.target.value === 'single' && !prev.single ? getDefaultSingleDay() : prev.single,
+                }))}>
+                <MenuItem value="none">None</MenuItem>
+                <MenuItem value="single">Single Day</MenuItem>
+                <MenuItem value="range">Date Range</MenuItem>
+              </Select>
+            </FormControl>
+            {dateFilter.mode === 'single' && (
+              <TextField label="Date" type="date" size="small" value={dateFilter.single}
+                onChange={(e) => setDateFilter(p => ({ ...p, single: e.target.value }))}
+                InputLabelProps={{ shrink: true }} sx={{ width: 156 }} />
+            )}
+            {dateFilter.mode === 'range' && (<>
+              <TextField label="From" type="date" size="small" value={dateFilter.from}
                 onChange={(e) => setDateFilter(p => ({ ...p, from: e.target.value }))}
-                InputLabelProps={{ shrink: true }} sx={{ width: 152 }} />
-              <TextField label="To" type="date" size="small"
-                value={dateFilter.to}
+                InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+              <TextField label="To" type="date" size="small" value={dateFilter.to}
                 onChange={(e) => setDateFilter(p => ({ ...p, to: e.target.value }))}
-                InputLabelProps={{ shrink: true }} sx={{ width: 152 }} />
-            </>
-          )}
+                InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+            </>)}
 
-          <FormControl size="small" sx={{ minWidth: 170 }}>
-            <InputLabel>Seller</InputLabel>
-            <Select value={selectedSeller}
-              onChange={(e) => setSelectedSeller(e.target.value)} label="Seller">
-              <MenuItem value="">All Sellers</MenuItem>
-              {sellers.map(s => (
-                <MenuItem key={s._id} value={s._id}>{s.user?.username || 'Unknown'}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+            <FormControl size="small" sx={{ minWidth: 158 }}>
+              <InputLabel>Seller</InputLabel>
+              <Select value={selectedSeller} label="Seller"
+                onChange={(e) => setSelectedSeller(e.target.value)}>
+                <MenuItem value="">All Sellers</MenuItem>
+                {sellers.map(s => <MenuItem key={s._id} value={s._id}>{s.user?.username || 'Unknown'}</MenuItem>)}
+              </Select>
+            </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: 170 }}>
-            <InputLabel>Marketplace</InputLabel>
-            <Select
-              value={selectedMarketplace}
-              onChange={(e) => setSelectedMarketplace(e.target.value)}
-              label="Marketplace"
-            >
-              <MenuItem value="">
-                <em>All</em>
-              </MenuItem>
-              <MenuItem value="EBAY_US">EBAY_US</MenuItem>
-              <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
-              <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
-              <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
-            </Select>
-          </FormControl>
+            <FormControl size="small" sx={{ minWidth: 158 }}>
+              <InputLabel>Marketplace</InputLabel>
+              <Select value={selectedMarketplace} label="Marketplace"
+                onChange={(e) => setSelectedMarketplace(e.target.value)}>
+                <MenuItem value=""><em>All</em></MenuItem>
+                <MenuItem value="EBAY_US">EBAY_US</MenuItem>
+                <MenuItem value="EBAY_AU">EBAY_AU</MenuItem>
+                <MenuItem value="EBAY_ENCA">EBAY_CA</MenuItem>
+                <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
+              </Select>
+            </FormControl>
 
-          <ToggleButtonGroup value={groupBy} exclusive size="small"
-            onChange={(_, v) => { if (v) setGroupBy(v); }}
-            sx={{
-              '& .MuiToggleButton-root': {
-                '&:hover': { backgroundColor: 'rgba(245,200,66,0.12)', borderColor: '#f0b800' },
-              },
-              '& .MuiToggleButton-root.Mui-selected': {
-                backgroundColor: '#f5c842',
-                color: '#1a1a2e',
-                fontWeight: 700,
-                '&:hover': { backgroundColor: '#f0b800' },
-              },
-            }}
-          >
-            <ToggleButton value="category">Category</ToggleButton>
-            <ToggleButton value="range">Range</ToggleButton>
-            <ToggleButton value="product">Product</ToggleButton>
-          </ToggleButtonGroup>
+            {/* Divider */}
+            <Box sx={{ width: '1px', height: 26, bgcolor: alpha(BRAND_DARK, 0.1) }} />
 
-          <FormControlLabel
-            control={<Switch checked={excludeClient} color="primary"
-              onChange={(e) => setExcludeClient(e.target.checked)} />}
-            label={<Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Exclude Client</Typography>}
-            sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
-          />
+            <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.38), fontWeight: 700, fontSize: '0.67rem', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              Group by
+            </Typography>
+            <ToggleButtonGroup value={groupBy} exclusive size="small" onChange={(_, v) => { if (v) setGroupBy(v); }}
+              sx={{
+                '& .MuiToggleButton-root': { px: 1.5, fontSize: '0.78rem', fontWeight: 500 },
+                '& .MuiToggleButton-root.Mui-selected': { backgroundColor: BRAND_YELLOW, color: BRAND_DARK, fontWeight: 700, '&:hover': { backgroundColor: BRAND_YELLOW_DARK } },
+              }}>
+              <ToggleButton value="category">Category</ToggleButton>
+              <ToggleButton value="range">Range</ToggleButton>
+              <ToggleButton value="product">Product</ToggleButton>
+            </ToggleButtonGroup>
 
-          <FormControlLabel
-            control={<Switch checked={excludeLowValue} color="primary"
-              onChange={(e) => setExcludeLowValue(e.target.checked)} />}
-            label={<Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Excl. &lt;$3</Typography>}
-            sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
-          />
+            {/* Divider */}
+            <Box sx={{ width: '1px', height: 26, bgcolor: alpha(BRAND_DARK, 0.1) }} />
 
-          <Button variant="outlined" size="small"
-            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-            onClick={fetchAnalytics} disabled={loading} sx={{ ...yellowOutlinedButtonSx, height: 40 }}>
-            Refresh
-          </Button>
-        </Stack>
-      </Stack>
-
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-      {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
+            <FormControlLabel
+              control={<Switch checked={excludeClient} size="small" color="primary" onChange={(e) => setExcludeClient(e.target.checked)} />}
+              label={<Typography variant="caption" sx={{ fontWeight: 500, color: alpha(BRAND_DARK, 0.65) }}>Excl. Client</Typography>}
+              sx={{ m: 0 }}
+            />
+            <FormControlLabel
+              control={<Switch checked={excludeLowValue} size="small" color="primary" onChange={(e) => setExcludeLowValue(e.target.checked)} />}
+              label={<Typography variant="caption" sx={{ fontWeight: 500, color: alpha(BRAND_DARK, 0.65) }}>Excl. &lt;$3</Typography>}
+              sx={{ m: 0 }}
+            />
+            <Button variant="outlined" size="small"
+              startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon sx={{ fontSize: 15 }} />}
+              onClick={fetchAnalytics} disabled={loading}
+              sx={{ ...yellowOutlinedButtonSx, height: 36, ml: 'auto !important' }}>
+              Refresh
+            </Button>
+          </Stack>
         </Box>
-      )}
 
-      {!loading && data.length === 0 && !error && (
-        <Alert severity="info">No orders found for the selected filters.</Alert>
-      )}
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {loading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>}
+        {!loading && data.length === 0 && !error && <Alert severity="info">No orders found for the selected filters.</Alert>}
 
-      {!loading && data.length > 0 && (
-        <>
-          {/* ── Stat cards ────────────────────────────────────────────────────── */}
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 1.5 }} flexWrap="wrap" useFlexGap>
-            <StatCard
-              icon={<TrendingUpIcon sx={{ fontSize: 19 }} />}
-              label="Total Orders"
+        {!loading && data.length > 0 && (<>
+
+          {/* â”€â”€ CRP Overview cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <SectionLabel>CRP Overview</SectionLabel>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+            <MetricCard icon={<TrendingUpIcon sx={{ fontSize: 18 }} />} label="Total Orders"
               value={totalOrders.toLocaleString()}
-              color="#1976d2"
-            />
-            <StatCard
-              icon={<CheckCircleOutlineIcon sx={{ fontSize: 19 }} />}
-              label="Assigned"
-              value={`${assignedPct}%`}
-              sub={`${assignedCount.toLocaleString()} orders`}
-              color="#2e7d32"
-            />
-            <StatCard
-              icon={<HelpOutlineIcon sx={{ fontSize: 19 }} />}
-              label="Unassigned"
-              value={`${unassignedPct}%`}
-              sub={`${unassignedCount.toLocaleString()} orders`}
-              color="#d32f2f"
-            />
-            <StatCard
-              icon={<EmojiEventsOutlinedIcon sx={{ fontSize: 19 }} />}
-              label={`Top ${groupByLabel}`}
-              value={topAssigned?.name ?? '—'}
-              sub={topAssigned ? `${topAssigned.count.toLocaleString()} orders · ${topAssigned.percentage}%` : ''}
-              color="#ed6c02"
-            />
+              sub={dateFilter.mode === 'single' && dateFilter.single ? dateFilter.single : undefined}
+              tone="info" />
+            <MetricCard icon={<CheckCircleOutlineIcon sx={{ fontSize: 18 }} />} label="Assigned"
+              value={`${assignedPct}%`} sub={`${assignedCount.toLocaleString()} orders`} tone="success" />
+            <MetricCard icon={<HelpOutlineIcon sx={{ fontSize: 18 }} />} label="Unassigned"
+              value={`${unassignedPct}%`} sub={`${unassignedCount.toLocaleString()} orders`} tone="danger" />
+            <MetricCard icon={<EmojiEventsOutlinedIcon sx={{ fontSize: 18 }} />} label={`Top ${groupByLabel}`}
+              value={topAssigned?.name ?? '-'}
+              sub={topAssigned ? `${topAssigned.count.toLocaleString()} · ${topAssigned.percentage}%` : ''}
+              tone="warning" />
           </Stack>
 
-          {/* ── Ticket tier breakdown ─────────────────────────────────────────── */}
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
-            <StatCard
-              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: 11, lineHeight: 1 }}>$0–30</Typography>}
-              label="Low Ticket"
-              value={ticketTiers.low.toLocaleString()}
-              sub="subtotal < $30"
-              color="#0288d1"
-            />
-            <StatCard
-              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: 11, lineHeight: 1 }}>$30–60</Typography>}
-              label="Mid Ticket"
-              value={ticketTiers.mid.toLocaleString()}
-              sub="$30 – $59"
-              color="#388e3c"
-            />
-            <StatCard
-              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: 11, lineHeight: 1 }}>$60–100</Typography>}
-              label="High Ticket"
-              value={ticketTiers.high.toLocaleString()}
-              sub="$60 – $99"
-              color="#f57c00"
-            />
-            <StatCard
-              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: 10, lineHeight: 1 }}>$100+</Typography>}
-              label="Extra High Ticket"
-              value={ticketTiers.extra_high.toLocaleString()}
-              sub="subtotal ≥ $100"
-              color="#7b1fa2"
-            />
+          {/* â”€â”€ Order value band cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <SectionLabel>Order Value Bands</SectionLabel>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} flexWrap="wrap" useFlexGap sx={{ mb: 2.5 }}>
+            <MetricCard
+              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$0-30</Typography>}
+              label="Low Ticket" value={ticketTiers.low.toLocaleString()} sub="subtotal < $30" tone="shipping" />
+            <MetricCard
+              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$30-60</Typography>}
+              label="Mid Ticket" value={ticketTiers.mid.toLocaleString()} sub="$30-$59" tone="success" />
+            <MetricCard
+              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$60-100</Typography>}
+              label="High Ticket" value={ticketTiers.high.toLocaleString()} sub="$60-$99" tone="amazon" />
+            <MetricCard
+              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$100+</Typography>}
+              label="Extra High Ticket" value={ticketTiers.extra_high.toLocaleString()} sub="subtotal >= $100" tone="danger" />
           </Stack>
 
-          {/* ── Charts ────────────────────────────────────────────────────────── */}
-          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
+          {/* â”€â”€ Main chart + ranking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <SectionLabel>
+            {`Distribution by ${groupByLabel}${canDrillDown ? ' · click a bar or row to drill in' : ''}`}
+          </SectionLabel>
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} sx={{ mb: drillPath.length > 0 ? 2.5 : 0 }}>
 
-            {/* Left: Horizontal bar chart */}
+            {/* Bar chart */}
             <SectionCard sx={{ flex: '3 1 0', minWidth: 0, p: 2 }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.25 }}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight={700}>Orders by {groupByLabel}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Sorted by volume · hover for details
-                    {canDrillDown && ' · click a bar to drill down'}
-                  </Typography>
-                </Box>
-              </Stack>
-              <Box sx={{ mt: 2 }}>
-                <ResponsiveContainer width="100%" height={barHeight}>
-                  <BarChart
-                    layout="vertical"
-                    data={data}
-                    margin={{ top: 2, right: 52, left: 8, bottom: 2 }}
-                    onClick={(chartData) => {
-                      if (canDrillDown && chartData?.activePayload?.[0]?.payload) {
-                        handleBarClick(chartData.activePayload[0].payload);
-                      }
-                    }}
-                    style={canDrillDown ? { cursor: 'pointer' } : undefined}
-                  >
-                    <XAxis type="number" allowDecimals={false}
-                      tick={{ fontSize: 11, fill: '#999' }}
-                      axisLine={false} tickLine={false} />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={155}
-                      tick={{ fontSize: 11, fill: '#555' }}
-                      axisLine={false} tickLine={false}
-                      tickFormatter={(v) => v.length > 22 ? v.slice(0, 21) + '…' : v}
-                    />
-                    <Tooltip content={<BarTooltipContent />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={20}>
-                      {data.map((entry, i) => (
-                        <Cell key={entry.id ?? i} fill={COLORS[i % COLORS.length]}
-                          opacity={drillPath.length > 0 && drillPath[0].id === entry.id ? 1 : drillPath.length > 0 ? 0.45 : 1}
-                        />
-                      ))}
-                      <LabelList
-                        dataKey="count"
-                        position="right"
-                        style={{ fontSize: 11, fill: '#555', fontWeight: 600 }}
-                      />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </Box>
-            </SectionCard>
-
-            {/* Right: Donut + legend table */}
-            <SectionCard sx={{
-              flex: '2 1 0', minWidth: 280,
-              p: 2,
-              display: 'flex', flexDirection: 'column',
-            }}>
-              <Typography variant="subtitle1" fontWeight={700}>Share by {groupByLabel}</Typography>
-              <Typography variant="caption" color="text.secondary">Proportional breakdown</Typography>
-
-              {/* Donut */}
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 1 }}>
-                <PieChart width={200} height={200}>
-                  <Pie
-                    data={data}
-                    dataKey="count"
-                    nameKey="name"
-                    cx={100} cy={100}
-                    innerRadius={58}
-                    outerRadius={92}
-                    startAngle={90}
-                    endAngle={-270}
-                    paddingAngle={data.length > 1 ? 1.5 : 0}
-                    onClick={canDrillDown ? (sliceData) => handleBarClick(sliceData) : undefined}
-                    style={canDrillDown ? { cursor: 'pointer' } : undefined}
-                  >
-                    <Label content={<DonutCenter total={totalOrders} />} position="center" />
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND_DARK }}>Orders by {groupByLabel}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>Sorted by volume</Typography>
+              <ResponsiveContainer width="100%" height={barHeight}>
+                <BarChart layout="vertical" data={data} margin={{ top: 2, right: 52, left: 8, bottom: 2 }}
+                  onClick={(chart) => { if (canDrillDown && chart?.activePayload?.[0]?.payload) handleBarClick(chart.activePayload[0].payload); }}
+                  style={canDrillDown ? { cursor: 'pointer' } : undefined}>
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: alpha(BRAND_DARK, 0.38) }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" width={155} tick={{ fontSize: 11, fill: alpha(BRAND_DARK, 0.58) }}
+                    axisLine={false} tickLine={false} tickFormatter={(v) => v.length > 22 ? v.slice(0, 21) + '...' : v} />
+                  <Tooltip content={<BarTooltipContent />} cursor={{ fill: alpha(BRAND_DARK, 0.04) }} />
+                  <Bar dataKey="count" radius={[0, 5, 5, 0]} maxBarSize={18}>
                     {data.map((entry, i) => (
                       <Cell key={entry.id ?? i} fill={COLORS[i % COLORS.length]}
-                        opacity={drillPath.length > 0 && drillPath[0].id === entry.id ? 1 : drillPath.length > 0 ? 0.45 : 1}
-                      />
+                        opacity={drillPath.length > 0 && drillPath[0].id === entry.id ? 1 : drillPath.length > 0 ? 0.28 : 1} />
                     ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v, _n, p) => [
-                      `${v.toLocaleString()} orders (${p.payload.percentage}%)`,
-                      p.payload.name,
-                    ]}
-                  />
-                </PieChart>
-              </Box>
+                    <LabelList dataKey="count" position="right" style={{ fontSize: 11, fill: alpha(BRAND_DARK, 0.52), fontWeight: 600 }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </SectionCard>
 
-              <Divider sx={{ mb: 1.5 }} />
-
-              {/* Scrollable legend table */}
-              <Box sx={{ overflowY: 'auto', flex: 1 }}>
-                {data.map((entry, i) => (
-                  <Box key={entry.id ?? i}
-                    onClick={canDrillDown && entry.id ? () => handleBarClick(entry) : undefined}
-                    sx={{
-                      mb: 1.2,
-                      cursor: canDrillDown && entry.id ? 'pointer' : 'default',
-                      opacity: drillPath.length > 0 && drillPath[0].id === entry.id ? 1 : drillPath.length > 0 ? 0.45 : 1,
-                      borderRadius: 1,
-                      px: 0.5,
-                      '&:hover': canDrillDown && entry.id ? { bgcolor: 'action.hover' } : {},
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.35 }}>
-                      <Box sx={{
-                        width: 8, height: 8, borderRadius: '50%',
-                        bgcolor: COLORS[i % COLORS.length], flexShrink: 0,
-                      }} />
-                      <Typography variant="caption" sx={{
-                        flex: 1, fontWeight: 500,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {entry.name}
-                      </Typography>
-                      <Typography variant="caption" fontWeight={700} sx={{ flexShrink: 0, minWidth: 33, textAlign: 'right' }}>
-                        {entry.count.toLocaleString()}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, minWidth: 38, textAlign: 'right' }}>
-                        {entry.percentage}%
-                      </Typography>
-                      {canDrillDown && entry.id && (
-                        <ArrowForwardIosIcon sx={{ fontSize: 10, color: 'text.disabled', flexShrink: 0 }} />
-                      )}
-                    </Stack>
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.min(parseFloat(entry.percentage), 100)}
-                      sx={{
-                        height: 3, borderRadius: 2,
-                        bgcolor: 'grey.100',
-                        ml: '14px',
-                        '& .MuiLinearProgress-bar': {
-                          bgcolor: COLORS[i % COLORS.length],
-                          borderRadius: 2,
-                        },
-                      }}
-                    />
-                  </Box>
-                ))}
-              </Box>
+            {/* Ranked list - replaces donut chart */}
+            <SectionCard sx={{ flex: '2 1 0', minWidth: 260, p: 2, display: 'flex', flexDirection: 'column', maxHeight: barHeight + 56 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND_DARK }}>Ranking</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                {data.length} {groupByLabel.toLowerCase()}s{canDrillDown ? ' · click to drill down' : ''}
+              </Typography>
+              {renderRankedList(data, handleBarClick, canDrillDown, 0, drillPath)}
             </SectionCard>
 
           </Stack>
 
-          {/* ── Drill-down panel ─────────────────────────────────────────────── */}
+          {/* â”€â”€ Drill-down panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           {drillPath.length > 0 && (
-            <Box ref={drillRef} sx={{ mt: 3 }}>
-              {/* Breadcrumb */}
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                <Breadcrumbs separator="›" sx={{ '& .MuiBreadcrumbs-separator': { mx: 0.5 } }}>
-                  <Link
-                    component="button"
-                    variant="body2"
-                    underline="hover"
-                    color="text.secondary"
-                    onClick={() => handleBreadcrumbClick(-1)}
-                    sx={{ cursor: 'pointer' }}
-                  >
-                    All {groupByLabel}s
-                  </Link>
-                  {drillPath.map((step, idx) => {
-                    const isLast = idx === drillPath.length - 1;
-                    return isLast ? (
-                      <Typography key={idx} variant="body2" fontWeight={700} color="text.primary">
-                        {step.name}
-                      </Typography>
-                    ) : (
-                      <Link
-                        key={idx}
-                        component="button"
-                        variant="body2"
-                        underline="hover"
-                        color="text.secondary"
-                        onClick={() => handleBreadcrumbClick(idx)}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        {step.name}
-                      </Link>
-                    );
-                  })}
-                </Breadcrumbs>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<CloseIcon sx={{ fontSize: 14 }} />}
+            <Box ref={drillRef}>
+              {/* Header bar */}
+              <Box sx={{
+                px: 2, py: 1.25,
+                borderRadius: `${T.radius.card}px ${T.radius.card}px 0 0`,
+                background: `linear-gradient(135deg, ${BRAND_DARK} 0%, ${alpha(BRAND_DARK, 0.86)} 100%)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <Box sx={{ width: 3, height: 20, borderRadius: 1, bgcolor: BRAND_YELLOW, flexShrink: 0 }} />
+                  <Breadcrumbs separator=">" sx={{ '& .MuiBreadcrumbs-separator': { mx: 0.25, color: alpha('#fff', 0.38) } }}>
+                    <Link component="button" variant="caption" underline="hover"
+                      sx={{ cursor: 'pointer', color: alpha('#fff', 0.5), fontWeight: 500, background: 'none', border: 'none' }}
+                      onClick={() => handleBreadcrumbClick(-1)}>
+                      All {groupByLabel}s
+                    </Link>
+                    {drillPath.map((step, idx) => {
+                      const isLast = idx === drillPath.length - 1;
+                      return isLast
+                        ? <Typography key={idx} variant="caption" fontWeight={700} sx={{ color: BRAND_YELLOW }}>{step.name}</Typography>
+                        : <Link key={idx} component="button" variant="caption" underline="hover"
+                            sx={{ cursor: 'pointer', color: alpha('#fff', 0.5), fontWeight: 500, background: 'none', border: 'none' }}
+                            onClick={() => handleBreadcrumbClick(idx)}>{step.name}</Link>;
+                    })}
+                  </Breadcrumbs>
+                </Stack>
+                <Button size="small" startIcon={<CloseIcon sx={{ fontSize: 13 }} />}
                   onClick={() => { setDrillPath([]); setDrillData([]); }}
-                  sx={{ ...yellowOutlinedButtonSx, height: 32, fontSize: 12 }}
-                >
-                  Clear Drill-down
+                  sx={{ color: alpha('#fff', 0.55), fontSize: '0.72rem', fontWeight: 500, minHeight: 28, px: 1, '&:hover': { bgcolor: alpha('#fff', 0.08), color: '#fff' } }}>
+                  Clear
                 </Button>
-              </Stack>
+              </Box>
 
-              {drillLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
-                  <CircularProgress size={32} />
-                </Box>
-              ) : drillData.length === 0 ? (
-                <Alert severity="info">No {drillLevelLabel.toLowerCase()} data found within this selection.</Alert>
-              ) : (
-                <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
-                  {/* Drill bar chart */}
-                  <SectionCard sx={{ flex: '3 1 0', minWidth: 0, p: 2 }}>
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      {drillLevelLabel}s within "{drillPath[drillPath.length - 1].name}"
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {drillTotalOrders.toLocaleString()} orders
-                      {drillPath[drillPath.length - 1].groupBy === 'range' && ' · click a bar to drill down to products'}
-                    </Typography>
-                    <Box sx={{ mt: 2 }}>
+              {/* Drill content */}
+              <Box sx={{
+                border: `1px solid ${alpha(BRAND_DARK, 0.1)}`,
+                borderTop: 'none',
+                borderRadius: `0 0 ${T.radius.card}px ${T.radius.card}px`,
+                p: 2,
+                bgcolor: alpha(BRAND_YELLOW, 0.022),
+              }}>
+                {drillLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
+                    <CircularProgress size={32} />
+                  </Box>
+                ) : drillData.length === 0 ? (
+                  <Alert severity="info">No {drillLevelLabel.toLowerCase()} data found within this selection.</Alert>
+                ) : (
+                  <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
+                    {/* Drill bar chart */}
+                    <SectionCard sx={{ flex: '3 1 0', minWidth: 0, p: 2 }}>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND_DARK }}>
+                        {drillLevelLabel}s within "{drillPath[drillPath.length - 1].name}"
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                        {drillTotalOrders.toLocaleString()} orders
+                        {drillPath[drillPath.length - 1].groupBy === 'range' && ' · click to drill into products'}
+                      </Typography>
                       <ResponsiveContainer width="100%" height={drillBarHeight}>
-                        <BarChart
-                          layout="vertical"
-                          data={drillData}
-                          margin={{ top: 2, right: 52, left: 8, bottom: 2 }}
-                          onClick={(chartData) => {
-                            if (drillPath[drillPath.length - 1].groupBy === 'range' && chartData?.activePayload?.[0]?.payload) {
-                              handleDrillRangeClick(chartData.activePayload[0].payload);
-                            }
+                        <BarChart layout="vertical" data={drillData} margin={{ top: 2, right: 52, left: 8, bottom: 2 }}
+                          onClick={(chart) => {
+                            if (drillPath[drillPath.length - 1].groupBy === 'range' && chart?.activePayload?.[0]?.payload)
+                              handleDrillRangeClick(chart.activePayload[0].payload);
                           }}
-                          style={drillPath[drillPath.length - 1].groupBy === 'range' ? { cursor: 'pointer' } : undefined}
-                        >
-                          <XAxis type="number" allowDecimals={false}
-                            tick={{ fontSize: 11, fill: '#999' }}
-                            axisLine={false} tickLine={false} />
-                          <YAxis
-                            type="category"
-                            dataKey="name"
-                            width={155}
-                            tick={{ fontSize: 11, fill: '#555' }}
-                            axisLine={false} tickLine={false}
-                            tickFormatter={(v) => v.length > 22 ? v.slice(0, 21) + '…' : v}
-                          />
-                          <Tooltip content={<BarTooltipContent />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                          <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={20}>
-                            {drillData.map((entry, i) => (
-                              <Cell key={entry.id ?? i} fill={COLORS[(i + 5) % COLORS.length]} />
-                            ))}
-                            <LabelList
-                              dataKey="count"
-                              position="right"
-                              style={{ fontSize: 11, fill: '#555', fontWeight: 600 }}
-                            />
+                          style={drillPath[drillPath.length - 1].groupBy === 'range' ? { cursor: 'pointer' } : undefined}>
+                          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: alpha(BRAND_DARK, 0.38) }} axisLine={false} tickLine={false} />
+                          <YAxis type="category" dataKey="name" width={155} tick={{ fontSize: 11, fill: alpha(BRAND_DARK, 0.58) }}
+                            axisLine={false} tickLine={false} tickFormatter={(v) => v.length > 22 ? v.slice(0, 21) + '...' : v} />
+                          <Tooltip content={<BarTooltipContent />} cursor={{ fill: alpha(BRAND_DARK, 0.04) }} />
+                          <Bar dataKey="count" radius={[0, 5, 5, 0]} maxBarSize={18}>
+                            {drillData.map((entry, i) => <Cell key={entry.id ?? i} fill={COLORS[(i + 5) % COLORS.length]} />)}
+                            <LabelList dataKey="count" position="right" style={{ fontSize: 11, fill: alpha(BRAND_DARK, 0.52), fontWeight: 600 }} />
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
-                    </Box>
-                  </SectionCard>
+                    </SectionCard>
 
-                  {/* Drill legend / share panel */}
-                  <SectionCard sx={{ flex: '2 1 0', minWidth: 260, p: 2, display: 'flex', flexDirection: 'column' }}>
-                    <Typography variant="subtitle1" fontWeight={700}>Share by {drillLevelLabel}</Typography>
-                    <Typography variant="caption" color="text.secondary">Proportional breakdown</Typography>
-
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 1 }}>
-                      <PieChart width={190} height={190}>
-                        <Pie
-                          data={drillData}
-                          dataKey="count"
-                          nameKey="name"
-                          cx={95} cy={95}
-                          innerRadius={52}
-                          outerRadius={85}
-                          startAngle={90}
-                          endAngle={-270}
-                          paddingAngle={drillData.length > 1 ? 1.5 : 0}
-                          onClick={drillPath[drillPath.length - 1].groupBy === 'range'
-                            ? (sliceData) => handleDrillRangeClick(sliceData)
-                            : undefined}
-                          style={drillPath[drillPath.length - 1].groupBy === 'range' ? { cursor: 'pointer' } : undefined}
-                        >
-                          <Label content={<DonutCenter total={drillTotalOrders} />} position="center" />
-                          {drillData.map((entry, i) => (
-                            <Cell key={entry.id ?? i} fill={COLORS[(i + 5) % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(v, _n, p) => [
-                            `${v.toLocaleString()} orders (${p.payload.percentage}%)`,
-                            p.payload.name,
-                          ]}
-                        />
-                      </PieChart>
-                    </Box>
-
-                    <Divider sx={{ mb: 1.5 }} />
-
-                    <Box sx={{ overflowY: 'auto', flex: 1 }}>
-                      {drillData.map((entry, i) => {
-                        const isRange = drillPath[drillPath.length - 1].groupBy === 'range';
-                        return (
-                          <Box key={entry.id ?? i}
-                            onClick={isRange && entry.id ? () => handleDrillRangeClick(entry) : undefined}
-                            sx={{
-                              mb: 1.2,
-                              cursor: isRange && entry.id ? 'pointer' : 'default',
-                              borderRadius: 1,
-                              px: 0.5,
-                              '&:hover': isRange && entry.id ? { bgcolor: 'action.hover' } : {},
-                            }}
-                          >
-                            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.35 }}>
-                              <Box sx={{
-                                width: 8, height: 8, borderRadius: '50%',
-                                bgcolor: COLORS[(i + 5) % COLORS.length], flexShrink: 0,
-                              }} />
-                              <Typography variant="caption" sx={{
-                                flex: 1, fontWeight: 500,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              }}>
-                                {entry.name}
-                              </Typography>
-                              <Typography variant="caption" fontWeight={700} sx={{ flexShrink: 0, minWidth: 33, textAlign: 'right' }}>
-                                {entry.count.toLocaleString()}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, minWidth: 38, textAlign: 'right' }}>
-                                {entry.percentage}%
-                              </Typography>
-                              {isRange && entry.id && (
-                                <ArrowForwardIosIcon sx={{ fontSize: 10, color: 'text.disabled', flexShrink: 0 }} />
-                              )}
-                            </Stack>
-                            <LinearProgress
-                              variant="determinate"
-                              value={Math.min(parseFloat(entry.percentage), 100)}
-                              sx={{
-                                height: 3, borderRadius: 2,
-                                bgcolor: 'grey.100',
-                                ml: '14px',
-                                '& .MuiLinearProgress-bar': {
-                                  bgcolor: COLORS[(i + 5) % COLORS.length],
-                                  borderRadius: 2,
-                                },
-                              }}
-                            />
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  </SectionCard>
-                </Stack>
-              )}
+                    {/* Drill ranked list */}
+                    <SectionCard sx={{ flex: '2 1 0', minWidth: 260, p: 2, display: 'flex', flexDirection: 'column', maxHeight: drillBarHeight + 56 }}>
+                      <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND_DARK }}>Ranking</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                        {drillData.length} {drillLevelLabel.toLowerCase()}s
+                        {drillPath[drillPath.length - 1].groupBy === 'range' ? ' · click to go deeper' : ''}
+                      </Typography>
+                      {renderRankedList(
+                        drillData,
+                        handleDrillRangeClick,
+                        drillPath[drillPath.length - 1].groupBy === 'range',
+                        5,
+                        [],
+                      )}
+                    </SectionCard>
+                  </Stack>
+                )}
+              </Box>
             </Box>
           )}
-        </>
-      )}
-    </AdminPageShell>
+
+        </>)}
+      </AdminPageShell>
     </Fade>
   );
 }
+
