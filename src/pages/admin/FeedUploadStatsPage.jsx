@@ -15,6 +15,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 import api from '../../lib/api';
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, ResponsiveContainer } from 'recharts';
 
 const todayStr = new Date().toISOString().slice(0, 10);
 const currentMonthStr = new Date().toISOString().slice(0, 7);
@@ -41,6 +42,20 @@ const getQuota = (sellerName, country = 'US') => {
   const isHighQuota = HIGH_QUOTA_SELLERS.includes((sellerName || '').toLowerCase());
   return isHighQuota ? quotas.high : quotas.normal;
 };
+
+function MetricMiniCard({ label, value, sub }) {
+  return (
+    <Box sx={{ px: 2.5, py: 2, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}`, backgroundColor: alpha(BRAND_YELLOW, 0.06), minWidth: 130 }}>
+      <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.55), fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block' }}>
+        {label}
+      </Typography>
+      <Typography variant="h6" sx={{ fontWeight: 800, color: BRAND_DARK, lineHeight: 1.2, mt: 0.5 }}>
+        {value}
+      </Typography>
+      {sub && <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.5) }}>{sub}</Typography>}
+    </Box>
+  );
+}
 
 export default function FeedUploadStatsPage() {
   const theme = useTheme();
@@ -122,6 +137,11 @@ export default function FeedUploadStatsPage() {
   const [monthLoading, setMonthLoading] = useState(true);
   const [monthError, setMonthError] = useState(null);
 
+  // ── Category / Range chart ─────────────────────────────────────────
+  const [categoryStats, setCategoryStats] = useState({ categories: [], ranges: [] });
+  const [categoryStatsLoading, setCategoryStatsLoading] = useState(false);
+  const [drillCategory, setDrillCategory] = useState(null); // { name, categoryId }
+
   // ── Build shared query params from global filters ─────────────────
   const buildParams = (extra = {}) => {
     const p = {};
@@ -181,10 +201,27 @@ export default function FeedUploadStatsPage() {
     }
   };
 
+  const fetchCategoryStats = async (from, to, paramOverrides = null) => {
+    try {
+      setCategoryStatsLoading(true);
+      const params = paramOverrides !== null
+        ? { startDate: from, endDate: to, ...paramOverrides }
+        : buildParams({ startDate: from, endDate: to });
+      const { data } = await api.get('/ebay/feed/category-stats', { params });
+      setCategoryStats(data);
+      setDrillCategory(null);
+    } catch {
+      // silent — chart section shows empty state
+    } finally {
+      setCategoryStatsLoading(false);
+    }
+  };
+
   // Apply handler — called only when user clicks "Apply Filters"
   const handleApply = () => {
     fetchDay(filterFromDate, filterToDate);
     fetchMonth(monthPicker);
+    fetchCategoryStats(filterFromDate, filterToDate);
   };
 
   // Clear all filters to defaults and re-fetch
@@ -200,6 +237,7 @@ export default function FeedUploadStatsPage() {
     // Fetch with no filter constraints (bypass stale state)
     fetchDay(todayStr, todayStr, {});
     fetchMonth(currentMonthStr, {});
+    fetchCategoryStats(todayStr, todayStr, {});
   };
 
   // Load filter option lists + initial data on mount
@@ -208,6 +246,7 @@ export default function FeedUploadStatsPage() {
     api.get('/asin-list-categories').then(({ data }) => setFilterCategories(data || [])).catch(() => {});
     fetchDay(filterFromDate, filterToDate);
     fetchMonth(monthPicker);
+    fetchCategoryStats(filterFromDate, filterToDate);
   }, []);
 
   // Load ranges when category filter changes (dropdown population only — no data fetch)
@@ -224,6 +263,10 @@ export default function FeedUploadStatsPage() {
 
   const dayTotal = dayStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
   const monthTotal = monthStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
+  const drillRanges = drillCategory
+    ? (categoryStats.ranges || []).filter((r) => r.categoryName === drillCategory.name)
+    : [];
+  const categoryTotal = (categoryStats.categories || []).reduce((s, c) => s + (c.totalSuccess || 0), 0);
 
   const headSx = {
     fontWeight: 700,
@@ -414,6 +457,130 @@ export default function FeedUploadStatsPage() {
             Clear Filters
           </Button>
         </Stack>
+      </Paper>
+
+      {/* ── Category & Range Breakdown ─────────────────────────────── */}
+      <Paper elevation={0} sx={{ mb: 3, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.12)}`, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
+          <Typography variant="subtitle1" fontWeight={700} fontSize="1rem" sx={{ color: BRAND_DARK }}>
+            Category & Range Breakdown
+          </Typography>
+        </Box>
+
+        {categoryStatsLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
+            <CircularProgress size={28} />
+          </Box>
+        ) : (categoryStats.categories.length === 0 && categoryStats.ranges.length === 0) ? (
+          <Box sx={{ py: 5, textAlign: 'center', color: 'text.secondary', fontSize: '0.9rem' }}>
+            No category data for the selected period
+          </Box>
+        ) : (
+          <Box sx={{ p: 3 }}>
+            {/* Summary cards */}
+            <Stack direction="row" flexWrap="wrap" gap={2} sx={{ mb: 3 }}>
+              <MetricMiniCard label="Categories" value={categoryStats.categories.length} />
+              <MetricMiniCard label="Ranges" value={categoryStats.ranges.length} />
+              <MetricMiniCard
+                label="Top Category"
+                value={categoryStats.categories[0]?.name || '—'}
+                sub={categoryStats.categories[0] ? categoryStats.categories[0].totalSuccess.toLocaleString() + ' listings' : undefined}
+              />
+              <MetricMiniCard label="Total Successful" value={categoryTotal.toLocaleString()} />
+            </Stack>
+
+            {/* Charts row */}
+            <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
+              {/* Category bar chart */}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: alpha(BRAND_DARK, 0.5), mb: 1.5, display: 'block', textTransform: 'uppercase', letterSpacing: 0.6, fontSize: '0.7rem' }}>
+                  By Category — click a bar to drill in
+                </Typography>
+                <ResponsiveContainer width="100%" height={Math.max(200, categoryStats.categories.length * 42 + 16)}>
+                  <BarChart
+                    data={categoryStats.categories}
+                    layout="vertical"
+                    margin={{ left: 0, right: 64, top: 0, bottom: 0 }}
+                  >
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 12, fill: BRAND_DARK }} />
+                    <RechartsTooltip
+                      formatter={(v) => [v.toLocaleString(), 'Successful Listings']}
+                      contentStyle={{ borderRadius: 8, fontSize: '0.82rem' }}
+                    />
+                    <Bar
+                      dataKey="totalSuccess"
+                      radius={[0, 5, 5, 0]}
+                      cursor="pointer"
+                      onClick={(d) => setDrillCategory(drillCategory?.name === d.name ? null : { name: d.name, categoryId: d.categoryId })}
+                      label={{ position: 'right', formatter: (v) => v.toLocaleString(), fontSize: 11, fill: alpha(BRAND_DARK, 0.6) }}
+                    >
+                      {(categoryStats.categories || []).map((c) => (
+                        <Cell
+                          key={String(c.categoryId)}
+                          fill={drillCategory?.name === c.name ? BRAND_YELLOW : alpha(BRAND_DARK, 0.55)}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+
+              {/* Range drill panel */}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                {drillCategory ? (
+                  <>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: alpha(BRAND_DARK, 0.5), textTransform: 'uppercase', letterSpacing: 0.6, fontSize: '0.7rem' }}>
+                        Ranges — {drillCategory.name}
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={() => setDrillCategory(null)}
+                        sx={{ ml: 'auto', textTransform: 'none', color: alpha(BRAND_DARK, 0.45), fontSize: '0.75rem', minWidth: 0, px: 1 }}
+                      >
+                        Clear
+                      </Button>
+                    </Box>
+                    {drillRanges.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                        No range breakdown for this category
+                      </Typography>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={Math.max(200, drillRanges.length * 42 + 16)}>
+                        <BarChart
+                          data={drillRanges}
+                          layout="vertical"
+                          margin={{ left: 0, right: 64, top: 0, bottom: 0 }}
+                        >
+                          <XAxis type="number" hide />
+                          <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 12, fill: BRAND_DARK }} />
+                          <RechartsTooltip
+                            formatter={(v) => [v.toLocaleString(), 'Successful Listings']}
+                            contentStyle={{ borderRadius: 8, fontSize: '0.82rem' }}
+                          />
+                          <Bar
+                            dataKey="totalSuccess"
+                            fill={BRAND_YELLOW}
+                            radius={[0, 5, 5, 0]}
+                            label={{ position: 'right', formatter: (v) => v.toLocaleString(), fontSize: 11, fill: alpha(BRAND_DARK, 0.6) }}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 1.5, opacity: 0.35 }}>
+                    <BarChartIcon sx={{ fontSize: 44, color: BRAND_DARK }} />
+                    <Typography variant="body2" sx={{ color: BRAND_DARK, fontWeight: 500 }}>
+                      Click a category to see range breakdown
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          </Box>
+        )}
       </Paper>
 
       <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
