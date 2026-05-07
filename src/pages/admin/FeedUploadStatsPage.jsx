@@ -2,18 +2,22 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box, Typography, Container, Paper, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Select, MenuItem, Stack
+  Select, MenuItem, Stack, FormControl, InputLabel, Button,
+  ToggleButtonGroup, ToggleButton
 } from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete';
+import TextField from '@mui/material/TextField';
 import { alpha, ThemeProvider, createTheme, useTheme } from '@mui/material/styles';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
-import { tableHeaderCellSx, tableBodyRowSx } from '../../theme/tableStyles.js';
+import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 import api from '../../lib/api';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const currentMonthStr = () => new Date().toISOString().slice(0, 7);
+const todayStr = new Date().toISOString().slice(0, 10);
+const currentMonthStr = new Date().toISOString().slice(0, 7);
 
 function monthBounds(ym) {
   const [y, m] = ym.split('-').map(Number);
@@ -22,7 +26,7 @@ function monthBounds(ym) {
 }
 
 // Sellers with a higher monthly quota (US only)
-const HIGH_QUOTA_SELLERS = ['truxi', 'raveoli_cart', 'techmania'];
+const HIGH_QUOTA_SELLERS = ['truxi', 'raveoli_cart', 'techmania', 'edgevolution'];
 
 // Country-based quotas
 const COUNTRY_QUOTAS = {
@@ -91,26 +95,53 @@ export default function FeedUploadStatsPage() {
     }
   }), []);
 
-  const [dayDate, setDayDate] = useState(todayStr);
+  // ── Global filters ────────────────────────────────────────────────
+  const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
+  const [filterSeller, setFilterSeller] = useState('');
+  const [filterCountry, setFilterCountry] = useState('ALL');
+  const [filterFromDate, setFilterFromDate] = useState(todayStr);
+  const [filterToDate, setFilterToDate] = useState(todayStr);
+  const [filterCategory, setFilterCategory] = useState(null);
+  const [filterRange, setFilterRange] = useState(null);
+
+  // Month picker (separate — driven by the same global filters except date)
+  const [monthPicker, setMonthPicker] = useState(currentMonthStr);
+  const [monthCountry, setMonthCountry] = useState('US');
+
+  // Filter option lists
+  const [sellers, setSellers] = useState([]);
+  const [filterCategories, setFilterCategories] = useState([]);
+  const [filterRanges, setFilterRanges] = useState([]);
+
+  // Stats state
   const [dayStats, setDayStats] = useState([]);
   const [dayLoading, setDayLoading] = useState(true);
   const [dayError, setDayError] = useState(null);
-  const [dayCountry, setDayCountry] = useState('ALL');
 
-  const [monthPicker, setMonthPicker] = useState(currentMonthStr);
   const [monthStats, setMonthStats] = useState([]);
   const [monthLoading, setMonthLoading] = useState(true);
   const [monthError, setMonthError] = useState(null);
-  const [monthCountry, setMonthCountry] = useState('US');
 
-  const fetchDay = async (date, country) => {
+  // ── Build shared query params from global filters ─────────────────
+  const buildParams = (extra = {}) => {
+    const p = {};
+    if (filterCountry !== 'ALL') p.country = filterCountry;
+    if (filterSeller) p.sellerId = filterSeller;
+    if (filterCategory) p.categoryId = filterCategory._id;
+    if (filterRange) p.rangeId = filterRange._id;
+    return { ...p, ...extra };
+  };
+
+  // ── Fetch functions ───────────────────────────────────────────────
+  const fetchDay = async (from, to, paramOverrides = null) => {
     try {
       setDayLoading(true);
       setDayError(null);
-      const params = { startDate: date, endDate: date };
-      if (country !== 'ALL') params.country = country;
+      const params = paramOverrides !== null
+        ? { startDate: from, endDate: to, ...paramOverrides }
+        : buildParams({ startDate: from, endDate: to });
       const { data } = await api.get('/ebay/feed/upload-stats', { params });
-      setDayStats([...data].sort((a, b) => (b.totalSuccess || 0) - (a.totalSuccess || 0)));
+      setDayStats([...data].sort((a, b) => (b.date || '').localeCompare(a.date || '')));
     } catch (err) {
       setDayError(err.response?.data?.error || 'Failed to fetch data');
     } finally {
@@ -118,25 +149,31 @@ export default function FeedUploadStatsPage() {
     }
   };
 
-  const fetchMonth = async (ym, country) => {
+  const fetchMonth = async (ym, paramOverrides = null) => {
     try {
       setMonthLoading(true);
       setMonthError(null);
       const { first, last } = monthBounds(ym);
-      const params = { startDate: first, endDate: last };
-      if (country !== 'ALL') params.country = country;
+      let params;
+      if (paramOverrides !== null) {
+        params = { startDate: first, endDate: last, ...paramOverrides };
+      } else {
+        const p = {};
+        if (monthCountry !== 'ALL') p.country = monthCountry;
+        if (filterSeller) p.sellerId = filterSeller;
+        if (filterCategory) p.categoryId = filterCategory._id;
+        if (filterRange) p.rangeId = filterRange._id;
+        params = { startDate: first, endDate: last, ...p };
+      }
       const { data } = await api.get('/ebay/feed/upload-stats', { params });
       const map = {};
       data.forEach((r) => {
-        // Group by sellerName to handle duplicate seller accounts
-        if (!map[r.sellerName])
-          map[r.sellerName] = { sellerId: r.sellerId, sellerName: r.sellerName, totalSuccess: 0 };
-        map[r.sellerName].totalSuccess += r.totalSuccess || 0;
+        const key = r.sellerName;
+        if (!map[key])
+          map[key] = { sellerId: r.sellerId, sellerName: r.sellerName, totalSuccess: 0 };
+        map[key].totalSuccess += r.totalSuccess || 0;
       });
-      setMonthStats(
-        Object.values(map)
-          .sort((a, b) => b.totalSuccess - a.totalSuccess)
-      );
+      setMonthStats(Object.values(map).sort((a, b) => b.totalSuccess - a.totalSuccess));
     } catch (err) {
       setMonthError(err.response?.data?.error || 'Failed to fetch data');
     } finally {
@@ -144,17 +181,46 @@ export default function FeedUploadStatsPage() {
     }
   };
 
-  useEffect(() => { fetchDay(todayStr(), dayCountry); }, []);
-  useEffect(() => { fetchMonth(currentMonthStr(), monthCountry); }, []);
+  // Apply handler — called only when user clicks "Apply Filters"
+  const handleApply = () => {
+    fetchDay(filterFromDate, filterToDate);
+    fetchMonth(monthPicker);
+  };
 
-  // Refetch when country filters change
-  useEffect(() => {
-    fetchDay(dayDate, dayCountry);
-  }, [dayCountry]);
+  // Clear all filters to defaults and re-fetch
+  const handleClearFilters = () => {
+    setDateMode('single');
+    setFilterSeller('');
+    setFilterCountry('ALL');
+    setFilterFromDate(todayStr);
+    setFilterToDate(todayStr);
+    setFilterCategory(null);
+    setFilterRange(null);
+    setMonthPicker(currentMonthStr);
+    // Fetch with no filter constraints (bypass stale state)
+    fetchDay(todayStr, todayStr, {});
+    fetchMonth(currentMonthStr, {});
+  };
 
+  // Load filter option lists + initial data on mount
   useEffect(() => {
-    fetchMonth(monthPicker, monthCountry);
-  }, [monthCountry]);
+    api.get('/sellers/all').then(({ data }) => setSellers(data || [])).catch(() => {});
+    api.get('/asin-list-categories').then(({ data }) => setFilterCategories(data || [])).catch(() => {});
+    fetchDay(filterFromDate, filterToDate);
+    fetchMonth(monthPicker);
+  }, []);
+
+  // Load ranges when category filter changes (dropdown population only — no data fetch)
+  useEffect(() => {
+    setFilterRange(null);
+    if (filterCategory) {
+      api.get(`/asin-list-ranges?categoryId=${filterCategory._id}`)
+        .then(({ data }) => setFilterRanges(data || []))
+        .catch(() => setFilterRanges([]));
+    } else {
+      setFilterRanges([]);
+    }
+  }, [filterCategory]);
 
   const dayTotal = dayStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
   const monthTotal = monthStats.reduce((s, r) => s + (r.totalSuccess || 0), 0);
@@ -180,46 +246,181 @@ export default function FeedUploadStatsPage() {
         </Typography>
       </Stack>
 
-      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-        {/* ── Day-wise ─────────────────────────────────────────────────── */}
-        <Paper elevation={0} sx={{ flex: 1, minWidth: 0, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
-          <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.12)}`, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
-            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem" sx={{ color: BRAND_DARK }}>Day-wise</Typography>
+      {/* ── Global Filter Bar ──────────────────────────────────────── */}
+      <Paper elevation={0} sx={{ mb: 3, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, px: 3, py: 2.5 }}>
+        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+          <FilterListIcon sx={{ color: BRAND_YELLOW_DARK, fontSize: 20 }} />
+          <Typography variant="subtitle2" fontWeight={700} sx={{ color: BRAND_DARK }}>Filters</Typography>
+        </Stack>
+        <Stack direction="row" flexWrap="wrap" gap={2} alignItems="center">
+          {/* Seller */}
+          <FormControl size="small" sx={{ minWidth: 180, ...inputFocusSx }}>
+            <InputLabel>Seller</InputLabel>
             <Select
-              size="small"
-              value={dayCountry}
-              onChange={(e) => setDayCountry(e.target.value)}
-              sx={{ minWidth: 140, ...selectFocusSx }}
+              value={filterSeller}
+              onChange={(e) => setFilterSeller(e.target.value)}
+              label="Seller"
+              sx={selectFocusSx}
               MenuProps={menuProps}
             >
-              <MenuItem value="ALL">All Countries</MenuItem>
+              <MenuItem value="">All Sellers</MenuItem>
+              {sellers.map((s) => (
+                <MenuItem key={s._id} value={s._id}>{s.storeName || s.user?.username || s._id}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Marketplace */}
+          <FormControl size="small" sx={{ minWidth: 160, ...inputFocusSx }}>
+            <InputLabel>Marketplace</InputLabel>
+            <Select
+              value={filterCountry}
+              onChange={(e) => setFilterCountry(e.target.value)}
+              label="Marketplace"
+              sx={selectFocusSx}
+              MenuProps={menuProps}
+            >
+              <MenuItem value="ALL">All Marketplaces</MenuItem>
               <MenuItem value="US">US</MenuItem>
               <MenuItem value="UK">UK</MenuItem>
               <MenuItem value="AU">AU</MenuItem>
               <MenuItem value="Canada">Canada</MenuItem>
             </Select>
-            <Box sx={{ ml: 'auto' }}>
+          </FormControl>
+
+          {/* Date mode toggle */}
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={dateMode}
+            onChange={(_, val) => {
+              if (!val) return;
+              setDateMode(val);
+              // When switching to single, align both dates to filterFromDate
+              if (val === 'single') setFilterToDate(filterFromDate);
+            }}
+            sx={{
+              '& .MuiToggleButton-root': {
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '0.78rem',
+                px: 1.5,
+                color: alpha(BRAND_DARK, 0.6),
+                borderColor: alpha(BRAND_DARK, 0.18),
+                '&.Mui-selected': {
+                  backgroundColor: alpha(BRAND_YELLOW, 0.25),
+                  color: BRAND_DARK,
+                  '&:hover': { backgroundColor: alpha(BRAND_YELLOW, 0.35) }
+                }
+              }
+            }}
+          >
+            <ToggleButton value="single">Single Date</ToggleButton>
+            <ToggleButton value="range">Date Range</ToggleButton>
+          </ToggleButtonGroup>
+
+          {/* Date picker(s) */}
+          {dateMode === 'single' ? (
+            <ThemeProvider theme={datePickerTheme}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="Date"
+                  value={filterFromDate ? new Date(filterFromDate) : null}
+                  onChange={(date) => {
+                    if (!date) { setFilterFromDate(''); setFilterToDate(''); return; }
+                    const iso = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+                    setFilterFromDate(iso);
+                    setFilterToDate(iso);
+                  }}
+                  slotProps={{ textField: { size: 'small', sx: { width: 160, ...inputFocusSx } } }}
+                />
+              </LocalizationProvider>
+            </ThemeProvider>
+          ) : (
+            <>
               <ThemeProvider theme={datePickerTheme}>
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
-                    value={dayDate ? new Date(dayDate) : null}
+                    label="Date From"
+                    value={filterFromDate ? new Date(filterFromDate) : null}
                     onChange={(date) => {
-                      if (!date) {
-                        setDayDate('');
-                        return;
-                      }
-                      const y = date.getFullYear();
-                      const m = String(date.getMonth() + 1).padStart(2, '0');
-                      const d = String(date.getDate()).padStart(2, '0');
-                      const isoDate = `${y}-${m}-${d}`;
-                      setDayDate(isoDate);
-                      fetchDay(isoDate, dayCountry);
+                      if (!date) { setFilterFromDate(''); return; }
+                      const iso = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+                      setFilterFromDate(iso);
                     }}
-                    slotProps={{ textField: { size: 'small', sx: { width: 170 } } }}
+                    slotProps={{ textField: { size: 'small', sx: { width: 160, ...inputFocusSx } } }}
                   />
                 </LocalizationProvider>
               </ThemeProvider>
-            </Box>
+              <ThemeProvider theme={datePickerTheme}>
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <DatePicker
+                    label="Date To"
+                    value={filterToDate ? new Date(filterToDate) : null}
+                    onChange={(date) => {
+                      if (!date) { setFilterToDate(''); return; }
+                      const iso = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+                      setFilterToDate(iso);
+                    }}
+                    slotProps={{ textField: { size: 'small', sx: { width: 160, ...inputFocusSx } } }}
+                  />
+                </LocalizationProvider>
+              </ThemeProvider>
+            </>
+          )}
+
+          {/* Category */}
+          <Autocomplete
+            size="small"
+            options={filterCategories}
+            getOptionLabel={(o) => o.name || ''}
+            value={filterCategory}
+            onChange={(_, val) => setFilterCategory(val)}
+            sx={{ minWidth: 180 }}
+            renderInput={(params) => (
+              <TextField {...params} label="Category" sx={inputFocusSx} />
+            )}
+          />
+
+          {/* Range */}
+          <Autocomplete
+            size="small"
+            options={filterRanges}
+            getOptionLabel={(o) => o.name || ''}
+            value={filterRange}
+            onChange={(_, val) => setFilterRange(val)}
+            disabled={!filterCategory}
+            sx={{ minWidth: 180 }}
+            renderInput={(params) => (
+              <TextField {...params} label="Range" sx={inputFocusSx} />
+            )}
+          />
+
+          {/* Apply */}
+          <Button
+            variant="contained"
+            onClick={handleApply}
+            sx={{ ...yellowFilledButtonSx, px: 3, height: 40, flexShrink: 0 }}
+          >
+            Apply Filters
+          </Button>
+
+          {/* Clear */}
+          <Button
+            variant="outlined"
+            onClick={handleClearFilters}
+            sx={{ height: 40, flexShrink: 0, textTransform: 'none', fontWeight: 600, borderColor: alpha(BRAND_DARK, 0.25), color: alpha(BRAND_DARK, 0.65), '&:hover': { borderColor: BRAND_DARK, backgroundColor: alpha(BRAND_DARK, 0.05) } }}
+          >
+            Clear Filters
+          </Button>
+        </Stack>
+      </Paper>
+
+      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
+        {/* ── Day-wise ─────────────────────────────────────────────────── */}
+        <Paper elevation={0} sx={{ flex: 1, minWidth: 0, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
+          <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.12)}`, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
+            <Typography variant="subtitle1" fontWeight={700} fontSize="1rem" sx={{ color: BRAND_DARK }}>Day-wise</Typography>
           </Box>
 
           {dayLoading ? (
@@ -234,15 +435,18 @@ export default function FeedUploadStatsPage() {
                 <TableHead sx={{ backgroundColor: BRAND_DARK }}>
                   <TableRow>
                     <TableCell sx={{ ...tableHeaderCellSx, width: 52, pl: 3 }}>#</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx }}>Date</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx }}>Seller</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx }}>Country</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx }}>Category</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx }}>Range</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx, pr: 3 }} align="right">Successful Listings</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {dayStats.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: '0.9rem' }}>
                         No data for this date
                       </TableCell>
                     </TableRow>
@@ -255,15 +459,18 @@ export default function FeedUploadStatsPage() {
                           sx={tableBodyRowSx}
                         >
                           <TableCell sx={{ ...cellSx, color: 'text.disabled', width: 52, pl: 3 }}>{idx + 1}</TableCell>
+                          <TableCell sx={{ ...cellSx }}>{row.date}</TableCell>
                           <TableCell sx={{ ...cellSx, fontWeight: 500, color: BRAND_DARK }}>{row.sellerName}</TableCell>
                           <TableCell sx={cellSx}>{row.country || 'US'}</TableCell>
+                          <TableCell sx={cellSx}>{row.categoryName || <Typography component="span" sx={{ color: alpha(BRAND_DARK, 0.35), fontSize: '0.85rem' }}>—</Typography>}</TableCell>
+                          <TableCell sx={cellSx}>{row.rangeName || <Typography component="span" sx={{ color: alpha(BRAND_DARK, 0.35), fontSize: '0.85rem' }}>—</Typography>}</TableCell>
                           <TableCell align="right" sx={{ ...numCellSx, pr: 3, fontWeight: 700, color: BRAND_DARK }}>
                             {row.totalSuccess.toLocaleString()}
                           </TableCell>
                         </TableRow>
                       ))}
                       <TableRow sx={{ backgroundColor: alpha(BRAND_YELLOW, 0.15) }}>
-                        <TableCell colSpan={3} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
+                        <TableCell colSpan={6} sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pl: 3, py: 1.6, borderBottom: 'none' }}>Total</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK, fontSize: '0.9rem', pr: 3, py: 1.6, borderBottom: 'none' }}>
                           {dayTotal.toLocaleString()}
                         </TableCell>
@@ -280,34 +487,27 @@ export default function FeedUploadStatsPage() {
         <Paper elevation={0} sx={{ flex: 1, minWidth: 0, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
           <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.12)}`, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: alpha(BRAND_DARK, 0.02) }}>
             <Typography variant="subtitle1" fontWeight={700} fontSize="1rem" sx={{ color: BRAND_DARK }}>Month-wise</Typography>
-            <Select
-              size="small"
-              value={monthCountry}
-              onChange={(e) => setMonthCountry(e.target.value)}
-              sx={{ minWidth: 140, ...selectFocusSx }}
-              MenuProps={menuProps}
-            >
-              <MenuItem value="US">US</MenuItem>
-              <MenuItem value="UK">UK</MenuItem>
-              <MenuItem value="AU">AU</MenuItem>
-              <MenuItem value="Canada">Canada</MenuItem>
-            </Select>
-            <Box sx={{ ml: 'auto' }}>
+            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <FormControl size="small" sx={{ minWidth: 130 }}>
+                <InputLabel>Marketplace</InputLabel>
+                <Select value={monthCountry} label="Marketplace" onChange={(e) => setMonthCountry(e.target.value)}>
+                  <MenuItem value="ALL">All</MenuItem>
+                  <MenuItem value="US">US</MenuItem>
+                  <MenuItem value="UK">UK</MenuItem>
+                  <MenuItem value="AU">AU</MenuItem>
+                  <MenuItem value="Canada">Canada</MenuItem>
+                </Select>
+              </FormControl>
               <ThemeProvider theme={datePickerTheme}>
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
                     views={['month', 'year']}
                     value={monthPicker ? new Date(`${monthPicker}-01T00:00:00`) : null}
                     onChange={(date) => {
-                      if (!date) {
-                        setMonthPicker('');
-                        return;
-                      }
+                      if (!date) { setMonthPicker(''); return; }
                       const y = date.getFullYear();
                       const m = String(date.getMonth() + 1).padStart(2, '0');
-                      const ym = `${y}-${m}`;
-                      setMonthPicker(ym);
-                      fetchMonth(ym, monthCountry);
+                      setMonthPicker(`${y}-${m}`);
                     }}
                     slotProps={{ textField: { size: 'small', sx: { width: 170 } } }}
                   />
@@ -342,7 +542,7 @@ export default function FeedUploadStatsPage() {
                   ) : (
                     <>
                       {monthStats.map((row, idx) => {
-                        const quota = getQuota(row.sellerName, monthCountry);
+                        const quota = getQuota(row.sellerName, monthCountry === 'ALL' ? 'US' : monthCountry);
                         return (
                           <TableRow
                             key={`m-${row.sellerId}-${idx}`}

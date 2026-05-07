@@ -6,6 +6,7 @@ import {
     Typography,
     TextField,
     Button,
+    IconButton,
     Select,
     MenuItem,
     FormControl,
@@ -17,6 +18,7 @@ import {
     Pagination,
     useTheme
 } from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ThemeProvider, createTheme, alpha } from '@mui/material/styles';
@@ -24,6 +26,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import AddIcon from '@mui/icons-material/Add';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -35,7 +38,6 @@ import api from '../../lib/api';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 
-// Common Feed Types
 const FEED_TYPES = [
     { value: 'FX_LISTING', label: 'File Exchange Listing (CSV)' }
 ];
@@ -99,6 +101,23 @@ const FeedUploadPage = () => {
     const [totalTasks, setTotalTasks] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
+    // Category / Range / Product selection
+    const [categories, setCategories] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [ranges, setRanges] = useState([]);
+    const [selectedRange, setSelectedRange] = useState('');
+    const [products, setProducts] = useState([]);
+    const [selectedProduct, setSelectedProduct] = useState('');
+    const [creatingCategory, setCreatingCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [savingCategory, setSavingCategory] = useState(false);
+    const [creatingRange, setCreatingRange] = useState(false);
+    const [newRangeName, setNewRangeName] = useState('');
+    const [savingRange, setSavingRange] = useState(false);
+    const [creatingProduct, setCreatingProduct] = useState(false);
+    const [newProductName, setNewProductName] = useState('');
+    const [savingProduct, setSavingProduct] = useState(false);
+
     // Schedule upload state (right panel)
     const [scheduleFile, setScheduleFile] = useState(null);
     const [scheduleDateTime, setScheduleDateTime] = useState(null);
@@ -112,6 +131,61 @@ const FeedUploadPage = () => {
             setSelectedFile(location.state.csvFile);
         }
     }, []);
+
+    // Fetch Categories on mount
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await api.get('/asin-list-categories');
+                setCategories(res.data || []);
+            } catch (err) {
+                console.error('Failed to fetch categories', err);
+            }
+        };
+        fetchCategories();
+    }, []);
+
+    // Fetch Ranges when category changes
+    useEffect(() => {
+        if (!selectedCategory) {
+            setRanges([]);
+            setSelectedRange('');
+            setProducts([]);
+            setSelectedProduct('');
+            return;
+        }
+        const fetchRanges = async () => {
+            try {
+                const res = await api.get('/asin-list-ranges', { params: { categoryId: selectedCategory } });
+                setRanges(res.data || []);
+                setSelectedRange('');
+                setProducts([]);
+                setSelectedProduct('');
+            } catch (err) {
+                console.error('Failed to fetch ranges', err);
+            }
+        };
+        fetchRanges();
+    }, [selectedCategory]);
+
+    // Fetch Products when range changes
+    useEffect(() => {
+        if (!selectedRange) {
+            setProducts([]);
+            setSelectedProduct('');
+            return;
+        }
+        const fetchProducts = async () => {
+            try {
+                const res = await api.get('/asin-list-products', { params: { rangeId: selectedRange } });
+                setProducts(res.data || []);
+                setSelectedProduct('');
+            } catch (err) {
+                console.error('Failed to fetch products', err);
+            }
+        };
+        fetchProducts();
+    }, [selectedRange]);
 
     // Fetch Sellers on mount
     useEffect(() => {
@@ -220,6 +294,9 @@ const FeedUploadPage = () => {
         formData.append('feedType', feedType);
         formData.append('schemaVersion', schemaVersion);
         formData.append('country', country);
+        if (selectedCategory) formData.append('categoryId', selectedCategory);
+        if (selectedRange) formData.append('rangeId', selectedRange);
+        if (selectedProduct) formData.append('productId', selectedProduct);
 
         try {
             const response = await api.post('/ebay/feed/upload', formData, {
@@ -377,6 +454,232 @@ const FeedUploadPage = () => {
                             helperText="Fixed to 1.0 for CSV uploads"
                             sx={inputFocusSx}
                         />
+
+                        {/* Category Selection */}
+                        <Box>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <Autocomplete
+                                    options={categories}
+                                    getOptionLabel={(opt) => (typeof opt === 'string' ? opt : (opt.name || ''))}
+                                    value={categories.find(c => c._id === selectedCategory) || null}
+                                    onChange={(_, newValue) => setSelectedCategory(newValue?._id || '')}
+                                    isOptionEqualToValue={(opt, val) => opt._id === val._id}
+                                    sx={{ flexGrow: 1 }}
+                                    renderInput={(params) => (
+                                        <TextField {...params} label="Category (optional)" sx={inputFocusSx} />
+                                    )}
+                                />
+                                <IconButton
+                                    size="small"
+                                    onClick={() => { setCreatingCategory(true); setNewCategoryName(''); }}
+                                    sx={{ color: BRAND_YELLOW_DARK, flexShrink: 0 }}
+                                    title="Add new category"
+                                >
+                                    <AddIcon />
+                                </IconButton>
+                            </Stack>
+                            {creatingCategory && (
+                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                                    <TextField
+                                        size="small"
+                                        placeholder="Category name"
+                                        value={newCategoryName}
+                                        onChange={(e) => setNewCategoryName(e.target.value)}
+                                        onKeyDown={async (e) => {
+                                            if (e.key === 'Enter' && newCategoryName.trim()) {
+                                                try {
+                                                    setSavingCategory(true);
+                                                    const res = await api.post('/asin-list-categories', { name: newCategoryName.trim() });
+                                                    const created = res.data;
+                                                    setCategories(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+                                                    setSelectedCategory(created._id);
+                                                    setCreatingCategory(false);
+                                                    setNewCategoryName('');
+                                                } catch (err) { console.error(err); }
+                                                finally { setSavingCategory(false); }
+                                            }
+                                            if (e.key === 'Escape') { setCreatingCategory(false); setNewCategoryName(''); }
+                                        }}
+                                        autoFocus
+                                        disabled={savingCategory}
+                                        sx={{ flexGrow: 1, ...inputFocusSx }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        disabled={!newCategoryName.trim() || savingCategory}
+                                        onClick={async () => {
+                                            try {
+                                                setSavingCategory(true);
+                                                const res = await api.post('/asin-list-categories', { name: newCategoryName.trim() });
+                                                const created = res.data;
+                                                setCategories(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+                                                setSelectedCategory(created._id);
+                                                setCreatingCategory(false);
+                                                setNewCategoryName('');
+                                            } catch (err) { console.error(err); }
+                                            finally { setSavingCategory(false); }
+                                        }}
+                                        sx={{ ...yellowFilledButtonSx, minWidth: 64, flexShrink: 0 }}
+                                    >
+                                        {savingCategory ? <CircularProgress size={14} /> : 'Save'}
+                                    </Button>
+                                    <Button size="small" onClick={() => { setCreatingCategory(false); setNewCategoryName(''); }} sx={{ flexShrink: 0 }}>Cancel</Button>
+                                </Stack>
+                            )}
+                        </Box>
+
+                        {/* Range Selection */}
+                        <Box>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <Autocomplete
+                                    options={ranges}
+                                    disabled={!selectedCategory}
+                                    getOptionLabel={(opt) => (typeof opt === 'string' ? opt : (opt.name || ''))}
+                                    value={ranges.find(r => r._id === selectedRange) || null}
+                                    onChange={(_, newValue) => setSelectedRange(newValue?._id || '')}
+                                    isOptionEqualToValue={(opt, val) => opt._id === val._id}
+                                    sx={{ flexGrow: 1 }}
+                                    renderInput={(params) => (
+                                        <TextField {...params} label="Range (optional)" sx={inputFocusSx} />
+                                    )}
+                                />
+                                <IconButton
+                                    size="small"
+                                    onClick={() => { setCreatingRange(true); setNewRangeName(''); }}
+                                    disabled={!selectedCategory}
+                                    sx={{ color: BRAND_YELLOW_DARK, flexShrink: 0 }}
+                                    title="Add new range"
+                                >
+                                    <AddIcon />
+                                </IconButton>
+                            </Stack>
+                            {creatingRange && (
+                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                                    <TextField
+                                        size="small"
+                                        placeholder="Range name"
+                                        value={newRangeName}
+                                        onChange={(e) => setNewRangeName(e.target.value)}
+                                        onKeyDown={async (e) => {
+                                            if (e.key === 'Enter' && newRangeName.trim()) {
+                                                try {
+                                                    setSavingRange(true);
+                                                    const res = await api.post('/asin-list-ranges', { name: newRangeName.trim(), categoryId: selectedCategory });
+                                                    const created = res.data;
+                                                    setRanges(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+                                                    setSelectedRange(created._id);
+                                                    setCreatingRange(false);
+                                                    setNewRangeName('');
+                                                } catch (err) { console.error(err); }
+                                                finally { setSavingRange(false); }
+                                            }
+                                            if (e.key === 'Escape') { setCreatingRange(false); setNewRangeName(''); }
+                                        }}
+                                        autoFocus
+                                        disabled={savingRange}
+                                        sx={{ flexGrow: 1, ...inputFocusSx }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        disabled={!newRangeName.trim() || savingRange}
+                                        onClick={async () => {
+                                            try {
+                                                setSavingRange(true);
+                                                const res = await api.post('/asin-list-ranges', { name: newRangeName.trim(), categoryId: selectedCategory });
+                                                const created = res.data;
+                                                setRanges(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+                                                setSelectedRange(created._id);
+                                                setCreatingRange(false);
+                                                setNewRangeName('');
+                                            } catch (err) { console.error(err); }
+                                            finally { setSavingRange(false); }
+                                        }}
+                                        sx={{ ...yellowFilledButtonSx, minWidth: 64, flexShrink: 0 }}
+                                    >
+                                        {savingRange ? <CircularProgress size={14} /> : 'Save'}
+                                    </Button>
+                                    <Button size="small" onClick={() => { setCreatingRange(false); setNewRangeName(''); }} sx={{ flexShrink: 0 }}>Cancel</Button>
+                                </Stack>
+                            )}
+                        </Box>
+
+                        {/* Product Selection */}
+                        <Box>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <Autocomplete
+                                    options={products}
+                                    disabled={!selectedRange}
+                                    getOptionLabel={(opt) => (typeof opt === 'string' ? opt : (opt.name || ''))}
+                                    value={products.find(p => p._id === selectedProduct) || null}
+                                    onChange={(_, newValue) => setSelectedProduct(newValue?._id || '')}
+                                    isOptionEqualToValue={(opt, val) => opt._id === val._id}
+                                    sx={{ flexGrow: 1 }}
+                                    renderInput={(params) => (
+                                        <TextField {...params} label="Product (optional)" sx={inputFocusSx} />
+                                    )}
+                                />
+                                <IconButton
+                                    size="small"
+                                    onClick={() => { setCreatingProduct(true); setNewProductName(''); }}
+                                    disabled={!selectedRange}
+                                    sx={{ color: BRAND_YELLOW_DARK, flexShrink: 0 }}
+                                    title="Add new product"
+                                >
+                                    <AddIcon />
+                                </IconButton>
+                            </Stack>
+                            {creatingProduct && (
+                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                                    <TextField
+                                        size="small"
+                                        placeholder="Product name"
+                                        value={newProductName}
+                                        onChange={(e) => setNewProductName(e.target.value)}
+                                        onKeyDown={async (e) => {
+                                            if (e.key === 'Enter' && newProductName.trim()) {
+                                                try {
+                                                    setSavingProduct(true);
+                                                    const res = await api.post('/asin-list-products', { name: newProductName.trim(), rangeId: selectedRange, categoryId: selectedCategory });
+                                                    const created = res.data;
+                                                    setProducts(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+                                                    setSelectedProduct(created._id);
+                                                    setCreatingProduct(false);
+                                                    setNewProductName('');
+                                                } catch (err) { console.error(err); }
+                                                finally { setSavingProduct(false); }
+                                            }
+                                            if (e.key === 'Escape') { setCreatingProduct(false); setNewProductName(''); }
+                                        }}
+                                        autoFocus
+                                        disabled={savingProduct}
+                                        sx={{ flexGrow: 1, ...inputFocusSx }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        disabled={!newProductName.trim() || savingProduct}
+                                        onClick={async () => {
+                                            try {
+                                                setSavingProduct(true);
+                                                const res = await api.post('/asin-list-products', { name: newProductName.trim(), rangeId: selectedRange, categoryId: selectedCategory });
+                                                const created = res.data;
+                                                setProducts(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+                                                setSelectedProduct(created._id);
+                                                setCreatingProduct(false);
+                                                setNewProductName('');
+                                            } catch (err) { console.error(err); }
+                                            finally { setSavingProduct(false); }
+                                        }}
+                                        sx={{ ...yellowFilledButtonSx, minWidth: 64, flexShrink: 0 }}
+                                    >
+                                        {savingProduct ? <CircularProgress size={14} /> : 'Save'}
+                                    </Button>
+                                    <Button size="small" onClick={() => { setCreatingProduct(false); setNewProductName(''); }} sx={{ flexShrink: 0 }}>Cancel</Button>
+                                </Stack>
+                            )}
+                        </Box>
 
                         {/* Country Selection */}
                         <FormControl fullWidth sx={selectFocusSx}>
