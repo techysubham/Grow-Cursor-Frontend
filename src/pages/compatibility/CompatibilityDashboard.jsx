@@ -118,6 +118,10 @@ export default function CompatibilityDashboard() {
   const [filterNoFitment, setFilterNoFitment] = useState(false);
   const [listedDateMode, setListedDateMode] = useState('range'); // 'single' | 'range'
   const [listedDate, setListedDate] = useState('');
+
+  // SKU → ASIN backtrack info for the edit modal
+  const [skuAsinInfo, setSkuAsinInfo] = useState(null);
+  const [skuAsinLoading, setSkuAsinLoading] = useState(false);
   const [listedFrom, setListedFrom] = useState('');
   const [listedTo, setListedTo] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -1115,6 +1119,20 @@ export default function CompatibilityDashboard() {
     }
   }, [trimsByYear, aiSuggestedTrims, aiExcludedTrims]);
 
+  const fetchSkuAsinInfo = async (sku) => {
+    setSkuAsinInfo(null);
+    if (!sku) return;
+    setSkuAsinLoading(true);
+    try {
+      const { data } = await api.get(`/compatibility/sku-info/${encodeURIComponent(sku)}`);
+      setSkuAsinInfo(data);
+    } catch (e) {
+      // non-fatal
+    } finally {
+      setSkuAsinLoading(false);
+    }
+  };
+
   const handleEditClick = (item, index, prefillAiData = null) => {
     setSelectedItem(item);
     setCurrentListingIndex(index);
@@ -1129,6 +1147,9 @@ export default function CompatibilityDashboard() {
     setBulkMode(false);
     setBulkQueue([]);
     setBulkQueueIdx(0);
+
+    // Backtrack SKU → ASIN → Amazon data
+    fetchSkuAsinInfo(item.sku);
 
     if (prefillAiData && prefillAiData.make) {
       setSelectedMake(prefillAiData.make);
@@ -1732,7 +1753,8 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
             setOpenModal(false);
           }
         }}
-        maxWidth="xl"
+        maxWidth={false}
+        PaperProps={{ sx: { width: '98vw', maxWidth: '98vw' } }}
         fullWidth
       >
         <DialogTitle sx={{ borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2 }}>
@@ -1823,6 +1845,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
         </DialogTitle>
         <DialogContent sx={{ p: 0, display: 'flex', height: '75vh' }}>
 
+          {/* eBay Description panel */}
           <Box sx={{ flex: 1, borderRight: '1px solid #eee', p: 2, overflowY: 'auto', bgcolor: '#fafafa' }}>
             {/* Product Image */}
             {selectedItem?.mainImageUrl && (
@@ -1844,6 +1867,90 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
             {selectedItem?.descriptionPreview ? (
               <div style={{ padding: 15, backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: 4 }} dangerouslySetInnerHTML={{ __html: selectedItem.descriptionPreview }} />
             ) : <Typography variant="body2" color="textSecondary">No preview available.</Typography>}
+          </Box>
+
+          {/* Amazon Source panel */}
+          <Box sx={{ flex: 1, borderRight: '1px solid #eee', p: 2, overflowY: 'auto', bgcolor: '#fffdf0' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, letterSpacing: 0.3, mb: 1.5, color: '#92400e' }}>Amazon Source</Typography>
+            {skuAsinLoading && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={14} />
+                <Typography variant="caption" color="textSecondary">Loading Amazon data...</Typography>
+              </Box>
+            )}
+            {!skuAsinLoading && !skuAsinInfo?.asin && (
+              <Typography variant="body2" color="textSecondary">
+                {selectedItem?.sku ? 'No ASIN linked to this SKU.' : 'No SKU linked to this listing.'}
+              </Typography>
+            )}
+            {!skuAsinLoading && skuAsinInfo?.asin && (
+              <>
+                {/* ASIN header row */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+                  <Chip label={skuAsinInfo.asin} size="small" sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 800, fontSize: '0.8rem', px: 0.5 }} />
+                  <a href={`https://www.amazon.com/dp/${skuAsinInfo.asin}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.82rem', color: '#1976d2', fontWeight: 600 }}>View on Amazon ↗</a>
+                </Box>
+
+                {/* No data in AsinDirectory warning */}
+                {!skuAsinInfo.amazonTitle && !skuAsinInfo.images?.length && !skuAsinInfo.brand && (
+                  <Alert severity="warning" sx={{ mb: 1.5, fontSize: '0.82rem' }}>
+                    ASIN <strong>{skuAsinInfo.asin}</strong> is not yet imported into the product database. Add it via ASIN import to see full product details here.
+                  </Alert>
+                )}
+
+                {/* Product image */}
+                {skuAsinInfo.images?.[0] && (
+                  <Box sx={{ mb: 2, textAlign: 'center', bgcolor: '#fff', borderRadius: 1, p: 1, border: '1px solid #eee' }}>
+                    <img src={skuAsinInfo.images[0]} alt="Amazon product" style={{ maxHeight: 180, maxWidth: '100%', objectFit: 'contain' }} />
+                  </Box>
+                )}
+
+                {/* Title */}
+                {skuAsinInfo.amazonTitle && (
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#111', mb: 1.5, lineHeight: 1.45, fontSize: '0.95rem' }}>
+                    {skuAsinInfo.amazonTitle}
+                  </Typography>
+                )}
+
+                <Divider sx={{ mb: 1.5 }} />
+
+                {/* Attribute rows */}
+                {[['Brand', skuAsinInfo.brand], ['Price', skuAsinInfo.price], ['Color', skuAsinInfo.color],
+                  ['Material', skuAsinInfo.material], ['Size', skuAsinInfo.size], ['Model', skuAsinInfo.model]
+                ].filter(([, v]) => v).map(([label, value]) => (
+                  <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.75, alignItems: 'flex-start' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', minWidth: 72, flexShrink: 0, fontSize: '0.83rem' }}>{label}:</Typography>
+                    <Typography variant="body2" sx={{ color: '#1a1a1a', fontSize: '0.83rem', fontWeight: 500 }}>{value}</Typography>
+                  </Box>
+                ))}
+
+                {/* Special Features */}
+                {skuAsinInfo.specialFeatures && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.4, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Special Features</Typography>
+                    <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem', lineHeight: 1.55 }}>{skuAsinInfo.specialFeatures}</Typography>
+                  </Box>
+                )}
+
+                {/* Amazon Compatibility */}
+                {skuAsinInfo.compatibility && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.4, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Amazon Compatibility</Typography>
+                    <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{skuAsinInfo.compatibility}</Typography>
+                  </Box>
+                )}
+
+                {/* Description */}
+                {skuAsinInfo.amazonDescription && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.4, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Description</Typography>
+                    <Typography variant="body2" sx={{ color: '#444', whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.55 }}>
+                      {skuAsinInfo.amazonDescription}
+                    </Typography>
+                  </Box>
+                )}
+              </>
+            )}
           </Box>
 
           <Box sx={{ flex: 1, p: 2, display: 'flex', flexDirection: 'column' }}>
