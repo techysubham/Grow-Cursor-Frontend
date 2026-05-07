@@ -9,14 +9,16 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import PublicIcon from '@mui/icons-material/Public';
-import api from '../../lib/api';
+import api, { getAuthToken } from '../../lib/api';
 
 const TIERS = [
-    { key: 'low',  label: 'Low Ticket',  range: '$0 – <$20',  color: '#2e7d32', bg: '#e8f5e9', icon: TrendingDownIcon },
-    { key: 'mid',  label: 'Mid Ticket',  range: '$20 – <$70', color: '#ed6c02', bg: '#fff3e0', icon: TrendingFlatIcon },
-    { key: 'high', label: 'High Ticket', range: '$70+',        color: '#1565c0', bg: '#e3f2fd', icon: TrendingUpIcon  },
+    { key: 'low',        label: 'Low Ticket',        range: '$0 – <$30',   color: '#2e7d32', bg: '#e8f5e9', icon: TrendingDownIcon },
+    { key: 'mid',        label: 'Mid Ticket',        range: '$30 – <$60',  color: '#ed6c02', bg: '#fff3e0', icon: TrendingFlatIcon },
+    { key: 'high',       label: 'High Ticket',       range: '$60 – <$100', color: '#1565c0', bg: '#e3f2fd', icon: TrendingUpIcon   },
+    { key: 'extra_high', label: 'Extra High Ticket', range: '$100+',       color: '#6a1b9a', bg: '#f3e5f5', icon: EmojiEventsIcon  },
 ];
 
 function TierCard({ tier, value, total }) {
@@ -50,9 +52,10 @@ function TierCard({ tier, value, total }) {
 }
 
 const MP_TIERS = [
-    { key: 'low',  label: 'Low',  color: '#2e7d32', bg: '#e8f5e9' },
-    { key: 'mid',  label: 'Mid',  color: '#ed6c02', bg: '#fff3e0' },
-    { key: 'high', label: 'High', color: '#1565c0', bg: '#e3f2fd' },
+    { key: 'low',        label: 'Low',        color: '#2e7d32', bg: '#e8f5e9' },
+    { key: 'mid',        label: 'Mid',        color: '#ed6c02', bg: '#fff3e0' },
+    { key: 'high',       label: 'High',       color: '#1565c0', bg: '#e3f2fd' },
+    { key: 'extra_high', label: 'Extra High', color: '#6a1b9a', bg: '#f3e5f5' },
 ];
 
 function MarketplaceBreakdown({ data, total }) {
@@ -119,6 +122,7 @@ export default function ActiveListingTiersPage() {
     const [result, setResult]   = useState(null);   // { tiers, sellerName, pagesFetched }
     const [fetching, setFetching] = useState(false);
     const [error, setError]     = useState(null);
+    const [progress, setProgress] = useState(null); // { page, totalPages, count }
 
     // Load seller list on mount
     useEffect(() => {
@@ -148,15 +152,41 @@ export default function ActiveListingTiersPage() {
         setFetching(true);
         setError(null);
         setResult(null);
+        setProgress(null);
         try {
-            const res = await api.get('/ebay/active-listings/live-tiers', {
-                params: { sellerId: selectedSellerId },
-            });
-            if (res.data.success) {
-                setResult(res.data);
+            const baseURL = import.meta.env.VITE_API_URL;
+            const token = getAuthToken();
+            const response = await fetch(
+                `${baseURL}/ebay/active-listings/live-tiers?sellerId=${selectedSellerId}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || `Request failed (${response.status})`);
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // keep incomplete line
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const evt = JSON.parse(line.slice(6));
+                    if (evt.type === 'progress') {
+                        setProgress({ page: evt.page, totalPages: evt.totalPages, count: evt.count });
+                    } else if (evt.type === 'done') {
+                        setResult(evt);
+                    } else if (evt.type === 'error') {
+                        throw new Error(evt.error);
+                    }
+                }
             }
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to fetch listing data from eBay.');
+            setError(err.message || 'Failed to fetch listing data from eBay.');
         } finally {
             setFetching(false);
         }
@@ -176,9 +206,10 @@ export default function ActiveListingTiersPage() {
             <Alert severity="info" icon={<InfoOutlinedIcon />} sx={{ mb: 3, borderRadius: 2 }}>
                 <Typography variant="body2">
                     Prices are pulled in real-time from eBay&apos;s <strong>ConvertedCurrentPrice</strong> field (always in USD).
-                    &nbsp;Low ticket: <strong>$0 – &lt;$20</strong>&nbsp; · &nbsp;
-                    Mid ticket: <strong>$20 – &lt;$70</strong>&nbsp; · &nbsp;
-                    High ticket: <strong>$70+</strong>
+                    Low: <strong>$0 – &lt;$30</strong>&nbsp; · &nbsp;
+                    Mid: <strong>$30 – &lt;$60</strong>&nbsp; · &nbsp;
+                    High: <strong>$60 – &lt;$100</strong>&nbsp; · &nbsp;
+                    Extra High: <strong>$100+</strong>
                 </Typography>
             </Alert>
 
@@ -221,9 +252,31 @@ export default function ActiveListingTiersPage() {
 
                 {fetching && (
                     <Box mt={2}>
-                        <Typography variant="caption" color="textSecondary">
-                            Paging through all active listings — this may take a moment for large accounts…
-                        </Typography>
+                        {progress ? (
+                            <>
+                                <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.5}>
+                                    <Typography variant="caption" color="textSecondary">
+                                        Page <strong>{progress.page}</strong> of <strong>{progress.totalPages}</strong>
+                                        &nbsp;·&nbsp;{progress.count.toLocaleString()} listings scanned so far
+                                    </Typography>
+                                    <Typography variant="caption" color="textSecondary">
+                                        {progress.totalPages > 0 ? Math.round((progress.page / progress.totalPages) * 100) : 0}%
+                                    </Typography>
+                                </Box>
+                                <LinearProgress
+                                    variant="determinate"
+                                    value={progress.totalPages > 0 ? (progress.page / progress.totalPages) * 100 : 0}
+                                    sx={{ borderRadius: 2, height: 6 }}
+                                />
+                            </>
+                        ) : (
+                            <>
+                                <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>
+                                    Connecting to eBay…
+                                </Typography>
+                                <LinearProgress sx={{ borderRadius: 2, height: 6 }} />
+                            </>
+                        )}
                     </Box>
                 )}
             </Paper>
@@ -245,7 +298,7 @@ export default function ActiveListingTiersPage() {
                     {/* Price tier cards */}
                     <Grid container spacing={3}>
                         {TIERS.map(tier => (
-                            <Grid item xs={12} sm={4} key={tier.key}>
+                            <Grid item xs={12} sm={6} md={3} key={tier.key}>
                                 <TierCard
                                     tier={tier}
                                     value={result.tiers[tier.key]}
