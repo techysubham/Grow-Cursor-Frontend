@@ -469,16 +469,16 @@ export default function CRPAnalyticsPage() {
           <SectionLabel>Order Value Bands</SectionLabel>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} flexWrap="wrap" useFlexGap sx={{ mb: 2.5 }}>
             <MetricCard
-              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$0-30</Typography>}
+              icon={<Box sx={{ textAlign: 'center' }}><Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1.2, display: 'block' }}>$0</Typography><Box sx={{ width: 14, height: '1px', bgcolor: 'rgba(255,255,255,0.35)', mx: 'auto', my: '2px' }} /><Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.58rem', fontWeight: 700, lineHeight: 1.1, display: 'block' }}>30</Typography></Box>}
               label="Low Ticket" value={ticketTiers.low.toLocaleString()} sub="subtotal < $30" tone="shipping" />
             <MetricCard
-              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$30-60</Typography>}
-              label="Mid Ticket" value={ticketTiers.mid.toLocaleString()} sub="$30-$59" tone="success" />
+              icon={<Box sx={{ textAlign: 'center' }}><Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1.2, display: 'block' }}>$30</Typography><Box sx={{ width: 14, height: '1px', bgcolor: 'rgba(255,255,255,0.35)', mx: 'auto', my: '2px' }} /><Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.58rem', fontWeight: 700, lineHeight: 1.1, display: 'block' }}>60</Typography></Box>}
+              label="Mid Ticket" value={ticketTiers.mid.toLocaleString()} sub="$30 - $59" tone="success" />
             <MetricCard
-              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$60-100</Typography>}
-              label="High Ticket" value={ticketTiers.high.toLocaleString()} sub="$60-$99" tone="amazon" />
+              icon={<Box sx={{ textAlign: 'center' }}><Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1.2, display: 'block' }}>$60</Typography><Box sx={{ width: 14, height: '1px', bgcolor: 'rgba(255,255,255,0.35)', mx: 'auto', my: '2px' }} /><Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.58rem', fontWeight: 700, lineHeight: 1.1, display: 'block' }}>100</Typography></Box>}
+              label="High Ticket" value={ticketTiers.high.toLocaleString()} sub="$60 - $99" tone="amazon" />
             <MetricCard
-              icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$100+</Typography>}
+              icon={<Box sx={{ textAlign: 'center' }}><Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1.2, display: 'block' }}>$100</Typography><Box sx={{ width: 14, height: '1px', bgcolor: 'rgba(255,255,255,0.35)', mx: 'auto', my: '2px' }} /><Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.65rem', fontWeight: 900, lineHeight: 1.1, display: 'block' }}>+</Typography></Box>}
               label="Extra High Ticket" value={ticketTiers.extra_high.toLocaleString()} sub="subtotal >= $100" tone="danger" />
           </Stack>
 
@@ -577,16 +577,16 @@ export default function CRPAnalyticsPage() {
                     {drillTicketTiers && (
                       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
                         <MetricCard
-                          icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$0-30</Typography>}
+                          icon={<Box sx={{ textAlign: 'center' }}><Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1.2, display: 'block' }}>$0</Typography><Box sx={{ width: 14, height: '1px', bgcolor: 'rgba(255,255,255,0.35)', mx: 'auto', my: '2px' }} /><Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.58rem', fontWeight: 700, lineHeight: 1.1, display: 'block' }}>30</Typography></Box>}
                           label="Low Ticket" value={drillTicketTiers.low.toLocaleString()} sub="subtotal < $30" tone="shipping" />
                         <MetricCard
-                          icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$30-60</Typography>}
-                          label="Mid Ticket" value={drillTicketTiers.mid.toLocaleString()} sub="$30-$59" tone="success" />
+                          icon={<Box sx={{ textAlign: 'center' }}><Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1.2, display: 'block' }}>$30</Typography><Box sx={{ width: 14, height: '1px', bgcolor: 'rgba(255,255,255,0.35)', mx: 'auto', my: '2px' }} /><Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.58rem', fontWeight: 700, lineHeight: 1.1, display: 'block' }}>60</Typography></Box>}
+                          label="Mid Ticket" value={drillTicketTiers.mid.toLocaleString()} sub="$30 - $59" tone="success" />
                         <MetricCard
-                          icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$60-100</Typography>}
-                          label="High Ticket" value={drillTicketTiers.high.toLocaleString()} sub="$60-$99" tone="amazon" />
+                          icon={<Box sx={{ textAlign: 'center' }}><Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1.2, display: 'block' }}>$60</Typography><Box sx={{ width: 14, height: '1px', bgcolor: 'rgba(255,255,255,0.35)', mx: 'auto', my: '2px' }} /><Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.58rem', fontWeight: 700, lineHeight: 1.1, display: 'block' }}>100</Typography></Box>}
+                          label="High Ticket" value={drillTicketTiers.high.toLocaleString()} sub="$60 - $99" tone="amazon" />
                         <MetricCard
-                          icon={<Typography variant="caption" fontWeight={900} sx={{ color: '#fff', fontSize: '0.63rem', lineHeight: 1 }}>$100+</Typography>}
+                          icon={<Box sx={{ textAlign: 'center' }}><Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1.2, display: 'block' }}>$100</Typography><Box sx={{ width: 14, height: '1px', bgcolor: 'rgba(255,255,255,0.35)', mx: 'auto', my: '2px' }} /><Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.65rem', fontWeight: 900, lineHeight: 1.1, display: 'block' }}>+</Typography></Box>}
                           label="Extra High Ticket" value={drillTicketTiers.extra_high.toLocaleString()} sub="subtotal >= $100" tone="danger" />
                       </Stack>
                     )}
