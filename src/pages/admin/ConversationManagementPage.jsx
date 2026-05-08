@@ -295,6 +295,28 @@ function ResolutionDialog({ open, onClose, metaItem, onSave, chatAgents = [] }) 
                 <Box key={i} sx={{ alignSelf: msg.sender === 'SELLER' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
                   <Paper sx={{ p: 1.5, bgcolor: msg.sender === 'SELLER' ? '#1976d2' : '#fff', color: msg.sender === 'SELLER' ? '#fff' : '#000' }}>
                     <Typography variant="body2">{msg.body}</Typography>
+
+                    {msg.mediaUrls && msg.mediaUrls.length > 0 && (
+                      <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {msg.mediaUrls.map((url, idx) => (
+                          <Box
+                            key={idx}
+                            component="img"
+                            src={url}
+                            alt="Attachment"
+                            sx={{
+                              width: 100,
+                              height: 100,
+                              objectFit: 'cover',
+                              borderRadius: 1,
+                              cursor: 'pointer',
+                              border: '1px solid #ccc'
+                            }}
+                            onClick={() => window.open(url, '_blank')}
+                          />
+                        ))}
+                      </Box>
+                    )}
                   </Paper>
                   <Typography variant="caption" sx={{ display: 'block', mt: 0.5, textAlign: msg.sender === 'SELLER' ? 'right' : 'left' }}>
                     {new Date(msg.messageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} PT
@@ -1053,118 +1075,118 @@ export default function ConversationManagementPage() {
         <Alert severity="info">No active conversation cases found matching your filters.</Alert>
       ) : (
         <>
-        <TableContainer component={Paper} sx={{ ...tableContainerSx, overflowX: 'auto', overflowY: 'hidden' }}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                {visibleColumns.includes('sl') && <TableCell sx={tableHeaderCellSx}>SL No</TableCell>}
-                {visibleColumns.includes('seller') && <TableCell sx={tableHeaderCellSx}>Seller</TableCell>}
-                {visibleColumns.includes('orderId') && <TableCell sx={tableHeaderCellSx}>Order ID</TableCell>}
-                {visibleColumns.includes('creationDate') && <TableCell sx={tableHeaderCellSx}>Creation Date</TableCell>}
-                {visibleColumns.includes('username') && <TableCell sx={tableHeaderCellSx}>Username</TableCell>}
-                {visibleColumns.includes('buyerName') && <TableCell sx={tableHeaderCellSx}>Buyer Name</TableCell>}
-                {visibleColumns.includes('buyerSla') && <TableCell sx={tableHeaderCellSx}>Buyer SLA</TableCell>}
-                {visibleColumns.includes('sellerReply') && <TableCell sx={tableHeaderCellSx}>Seller Last Reply</TableCell>}
-                {visibleColumns.includes('about') && <TableCell sx={tableHeaderCellSx}>Conversation About</TableCell>}
-                {visibleColumns.includes('case') && <TableCell sx={tableHeaderCellSx}>Case</TableCell>}
-                {visibleColumns.includes('pickedUpBy') && <TableCell sx={tableHeaderCellSx}>Picked Up By</TableCell>}
-                {visibleColumns.includes('action') && <TableCell align="center" sx={tableHeaderCellSx}>Action</TableCell>}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {items.map((item, index) => {
-                const buyerSla = getBuyerSlaLabel(item);
-                const sellerReply = getSellerReplyLabel(item);
-                return (
-                  <TableRow key={item._id} hover sx={tableBodyRowSx}>
-                    {/* SERIAL NUMBER */}
-                    {visibleColumns.includes('sl') && <TableCell sx={tableBodyCellSx}><Box component="span" sx={tableIndexBadgeSx}>{(currentPage - 1) * rowsPerPage + index + 1}</Box></TableCell>}
+          <TableContainer component={Paper} sx={{ ...tableContainerSx, overflowX: 'auto', overflowY: 'hidden' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  {visibleColumns.includes('sl') && <TableCell sx={tableHeaderCellSx}>SL No</TableCell>}
+                  {visibleColumns.includes('seller') && <TableCell sx={tableHeaderCellSx}>Seller</TableCell>}
+                  {visibleColumns.includes('orderId') && <TableCell sx={tableHeaderCellSx}>Order ID</TableCell>}
+                  {visibleColumns.includes('creationDate') && <TableCell sx={tableHeaderCellSx}>Creation Date</TableCell>}
+                  {visibleColumns.includes('username') && <TableCell sx={tableHeaderCellSx}>Username</TableCell>}
+                  {visibleColumns.includes('buyerName') && <TableCell sx={tableHeaderCellSx}>Buyer Name</TableCell>}
+                  {visibleColumns.includes('buyerSla') && <TableCell sx={tableHeaderCellSx}>Buyer SLA</TableCell>}
+                  {visibleColumns.includes('sellerReply') && <TableCell sx={tableHeaderCellSx}>Seller Last Reply</TableCell>}
+                  {visibleColumns.includes('about') && <TableCell sx={tableHeaderCellSx}>Conversation About</TableCell>}
+                  {visibleColumns.includes('case') && <TableCell sx={tableHeaderCellSx}>Case</TableCell>}
+                  {visibleColumns.includes('pickedUpBy') && <TableCell sx={tableHeaderCellSx}>Picked Up By</TableCell>}
+                  {visibleColumns.includes('action') && <TableCell align="center" sx={tableHeaderCellSx}>Action</TableCell>}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {items.map((item, index) => {
+                  const buyerSla = getBuyerSlaLabel(item);
+                  const sellerReply = getSellerReplyLabel(item);
+                  return (
+                    <TableRow key={item._id} hover sx={tableBodyRowSx}>
+                      {/* SERIAL NUMBER */}
+                      {visibleColumns.includes('sl') && <TableCell sx={tableBodyCellSx}><Box component="span" sx={tableIndexBadgeSx}>{(currentPage - 1) * rowsPerPage + index + 1}</Box></TableCell>}
 
-                    {/* SELLER NAME (Added) */}
-                    {visibleColumns.includes('seller') && <TableCell sx={tableBodyCellSx}>
-                      <Chip label={item.sellerName || 'Unknown'} size="small" variant="outlined" />
-                    </TableCell>}
+                      {/* SELLER NAME (Added) */}
+                      {visibleColumns.includes('seller') && <TableCell sx={tableBodyCellSx}>
+                        <Chip label={item.sellerName || 'Unknown'} size="small" variant="outlined" />
+                      </TableCell>}
 
-                    {visibleColumns.includes('orderId') && <TableCell sx={tableBodyCellSx}>
-                      {item.orderId ? (
-                        <Chip label={item.orderId} size="small" variant="outlined" sx={{ bgcolor: '#fafafa' }} />
-                      ) : (
-                        <Typography color="text.secondary">-</Typography>
+                      {visibleColumns.includes('orderId') && <TableCell sx={tableBodyCellSx}>
+                        {item.orderId ? (
+                          <Chip label={item.orderId} size="small" variant="outlined" sx={{ bgcolor: '#fafafa' }} />
+                        ) : (
+                          <Typography color="text.secondary">-</Typography>
+                        )}
+                      </TableCell>}
+                      {visibleColumns.includes('creationDate') && <TableCell sx={tableBodyCellSx}>{formatCreationDate(item.creationDate)}</TableCell>}
+                      {visibleColumns.includes('username') && <TableCell sx={tableBodyCellSx}>{item.buyerUsername}</TableCell>}
+                      {visibleColumns.includes('buyerName') && <TableCell sx={{ ...tableBodyCellSx, fontWeight: 'bold' }}>{item.buyerName}</TableCell>}
+                      {visibleColumns.includes('buyerSla') && <TableCell sx={tableBodyCellSx}>
+                        <Chip
+                          label={buyerSla.label}
+                          color={buyerSla.color}
+                          size="small"
+                          variant={buyerSla.color === 'default' ? 'outlined' : 'filled'}
+                        />
+                      </TableCell>}
+                      {visibleColumns.includes('sellerReply') && <TableCell sx={tableBodyCellSx}>
+                        <Chip
+                          label={sellerReply.label}
+                          color={sellerReply.color}
+                          size="small"
+                          variant={sellerReply.color === 'default' ? 'outlined' : 'filled'}
+                        />
+                      </TableCell>}
+                      {visibleColumns.includes('about') && <TableCell sx={tableBodyCellSx}>
+                        <Chip label={formatCategory(item.category)} color="primary" size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 'bold' }} />
+                      </TableCell>}
+                      {visibleColumns.includes('case') && <TableCell sx={tableBodyCellSx}>
+                        <Chip
+                          label={item.caseStatus}
+                          color={item.caseStatus === 'Case Opened' ? 'error' : 'success'}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </TableCell>}
+                      {visibleColumns.includes('pickedUpBy') && (
+                        <TableCell sx={{ ...tableBodyCellSx, minWidth: 150 }}>
+                          <FormControl fullWidth size="small">
+                            <Select
+                              value={item.pickedUpBy || ''}
+                              onChange={(e) => handlePickedUpByChange(item, e.target.value)}
+                              displayEmpty
+                              sx={{ fontSize: '0.8rem' }}
+                              renderValue={(selected) => (selected ? selected : <em style={{ color: '#999' }}>— Unassigned —</em>)}
+                            >
+                              <MenuItem value=""><em>— Unassigned —</em></MenuItem>
+                              {chatAgents.map(agent => (
+                                <MenuItem key={agent._id} value={agent.name}>{agent.name}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </TableCell>
                       )}
-                    </TableCell>}
-                    {visibleColumns.includes('creationDate') && <TableCell sx={tableBodyCellSx}>{formatCreationDate(item.creationDate)}</TableCell>}
-                    {visibleColumns.includes('username') && <TableCell sx={tableBodyCellSx}>{item.buyerUsername}</TableCell>}
-                    {visibleColumns.includes('buyerName') && <TableCell sx={{ ...tableBodyCellSx, fontWeight: 'bold' }}>{item.buyerName}</TableCell>}
-                    {visibleColumns.includes('buyerSla') && <TableCell sx={tableBodyCellSx}>
-                      <Chip
-                        label={buyerSla.label}
-                        color={buyerSla.color}
-                        size="small"
-                        variant={buyerSla.color === 'default' ? 'outlined' : 'filled'}
-                      />
-                    </TableCell>}
-                    {visibleColumns.includes('sellerReply') && <TableCell sx={tableBodyCellSx}>
-                      <Chip
-                        label={sellerReply.label}
-                        color={sellerReply.color}
-                        size="small"
-                        variant={sellerReply.color === 'default' ? 'outlined' : 'filled'}
-                      />
-                    </TableCell>}
-                    {visibleColumns.includes('about') && <TableCell sx={tableBodyCellSx}>
-                      <Chip label={formatCategory(item.category)} color="primary" size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 'bold' }} />
-                    </TableCell>}
-                    {visibleColumns.includes('case') && <TableCell sx={tableBodyCellSx}>
-                      <Chip
-                        label={item.caseStatus}
-                        color={item.caseStatus === 'Case Opened' ? 'error' : 'success'}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </TableCell>}
-                    {visibleColumns.includes('pickedUpBy') && (
-                      <TableCell sx={{ ...tableBodyCellSx, minWidth: 150 }}>
-                        <FormControl fullWidth size="small">
-                          <Select
-                            value={item.pickedUpBy || ''}
-                            onChange={(e) => handlePickedUpByChange(item, e.target.value)}
-                            displayEmpty
-                            sx={{ fontSize: '0.8rem' }}
-                            renderValue={(selected) => (selected ? selected : <em style={{ color: '#999' }}>— Unassigned —</em>)}
-                          >
-                            <MenuItem value=""><em>— Unassigned —</em></MenuItem>
-                            {chatAgents.map(agent => (
-                              <MenuItem key={agent._id} value={agent.name}>{agent.name}</MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </TableCell>
-                    )}
-                    {visibleColumns.includes('action') && <TableCell align="center" sx={tableBodyCellSx}>
-                      <IconButton color="primary" onClick={() => setSelectedItem(item)}>
-                        <ChatIcon />
-                      </IconButton>
-                    </TableCell>}
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <Paper sx={{ mt: 2, py: 1.5, px: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Typography variant="body2" color="text.secondary">
-            Showing {items.length} of {totalItems} conversations
-          </Typography>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(event, value) => setCurrentPage(value)}
-            color="primary"
-            showFirstButton
-            showLastButton
-            size="small"
-          />
-        </Paper>
+                      {visibleColumns.includes('action') && <TableCell align="center" sx={tableBodyCellSx}>
+                        <IconButton color="primary" onClick={() => setSelectedItem(item)}>
+                          <ChatIcon />
+                        </IconButton>
+                      </TableCell>}
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Paper sx={{ mt: 2, py: 1.5, px: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Typography variant="body2" color="text.secondary">
+              Showing {items.length} of {totalItems} conversations
+            </Typography>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={(event, value) => setCurrentPage(value)}
+              color="primary"
+              showFirstButton
+              showLastButton
+              size="small"
+            />
+          </Paper>
         </>
       )}
 
@@ -1375,51 +1397,51 @@ export default function ConversationManagementPage() {
               background: dashboardSignatureTokens.surfaces.metricCard
             }}
           >
-          <List dense>
-            {chatAgents.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>No agents yet. Add one above.</Typography>
-            )}
-            {chatAgents.map(agent => (
-              <ListItem
-                key={agent._id}
-                disableGutters
-                sx={{
-                  px: 1,
-                  borderRadius: 1.5,
-                  '&:hover': {
-                    backgroundColor: dashboardSignatureTokens.table.rowHover,
-                  }
-                }}
-              >
-                {editingAgent?._id === agent._id ? (
-                  <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={editAgentName}
-                      onChange={(e) => setEditAgentName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateAgent(); }}
-                      autoFocus
-                    />
-                    <Button size="small" variant="contained" onClick={handleUpdateAgent} disabled={agentSaving} sx={yellowFilledButtonSx}>Save</Button>
-                    <Button size="small" onClick={() => { setEditingAgent(null); setEditAgentName(''); }} sx={yellowOutlinedButtonSx}>Cancel</Button>
-                  </Stack>
-                ) : (
-                  <>
-                    <ListItemText primary={agent.name} />
-                    <ListItemSecondaryAction>
-                      <IconButton size="small" onClick={() => { setEditingAgent(agent); setEditAgentName(agent.name); }} sx={{ color: BRAND_DARK }}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" color="error" onClick={() => handleDeleteAgent(agent)}>
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </ListItemSecondaryAction>
-                  </>
-                )}
-              </ListItem>
-            ))}
-          </List>
+            <List dense>
+              {chatAgents.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>No agents yet. Add one above.</Typography>
+              )}
+              {chatAgents.map(agent => (
+                <ListItem
+                  key={agent._id}
+                  disableGutters
+                  sx={{
+                    px: 1,
+                    borderRadius: 1.5,
+                    '&:hover': {
+                      backgroundColor: dashboardSignatureTokens.table.rowHover,
+                    }
+                  }}
+                >
+                  {editingAgent?._id === agent._id ? (
+                    <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={editAgentName}
+                        onChange={(e) => setEditAgentName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateAgent(); }}
+                        autoFocus
+                      />
+                      <Button size="small" variant="contained" onClick={handleUpdateAgent} disabled={agentSaving} sx={yellowFilledButtonSx}>Save</Button>
+                      <Button size="small" onClick={() => { setEditingAgent(null); setEditAgentName(''); }} sx={yellowOutlinedButtonSx}>Cancel</Button>
+                    </Stack>
+                  ) : (
+                    <>
+                      <ListItemText primary={agent.name} />
+                      <ListItemSecondaryAction>
+                        <IconButton size="small" onClick={() => { setEditingAgent(agent); setEditAgentName(agent.name); }} sx={{ color: BRAND_DARK }}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" color="error" onClick={() => handleDeleteAgent(agent)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </>
+                  )}
+                </ListItem>
+              ))}
+            </List>
           </Paper>
         </Box>
       </Dialog>
