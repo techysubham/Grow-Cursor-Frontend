@@ -135,7 +135,7 @@ const FeedUploadPage = () => {
     const [filterDateFrom, setFilterDateFrom] = useState('');
     const [filterDateTo, setFilterDateTo] = useState('');
     const [filterCountry, setFilterCountry] = useState('');
-    const [filterStatus, setFilterStatus] = useState('');
+
     const [filterResult, setFilterResult] = useState('');
 
     // Pre-populate from navigation state (List Directly flow)
@@ -241,7 +241,7 @@ const FeedUploadPage = () => {
             setCurrentPage(1);
             fetchTasks(1);
         }
-    }, [filterDateFrom, filterDateTo, filterCountry, filterStatus, filterResult]);
+    }, [filterDateFrom, filterDateTo, filterCountry, filterResult]);
 
     const fetchTasks = async (pg = currentPage) => {
         setLoadingTasks(true);
@@ -252,7 +252,6 @@ const FeedUploadPage = () => {
             if (filterDateFrom) params.dateFrom = new Date(filterDateFrom + 'T00:00:00').toISOString();
             if (filterDateTo)   params.dateTo   = new Date(filterDateTo   + 'T23:59:59').toISOString();
             if (filterCountry) params.country = filterCountry;
-            if (filterStatus) params.status = filterStatus;
             if (filterResult) params.result = filterResult;
             const res = await api.get('/ebay/feed/tasks', { params });
             console.log('Fetched tasks:', res.data.tasks);
@@ -972,16 +971,6 @@ const FeedUploadPage = () => {
                                     <MenuItem value="Canada">Canada</MenuItem>
                                 </Select>
                             </FormControl>
-                            <FormControl size="small" sx={{ minWidth: 195, ...selectFocusSx }}>
-                                <InputLabel>Status</InputLabel>
-                                <Select value={filterStatus} label="Status" onChange={e => setFilterStatus(e.target.value)}>
-                                    <MenuItem value="">All</MenuItem>
-                                    <MenuItem value="CREATED">Created</MenuItem>
-                                    <MenuItem value="COMPLETED">Completed</MenuItem>
-                                    <MenuItem value="COMPLETED_WITH_ERROR">Completed with Error</MenuItem>
-                                    <MenuItem value="FAILURE">Failed</MenuItem>
-                                </Select>
-                            </FormControl>
                             <FormControl size="small" sx={{ minWidth: 148, ...selectFocusSx }}>
                                 <InputLabel>Result</InputLabel>
                                 <Select value={filterResult} label="Result" onChange={e => setFilterResult(e.target.value)}>
@@ -990,12 +979,12 @@ const FeedUploadPage = () => {
                                     <MenuItem value="noFailures">No Failures</MenuItem>
                                 </Select>
                             </FormControl>
-                            {(filterDateFrom || filterDateTo || filterCountry || filterStatus || filterResult) && (
+                            {(filterDateFrom || filterDateTo || filterCountry || filterResult) && (
                                 <Button
                                     size="small"
                                     startIcon={<ClearIcon fontSize="small" />}
                                     variant="outlined"
-                                    onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterCountry(''); setFilterStatus(''); setFilterResult(''); }}
+                                    onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterCountry(''); setFilterResult(''); }}
                                     sx={{ ...outlinedButtonSx, flexShrink: 0 }}
                                 >
                                     Clear
