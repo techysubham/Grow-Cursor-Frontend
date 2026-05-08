@@ -236,7 +236,8 @@ export default function ListingDirectoryPage() {
     const selected = listings.filter(l => selectedListings.has(l._id));
     const items = selected.map(l => ({
       id: l._id, asin: l._asinReference || '', sku: l.customLabel || '',
-      status: 'loading', sourceData: null,
+      status: 'loading',
+      sourceData: l._amazonSourcePrice ? { price: l._amazonSourcePrice, title: '', brand: '', images: [], description: '', color: '', compatibility: '' } : null,
       generatedListing: {
         _existingListingId: l._id, action: l.action, customLabel: l.customLabel,
         title: l.title, startPrice: l.startPrice, categoryId: l.categoryId,
