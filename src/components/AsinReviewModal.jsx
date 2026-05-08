@@ -1093,6 +1093,27 @@ export default function AsinReviewModal({
                               />
                             </Tooltip>
                           )}
+                          {!showActualProfit && currentItem.status !== 'loading' && currentItem.status !== 'blocked' && currentItem.status !== 'error' && (() => {
+                            let reason;
+                            if (marketplace !== 'US') {
+                              reason = `Profit calculation not yet supported for ${marketplace} marketplace`;
+                            } else if (!actualProfitBuyingPrice || isNaN(actualProfitBuyingPrice) || actualProfitBuyingPrice <= 0) {
+                              reason = 'Amazon price unavailable for this ASIN';
+                            } else {
+                              reason = 'Start price not available — pricing calculator may be disabled';
+                            }
+                            return (
+                              <Tooltip title={reason} placement="bottom-end" arrow>
+                                <Chip
+                                  label="Profit unavailable"
+                                  size="small"
+                                  variant="outlined"
+                                  color="default"
+                                  sx={{ mt: 0.5, cursor: 'default', opacity: 0.55 }}
+                                />
+                              </Tooltip>
+                            );
+                          })()}
                         </Stack>
 
                         {/* Content Area */}
