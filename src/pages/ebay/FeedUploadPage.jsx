@@ -16,7 +16,10 @@ import {
     Stack,
     FormHelperText,
     Pagination,
-    useTheme
+    useTheme,
+    Divider,
+    ToggleButton,
+    ToggleButtonGroup
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
@@ -27,6 +30,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import AddIcon from '@mui/icons-material/Add';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import ClearIcon from '@mui/icons-material/Clear';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -125,6 +130,14 @@ const FeedUploadPage = () => {
     const [scheduleResult, setScheduleResult] = useState(null);
     const [scheduleError, setScheduleError] = useState(null);
 
+    // Filters for Recent Uploads table
+    const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
+    const [filterCountry, setFilterCountry] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterResult, setFilterResult] = useState('');
+
     // Pre-populate from navigation state (List Directly flow)
     useEffect(() => {
         if (location.state?.csvFile) {
@@ -222,12 +235,26 @@ const FeedUploadPage = () => {
         }
     }, [currentPage, rowsPerPage]);
 
+    // Reset to page 1 and re-fetch when filters change
+    useEffect(() => {
+        if (selectedSeller) {
+            setCurrentPage(1);
+            fetchTasks(1);
+        }
+    }, [filterDateFrom, filterDateTo, filterCountry, filterStatus, filterResult]);
+
     const fetchTasks = async (pg = currentPage) => {
         setLoadingTasks(true);
         try {
-            const res = await api.get('/ebay/feed/tasks', {
-                params: { sellerId: selectedSeller, limit: rowsPerPage, offset: (pg - 1) * rowsPerPage }
-            });
+            const params = { sellerId: selectedSeller, limit: rowsPerPage, offset: (pg - 1) * rowsPerPage };
+            // Send local-timezone ISO strings so the server filter matches what the user sees.
+            // e.g. selecting "2026-05-09" in IST → dateFrom = 2026-05-08T18:30:00.000Z (IST midnight)
+            if (filterDateFrom) params.dateFrom = new Date(filterDateFrom + 'T00:00:00').toISOString();
+            if (filterDateTo)   params.dateTo   = new Date(filterDateTo   + 'T23:59:59').toISOString();
+            if (filterCountry) params.country = filterCountry;
+            if (filterStatus) params.status = filterStatus;
+            if (filterResult) params.result = filterResult;
+            const res = await api.get('/ebay/feed/tasks', { params });
             console.log('Fetched tasks:', res.data.tasks);
             setTasks(res.data.tasks || []);
             const total = res.data.total || 0;
@@ -417,6 +444,17 @@ const FeedUploadPage = () => {
                 <Paper elevation={0} sx={{ p: 3, maxWidth: 560, flex: '0 0 auto', border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3 }}>
                     <Stack spacing={3}>
 
+                        {/* Panel Header */}
+                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ pb: 1, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.08)}` }}>
+                            <Box sx={{ p: 0.75, borderRadius: 1.5, backgroundColor: alpha(BRAND_YELLOW, 0.18) }}>
+                                <CloudUploadIcon sx={{ fontSize: 20, color: BRAND_YELLOW_DARK }} />
+                            </Box>
+                            <Box>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: BRAND_DARK, lineHeight: 1.3 }}>Direct Upload</Typography>
+                                <Typography variant="caption" color="textSecondary">Upload CSV to eBay immediately via Feed API</Typography>
+                            </Box>
+                        </Stack>
+
                         {/* Seller Selection */}
                         <FormControl fullWidth sx={selectFocusSx}>
                             <InputLabel>Select Seller Account</InputLabel>
@@ -433,27 +471,12 @@ const FeedUploadPage = () => {
                             </Select>
                         </FormControl>
 
-                        {/* Feed Type Selection - Fixed to CSV */}
-                        <FormControl fullWidth sx={selectFocusSx}>
-                            <InputLabel>Feed Type</InputLabel>
-                            <Select
-                                value={feedType}
-                                label="Feed Type"
-                                disabled
-                            >
-                                <MenuItem value="FX_LISTING">File Exchange Listing (CSV)</MenuItem>
-                            </Select>
-                            <FormHelperText>Currently only CSV uploads (FX_LISTING) are supported.</FormHelperText>
-                        </FormControl>
-
-                        {/* Schema Version */}
-                        <TextField
-                            label="Schema Version"
-                            value={schemaVersion}
-                            disabled
-                            helperText="Fixed to 1.0 for CSV uploads"
-                            sx={inputFocusSx}
-                        />
+                        {/* Feed Type & Schema (fixed) */}
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 1.5, py: 1, borderRadius: 1.5, backgroundColor: alpha(BRAND_DARK, 0.04) }}>
+                            <Chip size="small" label="FX_LISTING" sx={{ backgroundColor: alpha(BRAND_DARK, 0.1), color: BRAND_DARK, fontWeight: 700, fontSize: '0.7rem' }} />
+                            <Chip size="small" label="Schema 1.0" sx={{ backgroundColor: alpha(BRAND_DARK, 0.1), color: BRAND_DARK, fontWeight: 700, fontSize: '0.7rem' }} />
+                            <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.45) }}>CSV only · fixed format</Typography>
+                        </Stack>
 
                         {/* Category Selection */}
                         <Box>
@@ -759,14 +782,19 @@ const FeedUploadPage = () => {
                 </Paper>
 
                 {/* Right: Schedule Upload */}
-                <Paper elevation={0} sx={{ p: 3, flex: '1 1 380px', minWidth: 340, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3 }}>
+                <Paper elevation={0} sx={{ p: 3, flex: '1 1 380px', minWidth: 340, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, backgroundColor: alpha(BRAND_DARK, 0.012) }}>
                     <Stack spacing={3}>
-                        <Box>
-                            <Typography variant="h6" gutterBottom>Schedule Upload</Typography>
-                            <Typography variant="body2" color="textSecondary">
-                                Attach a CSV file and pick a date/time — it will be automatically sent to eBay at that time and saved to CSV Storage with a Manual Upload tag.
-                            </Typography>
-                        </Box>
+                        <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ pb: 1, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.08)}` }}>
+                            <Box sx={{ p: 0.75, borderRadius: 1.5, backgroundColor: alpha(BRAND_DARK, 0.07), flexShrink: 0 }}>
+                                <ScheduleIcon sx={{ fontSize: 20, color: BRAND_DARK }} />
+                            </Box>
+                            <Box>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: BRAND_DARK, lineHeight: 1.3 }}>Schedule Upload</Typography>
+                                <Typography variant="caption" color="textSecondary">
+                                    Pick a date &amp; time and the CSV will be sent to eBay automatically and saved to CSV Storage.
+                                </Typography>
+                            </Box>
+                        </Stack>
 
                         {/* Schedule File Input */}
                         <Box
@@ -845,15 +873,137 @@ const FeedUploadPage = () => {
             {/* Tasks Table */}
             <Box sx={{ mt: 4 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Typography variant="h5">Recent Uploads</Typography>
+                    <Box>
+                        <Typography variant="h5" sx={{ fontWeight: 800, color: BRAND_DARK }}>Recent Uploads</Typography>
+                        {totalTasks > 0 && <Typography variant="caption" color="textSecondary">{totalTasks} total upload{totalTasks !== 1 ? 's' : ''}</Typography>}
+                    </Box>
                     <Button
                         startIcon={<RefreshIcon />}
-                        onClick={fetchTasks}
+                        onClick={() => fetchTasks(currentPage)}
                         disabled={loadingTasks}
+                        variant="outlined"
+                        sx={outlinedButtonSx}
                     >
                         Refresh
                     </Button>
                 </Stack>
+
+                {/* Filters */}
+                <Paper elevation={0} sx={{ p: 2, mb: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}`, borderRadius: 2, backgroundColor: alpha(BRAND_DARK, 0.015) }}>
+                    <Stack spacing={1.5}>
+                        {/* Top row: label + date mode toggle */}
+                        <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
+                            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
+                                <FilterListIcon sx={{ fontSize: 17, color: BRAND_YELLOW_DARK }} />
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: BRAND_DARK, whiteSpace: 'nowrap' }}>Filters</Typography>
+                            </Stack>
+
+                            {/* Date mode toggle */}
+                            <ToggleButtonGroup
+                                size="small"
+                                exclusive
+                                value={dateMode}
+                                onChange={(_, val) => {
+                                    if (!val) return;
+                                    setDateMode(val);
+                                    setFilterDateFrom('');
+                                    setFilterDateTo('');
+                                }}
+                                sx={{
+                                    height: 32,
+                                    '& .MuiToggleButton-root': {
+                                        px: 1.5, py: 0, fontSize: '0.72rem', fontWeight: 600,
+                                        color: alpha(BRAND_DARK, 0.55),
+                                        borderColor: alpha(BRAND_DARK, 0.18),
+                                        textTransform: 'none',
+                                        '&.Mui-selected': { color: BRAND_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.22), borderColor: BRAND_YELLOW_DARK },
+                                    }
+                                }}
+                            >
+                                <ToggleButton value="single">Single Date</ToggleButton>
+                                <ToggleButton value="range">Date Range</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
+
+                        {/* Filter controls row */}
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }} flexWrap="wrap">
+                            {/* Date input(s) */}
+                            {dateMode === 'single' ? (
+                                <TextField
+                                    label="Date"
+                                    type="date"
+                                    size="small"
+                                    value={filterDateFrom}
+                                    onChange={e => { setFilterDateFrom(e.target.value); setFilterDateTo(e.target.value); }}
+                                    InputLabelProps={{ shrink: true }}
+                                    sx={{ minWidth: 158, ...inputFocusSx }}
+                                />
+                            ) : (
+                                <>
+                                    <TextField
+                                        label="From"
+                                        type="date"
+                                        size="small"
+                                        value={filterDateFrom}
+                                        onChange={e => setFilterDateFrom(e.target.value)}
+                                        InputLabelProps={{ shrink: true }}
+                                        sx={{ minWidth: 148, ...inputFocusSx }}
+                                    />
+                                    <TextField
+                                        label="To"
+                                        type="date"
+                                        size="small"
+                                        value={filterDateTo}
+                                        onChange={e => setFilterDateTo(e.target.value)}
+                                        InputLabelProps={{ shrink: true }}
+                                        inputProps={{ min: filterDateFrom || undefined }}
+                                        sx={{ minWidth: 148, ...inputFocusSx }}
+                                    />
+                                </>
+                            )}
+
+                            <FormControl size="small" sx={{ minWidth: 120, ...selectFocusSx }}>
+                                <InputLabel>Country</InputLabel>
+                                <Select value={filterCountry} label="Country" onChange={e => setFilterCountry(e.target.value)}>
+                                    <MenuItem value="">All</MenuItem>
+                                    <MenuItem value="US">US</MenuItem>
+                                    <MenuItem value="UK">UK</MenuItem>
+                                    <MenuItem value="AU">AU</MenuItem>
+                                    <MenuItem value="Canada">Canada</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <FormControl size="small" sx={{ minWidth: 195, ...selectFocusSx }}>
+                                <InputLabel>Status</InputLabel>
+                                <Select value={filterStatus} label="Status" onChange={e => setFilterStatus(e.target.value)}>
+                                    <MenuItem value="">All</MenuItem>
+                                    <MenuItem value="CREATED">Created</MenuItem>
+                                    <MenuItem value="COMPLETED">Completed</MenuItem>
+                                    <MenuItem value="COMPLETED_WITH_ERROR">Completed with Error</MenuItem>
+                                    <MenuItem value="FAILURE">Failed</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <FormControl size="small" sx={{ minWidth: 148, ...selectFocusSx }}>
+                                <InputLabel>Result</InputLabel>
+                                <Select value={filterResult} label="Result" onChange={e => setFilterResult(e.target.value)}>
+                                    <MenuItem value="">All</MenuItem>
+                                    <MenuItem value="hasFailures">Has Failures</MenuItem>
+                                    <MenuItem value="noFailures">No Failures</MenuItem>
+                                </Select>
+                            </FormControl>
+                            {(filterDateFrom || filterDateTo || filterCountry || filterStatus || filterResult) && (
+                                <Button
+                                    size="small"
+                                    startIcon={<ClearIcon fontSize="small" />}
+                                    variant="outlined"
+                                    onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterCountry(''); setFilterStatus(''); setFilterResult(''); }}
+                                    sx={{ ...outlinedButtonSx, flexShrink: 0 }}
+                                >
+                                    Clear
+                                </Button>
+                            )}
+                        </Stack>
+                    </Stack>
+                </Paper>
 
                 <Paper elevation={0} sx={{ border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, borderRadius: 3, overflow: 'hidden' }}>
                     <TableContainer
