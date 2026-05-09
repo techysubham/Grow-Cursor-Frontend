@@ -241,7 +241,7 @@ export default function TemplateDirectoryPage() {
       asin: l._asinReference || '',
       sku: l.customLabel || '',
       status: 'loading',
-      sourceData: null,
+      sourceData: l._amazonSourcePrice ? { price: l._amazonSourcePrice, title: '', brand: '', images: [], description: '', color: '', compatibility: '' } : null,
       generatedListing: {
         _existingListingId: l._id,
         action: l.action,
