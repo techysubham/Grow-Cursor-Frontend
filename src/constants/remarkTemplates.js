@@ -21,7 +21,9 @@ Thank you for your trust and support.`
     name: 'Processing',
     text: `Hi {{buyer_first_name}},
 We're pleased to inform you that your order has been processed.
+
 Also, we are actively monitoring your order to ensure it reaches you smoothly and tracking number will be updated on your eBay order page as soon as they become available.
+
 Thank you for choosing us.`
   },
   {
