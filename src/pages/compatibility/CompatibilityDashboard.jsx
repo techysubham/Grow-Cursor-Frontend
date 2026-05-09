@@ -68,6 +68,19 @@ const formatDate = (dateString) => {
   }).format(new Date(dateString));
 };
 
+// Bold any 4-digit year (1900–2099) in text for display
+// Bold any number (integers, decimals, fractions, measurements like 12") in text
+function boldNumbers(text) {
+  if (!text) return null;
+  // Matches: integers, decimals (3.5), measurements with unit (12"), ranges (2011-2017), percentages (100%)
+  const parts = text.split(/(\b\d+(?:[./\-]\d+)*(?:\s*(?:in|inch|inches|ft|mm|cm|oz|lb|lbs|kg|g|%|"))?\b)/gi);
+  return parts.map((part, i) =>
+    /^\d/.test(part)
+      ? <strong key={i} style={{ fontWeight: 800, color: '#111' }}>{part}</strong>
+      : part
+  );
+}
+
 export default function CompatibilityDashboard() {
   const navigate = useNavigate();
   const [sellers, setSellers] = useState([]);
@@ -1891,10 +1904,10 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                   <a href={`https://www.amazon.com/dp/${skuAsinInfo.asin}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.82rem', color: '#1976d2', fontWeight: 600 }}>View on Amazon ↗</a>
                 </Box>
 
-                {/* No data in AsinDirectory warning */}
+                {/* No data from DB or scraper */}
                 {!skuAsinInfo.amazonTitle && !skuAsinInfo.images?.length && !skuAsinInfo.brand && (
                   <Alert severity="warning" sx={{ mb: 1.5, fontSize: '0.82rem' }}>
-                    ASIN <strong>{skuAsinInfo.asin}</strong> is not yet imported into the product database. Add it via ASIN import to see full product details here.
+                    Could not fetch product details for <strong>{skuAsinInfo.asin}</strong> from Amazon. The scraper may be rate-limited — try again shortly.
                   </Alert>
                 )}
 
@@ -1935,18 +1948,22 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 {/* Amazon Compatibility */}
                 {skuAsinInfo.compatibility && (
                   <Box sx={{ mt: 1.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.4, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Amazon Compatibility</Typography>
-                    <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{skuAsinInfo.compatibility}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.5, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Amazon Compatibility</Typography>
+                    <Typography variant="body2" sx={{ color: '#333', fontSize: '0.88rem', whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>{boldNumbers(skuAsinInfo.compatibility)}</Typography>
                   </Box>
                 )}
 
                 {/* Description */}
                 {skuAsinInfo.amazonDescription && (
                   <Box sx={{ mt: 1.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.4, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Description</Typography>
-                    <Typography variant="body2" sx={{ color: '#444', whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.55 }}>
-                      {skuAsinInfo.amazonDescription}
-                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.5, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Description</Typography>
+                    <Box sx={{ color: '#333', fontSize: '0.9rem', lineHeight: 1.8, fontWeight: 500 }}>
+                      {skuAsinInfo.amazonDescription.split('\n').map((line, i) => line.trim() ? (
+                        <Typography key={i} variant="body2" sx={{ mb: 0.6, fontSize: '0.9rem', lineHeight: 1.75, fontWeight: 500, color: '#222' }}>
+                          {boldNumbers(line)}
+                        </Typography>
+                      ) : <Box key={i} sx={{ mb: 0.3 }} />)}
+                    </Box>
                   </Box>
                 )}
               </>

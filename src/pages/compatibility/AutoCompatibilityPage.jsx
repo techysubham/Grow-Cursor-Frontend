@@ -233,6 +233,18 @@ const formatDateIST = (dateString) => {
   }).format(new Date(dateString));
 };
 
+// Bold any 4-digit year (1900–2099) in text for display
+// Bold any number (integers, decimals, fractions, measurements like 12") in text
+function boldNumbers(text) {
+  if (!text) return null;
+  const parts = text.split(/(\b\d+(?:[./\-]\d+)*(?:\s*(?:in|inch|inches|ft|mm|cm|oz|lb|lbs|kg|g|%|"))?\b)/gi);
+  return parts.map((part, i) =>
+    /^\d/.test(part)
+      ? <strong key={i} style={{ fontWeight: 800, color: '#111' }}>{part}</strong>
+      : part
+  );
+}
+
 export default function AutoCompatibilityPage() {
   const [sellers, setSellers] = useState([]);
   const [staffUsers, setStaffUsers] = useState([]); // non-seller users for "By" filter
@@ -255,9 +267,8 @@ export default function AutoCompatibilityPage() {
   const [skuAsinInfo, setSkuAsinInfo] = useState(null);
   const [skuAsinLoading, setSkuAsinLoading] = useState(false);
 
-  // SKU → ASIN backtrack info for the manual review modal
-  const [reviewSkuAsinInfo, setReviewSkuAsinInfo] = useState(null);
-  const [reviewSkuAsinLoading, setReviewSkuAsinLoading] = useState(false);
+  // SKU → ASIN backtrack info for the manual review modal — cached per SKU for batch prefetch
+  const [reviewAsinCache, setReviewAsinCache] = useState({}); // { [sku]: fetchedData | null }
 
   // Manual Review Mode
   const [reviewMode, setReviewMode] = useState(false);
@@ -266,6 +277,9 @@ export default function AutoCompatibilityPage() {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewItem, setReviewItem] = useState(null);
   const [fullBatch, setFullBatch] = useState(null);
+  // Derived from cache — same variable names so JSX is unchanged
+  const reviewSkuAsinInfo = reviewItem?.sku != null ? (reviewAsinCache[reviewItem.sku] ?? null) : null;
+  const reviewSkuAsinLoading = !!(reviewItem?.sku && !(reviewItem.sku in reviewAsinCache));
   const [editingCompat, setEditingCompat] = useState(false);
   
   // Compatibility Editor State
@@ -568,6 +582,7 @@ export default function AutoCompatibilityPage() {
     setReviewMode(true);
     setReviewItems([]);
     setReviewIndex(0);
+    setReviewAsinCache({});
     setReviewItem(null);
     try {
       const { data } = await api.get(`/ebay/auto-compatibility-batch/${batchId}`);
@@ -615,6 +630,13 @@ export default function AutoCompatibilityPage() {
       setReviewItem(enrichedItems[0]);
       // Pre-load makes so the dropdown is ready immediately
       if (makeOptions.length === 0) fetchMakes();
+      // Batch-prefetch Amazon data for all unique SKUs in the background (fire-and-forget)
+      const uniqueSkus = [...new Set(enrichedItems.map(r => r.sku).filter(Boolean))];
+      uniqueSkus.forEach(sku => {
+        api.get(`/compatibility/sku-info/${encodeURIComponent(sku)}`)
+          .then(({ data }) => setReviewAsinCache(prev => ({ ...prev, [sku]: data })))
+          .catch(() => setReviewAsinCache(prev => ({ ...prev, [sku]: null })));
+      });
     } catch (e) {
       setReviewMode(false);
       setSnackbar({ open: true, message: 'Failed to load batch: ' + (e.response?.data?.error || e.message), severity: 'error' });
@@ -1007,20 +1029,13 @@ export default function AutoCompatibilityPage() {
     return () => { cancelled = true; };
   }, [detailItem?.sku]);
 
-  // Fetch Amazon source info for the manual review modal when reviewItem SKU changes
+  // Fallback: if navigating to an item whose SKU isn't in the prefetch cache yet, fetch it now
   useEffect(() => {
-    if (!reviewItem?.sku) {
-      setReviewSkuAsinInfo(null);
-      return;
-    }
-    let cancelled = false;
-    setReviewSkuAsinInfo(null);
-    setReviewSkuAsinLoading(true);
+    if (!reviewItem?.sku) return;
+    if (reviewItem.sku in reviewAsinCache) return; // already prefetched or in-flight
     api.get(`/compatibility/sku-info/${encodeURIComponent(reviewItem.sku)}`)
-      .then(({ data }) => { if (!cancelled) setReviewSkuAsinInfo(data); })
-      .catch(() => { })
-      .finally(() => { if (!cancelled) setReviewSkuAsinLoading(false); });
-    return () => { cancelled = true; };
+      .then(({ data }) => setReviewAsinCache(prev => ({ ...prev, [reviewItem.sku]: data })))
+      .catch(() => setReviewAsinCache(prev => ({ ...prev, [reviewItem.sku]: null })));
   }, [reviewItem?.sku]);
 
   const fetchTrims = async (makeVal, modelVal, years) => {
@@ -1216,7 +1231,10 @@ export default function AutoCompatibilityPage() {
   const sendNewCompatibility = async () => {
     if (!reviewItem) return;
     const resolvedSellerId = fullBatch?.seller?._id || sellerId;
-    if (!resolvedSellerId) return;
+    if (!resolvedSellerId) {
+      setSnackbar({ open: true, message: 'Cannot send to eBay: no seller is selected.', severity: 'error' });
+      return;
+    }
 
     setSendingCompat(true);
     try {
@@ -1351,12 +1369,17 @@ export default function AutoCompatibilityPage() {
       return;
     }
 
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
+    if (!resolvedSellerId) {
+      setSnackbar({ open: true, message: 'Cannot send to eBay: no seller is selected. Please select a seller and re-open the batch.', severity: 'error' });
+      return;
+    }
+
     setBulkSending(true);
     let successCount = 0;
     let warningCount = 0;
     let failCount = 0;
 
-    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
     for (const item of itemsToSend) {
       try {
         const { data } = await api.post('/ebay/update-compatibility', {
@@ -2495,10 +2518,10 @@ export default function AutoCompatibilityPage() {
                   <a href={`https://www.amazon.com/dp/${reviewSkuAsinInfo.asin}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.82rem', color: '#1976d2', fontWeight: 600 }}>View on Amazon ↗</a>
                 </Box>
 
-                {/* No data in AsinDirectory warning */}
+                {/* No data from DB or scraper */}
                 {!reviewSkuAsinInfo.amazonTitle && !reviewSkuAsinInfo.images?.length && !reviewSkuAsinInfo.brand && (
                   <Alert severity="warning" sx={{ mb: 1.5, fontSize: '0.82rem' }}>
-                    ASIN <strong>{reviewSkuAsinInfo.asin}</strong> is not yet imported into the product database. Add it via ASIN import to see full product details here.
+                    Could not fetch product details for <strong>{reviewSkuAsinInfo.asin}</strong> from Amazon. The scraper may be rate-limited — try again shortly.
                   </Alert>
                 )}
 
@@ -2539,18 +2562,22 @@ export default function AutoCompatibilityPage() {
                 {/* Amazon Compatibility */}
                 {reviewSkuAsinInfo.compatibility && (
                   <Box sx={{ mt: 1.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.4, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Amazon Compatibility</Typography>
-                    <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{reviewSkuAsinInfo.compatibility}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.5, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Amazon Compatibility</Typography>
+                    <Typography variant="body2" sx={{ color: '#333', fontSize: '0.88rem', whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>{boldNumbers(reviewSkuAsinInfo.compatibility)}</Typography>
                   </Box>
                 )}
 
                 {/* Description */}
                 {reviewSkuAsinInfo.amazonDescription && (
                   <Box sx={{ mt: 1.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.4, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Description</Typography>
-                    <Typography variant="body2" sx={{ color: '#444', whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.55 }}>
-                      {reviewSkuAsinInfo.amazonDescription}
-                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.5, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Description</Typography>
+                    <Box sx={{ color: '#333', fontSize: '0.9rem', lineHeight: 1.8, fontWeight: 500 }}>
+                      {reviewSkuAsinInfo.amazonDescription.split('\n').map((line, i) => line.trim() ? (
+                        <Typography key={i} variant="body2" sx={{ mb: 0.6, fontSize: '0.9rem', lineHeight: 1.75, fontWeight: 500, color: '#222' }}>
+                          {boldNumbers(line)}
+                        </Typography>
+                      ) : <Box key={i} sx={{ mb: 0.3 }} />)}
+                    </Box>
                   </Box>
                 )}
               </>
