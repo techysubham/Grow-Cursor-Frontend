@@ -48,6 +48,7 @@ export const tableBodyCellSx = {
   px: 1.5,
   borderBottom: `1px solid ${dashboardSignatureTokens.table.rowBorder}`,
   whiteSpace: 'nowrap',
+  fontVariantNumeric: 'tabular-nums',
 };
 
 /** Applied to the <TableContainer> / outer <Paper> wrapping a data table */
