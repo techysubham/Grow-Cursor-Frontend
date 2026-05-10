@@ -233,6 +233,18 @@ const formatDateIST = (dateString) => {
   }).format(new Date(dateString));
 };
 
+// Bold any 4-digit year (1900–2099) in text for display
+// Bold any number (integers, decimals, fractions, measurements like 12") in text
+function boldNumbers(text) {
+  if (!text) return null;
+  const parts = text.split(/(\b\d+(?:[./\-]\d+)*(?:\s*(?:in|inch|inches|ft|mm|cm|oz|lb|lbs|kg|g|%|"))?\b)/gi);
+  return parts.map((part, i) =>
+    /^\d/.test(part)
+      ? <strong key={i} style={{ fontWeight: 800, color: '#111' }}>{part}</strong>
+      : part
+  );
+}
+
 export default function AutoCompatibilityPage() {
   const [sellers, setSellers] = useState([]);
   const [staffUsers, setStaffUsers] = useState([]); // non-seller users for "By" filter
@@ -251,6 +263,13 @@ export default function AutoCompatibilityPage() {
   const [detailItem, setDetailItem] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // SKU → ASIN backtrack info for the detail dialog
+  const [skuAsinInfo, setSkuAsinInfo] = useState(null);
+  const [skuAsinLoading, setSkuAsinLoading] = useState(false);
+
+  // SKU → ASIN backtrack info for the manual review modal — cached per SKU for batch prefetch
+  const [reviewAsinCache, setReviewAsinCache] = useState({}); // { [sku]: fetchedData | null }
+
   // Manual Review Mode
   const [reviewMode, setReviewMode] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -258,6 +277,9 @@ export default function AutoCompatibilityPage() {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewItem, setReviewItem] = useState(null);
   const [fullBatch, setFullBatch] = useState(null);
+  // Derived from cache — same variable names so JSX is unchanged
+  const reviewSkuAsinInfo = reviewItem?.sku != null ? (reviewAsinCache[reviewItem.sku] ?? null) : null;
+  const reviewSkuAsinLoading = !!(reviewItem?.sku && !(reviewItem.sku in reviewAsinCache));
   const [editingCompat, setEditingCompat] = useState(false);
   
   // Compatibility Editor State
@@ -560,6 +582,7 @@ export default function AutoCompatibilityPage() {
     setReviewMode(true);
     setReviewItems([]);
     setReviewIndex(0);
+    setReviewAsinCache({});
     setReviewItem(null);
     try {
       const { data } = await api.get(`/ebay/auto-compatibility-batch/${batchId}`);
@@ -607,6 +630,13 @@ export default function AutoCompatibilityPage() {
       setReviewItem(enrichedItems[0]);
       // Pre-load makes so the dropdown is ready immediately
       if (makeOptions.length === 0) fetchMakes();
+      // Batch-prefetch Amazon data for all unique SKUs in the background (fire-and-forget)
+      const uniqueSkus = [...new Set(enrichedItems.map(r => r.sku).filter(Boolean))];
+      uniqueSkus.forEach(sku => {
+        api.get(`/compatibility/sku-info/${encodeURIComponent(sku)}`)
+          .then(({ data }) => setReviewAsinCache(prev => ({ ...prev, [sku]: data })))
+          .catch(() => setReviewAsinCache(prev => ({ ...prev, [sku]: null })));
+      });
     } catch (e) {
       setReviewMode(false);
       setSnackbar({ open: true, message: 'Failed to load batch: ' + (e.response?.data?.error || e.message), severity: 'error' });
@@ -983,6 +1013,31 @@ export default function AutoCompatibilityPage() {
     }
   }, [trimsByYear, aiSuggestedTrims, aiExcludedTrims, aiSuggestedEngines, aiExcludedEngines, aiSelectAllWhenUnfiltered]);
 
+  // Fetch Amazon source info when a detail item with a SKU is opened
+  useEffect(() => {
+    if (!detailItem?.sku) {
+      setSkuAsinInfo(null);
+      return;
+    }
+    let cancelled = false;
+    setSkuAsinInfo(null);
+    setSkuAsinLoading(true);
+    api.get(`/compatibility/sku-info/${encodeURIComponent(detailItem.sku)}`)
+      .then(({ data }) => { if (!cancelled) setSkuAsinInfo(data); })
+      .catch(() => { })
+      .finally(() => { if (!cancelled) setSkuAsinLoading(false); });
+    return () => { cancelled = true; };
+  }, [detailItem?.sku]);
+
+  // Fallback: if navigating to an item whose SKU isn't in the prefetch cache yet, fetch it now
+  useEffect(() => {
+    if (!reviewItem?.sku) return;
+    if (reviewItem.sku in reviewAsinCache) return; // already prefetched or in-flight
+    api.get(`/compatibility/sku-info/${encodeURIComponent(reviewItem.sku)}`)
+      .then(({ data }) => setReviewAsinCache(prev => ({ ...prev, [reviewItem.sku]: data })))
+      .catch(() => setReviewAsinCache(prev => ({ ...prev, [reviewItem.sku]: null })));
+  }, [reviewItem?.sku]);
+
   const fetchTrims = async (makeVal, modelVal, years) => {
     if (!makeVal || !modelVal || !years || years.length === 0) {
       setTrimsByYear({});
@@ -1176,7 +1231,10 @@ export default function AutoCompatibilityPage() {
   const sendNewCompatibility = async () => {
     if (!reviewItem) return;
     const resolvedSellerId = fullBatch?.seller?._id || sellerId;
-    if (!resolvedSellerId) return;
+    if (!resolvedSellerId) {
+      setSnackbar({ open: true, message: 'Cannot send to eBay: no seller is selected.', severity: 'error' });
+      return;
+    }
 
     setSendingCompat(true);
     try {
@@ -1311,12 +1369,17 @@ export default function AutoCompatibilityPage() {
       return;
     }
 
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
+    if (!resolvedSellerId) {
+      setSnackbar({ open: true, message: 'Cannot send to eBay: no seller is selected. Please select a seller and re-open the batch.', severity: 'error' });
+      return;
+    }
+
     setBulkSending(true);
     let successCount = 0;
     let warningCount = 0;
     let failCount = 0;
 
-    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
     for (const item of itemsToSend) {
       try {
         const { data } = await api.post('/ebay/update-compatibility', {
@@ -2132,6 +2195,61 @@ export default function AutoCompatibilityPage() {
                 {detailItem.sku && <Chip label={`SKU: ${detailItem.sku}`} variant="outlined" />}
               </Box>
 
+              {/* Amazon Source Info (SKU backtrack) */}
+              {skuAsinLoading && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <CircularProgress size={14} />
+                  <Typography variant="caption" color="textSecondary">Loading Amazon source...</Typography>
+                </Box>
+              )}
+              {!skuAsinLoading && skuAsinInfo?.asin && (
+                <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: '#fff8e1', borderColor: '#ffe082' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 0.5 }}>
+                    <Typography variant="caption" fontWeight={700} color="#b45309" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Amazon Source</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip label={`ASIN: ${skuAsinInfo.asin}`} size="small" sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 700, fontSize: '0.72rem' }} />
+                      <a href={`https://www.amazon.com/dp/${skuAsinInfo.asin}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.75rem', color: '#1976d2' }}>View on Amazon ↗</a>
+                    </Box>
+                  </Box>
+                  {skuAsinInfo.images?.[0] && (
+                    <Box sx={{ mb: 1, textAlign: 'center' }}>
+                      <img src={skuAsinInfo.images[0]} alt="Amazon product" style={{ maxHeight: 80, maxWidth: '100%', objectFit: 'contain', borderRadius: 4, border: '1px solid #ddd' }} />
+                    </Box>
+                  )}
+                  {skuAsinInfo.amazonTitle && (
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 0.5 }}>{skuAsinInfo.amazonTitle}</Typography>
+                  )}
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}>
+                    {skuAsinInfo.brand && <Chip label={`Brand: ${skuAsinInfo.brand}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />}
+                    {skuAsinInfo.price && <Chip label={`Price: ${skuAsinInfo.price}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />}
+                    {skuAsinInfo.color && <Chip label={`Color: ${skuAsinInfo.color}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />}
+                    {skuAsinInfo.material && <Chip label={`Material: ${skuAsinInfo.material}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />}
+                    {skuAsinInfo.size && <Chip label={`Size: ${skuAsinInfo.size}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />}
+                    {skuAsinInfo.model && <Chip label={`Model: ${skuAsinInfo.model}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />}
+                  </Box>
+                  {skuAsinInfo.specialFeatures && (
+                    <Box sx={{ mb: 0.5 }}>
+                      <Typography variant="caption" fontWeight={700} color="textSecondary">Special Features</Typography>
+                      <Typography variant="body2" sx={{ color: '#444', fontSize: '0.78rem' }}>{skuAsinInfo.specialFeatures}</Typography>
+                    </Box>
+                  )}
+                  {skuAsinInfo.compatibility && (
+                    <Box sx={{ mb: 0.5 }}>
+                      <Typography variant="caption" fontWeight={700} color="textSecondary">Amazon Compatibility</Typography>
+                      <Typography variant="body2" sx={{ color: '#444', fontSize: '0.78rem', whiteSpace: 'pre-wrap' }}>{skuAsinInfo.compatibility}</Typography>
+                    </Box>
+                  )}
+                  {skuAsinInfo.amazonDescription && (
+                    <Box>
+                      <Typography variant="caption" fontWeight={700} color="textSecondary">Description</Typography>
+                      <Typography variant="body2" sx={{ color: '#555', whiteSpace: 'pre-wrap', maxHeight: 100, overflowY: 'auto', fontSize: '0.78rem' }}>
+                        {skuAsinInfo.amazonDescription.length > 500 ? skuAsinInfo.amazonDescription.slice(0, 500) + '…' : skuAsinInfo.amazonDescription}
+                      </Typography>
+                    </Box>
+                  )}
+                </Paper>
+              )}
+
               {detailItem.aiSuggestion?.make && (
                 <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
                   <Typography variant="subtitle2" gutterBottom>AI Suggestion</Typography>
@@ -2211,7 +2329,8 @@ export default function AutoCompatibilityPage() {
         open={reviewMode} 
         onClose={handleReviewModeClose}
         disableEscapeKeyDown
-        maxWidth="xl" 
+        maxWidth={false}
+        PaperProps={{ sx: { width: '98vw', maxWidth: '98vw' } }}
         fullWidth
       >
         <DialogTitle sx={{ borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2 }}>
@@ -2350,7 +2469,7 @@ export default function AutoCompatibilityPage() {
             ) : (
               <Typography variant="body2" color="textSecondary">No preview available.</Typography>
             )}
-            
+
             {/* AI Suggestion Box */}
             {reviewItem?.aiSuggestion?.make && (
               <Alert severity="info" sx={{ mt: 2 }}>
@@ -2363,7 +2482,6 @@ export default function AutoCompatibilityPage() {
                     → Resolved: {reviewItem.resolvedMake} {reviewItem.resolvedModel}
                   </Typography>
                 )}
-
                 {reviewItem.failureReason && (
                   <Typography variant="caption" display="block" color="error.main" sx={{ mt: 0.5 }}>
                     ⚠️ {reviewItem.failureReason}
@@ -2375,6 +2493,94 @@ export default function AutoCompatibilityPage() {
                   </Typography>
                 )}
               </Alert>
+            )}
+          </Box>
+
+          {/* MIDDLE PANEL: Amazon Source */}
+          <Box sx={{ flex: 1, borderRight: '1px solid #eee', p: 2, overflowY: 'auto', bgcolor: '#fffdf0' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, letterSpacing: 0.3, mb: 1.5, color: '#92400e' }}>Amazon Source</Typography>
+            {reviewSkuAsinLoading && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={14} />
+                <Typography variant="caption" color="textSecondary">Loading Amazon data...</Typography>
+              </Box>
+            )}
+            {!reviewSkuAsinLoading && !reviewSkuAsinInfo?.asin && (
+              <Typography variant="body2" color="textSecondary">
+                {reviewItem?.sku ? 'No ASIN linked to this SKU.' : 'No SKU linked to this listing.'}
+              </Typography>
+            )}
+            {!reviewSkuAsinLoading && reviewSkuAsinInfo?.asin && (
+              <>
+                {/* ASIN header row */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+                  <Chip label={reviewSkuAsinInfo.asin} size="small" sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 800, fontSize: '0.8rem', px: 0.5 }} />
+                  <a href={`https://www.amazon.com/dp/${reviewSkuAsinInfo.asin}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.82rem', color: '#1976d2', fontWeight: 600 }}>View on Amazon ↗</a>
+                </Box>
+
+                {/* No data from DB or scraper */}
+                {!reviewSkuAsinInfo.amazonTitle && !reviewSkuAsinInfo.images?.length && !reviewSkuAsinInfo.brand && (
+                  <Alert severity="warning" sx={{ mb: 1.5, fontSize: '0.82rem' }}>
+                    Could not fetch product details for <strong>{reviewSkuAsinInfo.asin}</strong> from Amazon. The scraper may be rate-limited — try again shortly.
+                  </Alert>
+                )}
+
+                {/* Product image */}
+                {reviewSkuAsinInfo.images?.[0] && (
+                  <Box sx={{ mb: 2, textAlign: 'center', bgcolor: '#fff', borderRadius: 1, p: 1, border: '1px solid #eee' }}>
+                    <img src={reviewSkuAsinInfo.images[0]} alt="Amazon product" style={{ maxHeight: 180, maxWidth: '100%', objectFit: 'contain' }} />
+                  </Box>
+                )}
+
+                {/* Title */}
+                {reviewSkuAsinInfo.amazonTitle && (
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#111', mb: 1.5, lineHeight: 1.45, fontSize: '0.95rem' }}>
+                    {reviewSkuAsinInfo.amazonTitle}
+                  </Typography>
+                )}
+
+                <Divider sx={{ mb: 1.5 }} />
+
+                {/* Attribute rows */}
+                {[['Brand', reviewSkuAsinInfo.brand], ['Price', reviewSkuAsinInfo.price], ['Color', reviewSkuAsinInfo.color],
+                  ['Material', reviewSkuAsinInfo.material], ['Size', reviewSkuAsinInfo.size], ['Model', reviewSkuAsinInfo.model]
+                ].filter(([, v]) => v).map(([label, value]) => (
+                  <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.75, alignItems: 'flex-start' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', minWidth: 72, flexShrink: 0, fontSize: '0.83rem' }}>{label}:</Typography>
+                    <Typography variant="body2" sx={{ color: '#1a1a1a', fontSize: '0.83rem', fontWeight: 500 }}>{value}</Typography>
+                  </Box>
+                ))}
+
+                {/* Special Features */}
+                {reviewSkuAsinInfo.specialFeatures && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.4, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Special Features</Typography>
+                    <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem', lineHeight: 1.55 }}>{reviewSkuAsinInfo.specialFeatures}</Typography>
+                  </Box>
+                )}
+
+                {/* Amazon Compatibility */}
+                {reviewSkuAsinInfo.compatibility && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.5, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Amazon Compatibility</Typography>
+                    <Typography variant="body2" sx={{ color: '#333', fontSize: '0.88rem', whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>{boldNumbers(reviewSkuAsinInfo.compatibility)}</Typography>
+                  </Box>
+                )}
+
+                {/* Description */}
+                {reviewSkuAsinInfo.amazonDescription && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#555', mb: 0.5, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Description</Typography>
+                    <Box sx={{ color: '#333', fontSize: '0.9rem', lineHeight: 1.8, fontWeight: 500 }}>
+                      {reviewSkuAsinInfo.amazonDescription.split('\n').map((line, i) => line.trim() ? (
+                        <Typography key={i} variant="body2" sx={{ mb: 0.6, fontSize: '0.9rem', lineHeight: 1.75, fontWeight: 500, color: '#222' }}>
+                          {boldNumbers(line)}
+                        </Typography>
+                      ) : <Box key={i} sx={{ mb: 0.3 }} />)}
+                    </Box>
+                  </Box>
+                )}
+              </>
             )}
           </Box>
 
