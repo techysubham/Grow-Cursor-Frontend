@@ -113,8 +113,6 @@ const OrdersDepartmentDashboardPage = lazy(() => import('../pages/admin/OrdersDe
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ChatIcon from '@mui/icons-material/Chat';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-const ASINStoragePage = lazy(() => import('../pages/admin/ASINStoragePage.jsx'));
-import StorageIcon from '@mui/icons-material/Storage';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import LayersIcon from '@mui/icons-material/Layers';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
@@ -305,7 +303,6 @@ const COMPONENT_MAP = {
   'ManagePlatforms': ManagePlatformsPage,
   'ManageStores': ManageStoresPage,
   'ProductTable': ListingManagementPage,
-  'AsinStorage': ASINStoragePage,
   'ManageRanges': ManageRangesPage,
   'UserCredentials': UserCredentialsPage,
   'UserPerformance': UserPerformancePage,

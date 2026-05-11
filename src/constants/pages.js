@@ -127,7 +127,6 @@ export const PAGE_REGISTRY = [
   { id: 'ManagePlatforms', name: 'Manage Platforms', path: '/platforms', category: 'others', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'ManageStores', name: 'Manage Stores', path: '/stores', category: 'others', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'ProductTable', name: 'Product Table', path: '/listing', category: 'others', defaultRoles: ['superadmin', 'listingadmin'] },
-  { id: 'AsinStorage', name: 'ASIN Storage', path: '/asin-storage', category: 'others', defaultRoles: ['superadmin', 'productadmin'] },
   { id: 'ManageRanges', name: 'Manage Ranges', path: '/ranges', category: 'others', defaultRoles: ['superadmin', 'productadmin'] },
   { id: 'UserCredentials', name: 'User Credentials', path: '/user-credentials', category: 'others', defaultRoles: ['superadmin'] },
   { id: 'UserPerformance', name: 'User Performance Logs', path: '/user-performance', category: 'others', defaultRoles: ['superadmin'] },
