@@ -38,23 +38,14 @@ const AddListerPage = lazy(() => import('../pages/admin/AddListerPage.jsx'));
 const ListingManagementPage = lazy(() => import('../pages/admin/ListingManagementPage.jsx'));
 const ManagePlatformsPage = lazy(() => import('../pages/admin/ManagePlatformsPage.jsx'));
 const ManageStoresPage = lazy(() => import('../pages/admin/ManageStoresPage.jsx'));
-const AdminAssignmentsPage = lazy(() => import('../pages/admin/AdminAssignmentsPage.jsx'));
 const ManageRangesPage = lazy(() => import('../pages/admin/ManageRangesPage.jsx'));
 const ManageCategoriesPage = lazy(() => import('../pages/admin/ManageCategoriesPage.jsx'));
-const ListingsSummaryPage = lazy(() => import('../pages/admin/ListingsSummaryPage.jsx'));
 const UserCredentialsPage = lazy(() => import('../pages/admin/UserCredentialsPage.jsx'));
-const ListingSheetPage = lazy(() => import('../pages/admin/ListingSheetPage.jsx'));
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import TaskIcon from '@mui/icons-material/Task';
 import EditIcon from '@mui/icons-material/Edit';
 
-const TaskListPage = lazy(() => import('../pages/admin/TaskListPage.jsx'));
 const StockLedgerPage = lazy(() => import('../pages/admin/StockLedgerPage.jsx'));
-const StoreWiseTaskListPage = lazy(() => import('../pages/admin/StoreWiseTaskListPage.jsx'));
-const StoreTaskDetailPage = lazy(() => import('../pages/admin/StoreTaskDetailPage.jsx'));
-const StoreDailyTasksPage = lazy(() => import('../pages/admin/StoreDailyTasksPage.jsx'));
-const ListerInfoPage = lazy(() => import('../pages/admin/ListerInfoPage.jsx'));
-const ListerInfoDetailPage = lazy(() => import('../pages/admin/ListerInfoDetailPage.jsx'));
 const AdminTaskList = lazy(() => import('../pages/compatibility/AdminTaskList.jsx'));
 const EditorDashboard = lazy(() => import('../pages/compatibility/EditorDashboard.jsx'));
 const ProgressTrackingPage = lazy(() => import('../pages/compatibility/ProgressTrackingPage.jsx'));
@@ -83,7 +74,6 @@ const AboutMePage = lazy(() => import('../pages/AboutMePage.jsx'));
 const EmployeeDetailsPage = lazy(() => import('../pages/admin/EmployeeDetailsPage.jsx'));
 const EmployeeManagementPage = lazy(() => import('../pages/admin/EmployeeManagementPage.jsx'));
 const BuyerChatPage = lazy(() => import('../pages/admin/BuyerChatPage.jsx'));
-const RangeAnalyzerPage = lazy(() => import('../pages/admin/RangeAnalyzerPage.jsx'));
 const FeedUploadPage = lazy(() => import('../pages/ebay/FeedUploadPage.jsx'));
 const SellingPrivilegesPage = lazy(() => import('../pages/admin/SellingPrivilegesPage.jsx'));
 const EbayApiUsagePage = lazy(() => import('../pages/admin/EbayApiUsagePage.jsx'));
@@ -123,15 +113,10 @@ const OrdersDepartmentDashboardPage = lazy(() => import('../pages/admin/OrdersDe
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ChatIcon from '@mui/icons-material/Chat';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-const AmazonLookupPage = lazy(() => import('../pages/admin/AmazonLookupPage.jsx'));
-import SearchIcon from '@mui/icons-material/Search';
-const ManageProductUmbrellasPage = lazy(() => import('../pages/admin/ManageProductUmbrellasPage.jsx'));
-import UmbrellaIcon from '@mui/icons-material/Umbrella';
 const ASINStoragePage = lazy(() => import('../pages/admin/ASINStoragePage.jsx'));
 import StorageIcon from '@mui/icons-material/Storage';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import LayersIcon from '@mui/icons-material/Layers';
-const ColumnCreatorPage = lazy(() => import('../pages/admin/ColumnCreatorPage.jsx'));
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 const ManageTemplatesPage = lazy(() => import('../pages/admin/ManageTemplatesPage.jsx'));
 const TemplateListingsPage = lazy(() => import('../pages/admin/TemplateListingsPage.jsx'));
@@ -320,18 +305,7 @@ const COMPONENT_MAP = {
   'ManagePlatforms': ManagePlatformsPage,
   'ManageStores': ManageStoresPage,
   'ProductTable': ListingManagementPage,
-  'TaskList': TaskListPage,
-  'Assignments': AdminAssignmentsPage,
-  'ListingsSummary': ListingsSummaryPage,
-  'ListingSheet': ListingSheetPage,
-  'StoreWiseTasks': StoreWiseTaskListPage,
-  'StoreDailyTasks': StoreDailyTasksPage,
-  'ListerInfo': ListerInfoPage,
-  'RangeAnalyzer': RangeAnalyzerPage,
-  'AmazonLookup': AmazonLookupPage,
-  'ProductUmbrellas': ManageProductUmbrellasPage,
   'AsinStorage': ASINStoragePage,
-  'ColumnCreator': ColumnCreatorPage,
   'ManageRanges': ManageRangesPage,
   'UserCredentials': UserCredentialsPage,
   'UserPerformance': UserPerformancePage,
@@ -927,14 +901,6 @@ export default function AdminLayout({ user, onLogout }) {
               <Route path="/seller-templates" element={<SellerTemplatesPage />} />
               <Route path="/template-listing-analytics" element={<TemplateListingAnalyticsPage />} />
             </>
-          )}
-
-          {hasAccess('StoreWiseTasks') && (
-            <Route path="/store-wise-tasks/details" element={<StoreTaskDetailPage />} />
-          )}
-
-          {hasAccess('ListerInfo') && (
-            <Route path="/lister-info/details" element={<ListerInfoDetailPage />} />
           )}
 
           {/* Default redirect */}

@@ -6,15 +6,12 @@ import {
   Toolbar, Typography, Divider, TextField,
   Stack, Alert, IconButton, Autocomplete,
   Chip, LinearProgress, CardHeader, Avatar,
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  CircularProgress, Collapse
+  CircularProgress
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import LinkIcon from '@mui/icons-material/Link';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import SendIcon from '@mui/icons-material/Send';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -37,18 +34,7 @@ export default function ListerDashboard({ user, onLogout }) {
   // Per-assignment UI state
   const [selectedRanges, setSelectedRanges] = useState({});
   const [rangeQtys, setRangeQtys] = useState({});
-  
-  // Paste Modal State
-  const [pasteModalOpen, setPasteModalOpen] = useState(false);
-  const [pasteAssignment, setPasteAssignment] = useState(null);
-  const [pasteText, setPasteText] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analyzeResult, setAnalyzeResult] = useState(null);
-  const [unknownQty, setUnknownQty] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [expandedInModal, setExpandedInModal] = useState(false);
-  const [selectedModels, setSelectedModels] = useState({}); // { modelName: count } - models selected for adding
-  
+
   // Data Cache
   const [categoryRanges, setCategoryRanges] = useState({});
   const fetchingCategories = useRef(new Set());
@@ -100,142 +86,7 @@ export default function ListerDashboard({ user, onLogout }) {
     if (allAssignments.length > 0) fetchMissing();
   }, [allAssignments, categoryRanges]);
 
-  // Open paste modal
-  const openPasteModal = (assignment) => {
-    setPasteAssignment(assignment);
-    setPasteText('');
-    setAnalyzeResult(null);
-    setUnknownQty(0);
-    setExpandedInModal(false);
-    setPasteModalOpen(true);
-  };
-
-  // Close paste modal
-  const closePasteModal = () => {
-    setPasteModalOpen(false);
-    setPasteAssignment(null);
-    setPasteText('');
-    setAnalyzeResult(null);
-    setUnknownQty(0);
-    setSelectedModels({});
-  };
-
-  // Helper: Detect search type based on category name
-  const getSearchTypeForCategory = (categoryName) => {
-    if (!categoryName) return 'vehicles';
-    const lowerName = categoryName.toLowerCase();
-    
-    // Cell phones, tablets, accessories
-    if (lowerName.includes('cell phone') || 
-        lowerName.includes('cellphone') || 
-        lowerName.includes('phone') ||
-        lowerName.includes('tablet') ||
-        lowerName.includes('mobile') ||
-        lowerName.includes('smartphone')) {
-      return 'devices'; // Search both phones and tablets
-    }
-    
-    // Default to vehicles (eBay Motors)
-    return 'vehicles';
-  };
-
-  // Analyze pasted text
-  const handleAnalyze = async () => {
-    if (!pasteText.trim() || !pasteAssignment) return;
-    
-    setAnalyzing(true);
-    setAnalyzeResult(null);
-    setSelectedModels({});
-    
-    try {
-      // Detect search type based on category
-      const categoryName = pasteAssignment.task?.category?.name || '';
-      const categoryId = pasteAssignment.task?.category?._id;
-      const searchType = getSearchTypeForCategory(categoryName);
-      
-      console.log(`[Analyze] Category: "${categoryName}" (${categoryId}) → Search Type: ${searchType}`);
-      
-      const { data } = await api.post('/range-analysis/analyze', { 
-        textToAnalyze: pasteText,
-        searchType: searchType,
-        categoryId: categoryId  // Pass categoryId to also search existing ranges
-      });
-      
-      setAnalyzeResult(data);
-      
-      // Initialize selectedModels with all detected models
-      const initialSelected = {};
-      (data.foundInDatabase || []).forEach(item => {
-        initialSelected[item.modelName] = item.count;
-      });
-      setSelectedModels(initialSelected);
-      
-      // Calculate how many are unmatched
-      const matchedCount = data.totalMatchCount || 0;
-      const savedTotal = (pasteAssignment.rangeQuantities || []).reduce((sum, rq) => sum + (rq.quantity || 0), 0);
-      const assignedQty = pasteAssignment.quantity || 0;
-      const currentRemaining = assignedQty - savedTotal;
-      
-      // Unmatched = lines without a model
-      const unmatchedFromPaste = data.unmatchedCount || 0;
-      
-      // Default unknown qty to unmatched count (but not more than remaining)
-      setUnknownQty(Math.min(unmatchedFromPaste, Math.max(0, currentRemaining - matchedCount)));
-      
-    } catch (e) {
-      console.error('Analysis failed:', e);
-      alert('Failed to analyze text: ' + (e.response?.data?.error || e.message));
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
-  // Submit detected ranges to assignment
-  const handleSubmitRanges = async () => {
-    if (!analyzeResult || !pasteAssignment) return;
-    
-    const catId = pasteAssignment.task?.category?._id;
-    if (!catId) {
-      alert('Category not found for this assignment');
-      return;
-    }
-    
-    setSubmitting(true);
-    
-    try {
-      // Use selectedModels (user can remove models they don't want)
-      const modelCounts = Object.entries(selectedModels)
-        .filter(([_, count]) => count > 0)
-        .map(([modelName, count]) => ({ modelName, count }));
-      
-      const { data } = await api.post('/range-analysis/save-bulk-ranges', {
-        assignmentId: pasteAssignment._id,
-        categoryId: catId,
-        modelCounts: modelCounts,
-        unknownQty: unknownQty > 0 ? unknownQty : 0
-        // No remainingLimit - user controls what to add by removing chips
-      });
-      
-      console.log(`[Bulk Save] Result:`, data);
-      
-      // Refresh and close
-      await load();
-      
-      // Refresh category ranges cache
-      const { data: refreshedRanges } = await api.get('/ranges', { params: { categoryId: catId } });
-      setCategoryRanges(prev => ({ ...prev, [String(catId)]: refreshedRanges }));
-      
-      closePasteModal();
-      
-    } catch (e) {
-      console.error('Submit failed:', e);
-      alert('Failed to save ranges: ' + (e.response?.data?.error || e.message));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Manual add range (old method still available)
+  // Manual add range
   const addRangeQuantity = async (assignmentId) => {
     const rangeId = selectedRanges[assignmentId];
     const qty = Number(rangeQtys[assignmentId] || 0);
@@ -354,21 +205,7 @@ export default function ListerDashboard({ user, onLogout }) {
             </Alert>
           )}
 
-          {/* PASTE BUTTON - Primary Action */}
-          {!a.completedAt && (
-            <Button
-              variant="contained"
-              color="secondary"
-              fullWidth
-              startIcon={<ContentPasteIcon />}
-              onClick={() => openPasteModal(a)}
-              sx={{ mb: 2 }}
-            >
-              Paste Listings to Detect Models
-            </Button>
-          )}
-
-          {/* Manual Input Area (Collapsible) */}
+          {/* Manual Input Area */}
           {!a.completedAt && (
             <Box sx={{ bgcolor: 'action.hover', p: 1.5, borderRadius: 1, mb: 2 }}>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
@@ -455,54 +292,6 @@ export default function ListerDashboard({ user, onLogout }) {
     );
   };
 
-  // Calculate modal stats based on user's selected models
-  const getModalStats = () => {
-    if (!analyzeResult || !pasteAssignment) return null;
-    
-    const savedTotal = (pasteAssignment.rangeQuantities || []).reduce((sum, rq) => sum + (rq.quantity || 0), 0);
-    const assignedQty = pasteAssignment.quantity || 0;
-    const currentRemaining = assignedQty - savedTotal;
-    
-    // Original detected counts
-    const originalMatchedCount = analyzeResult.totalMatchCount || 0;
-    const totalLines = analyzeResult.totalLinesAnalyzed || 0;
-    const unmatchedCount = analyzeResult.unmatchedCount || 0;
-    
-    // User's selected counts (after removing chips)
-    const selectedCount = Object.values(selectedModels).reduce((sum, count) => sum + count, 0);
-    const removedCount = originalMatchedCount - selectedCount;
-    
-    // What will be added
-    const totalToAdd = selectedCount + unknownQty;
-    const exceeds = totalToAdd > currentRemaining;
-    const newRemaining = currentRemaining - totalToAdd;
-    
-    return {
-      assignedQty,
-      savedTotal,
-      currentRemaining,
-      originalMatchedCount,
-      selectedCount,
-      removedCount,
-      totalLines,
-      unmatchedCount,
-      totalToAdd,
-      exceeds,
-      newRemaining
-    };
-  };
-
-  const modalStats = getModalStats();
-  
-  // Helper: Remove a model from selection
-  const removeModel = (modelName) => {
-    setSelectedModels(prev => {
-      const updated = { ...prev };
-      delete updated[modelName];
-      return updated;
-    });
-  };
-
   return (
     <Box sx={{ pb: 4 }}>
       <AppBar position="static" color="default" elevation={1} sx={{ bgcolor: 'white' }}>
@@ -557,207 +346,6 @@ export default function ListerDashboard({ user, onLogout }) {
           {completed.length === 0 && <Grid item xs={12}><Typography color="text.secondary">No completed tasks yet.</Typography></Grid>}
         </Grid>
       </Box>
-
-      {/* PASTE MODAL */}
-      <Dialog 
-        open={pasteModalOpen} 
-        onClose={closePasteModal}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          {(() => {
-            const categoryName = pasteAssignment?.task?.category?.name || '';
-            const searchType = getSearchTypeForCategory(categoryName);
-            if (searchType === 'devices') {
-              return '📱 Paste Listings - Auto Detect Phone/Tablet Models';
-            }
-            return '🚗 Paste Listings - Auto Detect Car Models';
-          })()}
-        </DialogTitle>
-        <DialogContent dividers>
-          {/* Instructions */}
-          <Alert severity="info" sx={{ mb: 2 }}>
-            {(() => {
-              const categoryName = pasteAssignment?.task?.category?.name || '';
-              const searchType = getSearchTypeForCategory(categoryName);
-              if (searchType === 'devices') {
-                return 'Paste your listing titles (one per line). The system will detect phone and tablet models automatically.';
-              }
-              return 'Paste your listing titles (one per line). The system will detect car models automatically.';
-            })()}
-            <br />
-            <Typography variant="caption" color="text.secondary">
-              Category: {pasteAssignment?.task?.category?.name || '-'}
-            </Typography>
-          </Alert>
-          
-          {/* Text Area */}
-          <TextField
-            fullWidth
-            multiline
-            minRows={6}
-            maxRows={12}
-            label="Paste listing titles here (one per line)"
-            value={pasteText}
-            onChange={(e) => setPasteText(e.target.value)}
-            placeholder={(() => {
-              const categoryName = pasteAssignment?.task?.category?.name || '';
-              const searchType = getSearchTypeForCategory(categoryName);
-              if (searchType === 'devices') {
-                return "Screen Protector for iPhone 15 Pro Max\nCase for Samsung Galaxy S24 Ultra\nCharger for iPad Pro 12.9\n...";
-              }
-              return "Power Steering Pump for Honda CR-V 2005-2011 Accord 2006-2007\nBrake Pads for Toyota Camry 2018-2022\n...";
-            })()}
-            sx={{ mb: 2 }}
-            disabled={analyzing}
-          />
-          
-          {/* Analyze Button */}
-          <Button
-            variant="contained"
-            onClick={handleAnalyze}
-            disabled={!pasteText.trim() || analyzing}
-            startIcon={analyzing ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
-            sx={{ mb: 3 }}
-          >
-            {analyzing ? 'Analyzing...' : 'Detect Models'}
-          </Button>
-          
-          {/* Results */}
-          {analyzeResult && modalStats && (
-            <Box>
-              {/* Summary Stats */}
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={3}>
-                  <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#e3f2fd', borderRadius: 1 }}>
-                    <Typography variant="h5" color="primary">{modalStats.totalLines}</Typography>
-                    <Typography variant="caption">Lines Pasted</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={3}>
-                  <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#e8f5e9', borderRadius: 1 }}>
-                    <Typography variant="h5" color="success.main">{modalStats.originalMatchedCount}</Typography>
-                    <Typography variant="caption">Models Found</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={3}>
-                  <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#fff3e0', borderRadius: 1 }}>
-                    <Typography variant="h5" color="warning.main">{modalStats.unmatchedCount}</Typography>
-                    <Typography variant="caption">Not Matched</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={3}>
-                  <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-                    <Typography variant="h5">{modalStats.currentRemaining}</Typography>
-                    <Typography variant="caption">Remaining Qty</Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-              
-              {/* Selected Models as Deletable Chips */}
-              <Typography variant="subtitle2" gutterBottom>
-                Selected Models ({Object.keys(selectedModels).length}) - Click ✕ to remove:
-                {modalStats.removedCount > 0 && (
-                  <Chip 
-                    label={`${modalStats.removedCount} removed`} 
-                    size="small" 
-                    color="error" 
-                    variant="outlined" 
-                    sx={{ ml: 1 }}
-                  />
-                )}
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2, maxHeight: 200, overflow: 'auto', p: 1, bgcolor: '#f9f9f9', borderRadius: 1, border: modalStats.exceeds ? '2px solid #f44336' : '1px solid #e0e0e0' }}>
-                {Object.entries(selectedModels).map(([modelName, count], idx) => (
-                  <Chip 
-                    key={idx} 
-                    label={`${modelName}: ${count}`}
-                    size="small"
-                    color="success"
-                    variant="filled"
-                    onDelete={() => removeModel(modelName)}
-                  />
-                ))}
-                {Object.keys(selectedModels).length === 0 && (
-                  <Typography variant="body2" color="text.secondary">No models selected (all removed)</Typography>
-                )}
-              </Box>
-              
-              {/* Warning if exceeds */}
-              {modalStats.exceeds && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  <strong>⚠️ Total ({modalStats.totalToAdd}) exceeds remaining qty ({modalStats.currentRemaining})!</strong>
-                  <br />Remove {modalStats.totalToAdd - modalStats.currentRemaining} more items by clicking ✕ on the chips above.
-                </Alert>
-              )}
-              
-              {/* Unmatched Lines (Expandable) */}
-              {modalStats.unmatchedCount > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Button 
-                    size="small" 
-                    onClick={() => setExpandedInModal(!expandedInModal)}
-                    startIcon={expandedInModal ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                  >
-                    {expandedInModal ? 'Hide' : 'Show'} Unmatched Lines ({modalStats.unmatchedCount})
-                  </Button>
-                  <Collapse in={expandedInModal}>
-                    <Box sx={{ maxHeight: 150, overflow: 'auto', p: 1, bgcolor: '#fff3e0', borderRadius: 1, mt: 1 }}>
-                      {(analyzeResult.unmatchedLines || []).map((line, idx) => (
-                        <Typography key={idx} variant="caption" display="block" sx={{ mb: 0.5 }}>
-                          Line {line.lineNumber}: {line.text}
-                        </Typography>
-                      ))}
-                    </Box>
-                  </Collapse>
-                </Box>
-              )}
-              
-              {/* Unknown Quantity Input */}
-              {modalStats.unmatchedCount > 0 && (
-                <Box sx={{ bgcolor: '#fff3e0', p: 2, borderRadius: 1, mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    ⚠️ {modalStats.unmatchedCount} lines couldn't be matched to a car model.
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    How many should be added as "Unknown" range?
-                  </Typography>
-                  <TextField
-                    type="number"
-                    size="small"
-                    label="Unknown Quantity"
-                    value={unknownQty}
-                    onChange={(e) => setUnknownQty(Math.max(0, Math.min(Number(e.target.value), Math.max(0, modalStats.currentRemaining - modalStats.matchedCount))))}
-                    inputProps={{ min: 0, max: Math.max(0, modalStats.currentRemaining - modalStats.selectedCount) }}
-                    sx={{ width: 150 }}
-                  />
-                </Box>
-              )}
-              
-              {/* Final Summary */}
-              <Alert severity={modalStats.exceeds ? 'error' : modalStats.newRemaining === 0 ? 'success' : 'warning'}>
-                <strong>Summary:</strong> Selected {modalStats.selectedCount} models + {unknownQty} unknown = {modalStats.totalToAdd} total.
-                {modalStats.removedCount > 0 && ` (${modalStats.removedCount} removed by you)`}
-                {!modalStats.exceeds && modalStats.newRemaining > 0 && ` → ${modalStats.newRemaining} still remaining after this.`}
-                {!modalStats.exceeds && modalStats.newRemaining === 0 && ` → Assignment will be complete!`}
-              </Alert>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closePasteModal} disabled={submitting}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            color="primary"
-            onClick={handleSubmitRanges}
-            disabled={!analyzeResult || submitting || (modalStats && modalStats.totalToAdd <= 0) || (modalStats && modalStats.exceeds)}
-            startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
-          >
-            {submitting ? 'Saving...' : `Add ${modalStats?.totalToAdd || 0} Ranges`}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }
