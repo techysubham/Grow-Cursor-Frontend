@@ -407,12 +407,21 @@ const FeedUploadPage = () => {
             storageForm.append('sellerId', selectedSeller);
             storageForm.append('listingCount', String(listingCount));
             storageForm.append('source', 'manual');
+            // Include metadata so they are saved on the CsvStorage record
+            storageForm.append('country', country);
+            if (selectedCategory) storageForm.append('categoryId', selectedCategory);
+            if (selectedRange) storageForm.append('rangeId', selectedRange);
+            if (selectedProduct) storageForm.append('productId', selectedProduct);
             const saveRes = await api.post('/csv-storage', storageForm, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             await api.post(`/csv-storage/${saveRes.data._id}/schedule-upload`, {
                 scheduledAt: scheduledDate.toISOString(),
                 sellerId: selectedSeller,
+                country: country,
+                categoryId: selectedCategory || undefined,
+                rangeId: selectedRange || undefined,
+                productId: selectedProduct || undefined,
             });
             setScheduleResult(scheduledDate);
             setScheduleFile(null);
