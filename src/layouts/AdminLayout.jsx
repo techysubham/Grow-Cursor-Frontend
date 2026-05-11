@@ -148,6 +148,7 @@ import SecurityIcon from '@mui/icons-material/Security';
 const PageAccessManagementPage = lazy(() => import('../pages/admin/PageAccessManagementPage.jsx'));
 const PageAccessAuditLogPage = lazy(() => import('../pages/admin/PageAccessAuditLogPage.jsx'));
 const UserPasswordManagementPage = lazy(() => import('../pages/admin/UserPasswordManagementPage.jsx'));
+const WelcomePage = lazy(() => import('../pages/admin/WelcomePage.jsx'));
 
 import PageLoader from '../components/PageLoader.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
@@ -571,6 +572,25 @@ export default function AdminLayout({ user, onLogout }) {
         {/* Divider after lister dashboard link */}
         {isAnyLister && <Divider sx={{ my: 1.5, mx: 2, borderColor: 'rgba(0, 0, 0, 0.08)' }} />}
 
+        {/* Home / Welcome - visible to all users */}
+        <ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            to="/admin/welcome"
+            onClick={() => setMobileOpen(false)}
+            selected={location.pathname === '/admin/welcome'}
+            sx={{
+              ...selectedMenuItemStyle,
+              minHeight: 44,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <NavIcon icon={HomeIcon} label="Home" sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
+            {sidebarOpen && <ListItemText primary="Home" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+          </ListItemButton>
+        </ListItem>
+
         {/* About Me - visible to all users except superadmin */}
         {!isSuper && (
           <ListItem disablePadding>
@@ -664,21 +684,7 @@ export default function AdminLayout({ user, onLogout }) {
   );
 
   // Determine default redirect page
-  const getDefaultRedirect = () => {
-    if (isSuper) return '/admin/crp-analytics';
-    // Check categories in priority order
-    const priorityPages = [
-      'ProductResearch', 'ProductTable', 'CompatibilityTasks', 'CompatibilityEditor',
-      'Fulfillment', 'EmployeeDetails', 'OrdersDashboard'
-    ];
-    for (const pageId of priorityPages) {
-      if (hasAccess(pageId)) {
-        const page = PAGE_REGISTRY.find(p => p.id === pageId);
-        if (page) return `/admin${page.path}`;
-      }
-    }
-    return '/admin/about-me';
-  };
+  const getDefaultRedirect = () => '/admin/welcome';
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -859,6 +865,9 @@ export default function AdminLayout({ user, onLogout }) {
         <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <Routes>
+          {/* Welcome / Home page */}
+          <Route path="/welcome" element={<WelcomePage user={user} />} />
+
           {/* Ideas & Issues - accessible to ALL roles */}
           <Route path="/ideas" element={<IdeasPage />} />
 

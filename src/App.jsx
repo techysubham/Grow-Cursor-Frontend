@@ -28,6 +28,8 @@ const STATIC_PAGE_TITLES = {
   '/login': `Login • ${BASE_DOCUMENT_TITLE}`,
   '/ideas': `Ideas & Issues • ${BASE_DOCUMENT_TITLE}`,
   '/about-me': `About Me • ${BASE_DOCUMENT_TITLE}`,
+  '/admin': `Welcome • ${BASE_DOCUMENT_TITLE}`,
+  '/admin/welcome': `Welcome • ${BASE_DOCUMENT_TITLE}`,
   '/admin/about-me': `About Me • ${BASE_DOCUMENT_TITLE}`,
   '/admin/my-leaves': `My Leaves • ${BASE_DOCUMENT_TITLE}`,
   '/admin/internal-messages': `Team Chat • ${BASE_DOCUMENT_TITLE}`,
@@ -95,16 +97,9 @@ function useAuth() {
     if (u.role === 'lister') navigate('/lister');
     else if (u.role === 'advancelister') navigate('/lister');
     else if (u.role === 'trainee') navigate('/lister');
-    else if (u.role === 'compatibilityadmin') navigate('/admin/compatibility-tasks');
-    else if (u.role === 'compatibilityeditor') navigate('/admin/compatibility-editor');
     else if (u.role === 'seller') navigate('/seller-ebay');
-    else if (u.role === 'fulfillmentadmin') navigate('/admin/fulfillment');
-    else if (u.role === 'hradmin') navigate('/admin/employee-details');
-    else if (u.role === 'hr') navigate('/admin/about-me');
-    else if (u.role === 'operationhead') navigate('/admin/employee-details');
-    // For HOC and Compliance Manager, we send them to the general admin area
-    // AdminLayout will handle the specific redirect to /fulfillment
-    else navigate('/admin');
+    // All admin-area roles land on the welcome page
+    else navigate('/admin/welcome');
   };
   const logout = () => {
     setToken(null);
