@@ -48,6 +48,14 @@ function timeLeftTone(h) {
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
+const COUNTRY_OPTIONS = [
+  { value: 'ALL', label: 'All Countries' },
+  { value: 'USD', label: '\uD83C\uDDFA\uD83C\uDDF8 eBay US' },
+  { value: 'AUD', label: '\uD83C\uDDE6\uD83C\uDDFA eBay Australia' },
+  { value: 'CAD', label: '\uD83C\uDDE8\uD83C\uDDE6 eBay Canada' },
+  { value: 'GBP', label: '\uD83C\uDDEC\uD83C\uDDE7 eBay UK' },
+];
+
 // ─── component ────────────────────────────────────────────────────────────────
 
 export default function ExpiringListingsPage() {
@@ -65,6 +73,10 @@ export default function ExpiringListingsPage() {
   // ── pagination ────────────────────────────────────────────────────────────
   const [tablePage, setTablePage]     = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+
+  // ── filters ───────────────────────────────────────────────────────────────
+  const [hoursRange, setHoursRange]         = useState(24);
+  const [countryFilter, setCountryFilter]   = useState('ALL');
 
   // ── ending ────────────────────────────────────────────────────────────────
   const [endingProgress, setEndingProgress] = useState(null);
@@ -106,7 +118,7 @@ export default function ExpiringListingsPage() {
       const baseURL  = import.meta.env.VITE_API_URL;
       const token    = getAuthToken();
       const response = await fetch(
-        `${baseURL}/ebay/expiring-low-activity-listings?sellerId=${selectedSeller}`,
+        `${baseURL}/ebay/expiring-low-activity-listings?sellerId=${selectedSeller}&hours=${hoursRange}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -146,7 +158,7 @@ export default function ExpiringListingsPage() {
       readerRef.current = null;
       setFetching(false);
     }
-  }, [selectedSeller]);
+  }, [selectedSeller, hoursRange]);
 
   // ── selection helpers ─────────────────────────────────────────────────────
   const toggleSelect = (itemId) =>
@@ -156,16 +168,36 @@ export default function ExpiringListingsPage() {
       return next;
     });
 
-  // across ALL pages
-  const allSelected  = listings.length > 0 && selectedItems.size === listings.length;
-  const someSelected = selectedItems.size > 0 && !allSelected;
+  // client-side country filter
+  const displayListings = countryFilter === 'ALL'
+    ? listings
+    : listings.filter(l => l.currency === countryFilter);
 
-  const toggleSelectAll = () =>
-    setSelectedItems(allSelected ? new Set() : new Set(listings.map(l => l.itemId)));
+  // across displayed listings
+  const allSelected  = displayListings.length > 0 && displayListings.every(l => selectedItems.has(l.itemId));
+  const someSelected = displayListings.some(l => selectedItems.has(l.itemId)) && !allSelected;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedItems(prev => {
+        const next = new Set(prev);
+        displayListings.forEach(l => next.delete(l.itemId));
+        return next;
+      });
+    } else {
+      setSelectedItems(prev => {
+        const next = new Set(prev);
+        displayListings.forEach(l => next.add(l.itemId));
+        return next;
+      });
+    }
+  };
 
   // ── end listings ──────────────────────────────────────────────────────────
   const endSelectedListings = async () => {
-    const itemsToEnd = listings.filter(l => selectedItems.has(l.itemId));
+    // Only end items that are visible in the current country filter —
+    // never touch listings that belong to a different country.
+    const itemsToEnd = displayListings.filter(l => selectedItems.has(l.itemId));
     if (!itemsToEnd.length) return;
 
     setEndingProgress({ total: itemsToEnd.length, done: 0, success: 0, failed: 0 });
@@ -203,7 +235,7 @@ export default function ExpiringListingsPage() {
   };
 
   // ── derived ───────────────────────────────────────────────────────────────
-  const pagedListings = listings.slice(tablePage * rowsPerPage, tablePage * rowsPerPage + rowsPerPage);
+  const pagedListings = displayListings.slice(tablePage * rowsPerPage, tablePage * rowsPerPage + rowsPerPage);
   const sellerName    = sellers.find(s => s._id === selectedSeller)?.user?.username || '';
   const pct           = fetchProgress && fetchProgress.totalPages > 0
     ? Math.round((fetchProgress.page / fetchProgress.totalPages) * 100)
@@ -230,14 +262,16 @@ export default function ExpiringListingsPage() {
           >
             <PageHeader
               title="Expiring Low-Activity Listings"
-              subtitle="Active listings expiring within 24 h · <5 watchers · <5 views (30-day) · 0 sold."
+              subtitle={`Active listings expiring within ${hoursRange} h · <5 watchers · <5 views (30-day) · 0 sold.`}
               sx={{ pt: 0, pb: 0 }}
             />
 
             {listings.length > 0 && (
               <Chip
                 icon={<TimerOffIcon />}
-                label={`${listings.length} expiring listing${listings.length !== 1 ? 's' : ''}`}
+                label={countryFilter === 'ALL'
+                  ? `${listings.length} expiring listing${listings.length !== 1 ? 's' : ''}`
+                  : `${displayListings.length} / ${listings.length} listing${listings.length !== 1 ? 's' : ''}`}
                 sx={{
                   height: 36,
                   px: 1,
@@ -255,7 +289,45 @@ export default function ExpiringListingsPage() {
 
           {/* Filters */}
           <Box sx={{ mt: 3, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" flexWrap="wrap">
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel>Time Range</InputLabel>
+                <Select
+                  value={hoursRange}
+                  label="Time Range"
+                  disabled={fetching}
+                  onChange={e => {
+                    setHoursRange(Number(e.target.value));
+                    setListings([]);
+                    setEndingResults(null);
+                    setFetchError('');
+                    setFetchProgress(null);
+                    setSelectedItems(new Set());
+                  }}
+                >
+                  {[24, 48, 72, 96].map(h => (
+                    <MenuItem key={h} value={h}>{h} hours</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel>Country</InputLabel>
+                <Select
+                  value={countryFilter}
+                  label="Country"
+                  onChange={e => {
+                    setCountryFilter(e.target.value);
+                    setTablePage(0);
+                    setSelectedItems(new Set());
+                  }}
+                >
+                  {COUNTRY_OPTIONS.map(opt => (
+                    <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
               <FormControl size="small" sx={{ minWidth: 240 }}>
                 <InputLabel>Select Seller</InputLabel>
                 <Select
@@ -377,7 +449,7 @@ export default function ExpiringListingsPage() {
         )}
 
         {/* ── Table card ────────────────────────────────────────────────── */}
-        {listings.length > 0 && (
+        {displayListings.length > 0 && (
           <SectionCard>
             {/* Action bar */}
             <Box
@@ -390,8 +462,11 @@ export default function ExpiringListingsPage() {
             >
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Typography variant="body2" color="text.secondary">
-                  <strong style={{ color: BRAND_DARK }}>{listings.length}</strong>{' '}
-                  listing{listings.length !== 1 ? 's' : ''}
+                  <strong style={{ color: BRAND_DARK }}>{displayListings.length}</strong>{' '}
+                  listing{displayListings.length !== 1 ? 's' : ''}
+                  {countryFilter !== 'ALL' && listings.length !== displayListings.length && (
+                    <> of <strong style={{ color: BRAND_DARK }}>{listings.length}</strong> total</>
+                  )}
                   {sellerName && (
                     <> for <strong style={{ color: BRAND_DARK }}>{sellerName}</strong></>
                   )}
@@ -442,7 +517,7 @@ export default function ExpiringListingsPage() {
                 }}
               >
                 <Typography variant="caption" color="text.secondary">
-                  {selectedItems.size} of {listings.length} listings selected.
+                  {selectedItems.size} of {displayListings.length} listings selected.
                 </Typography>
                 <Button
                   size="small"
@@ -450,7 +525,7 @@ export default function ExpiringListingsPage() {
                   onClick={toggleSelectAll}
                   sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.78rem', p: 0, minWidth: 0 }}
                 >
-                  Select all {listings.length}
+                  Select all {displayListings.length}
                 </Button>
                 <Button
                   size="small"
@@ -709,7 +784,7 @@ export default function ExpiringListingsPage() {
             {/* Pagination controls */}
             <TablePagination
               component="div"
-              count={listings.length}
+              count={displayListings.length}
               page={tablePage}
               rowsPerPage={rowsPerPage}
               rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
@@ -727,7 +802,26 @@ export default function ExpiringListingsPage() {
           </SectionCard>
         )}
 
-        {/* ── Empty state ───────────────────────────────────────────────── */}
+        {/* ── Country filter empty state ─────────────────────────────────────────────── */}
+        {!fetching && !fetchError && listings.length > 0 && displayListings.length === 0 && (
+          <SectionCard
+            sx={{
+              p: 5,
+              textAlign: 'center',
+              background: dashboardSignatureTokens.surfaces.emptyState,
+            }}
+          >
+            <TimerOffIcon sx={{ fontSize: 48, color: alpha(BRAND_DARK, 0.16), mb: 2 }} />
+            <Typography variant="h6" fontWeight={600} color="text.secondary" gutterBottom>
+              No listings for this country
+            </Typography>
+            <Typography variant="body2" color="text.disabled">
+              {listings.length} listing{listings.length !== 1 ? 's' : ''} fetched, but none match the selected country filter.
+            </Typography>
+          </SectionCard>
+        )}
+
+        {/* ── Empty state ─────────────────────────────────────────────────────────────────── */}
         {!fetching && !fetchError && listings.length === 0 && selectedSeller && !fetchProgress && (
           <SectionCard
             sx={{
@@ -741,7 +835,7 @@ export default function ExpiringListingsPage() {
               No expiring low-activity listings found
             </Typography>
             <Typography variant="body2" color="text.disabled">
-              No active listings match: expiring &lt;24 h · watchers &lt;5 · views &lt;5 · sold = 0
+              No active listings match: expiring &lt;{hoursRange} h · watchers &lt;5 · views &lt;5 · sold = 0
             </Typography>
           </SectionCard>
         )}
