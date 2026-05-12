@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -44,7 +44,11 @@ import SendIcon from '@mui/icons-material/Send';
 import api from '../../lib/api';
 import AdminPageShell from '../../components/AdminPageShell';
 import PageHeader from '../../components/PageHeader';
+import SectionCard from '../../components/SectionCard';
+import StatMetricCard from '../../components/StatMetricCard';
+import StatusChip from '../../components/StatusChip';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme';
+import { dashboardSignatureTokens } from '../../theme/appTheme';
 import {
   tableHeaderCellSx,
   tableBodyRowSx,
@@ -52,13 +56,13 @@ import {
   tableContainerSx,
 } from '../../theme/tableStyles';
 
-// ─── Status chip colours ────────────────────────────────────────────────────
-const STATUS_COLORS = {
+// ─── Status chip tones (maps to StatusChip / dashboardSignatureTokens) ────────
+const STATUS_TONES = {
   Active: 'warning',
   Accepted: 'success',
-  Declined: 'error',
-  Expired: 'default',
-  AdminEnded: 'default',
+  Declined: 'danger',
+  Expired: 'neutral',
+  AdminEnded: 'neutral',
   Countered: 'info',
 };
 
@@ -407,11 +411,21 @@ export default function BestOffersPage() {
     }
   };
 
-  // ── Shared style tokens ───────────────────────────────────────────────────
-  const selectSx = {
-    '& label.Mui-focused': { color: BRAND_YELLOW_DARK },
-    '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: BRAND_YELLOW_DARK },
-  };
+  // ── Stat cards derived from current tab data ─────────────────────────────
+  const statCards = useMemo(() => {
+    if (tab === 0) {
+      const uniqueItems = new Set(offers.map(o => o.itemId)).size;
+      return [
+        { label: 'Active Offers', value: totalEntries || offers.length, tone: (totalEntries || offers.length) > 0 ? 'warning' : 'neutral' },
+        { label: 'Items with Offers', value: uniqueItems, tone: uniqueItems > 0 ? 'info' : 'neutral' },
+      ];
+    }
+    const totalBuyers = eligibleItems.reduce((sum, i) => sum + (i.interestedBuyers || 0), 0);
+    return [
+      { label: 'Eligible Listings', value: eligibleTotal || eligibleItems.length, tone: (eligibleTotal || eligibleItems.length) > 0 ? 'info' : 'neutral' },
+      { label: 'Interested Buyers', value: totalBuyers, tone: totalBuyers > 0 ? 'success' : 'neutral' },
+    ];
+  }, [tab, offers, totalEntries, eligibleItems, eligibleTotal]);
 
   const actionBtnSx = (color) => ({
     minWidth: 0,
@@ -427,46 +441,74 @@ export default function BestOffersPage() {
 
   const isRefreshing = tab === 0 ? loading : eligibleLoading;
 
+  const indexBadgeSx = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 32,
+    height: 32,
+    borderRadius: '50%',
+    backgroundColor: dashboardSignatureTokens.table.indexBadgeBackground,
+    color: dashboardSignatureTokens.table.indexBadgeForeground,
+    fontWeight: 700,
+    fontSize: '0.875rem',
+  };
+
   return (
     <AdminPageShell>
-      <PageHeader title="Best Offers" subtitle="View and respond to buyer best offers from eBay" />
+      {/* ── Header Card ── */}
+      <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', lg: 'center' }} gap={2.5}>
+          <Box>
+            <PageHeader
+              title="Best Offers"
+              subtitle="View and respond to buyer offers, or send proactive offers to interested buyers."
+              sx={{ pt: 0, pb: 0 }}
+            />
+          </Box>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', lg: 'auto' } }}>
+            <Autocomplete
+              options={sellers}
+              getOptionLabel={s => s.user?.username || s._id}
+              value={selectedSeller}
+              onChange={(_, v) => setSelectedSeller(v)}
+              isOptionEqualToValue={(a, b) => a._id === b._id}
+              renderInput={params => <TextField {...params} label="Seller" size="small" />}
+              size="small"
+              sx={{ minWidth: 200 }}
+            />
+            <Button
+              variant="contained"
+              startIcon={isRefreshing ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RefreshIcon />}
+              onClick={() => tab === 0 ? fetchOffers(1) : fetchEligible()}
+              disabled={isRefreshing || !selectedSeller}
+              sx={{
+                bgcolor: BRAND_DARK, color: '#fff', fontWeight: 700, minHeight: 40,
+                '&:hover': { bgcolor: alpha(BRAND_DARK, 0.82) },
+                '&.Mui-disabled': { color: alpha('#fff', 0.35), bgcolor: alpha(BRAND_DARK, 0.38) },
+              }}
+            >
+              Refresh
+            </Button>
+          </Stack>
+        </Stack>
 
-      {/* ── Toolbar ── */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, alignItems: 'flex-end' }}>
-        <Box sx={{ minWidth: 220, flex: '1 1 220px', maxWidth: 320 }}>
-          <Autocomplete
-            options={sellers}
-            getOptionLabel={s => s.user?.username || s._id}
-            value={selectedSeller}
-            onChange={(_, v) => setSelectedSeller(v)}
-            isOptionEqualToValue={(a, b) => a._id === b._id}
-            renderInput={params => (
-              <TextField {...params} label="Seller" size="small" sx={selectSx} />
-            )}
-            size="small"
-          />
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={isRefreshing ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RefreshIcon />}
-          onClick={() => tab === 0 ? fetchOffers(1) : fetchEligible()}
-          disabled={isRefreshing || !selectedSeller}
-          sx={{
-            bgcolor: BRAND_DARK, color: '#fff', fontWeight: 700, minHeight: 36,
-            '&:hover': { bgcolor: alpha(BRAND_DARK, 0.82) },
-            '&.Mui-disabled': { color: alpha('#fff', 0.35), bgcolor: alpha(BRAND_DARK, 0.38) },
-          }}
-        >
-          Refresh
-        </Button>
-      </Box>
+        {/* ── Stat cards ── */}
+        {((tab === 0 && !loading) || (tab === 1 && !eligibleLoading)) && (
+          <Box sx={{ mt: 3, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 1.5 }}>
+            {statCards.map(card => (
+              <StatMetricCard key={card.label} label={card.label} value={card.value} tone={card.tone} />
+            ))}
+          </Box>
+        )}
+      </SectionCard>
 
       {/* ── Tabs ── */}
       <Tabs
         value={tab}
         onChange={(_, v) => { setTab(v); setError(''); setSuccessMsg(''); }}
         sx={{
-          mb: 2,
+          mb: 2.5,
           borderBottom: 1,
           borderColor: 'divider',
           '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 44 },
@@ -477,7 +519,7 @@ export default function BestOffersPage() {
         <Tab
           label={
             <Badge badgeContent={totalEntries || offers.length} color="warning" max={999} showZero={false}>
-              <Box sx={{ pr: totalEntries > 0 ? 1.5 : 0 }}>Buyer Offers</Box>
+              <Box sx={{ pr: (totalEntries || offers.length) > 0 ? 1.5 : 0 }}>Buyer Offers</Box>
             </Badge>
           }
         />
@@ -499,17 +541,11 @@ export default function BestOffersPage() {
       ═══════════════════════════════════════════════════════════════════ */}
       {tab === 0 && (
         <>
-          {!loading && offers.length > 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              Showing <b>{offers.length}</b> of <b>{totalEntries}</b> active offer{totalEntries !== 1 ? 's' : ''}
-              {selectedSeller ? ` for ${selectedSeller.user?.username || selectedSeller._id}` : ''}
-            </Typography>
-          )}
           <TableContainer component={Paper} sx={tableContainerSx}>
-            <Table size="small">
+            <Table size="small" sx={{ minWidth: 1100 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={tableHeaderCellSx}>#</TableCell>
+                  <TableCell sx={tableHeaderCellSx} align="center">#</TableCell>
                   <TableCell sx={tableHeaderCellSx}>Item</TableCell>
                   <TableCell sx={tableHeaderCellSx}>SKU</TableCell>
                   <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'right' }}>List Price</TableCell>
@@ -525,8 +561,8 @@ export default function BestOffersPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
-                      <CircularProgress size={32} sx={{ color: BRAND_YELLOW_DARK }} />
+                    <TableCell colSpan={11} align="center" sx={{ py: 7 }}>
+                      <CircularProgress size={36} sx={{ color: BRAND_YELLOW_DARK }} />
                     </TableCell>
                   </TableRow>
                 ) : offers.length === 0 ? (
@@ -538,15 +574,17 @@ export default function BestOffersPage() {
                 ) : (
                   offers.map((offer, idx) => (
                     <TableRow key={offer.bestOfferId} sx={tableBodyRowSx}>
-                      <TableCell sx={{ ...tableBodyCellSx, color: 'text.secondary', minWidth: 40 }}>
-                        {(currentPage - 1) * 20 + idx + 1}
+                      <TableCell sx={tableBodyCellSx} align="center">
+                        <Box component="span" sx={indexBadgeSx}>
+                          {(currentPage - 1) * 20 + idx + 1}
+                        </Box>
                       </TableCell>
 
                       {/* Item */}
                       <TableCell sx={{ ...tableBodyCellSx, maxWidth: 240 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Tooltip title={offer.title || ''} placement="top" arrow>
-                            <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200, display: 'block' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200, display: 'block' }}>
                               {offer.title || offer.itemId}
                             </Typography>
                           </Tooltip>
@@ -593,7 +631,7 @@ export default function BestOffersPage() {
 
                       {/* Status */}
                       <TableCell sx={tableBodyCellSx}>
-                        <Chip label={offer.status} color={STATUS_COLORS[offer.status] || 'default'} size="small" sx={{ fontWeight: 700, fontSize: '0.7rem' }} />
+                        <StatusChip label={offer.status} tone={STATUS_TONES[offer.status] || 'neutral'} />
                       </TableCell>
 
                       {/* Message */}
@@ -651,17 +689,11 @@ export default function BestOffersPage() {
            TAB 1 — Eligible to Send Offers
       ═══════════════════════════════════════════════════════════════════ */}
       {tab === 1 && (
-        <>
-          {!eligibleLoading && eligibleItems.length > 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              <b>{eligibleTotal || eligibleItems.length}</b> listing{eligibleTotal !== 1 ? 's' : ''} eligible — click <b>Send Offer</b> to proactively offer a discount to interested buyers (watchers / recent viewers).
-            </Typography>
-          )}
-          <TableContainer component={Paper} sx={tableContainerSx}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={tableHeaderCellSx}>#</TableCell>
+        <TableContainer component={Paper} sx={tableContainerSx}>
+          <Table size="small" sx={{ minWidth: 800 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={tableHeaderCellSx} align="center">#</TableCell>
                   <TableCell sx={tableHeaderCellSx}>Listing</TableCell>
                   <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'right' }}>Min Offer Price</TableCell>
                   <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'center' }}>Interested Buyers</TableCell>
@@ -669,89 +701,82 @@ export default function BestOffersPage() {
                   <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'center' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
-              <TableBody>
-                {eligibleLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                      <CircularProgress size={32} sx={{ color: BRAND_YELLOW_DARK }} />
+            <TableBody>
+              {eligibleLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 7 }}>
+                    <CircularProgress size={36} sx={{ color: BRAND_YELLOW_DARK }} />
+                  </TableCell>
+                </TableRow>
+              ) : eligibleItems.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                    {selectedSeller ? 'No listings currently eligible for sending offers.' : 'Select a seller to view eligible listings.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                eligibleItems.map((item, idx) => (
+                  <TableRow key={item.listingId} sx={tableBodyRowSx}>
+                    <TableCell sx={tableBodyCellSx} align="center">
+                      <Box component="span" sx={indexBadgeSx}>{idx + 1}</Box>
                     </TableCell>
-                  </TableRow>
-                ) : eligibleItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 5, color: 'text.secondary' }}>
-                      {selectedSeller ? 'No listings currently eligible for sending offers.' : 'Select a seller to view eligible listings.'}
+
+                    {/* Listing */}
+                    <TableCell sx={{ ...tableBodyCellSx, maxWidth: 320 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Tooltip title={item.title || ''} placement="top" arrow>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280, display: 'block' }}>
+                            {item.title || item.listingId}
+                          </Typography>
+                        </Tooltip>
+                        <Tooltip title="View on eBay" arrow>
+                          <IconButton size="small" onClick={() => window.open(`https://www.ebay.com/itm/${item.itemId || item.listingId}`, '_blank', 'noopener')} sx={{ p: 0.3 }}>
+                            <OpenInNewIcon sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">Listing ID: {item.listingId}</Typography>
                     </TableCell>
-                  </TableRow>
-                ) : (
-                  eligibleItems.map((item, idx) => (
-                    <TableRow key={item.listingId} sx={tableBodyRowSx}>
-                      <TableCell sx={{ ...tableBodyCellSx, color: 'text.secondary', minWidth: 40 }}>{idx + 1}</TableCell>
 
-                      {/* Listing */}
-                      <TableCell sx={{ ...tableBodyCellSx, maxWidth: 320 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Tooltip title={item.title || ''} placement="top" arrow>
-                            <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280, display: 'block' }}>
-                              {item.title || item.listingId}
-                            </Typography>
-                          </Tooltip>
-                          <Tooltip title="View on eBay" arrow>
-                            <IconButton size="small" onClick={() => window.open(`https://www.ebay.com/itm/${item.itemId || item.listingId}`, '_blank', 'noopener')} sx={{ p: 0.3 }}>
-                              <OpenInNewIcon sx={{ fontSize: 14 }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                        <Typography variant="caption" color="text.secondary">Listing ID: {item.listingId}</Typography>
-                      </TableCell>
-
-                      {/* Min Offer Price */}
-                      <TableCell sx={{ ...tableBodyCellSx, textAlign: 'right' }}>
+                    {/* Min Offer Price */}
+                    <TableCell sx={{ ...tableBodyCellSx, textAlign: 'right' }}>
+                      <Typography variant="body2">
                         {item.minimumOfferPrice
                           ? `${item.minimumOfferCurrency} ${parseFloat(item.minimumOfferPrice).toFixed(2)}`
                           : '—'}
-                      </TableCell>
+                      </Typography>
+                    </TableCell>
 
-                      {/* Interested Buyers */}
-                      <TableCell sx={{ ...tableBodyCellSx, textAlign: 'center' }}>
-                        <Chip
-                          label={item.interestedBuyers}
-                          color={item.interestedBuyers > 0 ? 'info' : 'default'}
+                    {/* Interested Buyers */}
+                    <TableCell sx={{ ...tableBodyCellSx, textAlign: 'center' }}>
+                      <StatusChip label={item.interestedBuyers} tone={item.interestedBuyers > 0 ? 'info' : 'neutral'} />
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell sx={{ ...tableBodyCellSx, textAlign: 'center' }}>
+                      <StatusChip label={item.listingStatus} tone={item.listingStatus === 'ACTIVE' ? 'success' : 'neutral'} />
+                    </TableCell>
+
+                    {/* Send Offer */}
+                    <TableCell sx={{ ...tableBodyCellSx, textAlign: 'center' }}>
+                      <Tooltip title="Send offer to interested buyers" arrow>
+                        <Button
+                          variant="contained"
                           size="small"
-                          sx={{ fontWeight: 700, fontSize: '0.75rem', minWidth: 36 }}
-                        />
-                      </TableCell>
-
-                      {/* Status */}
-                      <TableCell sx={{ ...tableBodyCellSx, textAlign: 'center' }}>
-                        <Chip
-                          label={item.listingStatus}
-                          color={item.listingStatus === 'ACTIVE' ? 'success' : 'default'}
-                          size="small"
-                          sx={{ fontWeight: 700, fontSize: '0.7rem' }}
-                        />
-                      </TableCell>
-
-                      {/* Send Offer */}
-                      <TableCell sx={{ ...tableBodyCellSx, textAlign: 'center' }}>
-                        <Tooltip title="Send offer to interested buyers" arrow>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<SendIcon sx={{ fontSize: '14px !important' }} />}
-                            onClick={() => setSendTarget(item)}
-                            sx={{ bgcolor: BRAND_DARK, color: '#fff', fontWeight: 700, fontSize: '0.72rem', px: 1.2, py: 0.4, borderRadius: 1, '&:hover': { bgcolor: alpha(BRAND_DARK, 0.82) } }}
-                          >
-                            Send Offer
-                          </Button>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </>
+                          startIcon={<SendIcon sx={{ fontSize: '14px !important' }} />}
+                          onClick={() => setSendTarget(item)}
+                          sx={{ bgcolor: BRAND_DARK, color: '#fff', fontWeight: 700, fontSize: '0.72rem', px: 1.2, py: 0.4, borderRadius: 1, '&:hover': { bgcolor: alpha(BRAND_DARK, 0.82) } }}
+                        >
+                          Send Offer
+                        </Button>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
 
       {/* ── Respond Dialog (Buyer Offers tab) ── */}
