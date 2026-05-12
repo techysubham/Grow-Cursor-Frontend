@@ -2008,7 +2008,7 @@ export default function AllOrdersSheetPage() {
                 <Tooltip title="A_total-inr = Amazon_total × Amazon Exchange Rate" arrow placement="top">
                   <TableCell sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, cursor: 'help' }} align="right">A_total-inr</TableCell>
                 </Tooltip>
-                <Tooltip title="Marketplace Fee = 4% of A_total-inr" arrow placement="top">
+                <Tooltip title="Marketplace Fee = 3.5% of A_total-inr" arrow placement="top">
                   <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Marketplace Fee</TableCell>
                 </Tooltip>
                 <Tooltip title="IGST = 18% of Marketplace Fee" arrow placement="top">

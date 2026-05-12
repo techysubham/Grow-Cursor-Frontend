@@ -1406,7 +1406,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
 function FulfillmentDashboard() {
   // Get user role for permission checks
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const isSuperAdmin = currentUser.role === 'superadmin';
+  const isSuperAdmin = currentUser.username === 'prasanna';
 
   // Mobile responsiveness
   const theme = useTheme();
