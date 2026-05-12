@@ -9,7 +9,6 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Lazy-loaded pages for route-level code splitting
 const ListerDashboard = lazy(() => import('./pages/lister/ListerDashboard.jsx'));
-const RangeAnalyzerPage = lazy(() => import('./pages/admin/RangeAnalyzerPage.jsx'));
 const SellerEbayPage = lazy(() => import('./pages/SellerProfilePage.jsx'));
 const AboutMePage = lazy(() => import('./pages/AboutMePage.jsx'));
 const IdeasPage = lazy(() => import('./pages/IdeasPage.jsx'));
@@ -29,13 +28,14 @@ const STATIC_PAGE_TITLES = {
   '/login': `Login • ${BASE_DOCUMENT_TITLE}`,
   '/ideas': `Ideas & Issues • ${BASE_DOCUMENT_TITLE}`,
   '/about-me': `About Me • ${BASE_DOCUMENT_TITLE}`,
+  '/admin': `Welcome • ${BASE_DOCUMENT_TITLE}`,
+  '/admin/welcome': `Welcome • ${BASE_DOCUMENT_TITLE}`,
   '/admin/about-me': `About Me • ${BASE_DOCUMENT_TITLE}`,
   '/admin/my-leaves': `My Leaves • ${BASE_DOCUMENT_TITLE}`,
   '/admin/internal-messages': `Team Chat • ${BASE_DOCUMENT_TITLE}`,
   '/admin/ideas': `Ideas & Issues • ${BASE_DOCUMENT_TITLE}`,
   '/admin/user-performance': `User Performance Logs • ${BASE_DOCUMENT_TITLE}`,
   '/lister': `My Dashboard • ${BASE_DOCUMENT_TITLE}`,
-  '/lister/range-analyzer': `Range Analyzer • ${BASE_DOCUMENT_TITLE}`,
   '/seller-ebay': `Seller Profile • ${BASE_DOCUMENT_TITLE}`,
 };
 
@@ -47,8 +47,6 @@ const ADMIN_ROUTE_TITLE_OVERRIDES = {
   '/admin/template-listings': 'Template Listings',
   '/admin/seller-templates': 'Seller Templates',
   '/admin/template-listing-analytics': 'Template Listing Analytics',
-  '/admin/store-wise-tasks/details': 'Store-Wise Task Details',
-  '/admin/lister-info/details': 'Lister Info Details',
 };
 
 function formatDocumentTitle(pageTitle) {
@@ -99,16 +97,9 @@ function useAuth() {
     if (u.role === 'lister') navigate('/lister');
     else if (u.role === 'advancelister') navigate('/lister');
     else if (u.role === 'trainee') navigate('/lister');
-    else if (u.role === 'compatibilityadmin') navigate('/admin/compatibility-tasks');
-    else if (u.role === 'compatibilityeditor') navigate('/admin/compatibility-editor');
     else if (u.role === 'seller') navigate('/seller-ebay');
-    else if (u.role === 'fulfillmentadmin') navigate('/admin/fulfillment');
-    else if (u.role === 'hradmin') navigate('/admin/employee-details');
-    else if (u.role === 'hr') navigate('/admin/about-me');
-    else if (u.role === 'operationhead') navigate('/admin/employee-details');
-    // For HOC and Compliance Manager, we send them to the general admin area
-    // AdminLayout will handle the specific redirect to /fulfillment
-    else navigate('/admin');
+    // All admin-area roles land on the welcome page
+    else navigate('/admin/welcome');
   };
   const logout = () => {
     setToken(null);
@@ -193,10 +184,6 @@ export default function App() {
             <Route
               path="/lister"
               element={user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee' ? <ListerDashboard user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
-            />
-            <Route
-              path="/lister/range-analyzer"
-              element={user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee' ? <RangeAnalyzerPage /> : <Navigate to="/login" replace />}
             />
             <Route
               path="/seller-ebay"
