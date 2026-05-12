@@ -56,7 +56,6 @@ export default function OrderAnalyticsPage() {
   const [sellers, setSellers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [pollResults, setPollResults] = useState(null);
 
   // Filter states - Date filter defaults to single mode with today's date
   const [draftDateFilter, setDraftDateFilter] = useState(initialDateFilter);
@@ -131,28 +130,6 @@ export default function OrderAnalyticsPage() {
   const handleApplyFilters = () => {
     setAppliedDateFilter(draftDateFilter);
     setAppliedMarketplace(draftMarketplace);
-  };
-
-  // Poll for NEW orders (like FulfillmentDashboard)
-  const pollNewOrders = async () => {
-    setLoading(true);
-    setError('');
-    setPollResults(null);
-    try {
-      const { data } = await api.post('/ebay/poll-all-sellers');
-      setPollResults(data || null);
-
-      // Refresh statistics after polling
-      await fetchStatistics();
-
-      if (data && data.totalNewOrders > 0) {
-        console.log(`✅ Polled ${data.totalNewOrders} new orders`);
-      }
-    } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to poll orders');
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Transform statistics into table format
@@ -314,16 +291,6 @@ export default function OrderAnalyticsPage() {
             </Box>
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', lg: 'auto' } }}>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
-                onClick={pollNewOrders}
-                disabled={loading}
-                sx={{ ...yellowFilledButtonSx, minWidth: 170, height: 40 }}
-              >
-                {loading ? 'Polling...' : 'Poll New Orders'}
-              </Button>
               <Chip
                 icon={<ShoppingCartIcon />}
                 label={`${totalOrders} Total Orders`}
@@ -795,17 +762,6 @@ export default function OrderAnalyticsPage() {
           </TableContainer>
         )}
 
-        {/* Poll Results Display */}
-        {pollResults && pollResults.totalNewOrders > 0 && (
-          <Alert severity="success" sx={{ mt: 2 }} onClose={() => setPollResults(null)}>
-            <Typography variant="subtitle2" fontWeight="bold">
-              ✅ Successfully polled {pollResults.totalNewOrders} new order{pollResults.totalNewOrders !== 1 ? 's' : ''}!
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 0.5 }}>
-              Statistics have been refreshed with the latest data.
-            </Typography>
-          </Alert>
-        )}
       </AdminPageShell>
     </Fade>
   );

@@ -2062,54 +2062,6 @@ function FulfillmentDashboard() {
     }
   }
 
-  async function fetchOrders() {
-    setLoading(true);
-    setError('');
-    setPollResults(null);
-    setSnackbarOrderIds([]);
-    setUpdatedOrderDetails([]);
-    try {
-      const { data } = await api.post('/ebay/poll-all-sellers');
-      setPollResults(data || null);
-      await loadStoredOrders();
-
-      // Show snackbar if there are new or updated orders
-      if (data && (data.totalNewOrders > 0 || data.totalUpdatedOrders > 0)) {
-        // Extract new order IDs (simple strings)
-        const newOrderIds = data.pollResults
-          .filter(r => r.success && r.newOrders && r.newOrders.length > 0)
-          .flatMap(r => r.newOrders);
-
-        // Extract updated order details (objects with orderId + changedFields)
-        const updatedDetails = data.pollResults
-          .filter(r => r.success && r.updatedOrders && r.updatedOrders.length > 0)
-          .flatMap(r => r.updatedOrders);
-
-        const updatedOrderIds = updatedDetails.map(u => u.orderId);
-
-        // Combine both lists (new orders first, then updated)
-        setSnackbarOrderIds([...newOrderIds, ...updatedOrderIds]);
-        setUpdatedOrderDetails(updatedDetails);
-
-        setSnackbarMsg(
-          `Polling Complete! New Orders: ${data.totalNewOrders}, Updated Orders: ${data.totalUpdatedOrders}`
-        );
-        setSnackbarSeverity('success');
-        setSnackbarOpen(true);
-      } else if (data) {
-        setSnackbarMsg('Polling Complete! No new or updated orders.');
-        setSnackbarSeverity('info');
-        setSnackbarOpen(true);
-      }
-    } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to poll orders');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-
-
   // Function to fetch ONLY thumbnail (first image) for display
   const fetchThumbnail = async (order) => {
     const orderId = order._id;
@@ -2503,7 +2455,7 @@ function FulfillmentDashboard() {
         : { allSellers: true, sinceDate: SINCE_DATE };
 
       const res = await api.post('/ebay/backfill-earnings', payload);
-      await fetchOrders();
+      await loadStoredOrders();
       setSnackbarMsg(res.data.message);
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
@@ -2538,7 +2490,7 @@ function FulfillmentDashboard() {
         : { allSellers: true, sinceDate: SINCE_DATE };
 
       const res = await api.post('/ebay/backfill-amazon-financials', payload);
-      await fetchOrders();
+      await loadStoredOrders();
       setSnackbarMsg(res.data.message);
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
@@ -3023,7 +2975,7 @@ function FulfillmentDashboard() {
       setSnackbarSeverity(sent > 0 ? 'success' : 'info');
       setSnackbarOpen(true);
       // Reload orders to reflect updated status
-      await fetchOrders();
+      await loadStoredOrders();
     } catch (err) {
       console.error('Auto-message error:', err);
       setSnackbarMsg('Failed to send auto-messages: ' + (err.response?.data?.error || err.message));
