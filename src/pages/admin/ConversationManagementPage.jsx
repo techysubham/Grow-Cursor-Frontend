@@ -597,6 +597,8 @@ export default function ConversationManagementPage() {
     { id: 'sellerReply', label: 'Seller Last Reply' },
     { id: 'about', label: 'Conversation About' },
     { id: 'case', label: 'Case' },
+    { id: 'amazonAccount', label: 'Amazon Account' },
+    { id: 'azOrderId', label: 'AZ Order ID' },
     { id: 'pickedUpBy', label: 'Picked Up By' },
     { id: 'action', label: 'Action' },
   ];
@@ -738,6 +740,14 @@ export default function ConversationManagementPage() {
         case: {
           label: 'Case',
           value: (item) => item.caseStatus || ''
+        },
+        amazonAccount: {
+          label: 'Amazon Account',
+          value: (item) => item.amazonAccount || ''
+        },
+        azOrderId: {
+          label: 'AZ Order ID',
+          value: (item) => item.azOrderId || ''
         },
         pickedUpBy: {
           label: 'Picked Up By',
@@ -1089,6 +1099,8 @@ export default function ConversationManagementPage() {
                   {visibleColumns.includes('sellerReply') && <TableCell sx={tableHeaderCellSx}>Seller Last Reply</TableCell>}
                   {visibleColumns.includes('about') && <TableCell sx={tableHeaderCellSx}>Conversation About</TableCell>}
                   {visibleColumns.includes('case') && <TableCell sx={tableHeaderCellSx}>Case</TableCell>}
+                  {visibleColumns.includes('amazonAccount') && <TableCell sx={tableHeaderCellSx}>Amazon Account</TableCell>}
+                  {visibleColumns.includes('azOrderId') && <TableCell sx={tableHeaderCellSx}>AZ Order ID</TableCell>}
                   {visibleColumns.includes('pickedUpBy') && <TableCell sx={tableHeaderCellSx}>Picked Up By</TableCell>}
                   {visibleColumns.includes('action') && <TableCell align="center" sx={tableHeaderCellSx}>Action</TableCell>}
                 </TableRow>
@@ -1144,6 +1156,24 @@ export default function ConversationManagementPage() {
                           variant="outlined"
                         />
                       </TableCell>}
+                      {visibleColumns.includes('amazonAccount') && (
+                        <TableCell sx={tableBodyCellSx}>
+                          {item.amazonAccount ? (
+                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{item.amazonAccount}</Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.disabled">—</Typography>
+                          )}
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes('azOrderId') && (
+                        <TableCell sx={tableBodyCellSx}>
+                          {item.azOrderId ? (
+                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{item.azOrderId}</Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.disabled">—</Typography>
+                          )}
+                        </TableCell>
+                      )}
                       {visibleColumns.includes('pickedUpBy') && (
                         <TableCell sx={{ ...tableBodyCellSx, minWidth: 150 }}>
                           <FormControl fullWidth size="small">
