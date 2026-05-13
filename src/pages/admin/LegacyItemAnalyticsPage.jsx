@@ -291,13 +291,22 @@ export default function LegacyItemAnalyticsPage() {
     ...sellerRow,
   }))), [itemRows]);
 
-  const summaryCards = [
-    { label: 'Legacy Items', value: summary?.itemCount || 0, tone: 'neutral' },
-    { label: 'Total Orders', value: summary?.totalOrders || 0, tone: 'info' },
-    { label: 'Cancelled', value: summary?.cancelledOrders || 0, tone: 'warning' },
-    { label: 'Partially Refunded', value: summary?.partiallyRefundedOrders || 0, tone: 'amazon' },
-    { label: 'Fully Refunded', value: summary?.fullyRefundedOrders || 0, tone: 'danger' },
-  ];
+  const fmtPct = (numerator, denominator) => {
+    if (!denominator) return null;
+    const pct = (numerator / denominator) * 100;
+    return pct % 1 === 0 ? `${pct}%` : `${pct.toFixed(1)}%`;
+  };
+
+  const summaryCards = useMemo(() => {
+    const total = summary?.totalOrders || 0;
+    return [
+      { label: 'Legacy Items', value: summary?.itemCount || 0, tone: 'neutral' },
+      { label: 'Total Orders', value: total, tone: 'info' },
+      { label: 'Cancelled', value: summary?.cancelledOrders || 0, tone: 'warning', subtext: fmtPct(summary?.cancelledOrders, total) },
+      { label: 'Partially Refunded', value: summary?.partiallyRefundedOrders || 0, tone: 'amazon', subtext: fmtPct(summary?.partiallyRefundedOrders, total) },
+      { label: 'Fully Refunded', value: summary?.fullyRefundedOrders || 0, tone: 'danger', subtext: fmtPct(summary?.fullyRefundedOrders, total) },
+    ];
+  }, [summary]);
 
   const pageSubtitle = dateFilter.mode === 'single'
     ? 'See all legacy item IDs sold on a selected PT day, with seller-wise cancellation and refund counts.'
@@ -305,388 +314,404 @@ export default function LegacyItemAnalyticsPage() {
 
   return (
     <>
-    <Fade in timeout={400}>
-      <AdminPageShell>
-        <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
-          <PageHeader
-            title="Legacy Item Analytics"
-            subtitle={pageSubtitle}
-            sx={{ pt: 0, pb: 0 }}
-          />
-
-          {/* ── Row 1: Date controls + filters ── */}
-          <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap sx={{ mt: 2.5 }}>
-            <FormControl size="small" sx={{ minWidth: 150, ...selectFocusSx }}>
-              <InputLabel>Date Mode</InputLabel>
-              <Select
-                label="Date Mode"
-                value={dateFilter.mode}
-                onChange={(event) => setDateFilter((previous) => ({
-                  ...previous,
-                  mode: event.target.value,
-                  single: event.target.value === 'single' && !previous.single ? getPtDateInputValue() : previous.single,
-                }))}
-              >
-                <MenuItem value="single">Single Day</MenuItem>
-                <MenuItem value="range">Date Range</MenuItem>
-              </Select>
-            </FormControl>
-
-            {dateFilter.mode === 'single' ? (
-              <TextField
-                label="Date"
-                type="date"
-                size="small"
-                value={dateFilter.single}
-                onChange={(event) => setDateFilter((previous) => ({ ...previous, single: event.target.value }))}
-                InputLabelProps={{ shrink: true }}
-                sx={{ minWidth: 180, ...inputFocusSx }}
-                helperText="Uses PT day boundaries (America/Los_Angeles, PST/PDT)."
-              />
-            ) : (
-              <>
-                <TextField
-                  label="From"
-                  type="date"
-                  size="small"
-                  value={dateFilter.from}
-                  onChange={(event) => setDateFilter((previous) => ({ ...previous, from: event.target.value }))}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ minWidth: 180, ...inputFocusSx }}
-                  helperText="PT start day"
-                />
-                <TextField
-                  label="To"
-                  type="date"
-                  size="small"
-                  value={dateFilter.to}
-                  onChange={(event) => setDateFilter((previous) => ({ ...previous, to: event.target.value }))}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ minWidth: 180, ...inputFocusSx }}
-                  helperText="PT end day"
-                />
-              </>
-            )}
-
-            <TextField
-              label="Legacy Item ID"
-              size="small"
-              value={legacyItemIdInput}
-              onChange={(event) => setLegacyItemIdInput(event.target.value)}
-              placeholder="Optional"
-              sx={{ minWidth: 180, ...inputFocusSx }}
-              onKeyDown={(event) => { if (event.key === 'Enter') handleSearch(); }}
+      <Fade in timeout={400}>
+        <AdminPageShell>
+          <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+            <PageHeader
+              title="Legacy Item Analytics"
+              subtitle={pageSubtitle}
+              sx={{ pt: 0, pb: 0 }}
             />
 
-            <FormControl size="small" sx={{ minWidth: 200, ...selectFocusSx }}>
-              <InputLabel>Seller</InputLabel>
-              <Select
-                label="Seller"
-                value={selectedSeller}
-                onChange={(event) => setSelectedSeller(event.target.value)}
-                disabled={sellerLoading}
-              >
-                <MenuItem value="">All Sellers</MenuItem>
-                {sellers.map((seller) => (
-                  <MenuItem key={seller._id} value={seller._id}>
-                    {seller.user?.username || 'Unknown Seller'}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {/* ── Row 1: Date controls + filters ── */}
+            <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap sx={{ mt: 2.5 }}>
+              <FormControl size="small" sx={{ minWidth: 150, ...selectFocusSx }}>
+                <InputLabel>Date Mode</InputLabel>
+                <Select
+                  label="Date Mode"
+                  value={dateFilter.mode}
+                  onChange={(event) => setDateFilter((previous) => ({
+                    ...previous,
+                    mode: event.target.value,
+                    single: event.target.value === 'single' && !previous.single ? getPtDateInputValue() : previous.single,
+                  }))}
+                >
+                  <MenuItem value="single">Single Day</MenuItem>
+                  <MenuItem value="range">Date Range</MenuItem>
+                </Select>
+              </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: 190, ...selectFocusSx }}>
-              <InputLabel>Payment Status</InputLabel>
-              <Select
-                label="Payment Status"
-                value={selectedPaymentStatus}
-                onChange={(event) => setSelectedPaymentStatus(event.target.value)}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
-                <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
-              </Select>
-            </FormControl>
+              {dateFilter.mode === 'single' ? (
+                <TextField
+                  label="Date"
+                  type="date"
+                  size="small"
+                  value={dateFilter.single}
+                  onChange={(event) => setDateFilter((previous) => ({ ...previous, single: event.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ minWidth: 180, ...inputFocusSx }}
+                  helperText="Uses PT day boundaries (America/Los_Angeles, PST/PDT)."
+                />
+              ) : (
+                <>
+                  <TextField
+                    label="From"
+                    type="date"
+                    size="small"
+                    value={dateFilter.from}
+                    onChange={(event) => setDateFilter((previous) => ({ ...previous, from: event.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 180, ...inputFocusSx }}
+                    helperText="PT start day"
+                  />
+                  <TextField
+                    label="To"
+                    type="date"
+                    size="small"
+                    value={dateFilter.to}
+                    onChange={(event) => setDateFilter((previous) => ({ ...previous, to: event.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 180, ...inputFocusSx }}
+                    helperText="PT end day"
+                  />
+                </>
+              )}
 
-            <FormControl size="small" sx={{ minWidth: 180, ...selectFocusSx }}>
-              <InputLabel>Cancel Filter</InputLabel>
-              <Select
-                label="Cancel Filter"
-                value={selectedCancelledFilter}
-                onChange={(event) => setSelectedCancelledFilter(event.target.value)}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="cancelled">Cancelled Only</MenuItem>
-                <MenuItem value="not_cancelled">Not Cancelled</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
+              <TextField
+                label="Legacy Item ID"
+                size="small"
+                value={legacyItemIdInput}
+                onChange={(event) => setLegacyItemIdInput(event.target.value)}
+                placeholder="Optional"
+                sx={{ minWidth: 180, ...inputFocusSx }}
+                onKeyDown={(event) => { if (event.key === 'Enter') handleSearch(); }}
+              />
 
-          {/* ── Row 2: Toggles + action buttons ── */}
-          <Stack direction="row" flexWrap="wrap" gap={2} useFlexGap alignItems="center" sx={{ mt: 1.5 }}>
-            {/* Toggles group */}
-            <Stack direction="row" gap={3} useFlexGap alignItems="center" flexWrap="wrap">
-              <FormControlLabel
-                sx={{ gap: 0.75, mr: 0 }}
-                control={<Switch checked={ebayMotorsOnly} onChange={(event) => setEbayMotorsOnly(event.target.checked)} size="small" />}
-                label={<Typography variant="body2" sx={{ fontWeight: 500 }}>eBay Motors</Typography>}
-              />
-              <FormControlLabel
-                sx={{ gap: 0.75, mr: 0 }}
-                control={<Switch checked={excludeClient} onChange={(event) => setExcludeClient(event.target.checked)} size="small" />}
-                label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Exclude Client</Typography>}
-              />
-              <FormControlLabel
-                sx={{ gap: 0.75, mr: 0 }}
-                control={<Switch checked={excludeLowValue} onChange={(event) => setExcludeLowValue(event.target.checked)} size="small" />}
-                label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Exclude Low Value</Typography>}
-              />
+              <FormControl size="small" sx={{ minWidth: 200, ...selectFocusSx }}>
+                <InputLabel>Seller</InputLabel>
+                <Select
+                  label="Seller"
+                  value={selectedSeller}
+                  onChange={(event) => setSelectedSeller(event.target.value)}
+                  disabled={sellerLoading}
+                >
+                  <MenuItem value="">All Sellers</MenuItem>
+                  {sellers.map((seller) => (
+                    <MenuItem key={seller._id} value={seller._id}>
+                      {seller.user?.username || 'Unknown Seller'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 190, ...selectFocusSx }}>
+                <InputLabel>Payment Status</InputLabel>
+                <Select
+                  label="Payment Status"
+                  value={selectedPaymentStatus}
+                  onChange={(event) => setSelectedPaymentStatus(event.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="FULLY_REFUNDED">FULLY_REFUNDED</MenuItem>
+                  <MenuItem value="PARTIALLY_REFUNDED">PARTIALLY_REFUNDED</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 180, ...selectFocusSx }}>
+                <InputLabel>Cancel Filter</InputLabel>
+                <Select
+                  label="Cancel Filter"
+                  value={selectedCancelledFilter}
+                  onChange={(event) => setSelectedCancelledFilter(event.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="cancelled">Cancelled Only</MenuItem>
+                  <MenuItem value="not_cancelled">Not Cancelled</MenuItem>
+                </Select>
+              </FormControl>
             </Stack>
 
-            <Box sx={{ flex: 1 }} />
+            {/* ── Row 2: Toggles + action buttons ── */}
+            <Stack direction="row" flexWrap="wrap" gap={2} useFlexGap alignItems="center" sx={{ mt: 1.5 }}>
+              {/* Toggles group */}
+              <Stack direction="row" gap={3} useFlexGap alignItems="center" flexWrap="wrap">
+                <FormControlLabel
+                  sx={{ gap: 0.75, mr: 0 }}
+                  control={<Switch checked={ebayMotorsOnly} onChange={(event) => setEbayMotorsOnly(event.target.checked)} size="small" />}
+                  label={<Typography variant="body2" sx={{ fontWeight: 500 }}>eBay Motors</Typography>}
+                />
+                <FormControlLabel
+                  sx={{ gap: 0.75, mr: 0 }}
+                  control={<Switch checked={excludeClient} onChange={(event) => setExcludeClient(event.target.checked)} size="small" />}
+                  label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Exclude Client</Typography>}
+                />
+                <FormControlLabel
+                  sx={{ gap: 0.75, mr: 0 }}
+                  control={<Switch checked={excludeLowValue} onChange={(event) => setExcludeLowValue(event.target.checked)} size="small" />}
+                  label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Exclude Low Value</Typography>}
+                />
+              </Stack>
 
-            {/* Action buttons group */}
-            <Stack direction="row" spacing={1} alignItems="center">
+              <Box sx={{ flex: 1 }} />
+
+              {/* Action buttons group */}
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Button
+                  variant="contained"
+                  startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
+                  onClick={handleSearch}
+                  disabled={loading}
+                  sx={{ ...yellowFilledButtonSx, minWidth: 110 }}
+                >
+                  Search
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={handleRefresh}
+                  disabled={loading || !hasSearched}
+                  sx={{ ...yellowOutlinedButtonSx, minWidth: 110 }}
+                >
+                  Refresh
+                </Button>
+              </Stack>
+            </Stack>
+
+            {/* ── Row 3: End Listing ── */}
+            <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap alignItems="center" sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed', borderColor: 'divider' }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', minWidth: 90 }}>End Listing</Typography>
+              <FormControl size="small" sx={{ minWidth: 200, ...selectFocusSx }}>
+                <InputLabel>Seller</InputLabel>
+                <Select
+                  label="Seller"
+                  value={endListingSellerId}
+                  onChange={(e) => setEndListingSellerId(e.target.value)}
+                  disabled={sellerLoading}
+                >
+                  <MenuItem value=""><em>Select Seller</em></MenuItem>
+                  {sellers.map((seller) => (
+                    <MenuItem key={seller._id} value={seller._id}>
+                      {seller.user?.username || 'Unknown Seller'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Item ID"
+                size="small"
+                value={endListingItemId}
+                onChange={(e) => setEndListingItemId(e.target.value)}
+                placeholder="e.g. 123456789012"
+                sx={{ minWidth: 200, ...inputFocusSx }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleEndListingClick(); }}
+              />
               <Button
                 variant="contained"
-                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
-                onClick={handleSearch}
-                disabled={loading}
-                sx={{ ...yellowFilledButtonSx, minWidth: 110 }}
+                color="error"
+                size="small"
+                disabled={!endListingItemId.trim() || !endListingSellerId || endingListing}
+                onClick={handleEndListingClick}
+                startIcon={endingListing ? <CircularProgress size={14} color="inherit" /> : null}
+                sx={{ minWidth: 130, fontWeight: 700 }}
               >
-                Search
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={handleRefresh}
-                disabled={loading || !hasSearched}
-                sx={{ ...yellowOutlinedButtonSx, minWidth: 110 }}
-              >
-                Refresh
+                {endingListing ? 'Ending…' : 'End Listing'}
               </Button>
             </Stack>
-          </Stack>
 
-          {/* ── Row 3: End Listing ── */}
-          <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap alignItems="center" sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed', borderColor: 'divider' }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', minWidth: 90 }}>End Listing</Typography>
-            <FormControl size="small" sx={{ minWidth: 200, ...selectFocusSx }}>
-              <InputLabel>Seller</InputLabel>
-              <Select
-                label="Seller"
-                value={endListingSellerId}
-                onChange={(e) => setEndListingSellerId(e.target.value)}
-                disabled={sellerLoading}
-              >
-                <MenuItem value=""><em>Select Seller</em></MenuItem>
-                {sellers.map((seller) => (
-                  <MenuItem key={seller._id} value={seller._id}>
-                    {seller.user?.username || 'Unknown Seller'}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              label="Item ID"
-              size="small"
-              value={endListingItemId}
-              onChange={(e) => setEndListingItemId(e.target.value)}
-              placeholder="e.g. 123456789012"
-              sx={{ minWidth: 200, ...inputFocusSx }}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleEndListingClick(); }}
-            />
-            <Button
-              variant="contained"
-              color="error"
-              size="small"
-              disabled={!endListingItemId.trim() || !endListingSellerId || endingListing}
-              onClick={handleEndListingClick}
-              startIcon={endingListing ? <CircularProgress size={14} color="inherit" /> : null}
-              sx={{ minWidth: 130, fontWeight: 700 }}
-            >
-              {endingListing ? 'Ending…' : 'End Listing'}
-            </Button>
-          </Stack>
-
-          {/* ── Row 4: Edit Listing ── */}
-          <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap alignItems="center" sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed', borderColor: 'divider' }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', minWidth: 90 }}>Edit Listing</Typography>
-            <FormControl size="small" sx={{ minWidth: 200, ...selectFocusSx }}>
-              <InputLabel>Seller</InputLabel>
-              <Select
-                label="Seller"
-                value={editSellerId}
-                onChange={(e) => setEditSellerId(e.target.value)}
-                disabled={sellerLoading}
-              >
-                <MenuItem value=""><em>Select Seller</em></MenuItem>
-                {sellers.map((seller) => (
-                  <MenuItem key={seller._id} value={seller._id}>
-                    {seller.user?.username || 'Unknown Seller'}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              label="Item ID"
-              size="small"
-              value={editItemId}
-              onChange={(e) => setEditItemId(e.target.value)}
-              placeholder="e.g. 123456789012"
-              sx={{ minWidth: 200, ...inputFocusSx }}
-            />
-            <TextField
-              label="New Title"
-              size="small"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              placeholder="Leave blank to keep current"
-              inputProps={{ maxLength: 80 }}
-              sx={{ minWidth: 280, ...inputFocusSx }}
-            />
-            <TextField
-              label="New Price (USD)"
-              size="small"
-              type="number"
-              value={editPrice}
-              onChange={(e) => setEditPrice(e.target.value)}
-              placeholder="Leave blank to keep current"
-              inputProps={{ min: 0, step: '0.01' }}
-              sx={{ minWidth: 180, ...inputFocusSx }}
-            />
-            <Button
-              variant="contained"
-              size="small"
-              disabled={!editItemId.trim() || !editSellerId || (!editTitle.trim() && !editPrice) || editingListing}
-              onClick={handleEditListingClick}
-              startIcon={editingListing ? <CircularProgress size={14} color="inherit" /> : null}
-              sx={{ minWidth: 130, fontWeight: 700, bgcolor: BRAND_DARK, color: BRAND_YELLOW, '&:hover': { bgcolor: alpha(BRAND_DARK, 0.85) }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}
-            >
-              {editingListing ? 'Saving…' : 'Save Changes'}
-            </Button>
-          </Stack>
-
-          {error && (
-            <Alert severity="error" sx={{ mt: 2.5 }}>
-              {error}
-            </Alert>
-          )}
-        </SectionCard>
-
-        {summary && !error && (
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))', xl: 'repeat(5, minmax(0, 1fr))' }, gap: 1.5, mb: 3 }}>
-            {summaryCards.map((card) => (
-              <StatMetricCard
-                key={card.label}
-                label={card.label}
-                value={card.value}
-                tone={card.tone}
+            {/* ── Row 4: Edit Listing ── */}
+            <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap alignItems="center" sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed', borderColor: 'divider' }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', minWidth: 90 }}>Edit Listing</Typography>
+              <FormControl size="small" sx={{ minWidth: 200, ...selectFocusSx }}>
+                <InputLabel>Seller</InputLabel>
+                <Select
+                  label="Seller"
+                  value={editSellerId}
+                  onChange={(e) => setEditSellerId(e.target.value)}
+                  disabled={sellerLoading}
+                >
+                  <MenuItem value=""><em>Select Seller</em></MenuItem>
+                  {sellers.map((seller) => (
+                    <MenuItem key={seller._id} value={seller._id}>
+                      {seller.user?.username || 'Unknown Seller'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Item ID"
+                size="small"
+                value={editItemId}
+                onChange={(e) => setEditItemId(e.target.value)}
+                placeholder="e.g. 123456789012"
+                sx={{ minWidth: 200, ...inputFocusSx }}
               />
-            ))}
-          </Box>
-        )}
+              <TextField
+                label="New Title"
+                size="small"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Leave blank to keep current"
+                inputProps={{ maxLength: 80 }}
+                sx={{ minWidth: 280, ...inputFocusSx }}
+              />
+              <TextField
+                label="New Price (USD)"
+                size="small"
+                type="number"
+                value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value)}
+                placeholder="Leave blank to keep current"
+                inputProps={{ min: 0, step: '0.01' }}
+                sx={{ minWidth: 180, ...inputFocusSx }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                disabled={!editItemId.trim() || !editSellerId || (!editTitle.trim() && !editPrice) || editingListing}
+                onClick={handleEditListingClick}
+                startIcon={editingListing ? <CircularProgress size={14} color="inherit" /> : null}
+                sx={{ minWidth: 130, fontWeight: 700, bgcolor: BRAND_DARK, color: BRAND_YELLOW, '&:hover': { bgcolor: alpha(BRAND_DARK, 0.85) }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}
+              >
+                {editingListing ? 'Saving…' : 'Save Changes'}
+              </Button>
+            </Stack>
 
-        <SectionCard sx={{ p: 0 }}>
-          <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Legacy Item Breakdown
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Each row shows a legacy item ID found in the selected dates, the seller handling those orders, and the cancellation and refund counts.
-            </Typography>
-          </Box>
+            {error && (
+              <Alert severity="error" sx={{ mt: 2.5 }}>
+                {error}
+              </Alert>
+            )}
+          </SectionCard>
 
-          <TableContainer sx={tableContainerSx}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={tableHeaderCellSx}>Legacy Item ID</TableCell>
-                  <TableCell sx={tableHeaderCellSx}>Item Total</TableCell>
-                  <TableCell sx={tableHeaderCellSx}>Seller</TableCell>
-                  <TableCell sx={tableHeaderCellSx}>Product Title</TableCell>
-                  <TableCell sx={tableHeaderCellSx} align="right">Seller Orders</TableCell>
-                  <TableCell sx={tableHeaderCellSx} align="right">Cancelled</TableCell>
-                  <TableCell sx={tableHeaderCellSx} align="right">Partially Refunded</TableCell>
-                  <TableCell sx={tableHeaderCellSx} align="right">Fully Refunded</TableCell>
-                </TableRow>
-              </TableHead>
+          {summary && !error && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))', xl: 'repeat(5, minmax(0, 1fr))' }, gap: 1.5, mb: 3 }}>
+              {summaryCards.map((card) => (
+                <StatMetricCard
+                  key={card.label}
+                  label={card.label}
+                  value={card.value}
+                  tone={card.tone}
+                  subtext={card.subtext}
+                />
+              ))}
+            </Box>
+          )}
 
-              <TableBody>
-                {loading && (
-                  <TableRow sx={tableBodyRowSx}>
-                    <TableCell sx={tableBodyCellSx} colSpan={8}>
-                      <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center" sx={{ py: 3 }}>
-                        <CircularProgress size={20} />
-                        <Typography variant="body2" color="text.secondary">
-                          Loading legacy item summary...
-                        </Typography>
-                      </Stack>
-                    </TableCell>
+          <SectionCard sx={{ p: 0 }}>
+            <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Legacy Item Breakdown
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Each row shows a legacy item ID found in the selected dates, the seller handling those orders, and the cancellation and refund counts.
+              </Typography>
+            </Box>
+
+            <TableContainer sx={tableContainerSx}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={tableHeaderCellSx}>Legacy Item ID</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Item Total</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Seller</TableCell>
+                    <TableCell sx={tableHeaderCellSx}>Product Title</TableCell>
+                    <TableCell sx={tableHeaderCellSx} align="right">Seller Orders</TableCell>
+                    <TableCell sx={tableHeaderCellSx} align="right">Cancelled</TableCell>
+                    <TableCell sx={tableHeaderCellSx} align="right">Partially Refunded</TableCell>
+                    <TableCell sx={tableHeaderCellSx} align="right">Fully Refunded</TableCell>
                   </TableRow>
-                )}
+                </TableHead>
 
-                {!loading && flattenedRows.map((row) => (
-                  <TableRow key={`${row.legacyItemId}-${row.sellerId || row.sellerUsername}`} sx={tableBodyRowSx}>
-                    <TableCell sx={tableBodyCellSx}>{row.legacyItemId}</TableCell>
-                    <TableCell sx={tableBodyCellSx} align="right">{row.itemTotalOrders}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>{row.sellerUsername}</TableCell>
-                    <TableCell sx={{ ...tableBodyCellSx, whiteSpace: 'normal', minWidth: 320 }}>
-                      {row.productTitle || 'Title not found'}
-                    </TableCell>
-                    <TableCell sx={tableBodyCellSx} align="right">
-                      {row.totalOrders > 0 ? (
-                        <Button variant="text" size="small" onClick={() => handleDrillDown(row, 'all')} sx={{ minWidth: 0, p: 0, fontWeight: 700, color: 'primary.main', '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' } }}>
-                          {row.totalOrders}
-                        </Button>
-                      ) : 0}
-                    </TableCell>
-                    <TableCell sx={tableBodyCellSx} align="right">
-                      {row.cancelledOrders > 0 ? (
-                        <Button variant="text" size="small" onClick={() => handleDrillDown(row, 'cancelled')} sx={{ minWidth: 0, p: 0, fontWeight: 700, color: 'warning.main', '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' } }}>
-                          {row.cancelledOrders}
-                        </Button>
-                      ) : 0}
-                    </TableCell>
-                    <TableCell sx={tableBodyCellSx} align="right">
-                      {row.partiallyRefundedOrders > 0 ? (
-                        <Button variant="text" size="small" onClick={() => handleDrillDown(row, 'partiallyRefunded')} sx={{ minWidth: 0, p: 0, fontWeight: 700, color: 'info.main', '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' } }}>
-                          {row.partiallyRefundedOrders}
-                        </Button>
-                      ) : 0}
-                    </TableCell>
-                    <TableCell sx={tableBodyCellSx} align="right">
-                      {row.fullyRefundedOrders > 0 ? (
-                        <Button variant="text" size="small" onClick={() => handleDrillDown(row, 'fullyRefunded')} sx={{ minWidth: 0, p: 0, fontWeight: 700, color: 'error.main', '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' } }}>
-                          {row.fullyRefundedOrders}
-                        </Button>
-                      ) : 0}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                <TableBody>
+                  {loading && (
+                    <TableRow sx={tableBodyRowSx}>
+                      <TableCell sx={tableBodyCellSx} colSpan={8}>
+                        <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center" sx={{ py: 3 }}>
+                          <CircularProgress size={20} />
+                          <Typography variant="body2" color="text.secondary">
+                            Loading legacy item summary...
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  )}
 
-                {!loading && !flattenedRows.length && (
-                  <TableRow sx={tableBodyRowSx}>
-                    <TableCell sx={tableBodyCellSx} colSpan={8}>
-                      <Box sx={{ py: 4, textAlign: 'center' }}>
-                        <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          {hasSearched ? 'No matching legacy items found' : 'Select a date or date range'}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {hasSearched
-                            ? 'Try a different date selection or adjust the seller and filter options.'
-                            : 'Choose a single day or date range to see which legacy item IDs were present.'}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </SectionCard>
-      </AdminPageShell>
-    </Fade>
+                  {!loading && flattenedRows.map((row) => (
+                    <TableRow key={`${row.legacyItemId}-${row.sellerId || row.sellerUsername}`} sx={tableBodyRowSx}>
+                      <TableCell sx={tableBodyCellSx}>{row.legacyItemId}</TableCell>
+                      <TableCell sx={tableBodyCellSx} align="right">{row.itemTotalOrders}</TableCell>
+                      <TableCell sx={tableBodyCellSx}>{row.sellerUsername}</TableCell>
+                      <TableCell sx={{ ...tableBodyCellSx, whiteSpace: 'normal', minWidth: 320 }}>
+                        {row.productTitle || 'Title not found'}
+                      </TableCell>
+                      <TableCell sx={tableBodyCellSx} align="right">
+                        {row.totalOrders > 0 ? (
+                          <Button variant="text" size="small" onClick={() => handleDrillDown(row, 'all')} sx={{ minWidth: 0, p: 0, fontWeight: 700, color: 'primary.main', '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' } }}>
+                            {row.totalOrders}
+                          </Button>
+                        ) : 0}
+                      </TableCell>
+                      <TableCell sx={tableBodyCellSx} align="right">
+                        {row.cancelledOrders > 0 ? (
+                          <Stack alignItems="flex-end" spacing={0}>
+                            <Button variant="text" size="small" onClick={() => handleDrillDown(row, 'cancelled')} sx={{ minWidth: 0, p: 0, fontWeight: 700, color: 'warning.main', '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' } }}>
+                              {row.cancelledOrders}
+                            </Button>
+                            {fmtPct(row.cancelledOrders, row.baseTotalOrders) && (
+                              <Typography variant="caption" color="text.disabled" sx={{ lineHeight: 1.2 }}>{fmtPct(row.cancelledOrders, row.baseTotalOrders)}</Typography>
+                            )}
+                          </Stack>
+                        ) : 0}
+                      </TableCell>
+                      <TableCell sx={tableBodyCellSx} align="right">
+                        {row.partiallyRefundedOrders > 0 ? (
+                          <Stack alignItems="flex-end" spacing={0}>
+                            <Button variant="text" size="small" onClick={() => handleDrillDown(row, 'partiallyRefunded')} sx={{ minWidth: 0, p: 0, fontWeight: 700, color: 'info.main', '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' } }}>
+                              {row.partiallyRefundedOrders}
+                            </Button>
+                            {fmtPct(row.partiallyRefundedOrders, row.baseTotalOrders) && (
+                              <Typography variant="caption" color="text.disabled" sx={{ lineHeight: 1.2 }}>{fmtPct(row.partiallyRefundedOrders, row.baseTotalOrders)}</Typography>
+                            )}
+                          </Stack>
+                        ) : 0}
+                      </TableCell>
+                      <TableCell sx={tableBodyCellSx} align="right">
+                        {row.fullyRefundedOrders > 0 ? (
+                          <Stack alignItems="flex-end" spacing={0}>
+                            <Button variant="text" size="small" onClick={() => handleDrillDown(row, 'fullyRefunded')} sx={{ minWidth: 0, p: 0, fontWeight: 700, color: 'error.main', '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' } }}>
+                              {row.fullyRefundedOrders}
+                            </Button>
+                            {fmtPct(row.fullyRefundedOrders, row.baseTotalOrders) && (
+                              <Typography variant="caption" color="text.disabled" sx={{ lineHeight: 1.2 }}>{fmtPct(row.fullyRefundedOrders, row.baseTotalOrders)}</Typography>
+                            )}
+                          </Stack>
+                        ) : 0}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+
+                  {!loading && !flattenedRows.length && (
+                    <TableRow sx={tableBodyRowSx}>
+                      <TableCell sx={tableBodyCellSx} colSpan={8}>
+                        <Box sx={{ py: 4, textAlign: 'center' }}>
+                          <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            {hasSearched ? 'No matching legacy items found' : 'Select a date or date range'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {hasSearched
+                              ? 'Try a different date selection or adjust the seller and filter options.'
+                              : 'Choose a single day or date range to see which legacy item IDs were present.'}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </SectionCard>
+        </AdminPageShell>
+      </Fade>
 
       {/* ── Order Drill-Down Dialog ── */}
       <Dialog
