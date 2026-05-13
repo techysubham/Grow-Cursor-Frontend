@@ -39,7 +39,8 @@ import {
   Code as CodeIcon,
   Visibility as VisibilityIcon,
   Update as UpdateIcon,
-  Autorenew as AutorenewIcon
+  Autorenew as AutorenewIcon,
+  InfoOutlined as InfoOutlinedIcon
 } from '@mui/icons-material';
 import { Undo as UndoIcon } from '@mui/icons-material';
 import api from '../lib/api.js';
@@ -1152,6 +1153,19 @@ export default function AsinReviewModal({
                             >
                               {isStartPriceEditing ? 'Save' : 'Edit'}
                             </Button>
+                            {startPriceTooltipContent && (
+                              <Tooltip
+                                title={startPriceTooltipContent}
+                                placement="bottom-start"
+                                arrow
+                                componentsProps={{
+                                  tooltip: { sx: { maxWidth: 420, bgcolor: '#1a1a2e', color: '#fff' } },
+                                  arrow: { sx: { color: '#1a1a2e' } }
+                                }}
+                              >
+                                <InfoOutlinedIcon sx={{ fontSize: 18, color: 'info.main', cursor: 'help', flexShrink: 0 }} />
+                              </Tooltip>
+                            )}
                           </Stack>
 
                           {showActualProfit && (
@@ -1346,19 +1360,9 @@ export default function AsinReviewModal({
                         Profit: {currentItem.pricingCalculation.breakdown?.desiredProfit || currentItem.pricingCalculation.breakdown?.applicableProfit} INR
                       </Typography>
                     )}
-                    <Tooltip
-                      title={startPriceTooltipContent}
-                      placement="bottom-start"
-                      arrow
-                      componentsProps={{
-                        tooltip: { sx: { maxWidth: 420, bgcolor: '#1a1a2e', color: '#fff' } },
-                        arrow: { sx: { color: '#1a1a2e' } }
-                      }}
-                    >
-                      <Typography variant="caption" display="block" sx={{ fontWeight: 600, mt: 0.5, cursor: 'help', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>
-                        Calculated Start Price: ${currentItem.pricingCalculation.calculatedStartPrice}
-                      </Typography>
-                    </Tooltip>
+                    <Typography variant="caption" display="block" sx={{ fontWeight: 600, mt: 0.5 }}>
+                      Calculated Start Price: ${currentItem.pricingCalculation.calculatedStartPrice}
+                    </Typography>
                   </Alert>
                 )}
               </Stack>
