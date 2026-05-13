@@ -542,6 +542,34 @@ export default function AsinReviewModal({
       )}
     </Box>
   ) : '';
+
+  const startPriceTooltipContent = (() => {
+    const bd = currentItem?.pricingCalculation?.breakdown;
+    if (!bd) return null;
+    return (
+      <Box sx={{ fontFamily: 'monospace', fontSize: '0.72rem', lineHeight: 1.8, p: 0.5 }}>
+        <Box>Amazon Cost:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${Number(bd.cost).toFixed(2)}</Box>
+        <Box>Tax ({bd.taxRate}%):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${Number(bd.tax).toFixed(2)}&nbsp; (cost × {bd.taxRate}%)</Box>
+        {bd.shipping > 0 && <Box>Shipping:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${Number(bd.shipping).toFixed(2)}</Box>}
+        <Box>Buying Price (USD):&nbsp;&nbsp; ${Number(bd.buyingPriceUSD).toFixed(2)}&nbsp; (cost + ship + tax)</Box>
+        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+        {bd.profitTier?.enabled ? (
+          <Box sx={{ color: '#81c784' }}>Profit (Tier {bd.profitTier.costRange}):&nbsp; ₹{Number(bd.profitTier.profit).toFixed(0)}</Box>
+        ) : (
+          <Box>Desired Profit:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ₹{Number(bd.applicableProfit).toFixed(0)}</Box>
+        )}
+        <Box>Buying Price (INR):&nbsp;&nbsp; ₹{Number(bd.buyingPriceINR).toFixed(2)}&nbsp; (USD × spentRate)</Box>
+        <Box>Profit Component:&nbsp;&nbsp;&nbsp;&nbsp; ₹{Number(bd.profitComponent).toFixed(2)}&nbsp; (profit + buyingINR)</Box>
+        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+        <Box>Payout (USD):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${Number(bd.payoutUSD).toFixed(4)}&nbsp; (component ÷ payoutRate)</Box>
+        {bd.fixedFee > 0 && <Box>+ Fixed Fee:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${Number(bd.withFixedFee - bd.payoutUSD).toFixed(4)}</Box>}
+        <Box>Fee Multiplier:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {Number(bd.feeMultiplier).toFixed(4)}&nbsp; (1 − fees)</Box>
+        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+        <Box sx={{ fontWeight: 700, color: '#81c784' }}>Start Price:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${Number(bd.finalPrice).toFixed(2)}&nbsp; (withFee ÷ multiplier)</Box>
+      </Box>
+    );
+  })();
+
   // Separate core fields and custom fields from template columns
   const coreFieldColumns = templateColumns.filter(col => col.type === 'core');
   const customFieldColumns = templateColumns.filter(col => col.type === 'custom');
@@ -1318,9 +1346,19 @@ export default function AsinReviewModal({
                         Profit: {currentItem.pricingCalculation.breakdown?.desiredProfit || currentItem.pricingCalculation.breakdown?.applicableProfit} INR
                       </Typography>
                     )}
-                    <Typography variant="caption" display="block" sx={{ fontWeight: 600, mt: 0.5 }}>
-                      Calculated Start Price: ${currentItem.pricingCalculation.calculatedStartPrice}
-                    </Typography>
+                    <Tooltip
+                      title={startPriceTooltipContent}
+                      placement="bottom-start"
+                      arrow
+                      componentsProps={{
+                        tooltip: { sx: { maxWidth: 420, bgcolor: '#1a1a2e', color: '#fff' } },
+                        arrow: { sx: { color: '#1a1a2e' } }
+                      }}
+                    >
+                      <Typography variant="caption" display="block" sx={{ fontWeight: 600, mt: 0.5, cursor: 'help', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>
+                        Calculated Start Price: ${currentItem.pricingCalculation.calculatedStartPrice}
+                      </Typography>
+                    </Tooltip>
                   </Alert>
                 )}
               </Stack>
