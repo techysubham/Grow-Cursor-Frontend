@@ -113,7 +113,8 @@ export default function AsinReviewModal({
   onSave,
   onListDirectly = null,
   templateColumns = [],
-  marketplace = 'US'
+  marketplace = 'US',
+  sellerId = null
 }) {
   const amazonDomain = MARKETPLACE_DOMAINS[marketplace] || MARKETPLACE_DOMAINS.US;
   const wasOpenRef = useRef(false);
@@ -129,6 +130,7 @@ export default function AsinReviewModal({
   const [appliedDescTemplates, setAppliedDescTemplates] = useState({}); // { [itemId]: templateKey | '' }
   const [rephrasing, setRephrasing] = useState({}); // { [itemId]: true|false }
   const [startPriceEditMode, setStartPriceEditMode] = useState({}); // { [itemId]: true|false }
+  const [skuStatus, setSkuStatus] = useState({}); // { [itemId]: 'loading' | 'active' | 'inactive' }
 
   // Filter out dismissed items
   const activeItems = previewItems.filter(item => !dismissedItems.has(item.id));
@@ -170,10 +172,30 @@ export default function AsinReviewModal({
       setAppliedDescTemplates({});
       setRephrasing({});
       setStartPriceEditMode({});
+      setSkuStatus({});
     }
 
     wasOpenRef.current = open;
   }, [open, previewItems]);
+
+  // Check if the base SKU (part before '-') is active on eBay when navigating items
+  useEffect(() => {
+    if (!open || !currentItem || !sellerId) return;
+    const sku = (editedItems[currentItem.id] || currentItem.generatedListing || {}).customLabel;
+    if (!sku) return;
+    // Already have a result for this item, skip
+    if (skuStatus[currentItem.id] && skuStatus[currentItem.id] !== 'loading') return;
+    const baseSku = sku.includes('-') ? sku.split('-')[0] : sku;
+    setSkuStatus(prev => ({ ...prev, [currentItem.id]: 'loading' }));
+    api.get(`/ebay/check-sku-active?sku=${encodeURIComponent(baseSku)}&sellerId=${encodeURIComponent(sellerId)}`)
+      .then(({ data }) => {
+        setSkuStatus(prev => ({ ...prev, [currentItem.id]: data.active ? 'active' : 'inactive' }));
+      })
+      .catch(() => {
+        setSkuStatus(prev => ({ ...prev, [currentItem.id]: null }));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentItem?.id, sellerId]);
 
   // Merge streamed/generated listings into the editable map without overwriting user edits.
   useEffect(() => {
@@ -1067,14 +1089,27 @@ export default function AsinReviewModal({
                 ) : currentItem.generatedListing ? (
                   <Stack spacing={2}>
                 {/* SKU */}
-                <TextField
-                  label="SKU (Custom Label)"
-                  value={itemData.customLabel || ''}
-                  size="small"
-                  fullWidth
-                  disabled
-                  helperText="Auto-generated from ASIN"
-                />
+                <Box>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      label="SKU (Custom Label)"
+                      value={itemData.customLabel || ''}
+                      size="small"
+                      fullWidth
+                      disabled
+                      helperText="Auto-generated from ASIN"
+                    />
+                    {sellerId && itemData.customLabel && (
+                      skuStatus[currentItem?.id] === 'loading'
+                        ? <CircularProgress size={18} sx={{ flexShrink: 0 }} />
+                        : skuStatus[currentItem?.id] === 'active'
+                          ? <Chip label="Active" color="error" size="small" sx={{ flexShrink: 0 }} />
+                          : skuStatus[currentItem?.id] === 'inactive'
+                            ? <Chip label="Not Active" color="success" size="small" sx={{ flexShrink: 0 }} />
+                            : null
+                    )}
+                  </Stack>
+                </Box>
 
                 {/* Core Fields */}
                 {coreFieldColumns.map(col => {
