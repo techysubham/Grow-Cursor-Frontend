@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Box,
     Typography,
@@ -15,10 +15,13 @@ import {
     TableRow,
     TextField,
     InputAdornment,
-    Button
+    Button,
+    Tooltip,
+    IconButton,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SyncIcon from '@mui/icons-material/Sync';
 import api from '../../lib/api';
 
 export default function SellingPrivilegesPage() {
@@ -28,6 +31,9 @@ export default function SellingPrivilegesPage() {
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
 
+    // skuSync[sellerId] = { status: 'idle'|'running'|'completed'|'failed', dbCount, error }
+    const [skuSync, setSkuSync] = useState({});
+    const pollIntervalsRef = useRef({});
     useEffect(() => {
         fetchData();
     }, []);
@@ -58,6 +64,34 @@ export default function SellingPrivilegesPage() {
             setError('Failed to fetch selling limits.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const pollSkuSyncStatus = (sellerId) => {
+        if (pollIntervalsRef.current[sellerId]) return; // already polling
+        pollIntervalsRef.current[sellerId] = setInterval(async () => {
+            try {
+                const res = await api.get(`/ebay/sync-sku-index/status/${sellerId}`);
+                const s = res.data;
+                setSkuSync(prev => ({ ...prev, [sellerId]: { status: s.status, dbCount: s.dbCount, totalCount: s.totalCount, lastSyncAt: s.lastSyncAt } }));
+                if (s.status !== 'running') {
+                    clearInterval(pollIntervalsRef.current[sellerId]);
+                    delete pollIntervalsRef.current[sellerId];
+                }
+            } catch {
+                clearInterval(pollIntervalsRef.current[sellerId]);
+                delete pollIntervalsRef.current[sellerId];
+            }
+        }, 3000);
+    };
+
+    const handleSyncSkuIndex = async (sellerId) => {
+        setSkuSync(prev => ({ ...prev, [sellerId]: { status: 'running', dbCount: prev[sellerId]?.dbCount ?? 0 } }));
+        try {
+            await api.post('/ebay/sync-sku-index', { sellerId });
+            pollSkuSyncStatus(sellerId);
+        } catch (err) {
+            setSkuSync(prev => ({ ...prev, [sellerId]: { status: 'failed', dbCount: prev[sellerId]?.dbCount ?? 0 } }));
         }
     };
 
@@ -128,46 +162,78 @@ export default function SellingPrivilegesPage() {
                                 <TableCell align="right">Qty Limit Remaining</TableCell>
                                 <TableCell align="right">Amt Limit Remaining</TableCell>
                                 <TableCell align="center">Status</TableCell>
+                                <TableCell align="center">SKU Index</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                                    <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                                         <CircularProgress />
                                         <Typography variant="body2" sx={{ mt: 1 }}>Loading selling privileges...</Typography>
                                     </TableCell>
                                 </TableRow>
                             ) : filteredData.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                                    <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                                         No data available
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredData.map((row) => (
-                                    <TableRow
-                                        key={row.sellerId || Math.random()}
-                                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                                    >
-                                        <TableCell component="th" scope="row">
-                                            {row.sellerName}
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            {formatNumber(row.quantityLimitRemaining)}
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            {formatCurrency(row.amountLimitRemaining, row.amountLimitCurrency)}
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            {row.error ? (
-                                                <Chip label="Error" color="error" size="small" title={row.error} />
-                                            ) : (
-                                                <Chip label="Active" color="success" size="small" />
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                filteredData.map((row) => {
+                                    const sync = skuSync[row.sellerId] || { status: 'idle', dbCount: 0 };
+                                    const isSyncing = sync.status === 'running';
+                                    return (
+                                        <TableRow
+                                            key={row.sellerId || Math.random()}
+                                            sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                                        >
+                                            <TableCell component="th" scope="row">
+                                                {row.sellerName}
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                {formatNumber(row.quantityLimitRemaining)}
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                {formatCurrency(row.amountLimitRemaining, row.amountLimitCurrency)}
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                {row.error ? (
+                                                    <Chip label="Error" color="error" size="small" title={row.error} />
+                                                ) : (
+                                                    <Chip label="Active" color="success" size="small" />
+                                                )}
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                                                    {sync.dbCount > 0 && !isSyncing && (
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {sync.dbCount.toLocaleString()} listings
+                                                        </Typography>
+                                                    )}
+                                                    {isSyncing && sync.totalCount > 0 && (
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {sync.totalCount.toLocaleString()}…
+                                                        </Typography>
+                                                    )}
+                                                    <Tooltip title={isSyncing ? 'Syncing…' : 'Sync active listings index'}>
+                                                        <span>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleSyncSkuIndex(row.sellerId)}
+                                                                disabled={isSyncing || !row.sellerId}
+                                                            >
+                                                                {isSyncing
+                                                                    ? <CircularProgress size={18} />
+                                                                    : <SyncIcon fontSize="small" />}
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
+                                                </Box>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
                             )}
                         </TableBody>
                     </Table>
