@@ -75,6 +75,7 @@ const EmployeeDetailsPage = lazy(() => import('../pages/admin/EmployeeDetailsPag
 const EmployeeManagementPage = lazy(() => import('../pages/admin/EmployeeManagementPage.jsx'));
 const BuyerChatPage = lazy(() => import('../pages/admin/BuyerChatPage.jsx'));
 const FeedUploadPage = lazy(() => import('../pages/ebay/FeedUploadPage.jsx'));
+const BestOffersPage = lazy(() => import('../pages/admin/BestOffersPage.jsx'));
 const SellingPrivilegesPage = lazy(() => import('../pages/admin/SellingPrivilegesPage.jsx'));
 const EbayApiUsagePage = lazy(() => import('../pages/admin/EbayApiUsagePage.jsx'));
 const FeedUploadStatsPage = lazy(() => import('../pages/admin/FeedUploadStatsPage.jsx'));
@@ -288,6 +289,7 @@ const COMPONENT_MAP = {
   'SellerFunds': SellerFundsPage,
   'ActiveListingTiers': ActiveListingTiersPage,
   'ExpiringListings': ExpiringListingsPage,
+  'BestOffers': BestOffersPage,
   'IdeasAndIssues': IdeasPage,
   'TeamChat': InternalMessagesPage,
   'LeaveAdmin': LeaveAdminPage,
