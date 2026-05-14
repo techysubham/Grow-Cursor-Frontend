@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
     Box, Typography, Container, Paper, CircularProgress, Alert,
     Chip, Button, LinearProgress, Table, TableBody, TableCell,
-    TableContainer, TableHead, TableRow, Tooltip,
+    TableContainer, TableHead, TableRow,
 } from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -225,12 +225,18 @@ export default function SkuIndexSyncPage() {
                                                         <Chip label="Synced" color="success" size="small" variant="outlined" />
                                                     </Box>
                                                 ) : s.status === 'failed' ? (
-                                                    <Tooltip title={s.errorMsg || 'Unknown error'}>
+                                                    <Box>
                                                         <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
                                                             <ErrorOutlineIcon sx={{ fontSize: 16, color: 'error.main' }} />
                                                             <Chip label="Failed" color="error" size="small" variant="outlined" />
                                                         </Box>
-                                                    </Tooltip>
+                                                        <Typography variant="caption" color="error.main" display="block" textAlign="center" mt={0.5}>
+                                                            {s.errorMsg || 'Unknown error'}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary" display="block" textAlign="center">
+                                                            Previously synced data intact — re-sync to retry.
+                                                        </Typography>
+                                                    </Box>
                                                 ) : (
                                                     <Chip label="Not synced" size="small" variant="outlined" sx={{ color: 'text.disabled' }} />
                                                 )}
