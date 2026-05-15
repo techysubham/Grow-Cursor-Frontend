@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { alpha, useTheme } from '@mui/material/styles';
 import { 
   Box, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, 
@@ -86,6 +86,10 @@ export default function TemplateDatabasePage() {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  // Debounced value — only updates 400 ms after the user stops typing
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchDebounceRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   // ── Data state ───────────────────────────────────────────────────────────────
   const [listings, setListings] = useState([]);
@@ -110,9 +114,19 @@ export default function TemplateDatabasePage() {
       .finally(() => setInitialLoading(false));
   }, []);
 
+  // Debounce: wait 400 ms after the user stops typing before actually searching
+  useEffect(() => {
+    clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPagination(prev => ({ ...prev, page: 1 }));
+    }, 400);
+    return () => clearTimeout(searchDebounceRef.current);
+  }, [searchQuery]);
+
   useEffect(() => {
     fetchListings();
-  }, [selectedSeller, selectedTemplate, statusFilter, searchQuery, pagination.page]);
+  }, [selectedSeller, selectedTemplate, statusFilter, debouncedSearch, pagination.page]);
 
   useEffect(() => {
     const grouped = {};
@@ -147,6 +161,13 @@ export default function TemplateDatabasePage() {
   };
 
   const fetchListings = async () => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     setError('');
     try {
@@ -154,11 +175,15 @@ export default function TemplateDatabasePage() {
       if (selectedSeller) params.sellerId = selectedSeller;
       if (selectedTemplate) params.templateId = selectedTemplate;
       if (statusFilter) params.status = statusFilter;
-      if (searchQuery) params.search = searchQuery;
-      const { data } = await api.get('/template-listings/database-view', { params });
+      if (debouncedSearch) params.search = debouncedSearch;
+      const { data } = await api.get('/template-listings/database-view', {
+        params,
+        signal: controller.signal,
+      });
       setListings(data.listings || []);
       setPagination(data.pagination);
     } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return; // stale request, ignore
       console.error('Error fetching listings:', err);
       setError('Failed to load listings');
     } finally {
@@ -281,7 +306,7 @@ export default function TemplateDatabasePage() {
             size="small"
             placeholder="Search by ASIN, SKU, or Title..."
             value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setPagination(prev => ({ ...prev, page: 1 })); }}
+            onChange={(e) => setSearchQuery(e.target.value)}
             sx={{
               '& label.Mui-focused': { color: '#b8860b' },
               '& .MuiOutlinedInput-root': { '&.Mui-focused fieldset': { borderColor: '#b8860b' } }
