@@ -2705,6 +2705,7 @@ export default function TemplateListingsPage() {
       <AsinReviewModal
         open={reviewModal}
         marketplace={region}
+        sellerId={sellerId}
         onClose={() => {
           // Clean up EventSource if still active
           if (window._currentEventSource) {

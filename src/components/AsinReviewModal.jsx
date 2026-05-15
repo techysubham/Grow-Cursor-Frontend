@@ -113,10 +113,12 @@ export default function AsinReviewModal({
   onSave,
   onListDirectly = null,
   templateColumns = [],
-  marketplace = 'US'
+  marketplace = 'US',
+  sellerId = null
 }) {
   const amazonDomain = MARKETPLACE_DOMAINS[marketplace] || MARKETPLACE_DOMAINS.US;
   const wasOpenRef = useRef(false);
+  const checkedSkuIdsRef = useRef(new Set()); // tracks item IDs whose SKU check has already been initiated
   const [currentIndex, setCurrentIndex] = useState(0);
   const [editedItems, setEditedItems] = useState({});
   const [dismissedItems, setDismissedItems] = useState(new Set());
@@ -129,6 +131,7 @@ export default function AsinReviewModal({
   const [appliedDescTemplates, setAppliedDescTemplates] = useState({}); // { [itemId]: templateKey | '' }
   const [rephrasing, setRephrasing] = useState({}); // { [itemId]: true|false }
   const [startPriceEditMode, setStartPriceEditMode] = useState({}); // { [itemId]: true|false }
+  const [skuStatus, setSkuStatus] = useState({}); // { [itemId]: { status: 'loading'|'active'|'inactive'|null, count: number } }
 
   // Filter out dismissed items
   const activeItems = previewItems.filter(item => !dismissedItems.has(item.id));
@@ -170,10 +173,34 @@ export default function AsinReviewModal({
       setAppliedDescTemplates({});
       setRephrasing({});
       setStartPriceEditMode({});
+      setSkuStatus({});
+      checkedSkuIdsRef.current = new Set();
     }
 
     wasOpenRef.current = open;
   }, [open, previewItems]);
+
+  // Check each SKU as soon as its customLabel becomes available (items generate via SSE stream).
+  // Uses a ref to ensure each item is only checked once even as editedItems keeps changing.
+  useEffect(() => {
+    if (!open || !sellerId) return;
+    previewItems.forEach(item => {
+      if (checkedSkuIdsRef.current.has(item.id)) return; // already initiated for this item
+      const sku = (editedItems[item.id] || item.generatedListing || {}).customLabel;
+      if (!sku) return; // not generated yet — will re-run when editedItems updates
+      checkedSkuIdsRef.current.add(item.id);
+      const baseSku = sku.includes('-') ? sku.split('-')[0] : sku;
+      setSkuStatus(prev => ({ ...prev, [item.id]: { status: 'loading', count: 0 } }));
+      api.get(`/ebay/check-sku-active?sku=${encodeURIComponent(baseSku)}&sellerId=${encodeURIComponent(sellerId)}`)
+        .then(({ data }) => {
+          setSkuStatus(prev => ({ ...prev, [item.id]: { status: data.active ? 'active' : 'inactive', count: data._debug?.count ?? data._debug?.itemCount ?? 0 } }));
+        })
+        .catch(() => {
+          setSkuStatus(prev => ({ ...prev, [item.id]: { status: null, count: 0 } }));
+        });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sellerId, editedItems]);
 
   // Merge streamed/generated listings into the editable map without overwriting user edits.
   useEffect(() => {
@@ -1067,14 +1094,25 @@ export default function AsinReviewModal({
                 ) : currentItem.generatedListing ? (
                   <Stack spacing={2}>
                 {/* SKU */}
-                <TextField
-                  label="SKU (Custom Label)"
-                  value={itemData.customLabel || ''}
-                  size="small"
-                  fullWidth
-                  disabled
-                  helperText="Auto-generated from ASIN"
-                />
+                <Box>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      label="SKU (Custom Label)"
+                      value={itemData.customLabel || ''}
+                      size="small"
+                      fullWidth
+                      disabled
+                      helperText="Auto-generated from ASIN"
+                    />
+                    {sellerId && itemData.customLabel && (() => {
+                      const s = skuStatus[currentItem?.id];
+                      if (!s || s.status === 'loading') return <CircularProgress size={18} sx={{ flexShrink: 0 }} />;
+                      if (s.status === 'active') return <Chip label={`Active${s.count > 0 ? ` (${s.count})` : ''}`} color="error" size="small" sx={{ flexShrink: 0 }} />;
+                      if (s.status === 'inactive') return <Chip label="Not Active" color="success" size="small" sx={{ flexShrink: 0 }} />;
+                      return null;
+                    })()}
+                  </Stack>
+                </Box>
 
                 {/* Core Fields */}
                 {coreFieldColumns.map(col => {

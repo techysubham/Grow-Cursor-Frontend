@@ -106,6 +106,7 @@ const OrderAnalyticsPage = lazy(() => import('../pages/admin/OrderAnalyticsPage.
 const LegacyItemAnalyticsPage = lazy(() => import('../pages/admin/LegacyItemAnalyticsPage.jsx'));
 const ActiveListingTiersPage = lazy(() => import('../pages/admin/ActiveListingTiersPage.jsx'));
 const ExpiringListingsPage = lazy(() => import('../pages/admin/ExpiringListingsPage.jsx'));
+const SkuIndexSyncPage = lazy(() => import('../pages/admin/SkuIndexSyncPage.jsx'));
 const CRPAnalyticsPage = lazy(() => import('../pages/admin/CRPAnalyticsPage.jsx'));
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 const SellerAnalyticsPage = lazy(() => import('../pages/admin/SellerAnalyticsPage.jsx'));
@@ -289,6 +290,7 @@ const COMPONENT_MAP = {
   'SellerFunds': SellerFundsPage,
   'ActiveListingTiers': ActiveListingTiersPage,
   'ExpiringListings': ExpiringListingsPage,
+  'SkuIndexSync': SkuIndexSyncPage,
   'BestOffers': BestOffersPage,
   'IdeasAndIssues': IdeasPage,
   'TeamChat': InternalMessagesPage,
