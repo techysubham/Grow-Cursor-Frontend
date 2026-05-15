@@ -108,6 +108,7 @@ export const PAGE_REGISTRY = [
   { id: 'ActiveListingTiers', name: 'Active Listing Tiers', path: '/active-listing-tiers', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'ExpiringListings', name: 'Expiring Listings', path: '/expiring-listings', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'SkuIndexSync', name: 'SKU Index Sync', path: '/sku-index-sync', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'BestOffers', name: 'Best Offers', path: '/best-offers', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
 
   // ====== HR & MANAGEMENT ======
   { id: 'IdeasAndIssues', name: 'Ideas and Issues', path: '/ideas', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin', 'operationhead', 'listingadmin'] },
