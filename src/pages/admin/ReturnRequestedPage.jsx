@@ -188,6 +188,12 @@ export default function ReturnRequestedPage({
     () => dateFilterProp ?? internalDateFilter,
     [dateFilterProp, internalDateFilter]
   );
+  const [responseDueDateFilter, setResponseDueDateFilter] = useState({
+    mode: 'all',
+    single: '',
+    from: '',
+    to: ''
+  });
 
   const hasFetchedInitialData = useRef(false);
 
@@ -248,14 +254,14 @@ export default function ReturnRequestedPage({
       return;
     }
     loadStoredReturns();
-  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, urgentOnly, page]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, responseDueDateFilter, urgentOnly, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     if (hasFetchedInitialData.current) {
       setPage(1);
     }
-  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, urgentOnly]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, responseDueDateFilter, urgentOnly]);
 
   async function loadStoredReturns() {
     setLoading(true);
@@ -275,6 +281,13 @@ export default function ReturnRequestedPage({
       } else if (dateFilter.mode === 'range') {
         if (dateFilter.from) params.startDate = dateFilter.from;
         if (dateFilter.to) params.endDate = dateFilter.to;
+      }
+      if (responseDueDateFilter.mode === 'single' && responseDueDateFilter.single) {
+        params.responseDueStartDate = responseDueDateFilter.single;
+        params.responseDueEndDate = responseDueDateFilter.single;
+      } else if (responseDueDateFilter.mode === 'range') {
+        if (responseDueDateFilter.from) params.responseDueStartDate = responseDueDateFilter.from;
+        if (responseDueDateFilter.to) params.responseDueEndDate = responseDueDateFilter.to;
       }
 
       const res = await api.get('/ebay/stored-returns', { params });
@@ -368,6 +381,7 @@ export default function ReturnRequestedPage({
     setReasonFilter([]);
     setUrgentOnly(false);
     setInternalDateFilter({ mode: 'all', single: '', from: '', to: '' });
+    setResponseDueDateFilter({ mode: 'all', single: '', from: '', to: '' });
   };
 
   const handleWorksheetStatusChange = async (returnId, newStatus) => {
@@ -449,7 +463,8 @@ export default function ReturnRequestedPage({
     reasonFilter.length > 0 ||
     urgentOnly ||
     (!hideDateFilter &&
-      (dateFilter.mode !== 'all' || dateFilter.single || dateFilter.from || dateFilter.to));
+      (dateFilter.mode !== 'all' || dateFilter.single || dateFilter.from || dateFilter.to)) ||
+    responseDueDateFilter.mode !== 'all' || responseDueDateFilter.single || responseDueDateFilter.from || responseDueDateFilter.to;
 
   // Check if response due date is within next 24 hours (urgent for filter)
   const isResponseUrgent24hrs = (responseDate) => {
@@ -721,12 +736,12 @@ export default function ReturnRequestedPage({
 
           {!hideDateFilter && (
             <>
-              {/* Date Filter */}
+              {/* Created Date Filter */}
               <FormControl size="small" sx={{ minWidth: 160 }}>
-                <InputLabel>Date</InputLabel>
+                <InputLabel>Created Date</InputLabel>
                 <Select
                   value={dateFilter.mode}
-                  label="Date"
+                  label="Created Date"
                   onChange={(e) => {
                     const mode = e.target.value;
                     if (mode === 'all') {
@@ -758,7 +773,7 @@ export default function ReturnRequestedPage({
                 <TextField
                   size="small"
                   type="date"
-                  label="On"
+                  label="Created On"
                   value={dateFilter.single}
                   onChange={(e) =>
                     setInternalDateFilter((prev) => ({ ...prev, single: e.target.value }))
@@ -772,7 +787,7 @@ export default function ReturnRequestedPage({
                   <TextField
                     size="small"
                     type="date"
-                    label="From"
+                    label="Created From"
                     value={dateFilter.from}
                     onChange={(e) =>
                       setInternalDateFilter((prev) => ({ ...prev, from: e.target.value }))
@@ -782,7 +797,7 @@ export default function ReturnRequestedPage({
                   <TextField
                     size="small"
                     type="date"
-                    label="To"
+                    label="Created To"
                     value={dateFilter.to}
                     onChange={(e) =>
                       setInternalDateFilter((prev) => ({ ...prev, to: e.target.value }))
@@ -791,6 +806,77 @@ export default function ReturnRequestedPage({
                   />
                 </>
               )}
+            </>
+          )}
+
+          {/* Response Due Date Filter */}
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel>Response Due</InputLabel>
+            <Select
+              value={responseDueDateFilter.mode}
+              label="Response Due"
+              onChange={(e) => {
+                const mode = e.target.value;
+                if (mode === 'all') {
+                  setResponseDueDateFilter({ mode: 'all', single: '', from: '', to: '' });
+                } else if (mode === 'single') {
+                  setResponseDueDateFilter((prev) => ({
+                    mode: 'single',
+                    single: prev.single || new Date().toISOString().split('T')[0],
+                    from: '',
+                    to: ''
+                  }));
+                } else {
+                  setResponseDueDateFilter((prev) => ({
+                    mode: 'range',
+                    single: '',
+                    from: prev.from || '',
+                    to: prev.to || ''
+                  }));
+                }
+              }}
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="single">Single date</MenuItem>
+              <MenuItem value="range">Date range</MenuItem>
+            </Select>
+          </FormControl>
+
+          {responseDueDateFilter.mode === 'single' && (
+            <TextField
+              size="small"
+              type="date"
+              label="Due On (PST)"
+              value={responseDueDateFilter.single}
+              onChange={(e) =>
+                setResponseDueDateFilter((prev) => ({ ...prev, single: e.target.value }))
+              }
+              InputLabelProps={{ shrink: true }}
+            />
+          )}
+
+          {responseDueDateFilter.mode === 'range' && (
+            <>
+              <TextField
+                size="small"
+                type="date"
+                label="Due From (PST)"
+                value={responseDueDateFilter.from}
+                onChange={(e) =>
+                  setResponseDueDateFilter((prev) => ({ ...prev, from: e.target.value }))
+                }
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="Due To (PST)"
+                value={responseDueDateFilter.to}
+                onChange={(e) =>
+                  setResponseDueDateFilter((prev) => ({ ...prev, to: e.target.value }))
+                }
+                InputLabelProps={{ shrink: true }}
+              />
             </>
           )}
 
