@@ -333,6 +333,24 @@ export default function AdminLayout({ user, onLogout }) {
   // --- ROLE DEFINITIONS (kept for special non-page logic like lister dashboard link) ---
   const isAnyLister = ['lister', 'advancelister', 'trainee'].includes(user?.role);
 
+  const ROLE_LABELS = {
+    superadmin:          'Super Admin',
+    productadmin:        'Product Admin',
+    listingadmin:        'Listing Admin',
+    compatibilityadmin:  'Compatibility Admin',
+    compatibilityeditor: 'Compatibility Editor',
+    fulfillmentadmin:    'Fulfillment Admin',
+    hradmin:             'HR Admin',
+    hr:                  'HR',
+    operationhead:       'Operation Head',
+    hoc:                 'Head of Compliance',
+    compliancemanager:   'Compliance Manager',
+    lister:              'Lister',
+    advancelister:       'Advance Lister',
+    trainee:             'Trainee',
+    seller:              'Seller',
+  };
+
   // Close all flyout menus + mobile drawer
   const closeAllMenus = () => {
     setMenuAnchors({});
@@ -744,7 +762,7 @@ export default function AdminLayout({ user, onLogout }) {
               Admin Dashboard
             </Typography>
               <Typography variant="caption" sx={{ color: 'rgba(245, 200, 66, 0.72)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                Grow Mentality | Nurture Proper for Future
+                Grow Mentality | Nurture Proper for The Future
             </Typography>
           </Box>
           <Button
@@ -787,7 +805,7 @@ export default function AdminLayout({ user, onLogout }) {
             <Typography variant="body2" sx={{ color: '#fffdf0', fontWeight: 600 }}>
               {user?.username}{' '}
               <Box component="span" sx={{ color: 'rgba(245, 200, 66, 0.76)', fontWeight: 500 }}>
-                ({user?.role})
+                ({ROLE_LABELS[user?.role] ?? user?.role})
               </Box>
             </Typography>
           </Box>

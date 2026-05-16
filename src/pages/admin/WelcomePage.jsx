@@ -65,7 +65,7 @@ const ROLE_LABELS = {
   hradmin:             'HR Admin',
   hr:                  'HR',
   operationhead:       'Operation Head',
-  hoc:                 'Head of Commerce',
+  hoc:                 'Head of Compliance',
   compliancemanager:   'Compliance Manager',
   lister:              'Lister',
   advancelister:       'Advance Lister',
