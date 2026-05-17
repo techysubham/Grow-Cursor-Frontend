@@ -39,7 +39,7 @@ import StarIcon from '@mui/icons-material/Star';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import SecurityIcon from '@mui/icons-material/Security';
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
-import { listEmployeeProfiles, updateEmployeeProfile, getEmployeeFileUrl, deleteEmployeeProfile } from '../../lib/api.js';
+import { listEmployeeProfiles, updateEmployeeProfile, getEmployeeFileUrl, deleteEmployeeProfile, getAuthToken } from '../../lib/api.js';
 
 // TabPanel component for managing tab content
 function TabPanel({ children, value, index }) {
@@ -372,7 +372,7 @@ export default function EmployeeDetailsPage() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1, overflow: 'hidden' }}>
                         {r.hasProfilePic && (
                           <img
-                            src={`${import.meta.env.VITE_API_URL}/employee-profiles/${r._id}/file/profile-pic?token=${localStorage.getItem('auth_token')}&t=${r.updatedAt || Date.now()}`}
+                            src={`${import.meta.env.VITE_API_URL}/employee-profiles/${r._id}/file/profile-pic?token=${getAuthToken()}&t=${r.updatedAt || Date.now()}`}
                             alt="Profile"
                             style={{
                               width: 50,
