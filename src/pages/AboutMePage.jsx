@@ -9,7 +9,7 @@ import StarIcon from '@mui/icons-material/Star';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import { useLocation, useNavigate } from 'react-router-dom';
 import InternalMessagesPage from './admin/InternalMessagesPage.jsx';
-import { getMyProfile, updateMyProfile, uploadEmployeeFile, getMyFileUrl } from '../lib/api.js';
+import { getMyProfile, updateMyProfile, uploadEmployeeFile, getMyFileUrl, getAuthToken } from '../lib/api.js';
 
 export default function AboutMePage() {
   const location = useLocation();
@@ -220,7 +220,7 @@ export default function AboutMePage() {
                 {fileFlags.hasProfilePic ? (
                   <img
                     key={fileRefreshKeys.profilePic}
-                    src={`${import.meta.env.VITE_API_URL}/employee-profiles/me/file/profile-pic?token=${localStorage.getItem('auth_token')}&t=${fileRefreshKeys.profilePic}`}
+                    src={`${import.meta.env.VITE_API_URL}/employee-profiles/me/file/profile-pic?token=${getAuthToken()}&t=${fileRefreshKeys.profilePic}`}
                     alt="Profile"
                     style={{ width: 80, height: 80, borderRadius: '50%', display: 'block', marginTop: 8 }}
                   />

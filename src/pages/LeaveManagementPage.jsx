@@ -26,9 +26,8 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import axios from 'axios';
+import api from '../lib/api.js';
 
-const API_URL = import.meta.env.VITE_API_URL;
 const MAX_LEAVES_PER_MONTH = 2;
 
 export default function LeaveManagementPage() {
@@ -49,10 +48,7 @@ export default function LeaveManagementPage() {
 
     const fetchLeaves = async () => {
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await axios.get(`${API_URL}/leaves`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get('/leaves');
             setLeaves(res.data);
         } catch (error) {
             console.error('Error fetching leaves:', error);
@@ -117,12 +113,7 @@ export default function LeaveManagementPage() {
 
         setSubmitting(true);
         try {
-            const token = localStorage.getItem('auth_token');
-            await axios.post(
-                `${API_URL}/leaves`,
-                form,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            await api.post('/leaves', form);
             showSnackbar('Leave request submitted successfully', 'success');
             handleCloseDialog();
             fetchLeaves();
@@ -138,10 +129,7 @@ export default function LeaveManagementPage() {
         if (!window.confirm('Are you sure you want to cancel this leave request?')) return;
 
         try {
-            const token = localStorage.getItem('auth_token');
-            await axios.delete(`${API_URL}/leaves/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.delete(`/leaves/${id}`);
             showSnackbar('Leave request cancelled', 'success');
             fetchLeaves();
         } catch (error) {
