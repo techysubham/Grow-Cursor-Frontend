@@ -693,6 +693,23 @@ export default function AsinReviewModal({
                 ↗ Amazon
               </Button>
             )}
+
+            {currentItem?.asin && (
+              <Button
+                variant="outlined"
+                size="small"
+                sx={{ whiteSpace: 'nowrap', fontSize: showAmazonPreview ? '0.7rem' : undefined }}
+                onClick={() => {
+                  window.open(
+                    `https://${amazonDomain}/dp/${currentItem.asin}#customerReviews`,
+                    '_blank',
+                    'noopener,noreferrer'
+                  );
+                }}
+              >
+                See Reviews
+              </Button>
+            )}
             
             {showAmazonPreview ? (
               <>
