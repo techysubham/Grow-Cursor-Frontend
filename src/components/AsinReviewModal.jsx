@@ -114,7 +114,8 @@ export default function AsinReviewModal({
   onListDirectly = null,
   templateColumns = [],
   marketplace = 'US',
-  sellerId = null
+  sellerId = null,
+  templateName = ''
 }) {
   const amazonDomain = MARKETPLACE_DOMAINS[marketplace] || MARKETPLACE_DOMAINS.US;
   const wasOpenRef = useRef(false);
@@ -132,6 +133,8 @@ export default function AsinReviewModal({
   const [rephrasing, setRephrasing] = useState({}); // { [itemId]: true|false }
   const [startPriceEditMode, setStartPriceEditMode] = useState({}); // { [itemId]: true|false }
   const [skuStatus, setSkuStatus] = useState({}); // { [itemId]: { status: 'loading'|'active'|'inactive'|null, count: number } }
+  const [vehicleInputs, setVehicleInputs] = useState({}); // { [itemId]: string } — Steering Wheel Cover only
+  const isSteeringWheelCover = templateName?.toLowerCase() === 'steering wheel cover';
 
   // Filter out dismissed items
   const activeItems = previewItems.filter(item => !dismissedItems.has(item.id));
@@ -402,13 +405,17 @@ export default function AsinReviewModal({
     if (!currentItem || !itemData.title) return;
     setRephrasing(prev => ({ ...prev, [currentItem.id]: true }));
     try {
-      const { data } = await api.post('/ai/rephrase-title', {
+      const payload = {
         currentTitle: itemData.title,
         sourceTitle: currentItem.sourceData?.title || '',
         brand: currentItem.sourceData?.brand || '',
         color: currentItem.sourceData?.color || '',
         compatibility: currentItem.sourceData?.compatibility || ''
-      });
+      };
+      if (isSteeringWheelCover && vehicleInputs[currentItem.id]?.trim()) {
+        payload.vehicleMentions = vehicleInputs[currentItem.id].trim();
+      }
+      const { data } = await api.post('/ai/rephrase-title', payload);
       handleFieldChange('title', data.rephrasedTitle, false);
     } catch (error) {
       console.error('[Rephrase Title] Error:', error);
@@ -1311,32 +1318,46 @@ export default function AsinReviewModal({
                   // Title field — with rephrase button
                   if (col.name === 'title') {
                     return (
-                      <Stack key="title" direction="row" alignItems="flex-start" spacing={1}>
-                        <TextField
-                          label={col.label || col.name}
-                          value={itemData.title || ''}
-                          onChange={(e) => handleFieldChange('title', e.target.value, false)}
-                          size="small"
-                          fullWidth
-                          required
-                          helperText={`${(itemData.title || '').length}/80`}
-                          sx={{ flex: 1 }}
-                        />
-                        <Tooltip title="Rephrase title">
-                          <span>
-                            <IconButton
-                              onClick={handleRephrase}
-                              disabled={!itemData.title || !!rephrasing[currentItem.id]}
-                              size="small"
-                              sx={{ mt: 0.5 }}
-                            >
-                              {rephrasing[currentItem.id]
-                                ? <CircularProgress size={18} />
-                                : <AutorenewIcon fontSize="small" />}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      </Stack>
+                      <Box key="title">
+                        <Stack direction="row" alignItems="flex-start" spacing={1}>
+                          <TextField
+                            label={col.label || col.name}
+                            value={itemData.title || ''}
+                            onChange={(e) => handleFieldChange('title', e.target.value, false)}
+                            size="small"
+                            fullWidth
+                            required
+                            helperText={`${(itemData.title || '').length}/80`}
+                            sx={{ flex: 1 }}
+                          />
+                          <Tooltip title="Rephrase title">
+                            <span>
+                              <IconButton
+                                onClick={handleRephrase}
+                                disabled={!itemData.title || !!rephrasing[currentItem.id]}
+                                size="small"
+                                sx={{ mt: 0.5 }}
+                              >
+                                {rephrasing[currentItem.id]
+                                  ? <CircularProgress size={18} />
+                                  : <AutorenewIcon fontSize="small" />}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Stack>
+                        {isSteeringWheelCover && (
+                          <TextField
+                            label="Vehicle models (from reviews)"
+                            placeholder="e.g. 2022 Toyota Camry, 2019 Honda Accord"
+                            value={vehicleInputs[currentItem?.id] || ''}
+                            onChange={(e) => setVehicleInputs(prev => ({ ...prev, [currentItem.id]: e.target.value }))}
+                            size="small"
+                            fullWidth
+                            sx={{ mt: 1 }}
+                            helperText="Paste from 'See Reviews' · used when rephrasing"
+                          />
+                        )}
+                      </Box>
                     );
                   }
 
