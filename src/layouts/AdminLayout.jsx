@@ -79,6 +79,7 @@ const BestOffersPage = lazy(() => import('../pages/admin/BestOffersPage.jsx'));
 const SellingPrivilegesPage = lazy(() => import('../pages/admin/SellingPrivilegesPage.jsx'));
 const EbayApiUsagePage = lazy(() => import('../pages/admin/EbayApiUsagePage.jsx'));
 const FeedUploadStatsPage = lazy(() => import('../pages/admin/FeedUploadStatsPage.jsx'));
+const SellerUploadLimitsPage = lazy(() => import('../pages/admin/SellerUploadLimitsPage.jsx'));
 const SalaryPage = lazy(() => import('../pages/admin/SalaryPage.jsx'));
 const SellerFundsPage = lazy(() => import('../pages/admin/SellerFundsPage.jsx'));
 
@@ -266,6 +267,7 @@ const COMPONENT_MAP = {
   'AsinLists': AsinListPage,
   'FeedUpload': FeedUploadPage,
   'FeedUploadStats': FeedUploadStatsPage,
+  'SellerUploadLimits': SellerUploadLimitsPage,
   'CsvStorage': CsvStoragePage,
   'ProductResearch': ProductResearchPage,
   'Payoneer': PayoneerSheetPage,

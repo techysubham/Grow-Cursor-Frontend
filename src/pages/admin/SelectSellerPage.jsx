@@ -14,6 +14,7 @@ import {
 import api from '../../lib/api';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import Chip from '@mui/material/Chip';
 
 // ── Skeleton card ────────────────────────────────────────────────────────────
 function SellerCardSkeleton() {
@@ -49,8 +50,10 @@ export default function SelectSellerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  // Map of sellerId -> array of { country, isBlocked, currentCount, limit }
+  const [limitsBySellerMap, setLimitsBySellerMap] = useState({});
 
-  useEffect(() => { fetchSellers(); }, []);
+  useEffect(() => { fetchSellers(); fetchLimitStatuses(); }, []);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -76,6 +79,21 @@ export default function SelectSellerPage() {
       setError('Failed to fetch sellers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLimitStatuses = async () => {
+    try {
+      const { data } = await api.get('/seller-upload-limits');
+      const map = {};
+      (data || []).forEach(item => {
+        const sid = item.seller?._id || item.seller;
+        if (!map[sid]) map[sid] = [];
+        map[sid].push({ country: item.country, isBlocked: item.isBlocked, currentCount: item.currentCount, limit: item.limit });
+      });
+      setLimitsBySellerMap(map);
+    } catch {
+      // Non-critical — silently skip if the endpoint is unavailable
     }
   };
 
@@ -231,6 +249,32 @@ export default function SelectSellerPage() {
                     <Typography variant="caption" sx={{ fontWeight: 600, color: alpha(BRAND_DARK, 0.4), letterSpacing: 0.3 }}>
                       {seller.ebayMarketplaces?.length || 0} eBay Marketplace{seller.ebayMarketplaces?.length !== 1 ? 's' : ''}
                     </Typography>
+
+                    {/* Upload limit badges */}
+                    {(limitsBySellerMap[seller._id] || []).length > 0 && (
+                      <Stack direction="row" flexWrap="wrap" gap={0.5} sx={{ mt: 1 }}>
+                        {limitsBySellerMap[seller._id].map(ls => {
+                          const pct = ls.limit > 0 ? Math.round((ls.currentCount / ls.limit) * 100) : 0;
+                          const isWarn = !ls.isBlocked && pct >= 80;
+                          if (!ls.isBlocked && !isWarn) return null;
+                          return (
+                            <Chip
+                              key={ls.country}
+                              label={ls.isBlocked ? `${ls.country}: Blocked` : `${ls.country}: ${pct}%`}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                backgroundColor: ls.isBlocked ? '#fde8e8' : '#fff8e1',
+                                color: ls.isBlocked ? '#c0392b' : '#856404',
+                                border: `1px solid ${ls.isBlocked ? '#f5c6c6' : '#ffe082'}`,
+                              }}
+                            />
+                          );
+                        })}
+                      </Stack>
+                    )}
                   </CardContent>
 
                   <CardActions sx={{ p: 2, pt: 0.5 }}>

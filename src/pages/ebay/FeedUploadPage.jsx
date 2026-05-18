@@ -138,6 +138,9 @@ const FeedUploadPage = () => {
 
     const [filterResult, setFilterResult] = useState('');
 
+    // Upload limit check
+    const [limitStatus, setLimitStatus] = useState(null); // { isBlocked, currentCount, limit, startDate }
+
     // Pre-populate from navigation state (List Directly flow)
     useEffect(() => {
         if (location.state?.csvFile) {
@@ -243,6 +246,16 @@ const FeedUploadPage = () => {
         }
     }, [filterDateFrom, filterDateTo, filterCountry, filterResult]);
 
+    // Fetch upload limit status whenever seller or country changes
+    useEffect(() => {
+        if (!selectedSeller || !country) { setLimitStatus(null); return; }
+        let cancelled = false;
+        api.get('/seller-upload-limits/check', { params: { sellerId: selectedSeller, country } })
+            .then(res => { if (!cancelled) setLimitStatus(res.data); })
+            .catch(() => { if (!cancelled) setLimitStatus(null); });
+        return () => { cancelled = true; };
+    }, [selectedSeller, country]);
+
     const fetchTasks = async (pg = currentPage) => {
         setLoadingTasks(true);
         try {
@@ -307,6 +320,12 @@ const FeedUploadPage = () => {
     const handleUpload = async () => {
         if (!selectedFile || !selectedSeller) {
             setError('Please select a file and a seller.');
+            return;
+        }
+
+        // Block if the seller has reached their daily upload limit for this country
+        if (limitStatus?.isBlocked) {
+            setError(`Daily upload limit reached for this seller in ${country}: ${limitStatus.currentCount.toLocaleString()} / ${limitStatus.limit.toLocaleString()} successful uploads today. Resets at 12:00 AM IST.`);
             return;
         }
 
@@ -757,12 +776,32 @@ const FeedUploadPage = () => {
                             </Typography>
                         </Box>
 
+                        {/* Upload limit alert */}
+                        {limitStatus?.limit != null && (() => {
+                            const pct = limitStatus.limit > 0 ? (limitStatus.currentCount / limitStatus.limit) * 100 : 0;
+                            if (limitStatus.isBlocked) {
+                                return (
+                                    <Alert severity="error" sx={{ borderRadius: 1.5 }}>
+                                        <strong>Daily limit reached</strong> — {limitStatus.currentCount.toLocaleString()} / {limitStatus.limit.toLocaleString()} successful uploads today for {country}. Resets at 12:00 AM IST.
+                                    </Alert>
+                                );
+                            }
+                            if (pct >= 80) {
+                                return (
+                                    <Alert severity="warning" sx={{ borderRadius: 1.5 }}>
+                                        Approaching daily limit — {limitStatus.currentCount.toLocaleString()} / {limitStatus.limit.toLocaleString()} today for {country} ({Math.round(pct)}% used). Resets at 12:00 AM IST.
+                                    </Alert>
+                                );
+                            }
+                            return null;
+                        })()}
+
                         {/* Upload Button */}
                         <Button
                             variant="contained"
                             size="large"
                             onClick={handleUpload}
-                            disabled={uploading || !selectedFile || !selectedSeller}
+                            disabled={uploading || !selectedFile || !selectedSeller || limitStatus?.isBlocked}
                             startIcon={uploading && <CircularProgress size={20} color="inherit" />}
                             sx={yellowFilledButtonSx}
                         >
