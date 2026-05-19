@@ -5,7 +5,7 @@ import {
     TableBody, TableCell, TableContainer, TableHead, TableRow,
     Tooltip, Button, Collapse, IconButton, LinearProgress,
     Checkbox, Dialog, DialogTitle, DialogContent, DialogActions,
-    Snackbar,
+    Snackbar, Pagination,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -185,8 +185,11 @@ export default function DuplicateSkusPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Selection state
+    // Selection state (persists across page changes)
     const [selectedIds, setSelectedIds] = useState(new Set());
+
+    // Pagination
+    const [page, setPage] = useState(1);
 
     // End-listing state
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -201,21 +204,33 @@ export default function DuplicateSkusPage() {
             .finally(() => setLoadingSellers(false));
     }, []);
 
-    const handleSearch = useCallback(async () => {
-        if (!sellerId) return;
+    const fetchPage = useCallback(async (p, sid) => {
         setLoading(true);
         setError(null);
-        setResult(null);
-        setSelectedIds(new Set());
         try {
-            const { data } = await api.get('/sellers/sku-duplicates', { params: { sellerId } });
+            const { data } = await api.get('/sellers/sku-duplicates', {
+                params: { sellerId: sid, page: p, limit: 25 },
+            });
             setResult(data);
+            setPage(p);
         } catch (err) {
             setError(err?.response?.data?.error || 'Failed to fetch duplicate SKUs.');
         } finally {
             setLoading(false);
         }
-    }, [sellerId]);
+    }, []);
+
+    const handleSearch = useCallback(() => {
+        if (!sellerId) return;
+        setResult(null);
+        setSelectedIds(new Set());
+        setPage(1);
+        fetchPage(1, sellerId);
+    }, [sellerId, fetchPage]);
+
+    const handlePageChange = useCallback((_, value) => {
+        fetchPage(value, sellerId);
+    }, [sellerId, fetchPage]);
 
     const handleToggle = useCallback((itemId, forceValue) => {
         setSelectedIds(prev => {
@@ -312,7 +327,7 @@ export default function DuplicateSkusPage() {
                         <Select
                             value={sellerId}
                             label="Select Seller"
-                            onChange={e => { setSellerId(e.target.value); setResult(null); setSelectedIds(new Set()); }}
+                            onChange={e => { setSellerId(e.target.value); setResult(null); setSelectedIds(new Set()); setPage(1); }}
                         >
                             {sellers.map(s => (
                                 <MenuItem key={s._id} value={s._id}>
@@ -341,6 +356,14 @@ export default function DuplicateSkusPage() {
                         >
                             End {selectedIds.size} Selected
                         </Button>
+                    )}
+                    {selectedIds.size > 0 && result?.totalPages > 1 && (
+                        <Chip
+                            label={`${selectedIds.size} selected across pages`}
+                            size="small"
+                            color="warning"
+                            sx={{ fontWeight: 600 }}
+                        />
                     )}
                 </Box>
                 {ending && (
@@ -406,7 +429,7 @@ export default function DuplicateSkusPage() {
                                         <DuplicateRow
                                             key={row.sku}
                                             row={row}
-                                            index={i}
+                                            index={(page - 1) * 25 + i}
                                             selectedIds={selectedIds}
                                             onToggle={handleToggle}
                                         />
@@ -414,6 +437,19 @@ export default function DuplicateSkusPage() {
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                    )}
+
+                    {result.totalPages > 1 && (
+                        <Box display="flex" justifyContent="center" py={2} borderTop="1px solid #e0e0e0">
+                            <Pagination
+                                count={result.totalPages}
+                                page={page}
+                                onChange={handlePageChange}
+                                color="primary"
+                                shape="rounded"
+                                disabled={loading}
+                            />
+                        </Box>
                     )}
                 </Paper>
             )}
