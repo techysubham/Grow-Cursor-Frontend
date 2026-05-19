@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { alpha } from '@mui/material/styles';
 import {
-    Box, Typography, Container, Paper, Alert,
-    FormControl, InputLabel, Select, MenuItem, Chip, Table,
+    Box, Typography, Stack, Chip, Table, Fade,
     TableBody, TableCell, TableContainer, TableHead, TableRow,
     Tooltip, Button, Collapse, IconButton, LinearProgress,
     Checkbox, Dialog, DialogTitle, DialogContent, DialogActions,
-    Snackbar, Pagination,
+    Snackbar, Alert, Pagination, FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -13,8 +13,47 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import SearchIcon from '@mui/icons-material/Search';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import BlockIcon from '@mui/icons-material/Block';
-import api from '../../lib/api';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 
+import api from '../../lib/api';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import {
+    tableHeaderCellSx,
+    tableBodyRowSx,
+    tableBodyCellSx,
+    tableContainerSx,
+    tableIndexBadgeSx,
+    yellowFilledButtonSx,
+    yellowOutlinedButtonSx,
+} from '../../theme/tableStyles.js';
+
+const T = dashboardSignatureTokens;
+
+// ─── Tone chip helper ────────────────────────────────────────────────────────
+function ToneChip({ label, tone = 'neutral', size = 'small', sx = {} }) {
+    const t = T.tones[tone] || T.tones.neutral;
+    return (
+        <Chip
+            label={label}
+            size={size}
+            sx={{
+                fontWeight: 700,
+                fontSize: '0.7rem',
+                bgcolor: t.background,
+                color: t.color,
+                border: `1px solid ${t.border}`,
+                '& .MuiChip-label': { px: 1 },
+                ...sx,
+            }}
+        />
+    );
+}
+
+// ─── ItemRow ─────────────────────────────────────────────────────────────────
 function ItemRow({ itemId, title, orderCount, selected, onToggle }) {
     const [copied, setCopied] = useState(false);
     const handleCopy = (e) => {
@@ -29,46 +68,49 @@ function ItemRow({ itemId, title, orderCount, selected, onToggle }) {
             display="flex"
             alignItems="center"
             gap={1}
-            py={0.3}
-            px={0.5}
-            borderRadius={1}
+            py={0.4}
+            px={1}
+            borderRadius={1.5}
+            onClick={() => onToggle(itemId)}
             sx={{
                 cursor: 'pointer',
-                bgcolor: selected ? '#fff3e0' : 'transparent',
-                '&:hover': { bgcolor: selected ? '#ffe0b2' : '#f5f5f5' },
+                transition: 'background 0.15s',
+                bgcolor: selected ? alpha(BRAND_YELLOW, 0.14) : 'transparent',
+                '&:hover': {
+                    bgcolor: selected ? alpha(BRAND_YELLOW, 0.22) : alpha(BRAND_DARK, 0.04),
+                },
             }}
-            onClick={() => onToggle(itemId)}
         >
             <Checkbox
                 size="small"
                 checked={selected}
                 onChange={() => onToggle(itemId)}
                 onClick={e => e.stopPropagation()}
-                sx={{ p: 0.3 }}
+                sx={{
+                    p: 0.3,
+                    color: alpha(BRAND_DARK, 0.35),
+                    '&.Mui-checked': { color: BRAND_DARK },
+                }}
             />
             <Tooltip title={copied ? 'Copied!' : 'Copy Item ID'}>
                 <IconButton size="small" onClick={handleCopy} sx={{ p: 0.4 }}>
-                    <ContentCopyIcon sx={{ fontSize: 14, color: copied ? 'success.main' : 'text.disabled' }} />
+                    <ContentCopyIcon sx={{ fontSize: 13, color: copied ? T.tones.success.color : alpha(BRAND_DARK, 0.35) }} />
                 </IconButton>
             </Tooltip>
-            <Typography variant="caption" fontFamily="monospace" color="text.secondary" sx={{ minWidth: 120 }}>
+            <Typography
+                variant="caption"
+                fontFamily="'JetBrains Mono', 'Fira Mono', monospace"
+                sx={{ minWidth: 124, color: BRAND_DARK, fontWeight: 600, letterSpacing: 0.3 }}
+            >
                 {itemId}
             </Typography>
-            <Chip
+            <ToneChip
                 label={hasOrders ? `${orderCount} order${orderCount !== 1 ? 's' : ''}` : 'No orders'}
-                size="small"
-                sx={{
-                    height: 18,
-                    fontSize: '0.68rem',
-                    fontWeight: 600,
-                    bgcolor: hasOrders ? '#e8f5e9' : '#f5f5f5',
-                    color: hasOrders ? '#2e7d32' : '#9e9e9e',
-                    border: `1px solid ${hasOrders ? '#a5d6a7' : '#e0e0e0'}`,
-                    '& .MuiChip-label': { px: 0.8 },
-                }}
+                tone={hasOrders ? 'success' : 'neutral'}
+                sx={{ height: 20, fontSize: '0.65rem' }}
             />
             {title && (
-                <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 340 }}>
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 360, ml: 0.5 }}>
                     — {title}
                 </Typography>
             )}
@@ -76,99 +118,98 @@ function ItemRow({ itemId, title, orderCount, selected, onToggle }) {
     );
 }
 
+// ─── DuplicateRow ─────────────────────────────────────────────────────────────
 function DuplicateRow({ row, index, selectedIds, onToggle }) {
     const [open, setOpen] = useState(false);
-    const withOrders = (row.orderCounts || []).filter(c => c > 0).length;
-    const withoutOrders = (row.orderCounts || []).length - withOrders;
 
-    const allSelected = row.itemIds.length > 0 && row.itemIds.every(id => selectedIds.has(id));
-    const someSelected = row.itemIds.some(id => selectedIds.has(id));
+    const withOrders    = (row.orderCounts || []).filter(c => c > 0).length;
+    const withoutOrders = (row.orderCounts || []).length - withOrders;
+    const allSelected   = row.itemIds.length > 0 && row.itemIds.every(id => selectedIds.has(id));
+    const someSelected  = row.itemIds.some(id => selectedIds.has(id));
+    const countTone     = row.count >= 5 ? 'danger' : row.count >= 3 ? 'warning' : 'success';
 
     const handleSelectAll = (e) => {
         e.stopPropagation();
-        if (allSelected) {
-            row.itemIds.forEach(id => onToggle(id, false));
-        } else {
-            row.itemIds.forEach(id => onToggle(id, true));
-        }
+        if (allSelected) row.itemIds.forEach(id => onToggle(id, false));
+        else             row.itemIds.forEach(id => onToggle(id, true));
     };
 
     return (
         <>
-            <TableRow hover sx={{ '& td': { borderBottom: open ? 'none' : undefined } }}>
-                <TableCell sx={{ width: 50, color: 'text.disabled', fontWeight: 500 }}>{index + 1}</TableCell>
-                <TableCell>
-                    <Typography variant="body2" fontFamily="monospace" fontWeight={600}>
+            <TableRow sx={tableBodyRowSx}>
+                <TableCell sx={{ ...tableBodyCellSx, width: 56 }}>
+                    <Box sx={{ ...tableIndexBadgeSx, width: 28, height: 28, fontSize: '0.78rem' }}>
+                        {index + 1}
+                    </Box>
+                </TableCell>
+                <TableCell sx={tableBodyCellSx}>
+                    <Typography
+                        variant="body2"
+                        fontFamily="'JetBrains Mono', 'Fira Mono', monospace"
+                        fontWeight={700}
+                        sx={{ color: BRAND_DARK, letterSpacing: 0.2 }}
+                    >
                         {row.sku}
                     </Typography>
                 </TableCell>
-                <TableCell align="center">
-                    <Chip
-                        label={row.count}
-                        size="small"
-                        sx={{
-                            fontWeight: 700,
-                            bgcolor: row.count >= 5 ? '#fdecea' : row.count >= 3 ? '#fff3e0' : '#e8f5e9',
-                            color: row.count >= 5 ? '#c62828' : row.count >= 3 ? '#e65100' : '#2e7d32',
-                            border: `1px solid ${row.count >= 5 ? '#ef9a9a' : row.count >= 3 ? '#ffcc80' : '#a5d6a7'}`,
-                        }}
-                    />
+                <TableCell align="center" sx={{ ...tableBodyCellSx, width: 100 }}>
+                    <ToneChip label={row.count} tone={countTone} />
                 </TableCell>
-                <TableCell align="right">
-                    <IconButton size="small" onClick={() => setOpen(o => !o)}>
+                <TableCell sx={{ ...tableBodyCellSx, width: 52, pr: 1 }} align="right">
+                    <IconButton
+                        size="small"
+                        onClick={() => setOpen(o => !o)}
+                        sx={{
+                            color: open ? BRAND_DARK : alpha(BRAND_DARK, 0.45),
+                            bgcolor: open ? alpha(BRAND_DARK, 0.07) : 'transparent',
+                            '&:hover': { bgcolor: alpha(BRAND_DARK, 0.08) },
+                            transition: 'all 0.18s',
+                        }}
+                    >
                         {open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                     </IconButton>
                 </TableCell>
             </TableRow>
+
             <TableRow>
-                <TableCell colSpan={4} sx={{ py: 0, px: 3, bgcolor: '#fafafa' }}>
+                <TableCell
+                    colSpan={4}
+                    sx={{
+                        py: 0, px: 0,
+                        borderBottom: open ? `1px solid ${alpha(BRAND_DARK, 0.08)}` : 'none',
+                    }}
+                >
                     <Collapse in={open} unmountOnExit>
-                        <Box py={1.5}>
-                            {/* Summary chips + select-all row */}
-                            <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-                                <Box display="flex" gap={1} alignItems="center">
-                                    <Chip
-                                        label={`${withOrders} with order${withOrders !== 1 ? 's' : ''}`}
-                                        size="small"
-                                        sx={{
-                                            fontWeight: 700,
-                                            bgcolor: withOrders > 0 ? '#e8f5e9' : '#f5f5f5',
-                                            color: withOrders > 0 ? '#2e7d32' : '#9e9e9e',
-                                            border: `1px solid ${withOrders > 0 ? '#a5d6a7' : '#e0e0e0'}`,
-                                        }}
-                                    />
-                                    <Chip
-                                        label={`${withoutOrders} without order${withoutOrders !== 1 ? 's' : ''}`}
-                                        size="small"
-                                        sx={{
-                                            fontWeight: 700,
-                                            bgcolor: withoutOrders > 0 ? '#fdecea' : '#f5f5f5',
-                                            color: withoutOrders > 0 ? '#c62828' : '#9e9e9e',
-                                            border: `1px solid ${withoutOrders > 0 ? '#ef9a9a' : '#e0e0e0'}`,
-                                        }}
-                                    />
-                                </Box>
-                                <Box display="flex" alignItems="center" gap={0.5}>
+                        <Box sx={{ px: 3, py: 1.5, bgcolor: alpha(BRAND_DARK, 0.015), borderTop: `1px solid ${alpha(BRAND_DARK, 0.06)}` }}>
+                            <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.2}>
+                                <Stack direction="row" spacing={1}>
+                                    <ToneChip label={`${withOrders} with order${withOrders !== 1 ? 's' : ''}`} tone={withOrders > 0 ? 'success' : 'neutral'} />
+                                    <ToneChip label={`${withoutOrders} without order${withoutOrders !== 1 ? 's' : ''}`} tone={withoutOrders > 0 ? 'danger' : 'neutral'} />
+                                </Stack>
+                                <Box display="flex" alignItems="center" gap={0.5} sx={{ cursor: 'pointer' }} onClick={handleSelectAll}>
                                     <Checkbox
                                         size="small"
                                         checked={allSelected}
                                         indeterminate={someSelected && !allSelected}
                                         onChange={handleSelectAll}
-                                        sx={{ p: 0.3 }}
+                                        onClick={e => e.stopPropagation()}
+                                        sx={{ p: 0.3, color: alpha(BRAND_DARK, 0.35), '&.Mui-checked': { color: BRAND_DARK }, '&.MuiCheckbox-indeterminate': { color: BRAND_DARK } }}
                                     />
-                                    <Typography variant="caption" color="text.secondary">Select all</Typography>
+                                    <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.6), fontWeight: 500 }}>Select all</Typography>
                                 </Box>
                             </Box>
-                            {row.itemIds.map((id, i) => (
-                                <ItemRow
-                                    key={id}
-                                    itemId={id}
-                                    title={row.titles?.[i]}
-                                    orderCount={row.orderCounts?.[i] ?? 0}
-                                    selected={selectedIds.has(id)}
-                                    onToggle={(itemId) => onToggle(itemId)}
-                                />
-                            ))}
+                            <Stack spacing={0.1}>
+                                {row.itemIds.map((id, i) => (
+                                    <ItemRow
+                                        key={id}
+                                        itemId={id}
+                                        title={row.titles?.[i]}
+                                        orderCount={row.orderCounts?.[i] ?? 0}
+                                        selected={selectedIds.has(id)}
+                                        onToggle={(itemId) => onToggle(itemId)}
+                                    />
+                                ))}
+                            </Stack>
                         </Box>
                     </Collapse>
                 </TableCell>
@@ -177,6 +218,7 @@ function DuplicateRow({ row, index, selectedIds, onToggle }) {
     );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DuplicateSkusPage() {
     const [sellers, setSellers] = useState([]);
     const [sellerId, setSellerId] = useState('');
@@ -185,13 +227,13 @@ export default function DuplicateSkusPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Selection state (persists across page changes)
+    // Selection (persists across page changes)
     const [selectedIds, setSelectedIds] = useState(new Set());
 
     // Pagination
     const [page, setPage] = useState(1);
 
-    // End-listing state
+    // End-listing
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [ending, setEnding] = useState(false);
     const [endProgress, setEndProgress] = useState({ done: 0, total: 0, errors: [] });
@@ -309,178 +351,245 @@ export default function DuplicateSkusPage() {
         : '';
 
     return (
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-            <Box display="flex" alignItems="center" gap={1.5} mb={3}>
-                <ReportProblemOutlinedIcon sx={{ color: '#e65100', fontSize: 30 }} />
-                <Box>
-                    <Typography variant="h5" fontWeight={700}>Duplicate SKUs</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Find SKUs appearing on more than one listing for a given seller.
-                    </Typography>
-                </Box>
-            </Box>
-
-            <Paper elevation={2} sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-                <Box display="flex" alignItems="flex-end" gap={2} flexWrap="wrap">
-                    <FormControl size="small" sx={{ minWidth: 260 }} disabled={loadingSellers}>
-                        <InputLabel>Select Seller</InputLabel>
-                        <Select
-                            value={sellerId}
-                            label="Select Seller"
-                            onChange={e => { setSellerId(e.target.value); setResult(null); setSelectedIds(new Set()); setPage(1); }}
-                        >
-                            {sellers.map(s => (
-                                <MenuItem key={s._id} value={s._id}>
-                                    {s.user?.username || s.user?.email || s._id}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    <Button
-                        variant="contained"
-                        startIcon={<SearchIcon />}
-                        onClick={handleSearch}
-                        disabled={!sellerId || loading}
-                        sx={{ height: 40, textTransform: 'none', fontWeight: 600 }}
-                    >
-                        Check Duplicates
-                    </Button>
-                    {selectedIds.size > 0 && (
-                        <Button
-                            variant="contained"
-                            color="error"
-                            startIcon={<BlockIcon />}
-                            onClick={handleEndSelected}
-                            disabled={ending}
-                            sx={{ height: 40, textTransform: 'none', fontWeight: 600, ml: 'auto' }}
-                        >
-                            End {selectedIds.size} Selected
-                        </Button>
-                    )}
-                    {selectedIds.size > 0 && result?.totalPages > 1 && (
-                        <Chip
-                            label={`${selectedIds.size} selected across pages`}
-                            size="small"
-                            color="warning"
-                            sx={{ fontWeight: 600 }}
-                        />
-                    )}
-                </Box>
-                {ending && (
-                    <Box mt={2}>
-                        <Typography variant="caption" color="text.secondary">
-                            Ending listings… {endProgress.done} / {endProgress.total}
-                        </Typography>
-                        <LinearProgress
-                            variant="determinate"
-                            value={(endProgress.done / endProgress.total) * 100}
-                            sx={{ mt: 0.5, borderRadius: 2 }}
-                        />
-                    </Box>
-                )}
-            </Paper>
-
-            {loading && <LinearProgress sx={{ borderRadius: 2, mb: 2 }} />}
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-            {result && (
-                <Paper elevation={2} sx={{ borderRadius: 3 }}>
-                    <Box
-                        display="flex"
-                        alignItems="center"
+        <Fade in timeout={500}>
+            <AdminPageShell>
+                {/* ── Header + Filter bar ───────────────────────────────── */}
+                <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3, background: T.surfaces.pageCard }}>
+                    <Stack
+                        direction={{ xs: 'column', md: 'row' }}
                         justifyContent="space-between"
-                        px={3}
-                        py={2}
-                        borderBottom="1px solid #e0e0e0"
+                        alignItems={{ xs: 'flex-start', md: 'center' }}
+                        gap={2.5}
                     >
-                        <Box display="flex" alignItems="center" gap={1}>
-                            <Typography variant="subtitle1" fontWeight={700}>
-                                Results for&nbsp;
-                                <Box component="span" sx={{ color: 'primary.main' }}>{sellerLabel}</Box>
-                            </Typography>
-                        </Box>
-                        <Chip
-                            label={result.total === 0 ? 'No duplicates found' : `${result.total} duplicate SKU${result.total !== 1 ? 's' : ''}`}
-                            size="small"
-                            color={result.total === 0 ? 'success' : 'warning'}
-                            sx={{ fontWeight: 700 }}
+                        <PageHeader
+                            title="Duplicate SKUs"
+                            subtitle="Find SKUs appearing on more than one listing for a given seller."
+                            sx={{ pt: 0, pb: 0 }}
                         />
-                    </Box>
 
-                    {result.total === 0 ? (
-                        <Box py={6} textAlign="center">
-                            <Typography color="success.main" fontWeight={600} variant="body1">
-                                ✓ No duplicate SKUs found for this seller.
-                            </Typography>
-                        </Box>
-                    ) : (
-                        <TableContainer>
-                            <Table size="small">
-                                <TableHead>
-                                    <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                                        <TableCell sx={{ width: 50, fontWeight: 700 }}>#</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>SKU</TableCell>
-                                        <TableCell align="center" sx={{ fontWeight: 700, width: 100 }}>Count</TableCell>
-                                        <TableCell sx={{ width: 60 }} />
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {result.duplicates.map((row, i) => (
-                                        <DuplicateRow
-                                            key={row.sku}
-                                            row={row}
-                                            index={(page - 1) * 25 + i}
-                                            selectedIds={selectedIds}
-                                            onToggle={handleToggle}
-                                        />
+                        <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap alignItems="center">
+                            <FormControl size="small" sx={{ minWidth: 240 }} disabled={loadingSellers}>
+                                <InputLabel>Select Seller</InputLabel>
+                                <Select
+                                    value={sellerId}
+                                    label="Select Seller"
+                                    onChange={e => {
+                                        setSellerId(e.target.value);
+                                        setResult(null);
+                                        setSelectedIds(new Set());
+                                        setPage(1);
+                                    }}
+                                >
+                                    {sellers.map(s => (
+                                        <MenuItem key={s._id} value={s._id}>
+                                            {s.user?.username || s.user?.email || s._id}
+                                        </MenuItem>
                                     ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )}
+                                </Select>
+                            </FormControl>
 
-                    {result.totalPages > 1 && (
-                        <Box display="flex" justifyContent="center" py={2} borderTop="1px solid #e0e0e0">
-                            <Pagination
-                                count={result.totalPages}
-                                page={page}
-                                onChange={handlePageChange}
-                                color="primary"
-                                shape="rounded"
-                                disabled={loading}
+                            <Button
+                                variant="outlined"
+                                startIcon={<SearchIcon />}
+                                onClick={handleSearch}
+                                disabled={!sellerId || loading}
+                                sx={yellowFilledButtonSx}
+                            >
+                                Check Duplicates
+                            </Button>
+
+                            {selectedIds.size > 0 && (
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<BlockIcon />}
+                                    onClick={handleEndSelected}
+                                    disabled={ending}
+                                    sx={{
+                                        ...yellowOutlinedButtonSx,
+                                        color: T.tones.danger.color,
+                                        borderColor: T.tones.danger.border,
+                                        bgcolor: T.tones.danger.background,
+                                        '&:hover': {
+                                            bgcolor: alpha('#dc2626', 0.15),
+                                            borderColor: '#dc2626',
+                                            boxShadow: `0 8px 18px ${alpha('#dc2626', 0.18)}`,
+                                        },
+                                    }}
+                                >
+                                    End {selectedIds.size} Selected
+                                </Button>
+                            )}
+
+                            {selectedIds.size > 0 && result?.totalPages > 1 && (
+                                <ToneChip label={`${selectedIds.size} selected across pages`} tone="warning" />
+                            )}
+                        </Stack>
+                    </Stack>
+
+                    {ending && (
+                        <Box mt={2.5}>
+                            <Stack direction="row" justifyContent="space-between" mb={0.5}>
+                                <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.6), fontWeight: 500 }}>
+                                    Ending listings…
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.6), fontWeight: 600 }}>
+                                    {endProgress.done} / {endProgress.total}
+                                </Typography>
+                            </Stack>
+                            <LinearProgress
+                                variant="determinate"
+                                value={(endProgress.done / endProgress.total) * 100}
+                                sx={{
+                                    borderRadius: 99, height: 6,
+                                    bgcolor: alpha(BRAND_DARK, 0.08),
+                                    '& .MuiLinearProgress-bar': { bgcolor: BRAND_YELLOW_DARK, borderRadius: 99 },
+                                }}
                             />
                         </Box>
                     )}
-                </Paper>
-            )}
+                </SectionCard>
 
-            {/* Confirm dialog */}
-            <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ fontWeight: 700 }}>End {selectedIds.size} Listing{selectedIds.size !== 1 ? 's' : ''}?</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary">
-                        This will permanently end <strong>{selectedIds.size}</strong> listing{selectedIds.size !== 1 ? 's' : ''} on eBay with reason <em>NotAvailable</em>. This cannot be undone.
-                    </Typography>
-                </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setConfirmOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
-                    <Button variant="contained" color="error" onClick={confirmEndListing} sx={{ textTransform: 'none', fontWeight: 600 }}>
-                        Yes, End Listings
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                {loading && (
+                    <LinearProgress
+                        sx={{
+                            mb: 2, borderRadius: 99, height: 3,
+                            bgcolor: alpha(BRAND_DARK, 0.07),
+                            '& .MuiLinearProgress-bar': { bgcolor: BRAND_YELLOW_DARK },
+                        }}
+                    />
+                )}
+                {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
-            {/* Snackbar */}
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={5000}
-                onClose={() => setSnackbar(s => ({ ...s, open: false }))}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-            >
-                <Alert severity={snackbar.severity} onClose={() => setSnackbar(s => ({ ...s, open: false }))} sx={{ fontWeight: 600 }}>
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
-        </Container>
+                {result && (
+                    <SectionCard sx={{ overflow: 'hidden' }}>
+                        {/* Result header */}
+                        <Box
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            px={3}
+                            py={2}
+                            sx={{ borderBottom: `1px solid ${alpha(BRAND_DARK, 0.08)}` }}
+                        >
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <ReportProblemOutlinedIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.45) }} />
+                                <Typography variant="subtitle1" fontWeight={700} sx={{ color: BRAND_DARK }}>
+                                    Results for&nbsp;
+                                    <Box component="span" sx={{ color: '#2563eb' }}>{sellerLabel}</Box>
+                                </Typography>
+                            </Stack>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                {result.total > 0 && (
+                                    <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.45) }}>
+                                        Page {page} of {result.totalPages}
+                                    </Typography>
+                                )}
+                                <ToneChip
+                                    label={result.total === 0 ? 'No duplicates found' : `${result.total} duplicate SKU${result.total !== 1 ? 's' : ''}`}
+                                    tone={result.total === 0 ? 'success' : 'warning'}
+                                />
+                            </Stack>
+                        </Box>
+
+                        {result.total === 0 ? (
+                            <Box py={8} textAlign="center">
+                                <CheckCircleOutlineIcon sx={{ fontSize: 44, color: T.tones.success.color, mb: 1 }} />
+                                <Typography fontWeight={700} variant="body1" sx={{ color: T.tones.success.color }}>
+                                    No duplicate SKUs found for this seller.
+                                </Typography>
+                            </Box>
+                        ) : (
+                            <>
+                                <TableContainer sx={{ ...tableContainerSx, maxHeight: 'calc(100vh - 370px)', overflow: 'auto' }}>
+                                    <Table size="small" stickyHeader>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ ...tableHeaderCellSx, width: 56 }}>#</TableCell>
+                                                <TableCell sx={tableHeaderCellSx}>SKU</TableCell>
+                                                <TableCell align="center" sx={{ ...tableHeaderCellSx, width: 100 }}>Listings</TableCell>
+                                                <TableCell sx={{ ...tableHeaderCellSx, width: 52 }} />
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {result.duplicates.map((row, i) => (
+                                                <DuplicateRow
+                                                    key={row.sku}
+                                                    row={row}
+                                                    index={(page - 1) * 25 + i}
+                                                    selectedIds={selectedIds}
+                                                    onToggle={handleToggle}
+                                                />
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+
+                                {result.totalPages > 1 && (
+                                    <Box
+                                        display="flex"
+                                        justifyContent="center"
+                                        py={2.5}
+                                        sx={{ borderTop: `1px solid ${alpha(BRAND_DARK, 0.07)}` }}
+                                    >
+                                        <Pagination
+                                            count={result.totalPages}
+                                            page={page}
+                                            onChange={handlePageChange}
+                                            shape="rounded"
+                                            disabled={loading}
+                                            sx={{
+                                                '& .MuiPaginationItem-root': { fontWeight: 600, color: alpha(BRAND_DARK, 0.7) },
+                                                '& .Mui-selected': { bgcolor: `${BRAND_DARK} !important`, color: '#fff' },
+                                            }}
+                                        />
+                                    </Box>
+                                )}
+                            </>
+                        )}
+                    </SectionCard>
+                )}
+
+                {/* Confirm dialog */}
+                <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="xs" fullWidth>
+                    <DialogTitle sx={{ fontWeight: 700, color: BRAND_DARK }}>
+                        End {selectedIds.size} Listing{selectedIds.size !== 1 ? 's' : ''}?
+                    </DialogTitle>
+                    <DialogContent>
+                        <Typography variant="body2" color="text.secondary">
+                            This will permanently end <strong>{selectedIds.size}</strong> listing{selectedIds.size !== 1 ? 's' : ''} on eBay with reason <em>NotAvailable</em>. This cannot be undone.
+                        </Typography>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+                        <Button onClick={() => setConfirmOpen(false)} sx={{ ...yellowOutlinedButtonSx, px: 2 }}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={confirmEndListing}
+                            sx={{
+                                ...yellowOutlinedButtonSx, px: 2,
+                                color: T.tones.danger.color,
+                                borderColor: T.tones.danger.border,
+                                bgcolor: T.tones.danger.background,
+                                '&:hover': { bgcolor: alpha('#dc2626', 0.15), borderColor: '#dc2626' },
+                            }}
+                        >
+                            Yes, End Listings
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Snackbar */}
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={5000}
+                    onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                >
+                    <Alert severity={snackbar.severity} onClose={() => setSnackbar(s => ({ ...s, open: false }))} sx={{ fontWeight: 600, borderRadius: 2 }}>
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
+            </AdminPageShell>
+        </Fade>
     );
 }
