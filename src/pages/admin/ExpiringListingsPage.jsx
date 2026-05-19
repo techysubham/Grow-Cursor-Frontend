@@ -3,7 +3,7 @@ import {
   Box, Typography, Paper, Button, Checkbox, Chip, CircularProgress,
   Alert, FormControl, InputLabel, Select, MenuItem, LinearProgress,
   Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  TablePagination, Tooltip, Avatar, IconButton, Stack, Fade,
+  TablePagination, Tooltip, Avatar, IconButton, Stack, Fade, TextField,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -77,6 +77,8 @@ export default function ExpiringListingsPage() {
   // ── filters ───────────────────────────────────────────────────────────────
   const [hoursRange, setHoursRange]         = useState(24);
   const [countryFilter, setCountryFilter]   = useState('ALL');
+  const [maxWatchers, setMaxWatchers]       = useState(5);
+  const [maxViews, setMaxViews]             = useState(5);
 
   // ── ending ────────────────────────────────────────────────────────────────
   const [endingProgress, setEndingProgress] = useState(null);
@@ -118,7 +120,7 @@ export default function ExpiringListingsPage() {
       const baseURL  = import.meta.env.VITE_API_URL;
       const token    = getAuthToken();
       const response = await fetch(
-        `${baseURL}/ebay/expiring-low-activity-listings?sellerId=${selectedSeller}&hours=${hoursRange}`,
+        `${baseURL}/ebay/expiring-low-activity-listings?sellerId=${selectedSeller}&hours=${hoursRange}&maxWatchers=${maxWatchers}&maxViews=${maxViews}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -158,7 +160,7 @@ export default function ExpiringListingsPage() {
       readerRef.current = null;
       setFetching(false);
     }
-  }, [selectedSeller, hoursRange]);
+  }, [selectedSeller, hoursRange, maxWatchers, maxViews]);
 
   // ── selection helpers ─────────────────────────────────────────────────────
   const toggleSelect = (itemId) =>
@@ -262,7 +264,7 @@ export default function ExpiringListingsPage() {
           >
             <PageHeader
               title="Expiring Low-Activity Listings"
-              subtitle={`Active listings expiring within ${hoursRange} h · <5 watchers · <5 views (30-day) · 0 sold.`}
+              subtitle={`Active listings expiring within ${hoursRange} h · <${maxWatchers} watchers · <${maxViews} views (30-day) · 0 sold.`}
               sx={{ pt: 0, pb: 0 }}
             />
 
@@ -310,6 +312,28 @@ export default function ExpiringListingsPage() {
                   ))}
                 </Select>
               </FormControl>
+
+              <TextField
+                label="Max Watchers"
+                type="number"
+                size="small"
+                disabled={fetching}
+                value={maxWatchers}
+                onChange={e => setMaxWatchers(Math.max(0, parseInt(e.target.value) || 0))}
+                inputProps={{ min: 0 }}
+                sx={{ width: 130 }}
+              />
+
+              <TextField
+                label="Max Views"
+                type="number"
+                size="small"
+                disabled={fetching}
+                value={maxViews}
+                onChange={e => setMaxViews(Math.max(0, parseInt(e.target.value) || 0))}
+                inputProps={{ min: 0 }}
+                sx={{ width: 130 }}
+              />
 
               <FormControl size="small" sx={{ minWidth: 180 }}>
                 <InputLabel>Country</InputLabel>
