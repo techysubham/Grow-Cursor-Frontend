@@ -663,6 +663,7 @@ export default function ListingDirectoryPage() {
 
       <AsinReviewModal
         open={reviewModal}
+        templateName={template?.name}
         onClose={() => { setReviewModal(false); setPreviewItems([]); }}
         previewItems={previewItems}
         onSave={handleSaveFromReview}

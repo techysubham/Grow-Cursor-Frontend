@@ -2750,6 +2750,7 @@ export default function TemplateListingsPage() {
         open={reviewModal}
         marketplace={region}
         sellerId={sellerId}
+        templateName={template?.name}
         onClose={() => {
           // Clean up EventSource if still active
           if (window._currentEventSource) {
