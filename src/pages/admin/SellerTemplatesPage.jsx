@@ -4,7 +4,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Button, Alert, Breadcrumbs, Link as MuiLink,
-  Chip, Stack, TextField, InputAdornment, Skeleton, CircularProgress
+  Chip, Stack, TextField, InputAdornment, Skeleton, CircularProgress, Tooltip
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -13,7 +13,8 @@ import {
   ViewList as ViewListIcon,
   Upload as UploadIcon,
   CheckCircle as ReactivateIcon,
-  Cancel as DeactivateIcon
+  Cancel as DeactivateIcon,
+  Block as BlockIcon
 } from '@mui/icons-material';
 import api from '../../lib/api';
 import BulkImportASINsDialog from '../../components/BulkImportASINsDialog.jsx';
@@ -25,6 +26,17 @@ import { dashboardSignatureTokens } from '../../theme/appTheme.js';
 import AdminPageShell from '../../components/AdminPageShell.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
+
+// Derive eBay marketplace key from template's customActionField
+function extractMarketplace(customActionField) {
+  if (!customActionField) return 'US';
+  if (customActionField.includes('SiteID=eBayMotors')) return 'Motors';
+  if (customActionField.includes('SiteID=Australia'))  return 'Australia';
+  if (customActionField.includes('SiteID=Canada'))     return 'Canada';
+  if (customActionField.includes('SiteID=UK'))         return 'UK';
+  return 'US';
+}
+const MARKETPLACE_TO_COUNTRY = { Australia: 'AU', US: 'US', UK: 'UK', Canada: 'Canada', Motors: 'US' };
 
 // ── Skeleton rows ────────────────────────────────────────────────────────────
 function TableRowSkeleton({ cols = 5 }) {
@@ -70,10 +82,12 @@ export default function SellerTemplatesPage() {
   const [deactivateDialog, setDeactivateDialog] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [success, setSuccess] = useState('');
+  const [blockedCountries, setBlockedCountries] = useState([]);
 
   useEffect(() => {
     if (!sellerId) { navigate('/admin/select-seller'); return; }
     fetchSellerAndTemplates();
+    fetchUploadLimits();
   }, [sellerId]);
 
   useEffect(() => {
@@ -107,16 +121,32 @@ export default function SellerTemplatesPage() {
   };
 
   const fetchListingCounts = async (templatesList) => {
+    if (!templatesList.length) { setListingCounts({}); return; }
     setCountsLoading(true);
-    const counts = {};
-    await Promise.all(templatesList.map(async (template) => {
-      try {
-        const { data } = await api.get(`/template-listings?templateId=${template._id}&sellerId=${sellerId}&page=1&limit=1`);
-        counts[template._id] = data.pagination?.total || 0;
-      } catch { counts[template._id] = 0; }
-    }));
-    setListingCounts(counts);
-    setCountsLoading(false);
+    try {
+      const ids = templatesList.map(t => t._id).join(',');
+      const { data } = await api.get(`/template-listings/counts?templateIds=${ids}&sellerId=${sellerId}`);
+      setListingCounts(data || {});
+    } catch {
+      // Fall back to zeros so the page still renders
+      const zeros = {};
+      templatesList.forEach(t => { zeros[t._id] = 0; });
+      setListingCounts(zeros);
+    } finally {
+      setCountsLoading(false);
+    }
+  };
+
+  const fetchUploadLimits = async () => {
+    try {
+      const { data } = await api.get('/seller-upload-limits');
+      const blocked = (data || [])
+        .filter(item => (item.seller?._id || item.seller) === sellerId && item.isBlocked)
+        .map(item => item.country);
+      setBlockedCountries(blocked);
+    } catch {
+      // non-critical
+    }
   };
 
   const handleAddListings = (templateId) => navigate(`/admin/template-listings?templateId=${templateId}&sellerId=${sellerId}`);
@@ -175,6 +205,18 @@ export default function SellerTemplatesPage() {
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+
+      {/* Upload limit block banner */}
+      {blockedCountries.length > 0 && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2, fontWeight: 500 }}
+          icon={<BlockIcon fontSize="small" />}
+        >
+          <strong>Daily upload limit reached</strong> for <strong>{blockedCountries.join(', ')}</strong>.
+          Templates for {blockedCountries.length === 1 ? 'this country' : 'these countries'} are blocked (shown below). Resets at 12:00 AM IST.
+        </Alert>
+      )}
 
       {/* Bulk Operations Bar */}
       {!loading && templates.length > 0 && (
@@ -291,12 +333,28 @@ export default function SellerTemplatesPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredTemplates.map((template) => (
+                {filteredTemplates.map((template) => {
+                    const tmplCountry = MARKETPLACE_TO_COUNTRY[extractMarketplace(template.customActionField)];
+                    const tmplBlocked = tmplCountry ? blockedCountries.includes(tmplCountry) : false;
+                    return (
                   <TableRow key={template._id} hover sx={tableBodyRowSx}>
                     <TableCell>
-                      <Typography variant="body2" fontWeight={700} sx={{ color: BRAND_DARK }}>
-                        {template.name}
-                      </Typography>
+                      <Stack direction="row" spacing={0.75} alignItems="center">
+                        <Typography variant="body2" fontWeight={700} sx={{ color: tmplBlocked ? alpha(BRAND_DARK, 0.45) : BRAND_DARK }}>
+                          {template.name}
+                        </Typography>
+                        {tmplBlocked && (
+                          <Chip
+                            label={`${tmplCountry}: Blocked`}
+                            size="small"
+                            sx={{
+                              height: 18, fontSize: '0.62rem', fontWeight: 700,
+                              backgroundColor: '#fde8e8', color: '#c0392b',
+                              border: '1px solid #f5c6c6',
+                            }}
+                          />
+                        )}
+                      </Stack>
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -332,18 +390,24 @@ export default function SellerTemplatesPage() {
                       />
                     </TableCell>
                     <TableCell align="right">
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<AddIcon />}
-                        onClick={() => handleAddListings(template._id)}
-                        sx={yellowFilledButtonSx}
-                      >
-                        Add Listings
-                      </Button>
+                      <Tooltip title={tmplBlocked ? `Upload limit reached for ${tmplCountry}. Resets at 12:00 AM IST.` : ''} disableHoverListener={!tmplBlocked}>
+                        <span>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={() => handleAddListings(template._id)}
+                            disabled={tmplBlocked}
+                            sx={yellowFilledButtonSx}
+                          >
+                            Add Listings
+                          </Button>
+                        </span>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
-                ))}
+                    );
+                  })}
               </TableBody>
             </Table>
           </TableContainer>

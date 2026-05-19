@@ -42,6 +42,17 @@ import { tableHeaderCellSx, tableContainerSx } from '../../theme/tableStyles.js'
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
 
+// Derive marketplace key from customActionField (mirrors ManageTemplatesPage)
+function extractMarketplace(customActionField) {
+  if (!customActionField) return 'US';
+  if (customActionField.includes('SiteID=eBayMotors')) return 'Motors';
+  if (customActionField.includes('SiteID=Australia'))  return 'Australia';
+  if (customActionField.includes('SiteID=Canada'))     return 'Canada';
+  if (customActionField.includes('SiteID=UK'))         return 'UK';
+  return 'US';
+}
+const MARKETPLACE_TO_COUNTRY = { Australia: 'AU', US: 'US', UK: 'UK', Canada: 'Canada', Motors: 'US' };
+
 export default function TemplateListingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -107,6 +118,14 @@ export default function TemplateListingsPage() {
     { value: 'CA', label: '🇨🇦 Amazon.ca (Canada)' },
     { value: 'AU', label: '🇦🇺 Amazon.com.au (Australia)' },
   ];
+
+  // Upload limit statuses for this seller (all countries)
+  const [sellerLimitBlocks, setSellerLimitBlocks] = useState([]); // array of blocked country strings
+
+  // Derived: is THIS specific template's country blocked?
+  // Computed inline from sellerLimitBlocks + template state
+  const thisTemplateCountry = MARKETPLACE_TO_COUNTRY[extractMarketplace(template?.customActionField)];
+  const isThisTemplateBlocked = !!(thisTemplateCountry && sellerLimitBlocks.includes(thisTemplateCountry));
 
   // Core field defaults dialog state
   const [defaultsDialog, setDefaultsDialog] = useState(false);
@@ -420,6 +439,22 @@ export default function TemplateListingsPage() {
     
     fetchPricingConfig();
   }, [sellerId, templateId]);
+
+  // Fetch upload limit statuses for this seller (all countries)
+  useEffect(() => {
+    if (!sellerId) return;
+    let cancelled = false;
+    api.get('/seller-upload-limits')
+      .then(({ data }) => {
+        if (cancelled) return;
+        const blocked = (data || [])
+          .filter(item => (item.seller?._id || item.seller) === sellerId && item.isBlocked)
+          .map(item => item.country);
+        setSellerLimitBlocks(blocked);
+      })
+      .catch(() => { /* non-critical */ });
+    return () => { cancelled = true; };
+  }, [sellerId]);
 
   useEffect(() => {
     if (templateId && sellerId) {
@@ -1370,6 +1405,14 @@ export default function TemplateListingsPage() {
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
+      {/* Upload limit block banner */}
+      {isThisTemplateBlocked && (
+        <Alert severity="error" sx={{ mb: 2, fontWeight: 500 }}>
+          <strong>Daily upload limit reached</strong> for <strong>{thisTemplateCountry}</strong>.
+          CSV download and eBay upload are blocked for this template. Resets at 12:00 AM IST.
+        </Alert>
+      )}
+
       <Paper variant="outlined" sx={actionToolbarPaperSx}>
         <Stack
           direction={{ xs: 'column', xl: 'row' }}
@@ -1457,9 +1500,10 @@ export default function TemplateListingsPage() {
                 variant="outlined"
                 startIcon={<DownloadIcon />}
                 onClick={handleExportCSV}
-                disabled={loading || listings.length === 0}
+                disabled={loading || listings.length === 0 || isThisTemplateBlocked}
                 size="small"
                 sx={yellowOutlinedButtonSx}
+                title={isThisTemplateBlocked ? `Upload limit reached for ${thisTemplateCountry}` : undefined}
               >
                 Download CSV
               </Button>
