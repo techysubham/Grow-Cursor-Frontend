@@ -1,7 +1,8 @@
-import { lazy, Suspense, useMemo, useState, useEffect } from 'react';
+import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import { Link, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
+  Badge,
   Box,
   CssBaseline,
   Divider,
@@ -155,6 +156,7 @@ const WelcomePage = lazy(() => import('../pages/admin/WelcomePage.jsx'));
 import PageLoader from '../components/PageLoader.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import usePageAccess from '../hooks/usePageAccess';
+import api, { getAuthToken } from '../lib/api.js';
 import { PAGE_REGISTRY, PAGE_CATEGORIES, SUBMENUS } from '../constants/pages';
 import { BRAND_DARK, BRAND_DARK_ALT, BRAND_DARK_DEEP, BRAND_SIDEBAR_YELLOW, BRAND_SIDEBAR_YELLOW_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../constants/brandTheme';
 
@@ -167,9 +169,33 @@ const flyoutMenuPositionProps = {
 };
 
 // Helper component for sidebar icons with tooltips when collapsed
-const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
-  sidebarOpen ? (
+const renderNavIconGraphic = (Icon, badgeCount = 0) => (
+  <Badge
+    color="error"
+    badgeContent={badgeCount}
+    invisible={!badgeCount}
+    max={99}
+    overlap="circular"
+    anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+    sx={{
+      '& .MuiBadge-badge': {
+        minWidth: 18,
+        height: 18,
+        borderRadius: '999px',
+        fontSize: '0.65rem',
+        fontWeight: 700,
+        padding: '0 4px',
+        boxShadow: '0 0 0 2px #fff'
+      }
+    }}
+  >
     <Icon />
+  </Badge>
+);
+
+const NavIcon = ({ icon: Icon, label, sidebarOpen, badgeCount = 0 }) => (
+  sidebarOpen ? (
+    renderNavIconGraphic(Icon, badgeCount)
   ) : (
     <Tooltip
       title={label}
@@ -179,7 +205,7 @@ const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
       leaveDelay={200}
     >
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon />
+        {renderNavIconGraphic(Icon, badgeCount)}
       </span>
     </Tooltip>
   )
@@ -317,6 +343,14 @@ const COMPONENT_MAP = {
 export default function AdminLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [teamChatUnreadConversationCount, setTeamChatUnreadConversationCount] = useState(0);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const eventSourceRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const lastPlayedMessageIdRef = useRef(null);
+  const activeTeamChatConversationIdRef = useRef(null);
+  const locationPathRef = useRef(location.pathname);
 
   // Flyout menu anchor states
   const [menuAnchors, setMenuAnchors] = useState({});
@@ -324,31 +358,30 @@ export default function AdminLayout({ user, onLogout }) {
   // Submenu anchors
   const [submenuAnchors, setSubmenuAnchors] = useState({});
 
-  const navigate = useNavigate();
-  const location = useLocation();
-
   // Use the page access hook
   const { hasAccess, hasCategoryAccess, accessibleCategories, getAccessiblePages, getSubmenuPages, hasSubmenuAccess, isSuper } = usePageAccess(user);
 
   // --- ROLE DEFINITIONS (kept for special non-page logic like lister dashboard link) ---
   const isAnyLister = ['lister', 'advancelister', 'trainee'].includes(user?.role);
+  const canAccessTeamChat = hasAccess('TeamChat');
+  const hasUnreadTeamChats = teamChatUnreadConversationCount > 0;
 
   const ROLE_LABELS = {
-    superadmin:          'Super Admin',
-    productadmin:        'Product Admin',
-    listingadmin:        'Listing Admin',
-    compatibilityadmin:  'Compatibility Admin',
+    superadmin: 'Super Admin',
+    productadmin: 'Product Admin',
+    listingadmin: 'Listing Admin',
+    compatibilityadmin: 'Compatibility Admin',
     compatibilityeditor: 'Compatibility Editor',
-    fulfillmentadmin:    'Fulfillment Admin',
-    hradmin:             'HR Admin',
-    hr:                  'HR',
-    operationhead:       'Operation Head',
-    hoc:                 'Head of Compliance',
-    compliancemanager:   'Compliance Manager',
-    lister:              'Lister',
-    advancelister:       'Advance Lister',
-    trainee:             'Trainee',
-    seller:              'Seller',
+    fulfillmentadmin: 'Fulfillment Admin',
+    hradmin: 'HR Admin',
+    hr: 'HR',
+    operationhead: 'Operation Head',
+    hoc: 'Head of Compliance',
+    compliancemanager: 'Compliance Manager',
+    lister: 'Lister',
+    advancelister: 'Advance Lister',
+    trainee: 'Trainee',
+    seller: 'Seller',
   };
 
   // Close all flyout menus + mobile drawer
@@ -384,6 +417,163 @@ export default function AdminLayout({ user, onLogout }) {
     const pagePath = `/admin${page.path}`;
     return location.pathname === pagePath || location.pathname.startsWith(`${pagePath}/`);
   };
+
+  const buildTeamChatStreamUrl = () => {
+    const token = getAuthToken() || localStorage.getItem('auth_token');
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+
+    if (!token || !baseUrl) return null;
+
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}/internal-messages/unread-stream${separator}token=${encodeURIComponent(token)}`;
+  };
+
+  const refreshTeamChatUnreadConversationCount = async () => {
+    try {
+      const { data } = await api.get('/internal-messages/conversations');
+      const unreadConversationCount = Array.isArray(data)
+        ? data.filter((conversation) => Number(conversation.unreadCount || 0) > 0).length
+        : 0;
+
+      setTeamChatUnreadConversationCount(unreadConversationCount);
+    } catch {
+      // Leave the existing count unchanged if the fallback fetch fails.
+    }
+  };
+
+  const ensureAudioContext = async () => {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
+    }
+
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+
+    return audioContextRef.current;
+  };
+
+  const playTeamChatNotificationSound = async () => {
+    try {
+      const audioContext = await ensureAudioContext();
+      if (!audioContext) return;
+
+      const startAt = audioContext.currentTime + 0.01;
+      const firstOscillator = audioContext.createOscillator();
+      const secondOscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      firstOscillator.type = 'triangle';
+      secondOscillator.type = 'sine';
+      firstOscillator.frequency.setValueAtTime(740, startAt);
+      firstOscillator.frequency.exponentialRampToValueAtTime(988, startAt + 0.12);
+      secondOscillator.frequency.setValueAtTime(988, startAt + 0.08);
+      secondOscillator.frequency.exponentialRampToValueAtTime(1318, startAt + 0.24);
+
+      gainNode.gain.setValueAtTime(0.0001, startAt);
+      gainNode.gain.exponentialRampToValueAtTime(0.05, startAt + 0.03);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.34);
+
+      firstOscillator.connect(gainNode);
+      secondOscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      firstOscillator.start(startAt);
+      secondOscillator.start(startAt + 0.08);
+      firstOscillator.stop(startAt + 0.24);
+      secondOscillator.stop(startAt + 0.34);
+    } catch {
+      // Ignore blocked autoplay/audio errors.
+    }
+  };
+
+  useEffect(() => {
+    const primeAudio = () => {
+      ensureAudioContext().catch(() => { });
+    };
+
+    window.addEventListener('pointerdown', primeAudio);
+    window.addEventListener('keydown', primeAudio);
+
+    return () => {
+      window.removeEventListener('pointerdown', primeAudio);
+      window.removeEventListener('keydown', primeAudio);
+    };
+  }, []);
+
+  useEffect(() => {
+    locationPathRef.current = location.pathname;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleActiveConversationChange = (event) => {
+      activeTeamChatConversationIdRef.current = event.detail?.conversationId || null;
+    };
+
+    window.addEventListener('team-chat-active-conversation', handleActiveConversationChange);
+
+    return () => {
+      window.removeEventListener('team-chat-active-conversation', handleActiveConversationChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canAccessTeamChat) {
+      setTeamChatUnreadConversationCount(0);
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+      return undefined;
+    }
+
+    refreshTeamChatUnreadConversationCount();
+
+    const streamUrl = buildTeamChatStreamUrl();
+    if (!streamUrl) return undefined;
+
+    const source = new EventSource(streamUrl);
+    eventSourceRef.current = source;
+
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        const unreadConversationCount = Number(payload.unreadConversationCount || 0);
+
+        setTeamChatUnreadConversationCount(unreadConversationCount);
+        window.dispatchEvent(new CustomEvent('team-chat-notification', { detail: payload }));
+
+        const isSameConversationOpen =
+          locationPathRef.current === '/admin/internal-messages' &&
+          payload.conversationId &&
+          payload.conversationId === activeTeamChatConversationIdRef.current;
+
+        if (
+          payload.reason === 'message-received' &&
+          payload.messageId &&
+          payload.messageId !== lastPlayedMessageIdRef.current &&
+          !isSameConversationOpen
+        ) {
+          lastPlayedMessageIdRef.current = payload.messageId;
+          playTeamChatNotificationSound();
+        }
+      } catch {
+        // Ignore malformed SSE payloads.
+      }
+    };
+
+    source.onerror = () => {
+      refreshTeamChatUnreadConversationCount();
+    };
+
+    return () => {
+      source.close();
+      if (eventSourceRef.current === source) {
+        eventSourceRef.current = null;
+      }
+    };
+  }, [canAccessTeamChat]);
 
   const isSubmenuActive = (submenuId) => {
     const submenu = SUBMENUS[submenuId];
@@ -477,6 +667,7 @@ export default function AdminLayout({ user, onLogout }) {
     const IconComponent = categoryIcons[categoryId];
     const isActive = isCategoryActive(categoryId);
     const pages = getAccessiblePages(categoryId);
+    const teamChatCategoryBadgeCount = categoryId === 'hrManagement' ? teamChatUnreadConversationCount : 0;
 
     // Find which submenus belong to this category
     const categorySubmenus = Object.entries(SUBMENUS)
@@ -495,7 +686,7 @@ export default function AdminLayout({ user, onLogout }) {
           >
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <ListItemIcon sx={{ minWidth: 40 }}>
-                <NavIcon icon={IconComponent} label={category.name} sidebarOpen={sidebarOpen} />
+                <NavIcon icon={IconComponent} label={category.name} sidebarOpen={sidebarOpen} badgeCount={teamChatCategoryBadgeCount} />
               </ListItemIcon>
               {sidebarOpen && <ListItemText primary={category.name} primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
             </Box>
@@ -531,7 +722,26 @@ export default function AdminLayout({ user, onLogout }) {
               selected={isPageActive(page)}
               onClick={closeAllMenus}
             >
-              {page.name}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>{page.name}</span>
+                {page.id === 'TeamChat' && hasUnreadTeamChats && (
+                  <Badge
+                    color="error"
+                    badgeContent={teamChatUnreadConversationCount}
+                    max={99}
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        position: 'static',
+                        transform: 'none',
+                        minWidth: 18,
+                        height: 18,
+                        fontSize: '0.65rem',
+                        fontWeight: 700
+                      }
+                    }}
+                  />
+                )}
+              </Box>
             </MenuItem>
           ))}
         </Menu>
@@ -694,7 +904,7 @@ export default function AdminLayout({ user, onLogout }) {
               sx={selectedMenuItemStyle}
             >
               <ListItemIcon>
-                <NavIcon icon={ChatIcon} label="Team Chat & Messaging" sidebarOpen={sidebarOpen} />
+                <NavIcon icon={ChatIcon} label="Team Chat & Messaging" sidebarOpen={sidebarOpen} badgeCount={teamChatUnreadConversationCount} />
               </ListItemIcon>
               {sidebarOpen && <ListItemText primary="Team Chat" />}
             </ListItemButton>
@@ -761,12 +971,34 @@ export default function AdminLayout({ user, onLogout }) {
             <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '0.04em', color: '#fffdf0', lineHeight: 1.1 }}>
               Admin Dashboard
             </Typography>
-              <Typography variant="caption" sx={{ color: 'rgba(245, 200, 66, 0.72)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                Grow Mentality | Nurture Proper for The Future
+            <Typography variant="caption" sx={{ color: 'rgba(245, 200, 66, 0.72)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              Grow Mentality | Nurture Proper for The Future
             </Typography>
           </Box>
           <Button
-            startIcon={<ChatIcon />}
+            startIcon={(
+              <Badge
+                color="error"
+                badgeContent={teamChatUnreadConversationCount}
+                invisible={!hasUnreadTeamChats}
+                max={99}
+                overlap="circular"
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                sx={{
+                  '& .MuiBadge-badge': {
+                    minWidth: 18,
+                    height: 18,
+                    borderRadius: '999px',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    padding: '0 4px',
+                    boxShadow: '0 0 0 2px rgba(15, 15, 23, 0.9)'
+                  }
+                }}
+              >
+                <ChatIcon />
+              </Badge>
+            )}
             onClick={() => navigate('/admin/internal-messages')}
             sx={{
               mr: 1,
@@ -885,56 +1117,56 @@ export default function AdminLayout({ user, onLogout }) {
       <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${sidebarOpen ? drawerWidth : 56}px)` }, transition: 'width 0.2s' }}>
         <Toolbar />
         <ErrorBoundary>
-        <Suspense fallback={<PageLoader />}>
-        <Routes>
-          {/* Welcome / Home page */}
-          <Route path="/welcome" element={<WelcomePage user={user} />} />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Welcome / Home page */}
+              <Route path="/welcome" element={<WelcomePage user={user} />} />
 
-          {/* Ideas & Issues - accessible to ALL roles */}
-          <Route path="/ideas" element={<IdeasPage />} />
+              {/* Ideas & Issues - accessible to ALL roles */}
+              <Route path="/ideas" element={<IdeasPage />} />
 
-          {/* About Me */}
-          {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
+              {/* About Me */}
+              {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
 
-          {/* Leave Management - accessible to ALL authenticated users */}
-          <Route path="/my-leaves" element={<LeaveManagementPage />} />
+              {/* Leave Management - accessible to ALL authenticated users */}
+              <Route path="/my-leaves" element={<LeaveManagementPage />} />
 
-          {/* Internal Messages - accessible to ALL authenticated users */}
-          <Route path="/internal-messages" element={<InternalMessagesPage />} />
+              {/* Internal Messages - accessible to ALL authenticated users */}
+              <Route path="/internal-messages" element={<InternalMessagesPage />} />
 
-          {/* User Performance - accessible to all */}
-          <Route path="/user-performance" element={<UserPerformancePage />} />
+              {/* User Performance - accessible to all */}
+              <Route path="/user-performance" element={<UserPerformancePage />} />
 
-          {/* Dynamic page routes based on access */}
-          {PAGE_REGISTRY.map(page => {
-            if (!hasAccess(page.id)) return null;
-            const Component = COMPONENT_MAP[page.id];
-            if (!Component) return null;
-            return <Route key={page.id} path={page.path} element={<Component />} />;
-          })}
+              {/* Dynamic page routes based on access */}
+              {PAGE_REGISTRY.map(page => {
+                if (!hasAccess(page.id)) return null;
+                const Component = COMPONENT_MAP[page.id];
+                if (!Component) return null;
+                return <Route key={page.id} path={page.path} element={<Component />} />;
+              })}
 
-          {/* Additional routes that don't map 1:1 to pages but need to exist */}
-          {hasAccess('Fulfillment') && (
-            <>
-              <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
-              <Route path="/cancelled-status" element={<DisputesPage initialTab={3} />} />
-              <Route path="/return-requested" element={<DisputesPage initialTab={2} />} />
-              <Route path="/worksheet" element={<DisputesPage initialTab={4} />} />
-            </>
-          )}
+              {/* Additional routes that don't map 1:1 to pages but need to exist */}
+              {hasAccess('Fulfillment') && (
+                <>
+                  <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
+                  <Route path="/cancelled-status" element={<DisputesPage initialTab={3} />} />
+                  <Route path="/return-requested" element={<DisputesPage initialTab={2} />} />
+                  <Route path="/worksheet" element={<DisputesPage initialTab={4} />} />
+                </>
+              )}
 
-          {hasAccess('SelectSeller') && (
-            <>
-              <Route path="/template-listings" element={<TemplateListingsPage />} />
-              <Route path="/seller-templates" element={<SellerTemplatesPage />} />
-              <Route path="/template-listing-analytics" element={<TemplateListingAnalyticsPage />} />
-            </>
-          )}
+              {hasAccess('SelectSeller') && (
+                <>
+                  <Route path="/template-listings" element={<TemplateListingsPage />} />
+                  <Route path="/seller-templates" element={<SellerTemplatesPage />} />
+                  <Route path="/template-listing-analytics" element={<TemplateListingAnalyticsPage />} />
+                </>
+              )}
 
-          {/* Default redirect */}
-          <Route path="*" element={<Navigate to={getDefaultRedirect()} replace />} />
-        </Routes>
-        </Suspense>
+              {/* Default redirect */}
+              <Route path="*" element={<Navigate to={getDefaultRedirect()} replace />} />
+            </Routes>
+          </Suspense>
         </ErrorBoundary>
       </Box>
     </Box>
