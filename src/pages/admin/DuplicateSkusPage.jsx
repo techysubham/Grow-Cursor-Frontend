@@ -3,7 +3,7 @@ import { alpha } from '@mui/material/styles';
 import {
     Box, Typography, Stack, Chip, Table, Fade,
     TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Tooltip, Button, Collapse, IconButton, LinearProgress,
+    Tooltip, Button, Collapse, IconButton, LinearProgress, CircularProgress,
     Checkbox, Dialog, DialogTitle, DialogContent, DialogActions,
     Snackbar, Alert, Pagination, FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
@@ -14,6 +14,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import BlockIcon from '@mui/icons-material/Block';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import api from '../../lib/api';
 import AdminPageShell from '../../components/AdminPageShell.jsx';
@@ -32,6 +33,30 @@ import {
 } from '../../theme/tableStyles.js';
 
 const T = dashboardSignatureTokens;
+
+// ─── Time-left helpers ───────────────────────────────────────────────────────
+function formatTimeLeft(endTime) {
+    if (!endTime) return null;
+    const ms = new Date(endTime).getTime() - Date.now();
+    if (ms <= 0) return 'Expired';
+    const totalMins = Math.floor(ms / 60000);
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    if (h === 0) return `${m}m`;
+    if (h < 24) return `${h}h ${m}m`;
+    const d = Math.floor(h / 24);
+    const rh = h % 24;
+    return rh > 0 ? `${d}d ${rh}h` : `${d}d`;
+}
+
+function timeLeftTone(endTime) {
+    if (!endTime) return 'neutral';
+    const h = (new Date(endTime).getTime() - Date.now()) / 3600000;
+    if (h < 0)  return 'neutral';
+    if (h < 1)  return 'danger';
+    if (h < 24) return 'warning';
+    return 'info';
+}
 
 // ─── Tone chip helper ────────────────────────────────────────────────────────
 function ToneChip({ label, tone = 'neutral', size = 'small', sx = {} }) {
@@ -54,7 +79,7 @@ function ToneChip({ label, tone = 'neutral', size = 'small', sx = {} }) {
 }
 
 // ─── ItemRow ─────────────────────────────────────────────────────────────────
-function ItemRow({ itemId, title, orderCount, selected, onToggle }) {
+function ItemRow({ itemId, title, orderCount, endTime, loadingEndTimes, endTimesFetched, selected, onToggle }) {
     const [copied, setCopied] = useState(false);
     const handleCopy = (e) => {
         e.stopPropagation();
@@ -109,6 +134,74 @@ function ItemRow({ itemId, title, orderCount, selected, onToggle }) {
                 tone={hasOrders ? 'success' : 'neutral'}
                 sx={{ height: 20, fontSize: '0.65rem' }}
             />
+
+            {/* Time left — spinner while fetching, bold badge once loaded */}
+            {loadingEndTimes && !endTime ? (
+                <Tooltip title="Fetching end time…">
+                    <Box display="flex" alignItems="center" sx={{ ml: 0.5 }}>
+                        <CircularProgress size={11} thickness={5} sx={{ color: alpha(BRAND_DARK, 0.3) }} />
+                    </Box>
+                </Tooltip>
+            ) : endTime ? (
+                <Tooltip title={`Ends: ${new Date(endTime).toLocaleString()}`}>
+                    <Box
+                        display="flex"
+                        alignItems="center"
+                        gap={0.4}
+                        sx={{
+                            ml: 0.5,
+                            px: 0.9,
+                            py: 0.15,
+                            borderRadius: 99,
+                            bgcolor: T.tones[timeLeftTone(endTime)]?.background ?? alpha(BRAND_DARK, 0.06),
+                            border: `1px solid ${T.tones[timeLeftTone(endTime)]?.border ?? alpha(BRAND_DARK, 0.12)}`,
+                        }}
+                    >
+                        <AccessTimeIcon sx={{ fontSize: 11, color: T.tones[timeLeftTone(endTime)]?.color ?? alpha(BRAND_DARK, 0.5) }} />
+                        <Typography
+                            sx={{
+                                fontWeight: 900,
+                                fontSize: '0.75rem',
+                                lineHeight: 1,
+                                letterSpacing: 0.2,
+                                color: T.tones[timeLeftTone(endTime)]?.color ?? alpha(BRAND_DARK, 0.7),
+                                fontFamily: "'JetBrains Mono', 'Fira Mono', monospace",
+                            }}
+                        >
+                            {formatTimeLeft(endTime)}
+                        </Typography>
+                    </Box>
+                </Tooltip>
+            ) : endTimesFetched ? (
+                <Tooltip title="eBay returned no listing data — item is likely inactive or removed">
+                    <Box
+                        display="flex"
+                        alignItems="center"
+                        gap={0.4}
+                        sx={{
+                            ml: 0.5,
+                            px: 0.9,
+                            py: 0.15,
+                            borderRadius: 99,
+                            bgcolor: alpha(BRAND_DARK, 0.05),
+                            border: `1px solid ${alpha(BRAND_DARK, 0.1)}`,
+                        }}
+                    >
+                        <Typography
+                            sx={{
+                                fontWeight: 700,
+                                fontSize: '0.68rem',
+                                lineHeight: 1,
+                                letterSpacing: 0.2,
+                                color: alpha(BRAND_DARK, 0.35),
+                                fontFamily: "'JetBrains Mono', 'Fira Mono', monospace",
+                            }}
+                        >
+                            Inactive
+                        </Typography>
+                    </Box>
+                </Tooltip>
+            ) : null}
             {title && (
                 <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 360, ml: 0.5 }}>
                     — {title}
@@ -119,7 +212,7 @@ function ItemRow({ itemId, title, orderCount, selected, onToggle }) {
 }
 
 // ─── DuplicateRow ─────────────────────────────────────────────────────────────
-function DuplicateRow({ row, index, selectedIds, onToggle }) {
+function DuplicateRow({ row, index, selectedIds, onToggle, endTimeMap, loadingEndTimes, endTimesFetched }) {
     const [open, setOpen] = useState(false);
 
     const withOrders    = (row.orderCounts || []).filter(c => c > 0).length;
@@ -205,6 +298,9 @@ function DuplicateRow({ row, index, selectedIds, onToggle }) {
                                         itemId={id}
                                         title={row.titles?.[i]}
                                         orderCount={row.orderCounts?.[i] ?? 0}
+                                        endTime={endTimeMap?.[id] ?? null}
+                                        loadingEndTimes={loadingEndTimes}
+                                        endTimesFetched={endTimesFetched}
                                         selected={selectedIds.has(id)}
                                         onToggle={(itemId) => onToggle(itemId)}
                                     />
@@ -233,6 +329,11 @@ export default function DuplicateSkusPage() {
     // Pagination
     const [page, setPage] = useState(1);
 
+    // Live end times (fetched from eBay after each page load)
+    const [endTimeMap, setEndTimeMap] = useState({});
+    const [loadingEndTimes, setLoadingEndTimes] = useState(false);
+    const [endTimesFetched, setEndTimesFetched] = useState(false);
+
     // End-listing
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [ending, setEnding] = useState(false);
@@ -246,9 +347,32 @@ export default function DuplicateSkusPage() {
             .finally(() => setLoadingSellers(false));
     }, []);
 
+    // Fetch live end times from eBay for the current page's item IDs.
+    // AbortController ensures a stale response from a previous page never overwrites current data.
+    useEffect(() => {
+        if (!result?.duplicates?.length || !sellerId) return;
+        const ids = result.duplicates.flatMap(d => d.itemIds);
+        if (!ids.length) return;
+
+        const controller = new AbortController();
+        setLoadingEndTimes(true);
+        setEndTimesFetched(false);
+        api.get('/ebay/item-end-times', {
+            params: { sellerId, itemIds: ids.join(',') },
+            signal: controller.signal,
+        })
+            .then(({ data }) => setEndTimeMap(data))
+            .catch(err => { if (err?.name !== 'CanceledError' && err?.code !== 'ERR_CANCELED') { /* ignore */ } })
+            .finally(() => { setLoadingEndTimes(false); setEndTimesFetched(true); });
+
+        return () => controller.abort(); // cancel if page changes before response arrives
+    }, [result, sellerId]);
+
     const fetchPage = useCallback(async (p, sid) => {
         setLoading(true);
         setError(null);
+        setEndTimeMap({});
+        setEndTimesFetched(false);
         try {
             const { data } = await api.get('/sellers/sku-duplicates', {
                 params: { sellerId: sid, page: p, limit: 25 },
@@ -266,6 +390,7 @@ export default function DuplicateSkusPage() {
         if (!sellerId) return;
         setResult(null);
         setSelectedIds(new Set());
+        setEndTimeMap({});
         setPage(1);
         fetchPage(1, sellerId);
     }, [sellerId, fetchPage]);
@@ -484,6 +609,14 @@ export default function DuplicateSkusPage() {
                                         Page {page} of {result.totalPages}
                                     </Typography>
                                 )}
+                                {loadingEndTimes && (
+                                    <Box display="flex" alignItems="center" gap={0.5}>
+                                        <AccessTimeIcon sx={{ fontSize: 13, color: alpha(BRAND_DARK, 0.35) }} />
+                                        <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.4), fontStyle: 'italic' }}>
+                                            fetching end times…
+                                        </Typography>
+                                    </Box>
+                                )}
                                 <ToneChip
                                     label={result.total === 0 ? 'No duplicates found' : `${result.total} duplicate SKU${result.total !== 1 ? 's' : ''}`}
                                     tone={result.total === 0 ? 'success' : 'warning'}
@@ -518,6 +651,9 @@ export default function DuplicateSkusPage() {
                                                     index={(page - 1) * 25 + i}
                                                     selectedIds={selectedIds}
                                                     onToggle={handleToggle}
+                                                    endTimeMap={endTimeMap}
+                                                    loadingEndTimes={loadingEndTimes}
+                                                    endTimesFetched={endTimesFetched}
                                                 />
                                             ))}
                                         </TableBody>
