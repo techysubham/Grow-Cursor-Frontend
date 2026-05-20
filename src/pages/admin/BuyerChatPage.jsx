@@ -3,7 +3,7 @@ import {
   Avatar, TextField, Button, Divider, Badge, Stack, CircularProgress, Fade,
   IconButton, Chip, Alert, FormControl, Select, MenuItem, InputLabel, Link,
   Snackbar, ListItemButton, Box, Paper, Typography, List, ListItem, ListItemText, ListItemAvatar,
-  useTheme, useMediaQuery, Menu, ListSubheader, Tooltip
+  useTheme, useMediaQuery, Menu, ListSubheader, Tooltip, Switch, FormControlLabel
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import PersonIcon from '@mui/icons-material/Person';
@@ -69,7 +69,7 @@ export default function BuyerChatPage() {
   const [loadingThreads, setLoadingThreads] = useState(false);
 
   // Pending filter state — only applied when user clicks "Apply Filters"
-  const initialFilters = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '' };
+  const initialFilters = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '', excludeClient: true };
   const [pendingFilters, setPendingFilters] = useState({
     ...initialFilters,
     seller: getInitialState('selectedSeller', ''),
@@ -77,6 +77,7 @@ export default function BuyerChatPage() {
     filterMarketplace: getInitialState('filterMarketplace', ''),
     showUnreadOnly: getInitialState('showUnreadOnly', false),
     searchQuery: getInitialState('searchQuery', ''),
+    excludeClient: getInitialState('excludeClient', true),
   });
   const [appliedDateMode, setAppliedDateMode] = useState('none');
   const [dateFrom, setDateFrom] = useState('');
@@ -161,14 +162,15 @@ export default function BuyerChatPage() {
       selectedSeller,
       filterType,
       filterMarketplace,
-      showUnreadOnly
+      showUnreadOnly,
+      excludeClient: pendingFilters.excludeClient
     };
     try {
       sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedThread, searchQuery, selectedSeller]);
+  }, [selectedThread, searchQuery, selectedSeller, pendingFilters.excludeClient]);
 
 
 
@@ -431,7 +433,7 @@ export default function BuyerChatPage() {
   }
 
   function handleClearFilters() {
-    const reset = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '' };
+    const reset = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '', excludeClient: pendingFilters.excludeClient };
     setPendingFilters(reset);
     setSelectedSeller('');
     setFilterType('ALL');
@@ -442,11 +444,11 @@ export default function BuyerChatPage() {
     setDateFrom('');
     setDateTo('');
     setPage(1);
-    loadThreads(true, { sellerId: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, searchQuery: '', dateFrom: '', dateTo: '' });
+    loadThreads(true, { sellerId: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, searchQuery: '', dateFrom: '', dateTo: '', excludeClient: pendingFilters.excludeClient });
   }
 
   function handleApplyFilters() {
-    const { seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, searchQuery: sq, dateMode, dateSingle, dateFrom: df, dateTo: dt } = pendingFilters;
+    const { seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, searchQuery: sq, dateMode, dateSingle, dateFrom: df, dateTo: dt, excludeClient: ec } = pendingFilters;
     const effectiveDateFrom = dateMode === 'single' ? dateSingle : dateMode === 'range' ? df : '';
     const effectiveDateTo = dateMode === 'single' ? dateSingle : dateMode === 'range' ? dt : '';
     setSelectedSeller(seller);
@@ -458,7 +460,7 @@ export default function BuyerChatPage() {
     setDateFrom(effectiveDateFrom);
     setDateTo(effectiveDateTo);
     setPage(1);
-    loadThreads(true, { sellerId: seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, searchQuery: sq, dateFrom: effectiveDateFrom, dateTo: effectiveDateTo });
+    loadThreads(true, { sellerId: seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, searchQuery: sq, dateFrom: effectiveDateFrom, dateTo: effectiveDateTo, excludeClient: ec });
   }
 
   async function loadThreads(reset = false, overrides = {}) {
@@ -475,6 +477,7 @@ export default function BuyerChatPage() {
       const effectiveSearch = 'searchQuery' in overrides ? overrides.searchQuery : searchQuery;
       const effectiveDateFrom = 'dateFrom' in overrides ? overrides.dateFrom : dateFrom;
       const effectiveDateTo = 'dateTo' in overrides ? overrides.dateTo : dateTo;
+      const effectiveExcludeClient = 'excludeClient' in overrides ? overrides.excludeClient : pendingFilters.excludeClient;
 
       const params = {
         page: currentPage,
@@ -482,7 +485,8 @@ export default function BuyerChatPage() {
         search: effectiveSearch,
         filterType: effectiveFilterType,
         filterMarketplace: effectiveFilterMarketplace,
-        showUnreadOnly: effectiveShowUnreadOnly
+        showUnreadOnly: effectiveShowUnreadOnly,
+        excludeClient: effectiveExcludeClient
       };
 
       if (effectiveSeller) params.sellerId = effectiveSeller;
@@ -903,6 +907,17 @@ export default function BuyerChatPage() {
                 />
               </>
             )}
+
+            {/* Exclude Client Toggle */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5, py: 0.25, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>Exclude Client</Typography>
+              <Switch
+                size="small"
+                checked={!!pendingFilters.excludeClient}
+                onChange={(e) => setPendingFilters(p => ({ ...p, excludeClient: e.target.checked }))}
+                sx={{ '& .MuiSwitch-thumb': { bgcolor: pendingFilters.excludeClient ? BRAND_YELLOW : undefined }, '& .MuiSwitch-track': { bgcolor: pendingFilters.excludeClient ? `${BRAND_YELLOW} !important` : undefined } }}
+              />
+            </Box>
 
             {/* Search */}
             <TextField
