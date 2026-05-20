@@ -94,6 +94,14 @@ function calcActualProfitAU(buyingPrice, sold) {
   return { TotalBuyingPrice, Coupon, SoldMinusCoupon, eBayFee, Ads, OrderEarnings, TDS1pct, TCont, Net, Payoneer, TotalSpent, actualProfit };
 }
 
+function formatProductInfoKey(key) {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+const PRODUCT_INFO_SKIP_KEYS = new Set([
+  'asin', 'color', 'brand_name', 'customer_reviews'
+]);
+
 function buildInitialEditedItems(items = []) {
   const initial = {};
 
@@ -1043,6 +1051,46 @@ export default function AsinReviewModal({
                         </Grid>
                       </Box>
                     )}
+
+                    {(() => {
+                      const info = currentItem.sourceData?.productInfo
+                        || currentItem.sourceData?.rawData?.rawData?.product_information
+                        || currentItem.sourceData?.rawData?.product_information;
+                      if (!info || !Object.keys(info).length) return null;
+                      const entries = Object.entries(info).filter(
+                        ([k, v]) => !PRODUCT_INFO_SKIP_KEYS.has(k) && v !== null && v !== '' && v !== undefined
+                      );
+                      const reviews = info.customer_reviews;
+                      if (!entries.length && !reviews?.stars) return null;
+                      return (
+                        <Box>
+                          <Divider sx={{ my: 1 }} />
+                          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                            Product Information
+                          </Typography>
+                          <Box sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 1.5, rowGap: 0.5 }}>
+                            {reviews?.stars && (
+                              <>
+                                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>Rating</Typography>
+                                <Typography variant="caption">
+                                  {reviews.stars}★{reviews.ratings_count ? ` (${reviews.ratings_count})` : ''}
+                                </Typography>
+                              </>
+                            )}
+                            {entries.map(([key, value]) => (
+                              <>
+                                <Typography key={`k-${key}`} variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                                  {formatProductInfoKey(key)}
+                                </Typography>
+                                <Typography key={`v-${key}`} variant="caption">
+                                  {Array.isArray(value) ? value.join(' · ') : String(value)}
+                                </Typography>
+                              </>
+                            ))}
+                          </Box>
+                        </Box>
+                      );
+                    })()}
                   </Stack>
                 ) : !currentItem.sourceData ? (
                   <Stack spacing={2}>
