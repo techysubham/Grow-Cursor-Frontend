@@ -178,6 +178,7 @@ export default function ReturnRequestedPage({
   const [availableReasons, setAvailableReasons] = useState([]);
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [excludeClient, setExcludeClient] = useState(true);
   const [internalDateFilter, setInternalDateFilter] = useState({
     mode: 'all',
     single: '',
@@ -254,14 +255,14 @@ export default function ReturnRequestedPage({
       return;
     }
     loadStoredReturns();
-  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, responseDueDateFilter, urgentOnly, page]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, responseDueDateFilter, urgentOnly, excludeClient, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     if (hasFetchedInitialData.current) {
       setPage(1);
     }
-  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, responseDueDateFilter, urgentOnly]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, responseDueDateFilter, urgentOnly, excludeClient]);
 
   async function loadStoredReturns() {
     setLoading(true);
@@ -275,6 +276,7 @@ export default function ReturnRequestedPage({
       if (sellerFilter) params.sellerId = sellerFilter;
       if (reasonFilter.length > 0) params.reason = reasonFilter.join(',');
       if (urgentOnly) params.urgentOnly = 'true';
+      params.excludeClient = excludeClient ? 'true' : 'false';
       if (dateFilter.mode === 'single' && dateFilter.single) {
         params.startDate = dateFilter.single;
         params.endDate = dateFilter.single;
@@ -906,6 +908,18 @@ export default function ReturnRequestedPage({
                 🔥 Urgent (Due in 48hrs)
               </Typography>
             }
+          />
+
+          {/* Exclude Client Toggle */}
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={excludeClient}
+                onChange={(e) => setExcludeClient(e.target.checked)}
+              />
+            }
+            label={<Typography variant="body2">Exclude Client</Typography>}
           />
         </Stack>
       </SectionCard>

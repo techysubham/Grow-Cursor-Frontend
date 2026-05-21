@@ -25,6 +25,8 @@ import {
   Tabs,
   Tab,
   Fade,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -142,6 +144,9 @@ export default function DisputesPage({ initialTab = 0 }) {
   const [pdReasonFilter, setPdReasonFilter] = useState('');
   const [pdDateFilter, setPdDateFilter] = useState({ mode: 'all', single: '', from: '', to: '' });
 
+  // Shared exclude-client toggle (persists across clear)
+  const [excludeClient, setExcludeClient] = useState(true);
+
   // Column Selectors
   const ALL_INR_COLUMNS = [
     { id: 'caseId', label: 'Case ID' },
@@ -212,7 +217,7 @@ export default function DisputesPage({ initialTab = 0 }) {
       return;
     }
     loadStoredCases();
-  }, [inrStatusFilter, inrSellerFilter, inrTypeFilter, dateFilter]);
+  }, [inrStatusFilter, inrSellerFilter, inrTypeFilter, dateFilter, excludeClient]);
 
   // Load Payment Disputes when filters change
   useEffect(() => {
@@ -222,7 +227,7 @@ export default function DisputesPage({ initialTab = 0 }) {
       return;
     }
     loadStoredDisputes();
-  }, [pdStatusFilter, pdSellerFilter, pdReasonFilter, pdDateFilter]);
+  }, [pdStatusFilter, pdSellerFilter, pdReasonFilter, pdDateFilter, excludeClient]);
 
   async function loadStoredCases() {
     setCasesLoading(true);
@@ -232,6 +237,7 @@ export default function DisputesPage({ initialTab = 0 }) {
       if (inrStatusFilter) params.status = inrStatusFilter;
       if (inrSellerFilter) params.sellerId = inrSellerFilter;
       if (inrTypeFilter) params.caseType = inrTypeFilter;
+      params.excludeClient = excludeClient ? 'true' : 'false';
       if (dateFilter.mode === 'single' && dateFilter.single) {
         params.startDate = dateFilter.single;
         params.endDate = dateFilter.single;
@@ -267,6 +273,7 @@ export default function DisputesPage({ initialTab = 0 }) {
       if (pdStatusFilter) params.status = pdStatusFilter;
       if (pdSellerFilter) params.sellerId = pdSellerFilter;
       if (pdReasonFilter) params.reason = pdReasonFilter;
+      params.excludeClient = excludeClient ? 'true' : 'false';
       params.dateField = 'openDate';
       if (pdDateFilter.mode === 'single' && pdDateFilter.single) {
         params.startDate = pdDateFilter.single;
@@ -836,6 +843,17 @@ export default function DisputesPage({ initialTab = 0 }) {
                   Clear Filters
                 </Button>
               )}
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={excludeClient}
+                    onChange={(e) => setExcludeClient(e.target.checked)}
+                  />
+                }
+                label={<Typography variant="body2">Exclude Client</Typography>}
+              />
             </Stack>
           </SectionCard>
 
@@ -1163,6 +1181,17 @@ export default function DisputesPage({ initialTab = 0 }) {
                   Clear Filters
                 </Button>
               )}
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={excludeClient}
+                    onChange={(e) => setExcludeClient(e.target.checked)}
+                  />
+                }
+                label={<Typography variant="body2">Exclude Client</Typography>}
+              />
             </Stack>
           </SectionCard>
 
