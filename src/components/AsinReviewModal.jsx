@@ -52,6 +52,13 @@ const MARKETPLACE_DOMAINS = {
   AU: 'www.amazon.com.au',
 };
 
+const CURRENCY_SYMBOLS = {
+  US: '$',
+  UK: '£',
+  CA: 'CA$',
+  AU: 'A$',
+};
+
 /**
  * Calculates "Actual Profit" (INR) for a US marketplace listing.
  * @param {number} buyingPrice - Amazon price in USD
@@ -1005,7 +1012,7 @@ export default function AsinReviewModal({
                         Price
                       </Typography>
                       <Typography variant="body2">
-                        ${currentItem.sourceData.price}
+                        {CURRENCY_SYMBOLS[marketplace] || '$'}{currentItem.sourceData.price}
                       </Typography>
                     </Box>
 
