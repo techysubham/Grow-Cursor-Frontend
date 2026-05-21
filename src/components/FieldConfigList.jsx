@@ -270,7 +270,7 @@ export default function FieldConfigList({ configs, customColumns, onChange }) {
                         value={config.promptTemplate || ''}
                         onChange={(e) => handleUpdate(index, 'promptTemplate', e.target.value)}
                         fullWidth
-                        helperText="Available placeholders: {title}, {brand}, {description}, {price}, {asin}"
+                        helperText="Available placeholders: {title}, {brand}, {description}, {price}, {asin}, {product_information}"
                         placeholder="Example: Generate an 80-character eBay title for {title} by {brand}..."
                       />
                     </>
