@@ -212,6 +212,7 @@ export default function ExpiringListingsPage() {
           sellerId: selectedSeller,
           itemId: item.itemId,
           endingReason: 'NotAvailable',
+          source: 'expiry_listing',
         });
         results.success.push(item.itemId);
       } catch (err) {

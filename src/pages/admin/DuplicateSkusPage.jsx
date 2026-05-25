@@ -427,6 +427,7 @@ export default function DuplicateSkusPage() {
                     sellerId,
                     itemId: ids[i],
                     endingReason: 'NotAvailable',
+                    source: 'duplicate_sku',
                 });
             } catch (e) {
                 errors.push({ itemId: ids[i], msg: e?.response?.data?.error || e.message });
