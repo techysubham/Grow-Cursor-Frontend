@@ -110,6 +110,7 @@ export const PAGE_REGISTRY = [
   { id: 'ExpiringListings', name: 'Expiring Listings', path: '/expiring-listings', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'SkuIndexSync', name: 'SKU Index Sync', path: '/sku-index-sync', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'DuplicateSkus', name: 'Duplicate SKUs', path: '/duplicate-skus', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'EndListingStats', name: 'End Listing Stats', path: '/end-listing-stats', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'BestOffers', name: 'Best Offers', path: '/best-offers', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
 
   // ====== HR & MANAGEMENT ======
