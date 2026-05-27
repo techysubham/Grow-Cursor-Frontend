@@ -121,6 +121,56 @@ function buildInitialEditedItems(items = []) {
   return initial;
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function shuffleArrayWithChange(values) {
+  if (!Array.isArray(values) || values.length < 2) return Array.isArray(values) ? [...values] : [];
+
+  const shuffled = [...values];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  if (shuffled.some((value, index) => value !== values[index])) {
+    return shuffled;
+  }
+
+  return [...values.slice(1), values[0]];
+}
+
+function shuffleKnownImageUrlsInHtml(htmlContent, imageUrls = []) {
+  if (!htmlContent || typeof htmlContent !== 'string') return htmlContent;
+  if (!Array.isArray(imageUrls) || imageUrls.length < 2) return htmlContent;
+
+  const matchedUrls = getMatchedKnownImageUrls(htmlContent, imageUrls);
+  if (matchedUrls.length < 2) return htmlContent;
+
+  const shuffledUrls = shuffleArrayWithChange(matchedUrls);
+  const tokenPrefix = `__ASIN_IMAGE_SHUFFLE_${Date.now()}_${Math.random().toString(36).slice(2)}__`;
+  let processedContent = htmlContent;
+
+  matchedUrls.forEach((url, index) => {
+    processedContent = processedContent.replace(new RegExp(escapeRegExp(url), 'g'), `${tokenPrefix}${index}__`);
+  });
+
+  shuffledUrls.forEach((url, index) => {
+    processedContent = processedContent.replace(new RegExp(escapeRegExp(`${tokenPrefix}${index}__`), 'g'), url);
+  });
+
+  return processedContent;
+}
+
+function getMatchedKnownImageUrls(htmlContent, imageUrls = []) {
+  if (!htmlContent || typeof htmlContent !== 'string') return [];
+  if (!Array.isArray(imageUrls)) return [];
+
+  const uniqueImageUrls = [...new Set(imageUrls.filter(Boolean))];
+  return uniqueImageUrls.filter(url => htmlContent.includes(url));
+}
+
 export default function AsinReviewModal({ 
   open, 
   onClose, 
@@ -175,6 +225,12 @@ export default function AsinReviewModal({
         : calcActualProfit(actualProfitBuyingPrice, actualProfitSoldPrice))
     : null;
   const actualProfitColor = actualProfit && actualProfit.actualProfit < 300 ? 'error' : 'success';
+  const matchedDescriptionImageUrls = getMatchedKnownImageUrls(
+    itemData.description,
+    currentItem?.sourceData?.images
+  );
+  const canShuffleDescriptionImages = currentItem?.status === 'duplicate_updateable'
+    && matchedDescriptionImageUrls.length >= 2;
 
   // Reset modal-local session state only when the modal opens.
   useEffect(() => {
@@ -437,6 +493,26 @@ export default function AsinReviewModal({
     } finally {
       setRephrasing(prev => ({ ...prev, [currentItem.id]: false }));
     }
+  };
+
+  const handleShuffleDescriptionImages = () => {
+    if (!currentItem || !canShuffleDescriptionImages) return;
+
+    const shuffledDescription = shuffleKnownImageUrlsInHtml(
+      itemData.description,
+      currentItem.sourceData.images
+    );
+
+    if (shuffledDescription === itemData.description) return;
+
+    setEditedItems(prev => ({
+      ...prev,
+      [currentItem.id]: {
+        ...(prev[currentItem.id] || currentItem.generatedListing || {}),
+        description: shuffledDescription
+      }
+    }));
+    setHasUnsavedChanges(true);
   };
 
   const openAmazonPreview = () => {
@@ -1243,6 +1319,28 @@ export default function AsinReviewModal({
                               ))}
                             </Select>
                           </FormControl>
+
+                          {currentItem?.status === 'duplicate_updateable' && (
+                            <Tooltip
+                              title={canShuffleDescriptionImages
+                                ? 'Shuffle Amazon product images in this description'
+                                : 'At least two matching Amazon images are required'}
+                              placement="bottom"
+                              arrow
+                            >
+                              <span>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={handleShuffleDescriptionImages}
+                                  disabled={!canShuffleDescriptionImages}
+                                  sx={{ height: 40, flexShrink: 0, whiteSpace: 'nowrap' }}
+                                >
+                                  Shuffle Images
+                                </Button>
+                              </span>
+                            </Tooltip>
+                          )}
 
                           {/* Inline Start Price editor */}
                           <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
