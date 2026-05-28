@@ -65,6 +65,7 @@ const ANALYTICS_COLUMNS = [
   { id: 'totalPBalanceINR', label: 'P.Balance (INR)' },
   { id: 'totalAmazonCosts', label: 'A_total-inr' },
   { id: 'totalCreditCardFees', label: 'Credit Card Fees' },
+  { id: 'totalAmazonAndCreditCardFees', label: 'A_total-inr + CC Fees' },
   { id: 'totalProfit', label: 'Profit (INR)' },
 ];
 
@@ -251,6 +252,7 @@ export default function SellerAnalyticsPage() {
     totalPBalanceINR: acc.totalPBalanceINR + (row.totalPBalanceINR || 0),
     totalAmazonCosts: acc.totalAmazonCosts + (row.totalAmazonCosts || 0),
     totalCreditCardFees: acc.totalCreditCardFees + (row.totalCreditCardFees || 0),
+    totalAmazonAndCreditCardFees: acc.totalAmazonAndCreditCardFees + ((row.totalAmazonCosts || 0) + (row.totalCreditCardFees || 0)),
     totalProfit: acc.totalProfit + (row.totalProfit || 0),
   }), {
     totalOrders: 0,
@@ -263,6 +265,7 @@ export default function SellerAnalyticsPage() {
     totalPBalanceINR: 0,
     totalAmazonCosts: 0,
     totalCreditCardFees: 0,
+    totalAmazonAndCreditCardFees: 0,
     totalProfit: 0,
   });
 
@@ -308,6 +311,7 @@ export default function SellerAnalyticsPage() {
         totalPBalanceINR: { header: 'P.Balance (INR)', accessor: (row) => Number(row.totalPBalanceINR || 0).toFixed(2) },
         totalAmazonCosts: { header: 'A_total-inr', accessor: (row) => Number(row.totalAmazonCosts || 0).toFixed(2) },
         totalCreditCardFees: { header: 'Credit Card Fees', accessor: (row) => Number(row.totalCreditCardFees || 0).toFixed(2) },
+        totalAmazonAndCreditCardFees: { header: 'A_total-inr + CC Fees', accessor: (row) => Number((row.totalAmazonCosts || 0) + (row.totalCreditCardFees || 0)).toFixed(2) },
         totalProfit: { header: 'Profit (INR)', accessor: (row) => Number(row.totalProfit || 0).toFixed(2) },
       };
 
@@ -647,6 +651,7 @@ export default function SellerAnalyticsPage() {
                   <TableCell align="right" sx={tableHeaderCellSx}>P.Balance (INR)</TableCell>
                   <TableCell align="right" sx={tableHeaderCellSx}>A_total-inr</TableCell>
                   <TableCell align="right" sx={tableHeaderCellSx}>Credit Card Fees</TableCell>
+                  <TableCell align="right" sx={tableHeaderCellSx}>A_total-inr + CC Fees</TableCell>
                   <TableCell align="right" sx={tableHeaderCellSx}>Profit (INR)</TableCell>
                 </TableRow>
               </TableHead>
@@ -679,6 +684,7 @@ export default function SellerAnalyticsPage() {
                     </TableCell>
                     <TableCell align="right" sx={tableBodyCellSx}>{formatINR(row.totalAmazonCosts)}</TableCell>
                     <TableCell align="right" sx={tableBodyCellSx}>{formatINR(row.totalCreditCardFees)}</TableCell>
+                    <TableCell align="right" sx={tableBodyCellSx}>{formatINR((row.totalAmazonCosts || 0) + (row.totalCreditCardFees || 0))}</TableCell>
                     <TableCell
                       align="right"
                       sx={{ ...tableBodyCellSx, fontWeight: 700, color: row.totalProfit >= 0 ? 'success.dark' : 'error.main' }}
@@ -713,6 +719,7 @@ export default function SellerAnalyticsPage() {
                     </TableCell>
                     <TableCell align="right" sx={tableBodyCellSx}>{formatINR(parseFloat(totals.totalAmazonCosts.toFixed(2)))}</TableCell>
                     <TableCell align="right" sx={tableBodyCellSx}>{formatINR(parseFloat(totals.totalCreditCardFees.toFixed(2)))}</TableCell>
+                    <TableCell align="right" sx={tableBodyCellSx}>{formatINR(parseFloat(totals.totalAmazonAndCreditCardFees.toFixed(2)))}</TableCell>
                     <TableCell align="right" sx={{ ...tableBodyCellSx, color: totals.totalProfit >= 0 ? 'success.dark' : 'error.main' }}>
                       {formatINR(parseFloat(totals.totalProfit.toFixed(2)))}
                     </TableCell>
