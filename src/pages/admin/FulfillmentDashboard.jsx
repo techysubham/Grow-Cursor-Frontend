@@ -1489,6 +1489,10 @@ function FulfillmentDashboard() {
 
   // Resync window state
   const [resyncDays, setResyncDays] = useState(10);
+  const todayUTC = new Date().toISOString().slice(0, 10);
+  const [utcRefreshMode, setUtcRefreshMode] = useState('single');
+  const [utcRefreshStartDate, setUtcRefreshStartDate] = useState(todayUTC);
+  const [utcRefreshEndDate, setUtcRefreshEndDate] = useState(todayUTC);
 
   // Editing item status
   const [editingItemStatus, setEditingItemStatus] = useState({});
@@ -2360,6 +2364,65 @@ function FulfillmentDashboard() {
     }
   }
 
+  async function refreshExistingOrdersByUtcDate() {
+    const startDate = utcRefreshStartDate;
+    const endDate = utcRefreshMode === 'single'
+      ? utcRefreshStartDate
+      : (utcRefreshEndDate || utcRefreshStartDate);
+
+    if (!startDate || !endDate) {
+      setSnackbarMsg(utcRefreshMode === 'single' ? 'Select a UTC date first.' : 'Select a UTC start and end date first.');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setPollResults(null);
+    setSnackbarOrderIds([]);
+    setUpdatedOrderDetails([]);
+
+    try {
+      const payload = {
+        startDate,
+        endDate,
+        ...(selectedSeller ? { sellerId: selectedSeller } : {})
+      };
+      const { data } = await api.post('/ebay/resync-existing-orders-by-utc-date', payload);
+      setPollResults(data || null);
+
+      setCurrentPage(1);
+      await loadStoredOrders();
+
+      if (data && data.totalUpdated > 0) {
+        const updatedDetails = data.pollResults
+          .filter(r => r.success && r.updatedOrders && r.updatedOrders.length > 0)
+          .flatMap(r => r.updatedOrders);
+
+        setSnackbarOrderIds(updatedDetails.map(u => u.orderId));
+        setUpdatedOrderDetails(updatedDetails);
+        setSnackbarMsg(
+          `UTC refresh complete! Updated: ${data.totalUpdated}, Ignored new: ${data.totalIgnoredNew || 0}`
+        );
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+      } else if (data) {
+        setSnackbarMsg(`UTC refresh complete. No existing orders needed updates. Ignored new: ${data.totalIgnoredNew || 0}`);
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+      }
+    } catch (e) {
+      const message = e?.response?.data?.error || 'Failed to refresh existing orders by UTC date';
+      setError(message);
+      setSnackbarMsg(message);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const handleCopy = useCallback((text) => {
     const val = text || '-';
     if (val === '-') return;
@@ -3209,6 +3272,64 @@ function FulfillmentDashboard() {
                 )}
               </Stack>
 
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                <FormControl size="small" sx={{ flex: '1 1 120px' }}>
+                  <InputLabel id="utc-refresh-mode-mobile-label">UTC Mode</InputLabel>
+                  <Select
+                    labelId="utc-refresh-mode-mobile-label"
+                    label="UTC Mode"
+                    value={utcRefreshMode}
+                    onChange={(e) => {
+                      setUtcRefreshMode(e.target.value);
+                      if (e.target.value === 'single') setUtcRefreshEndDate(utcRefreshStartDate);
+                    }}
+                  >
+                    <MenuItem value="single">Single Date</MenuItem>
+                    <MenuItem value="range">Date Range</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  label={utcRefreshMode === 'single' ? 'UTC Date' : 'UTC Start'}
+                  type="date"
+                  size="small"
+                  value={utcRefreshStartDate}
+                  onChange={(e) => {
+                    const nextDate = e.target.value;
+                    setUtcRefreshStartDate(nextDate);
+                    if (!utcRefreshEndDate || utcRefreshEndDate === utcRefreshStartDate) setUtcRefreshEndDate(nextDate);
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ flex: '1 1 135px' }}
+                />
+                {utcRefreshMode === 'range' && (
+                  <TextField
+                    label="UTC End"
+                    type="date"
+                    size="small"
+                    value={utcRefreshEndDate}
+                    onChange={(e) => setUtcRefreshEndDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ flex: '1 1 135px' }}
+                  />
+                )}
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />)}
+                  onClick={refreshExistingOrdersByUtcDate}
+                  disabled={loading || !utcRefreshStartDate || (utcRefreshMode === 'range' && !utcRefreshEndDate)}
+                  size="small"
+                  fullWidth
+                  sx={{
+                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                    px: { xs: 0.5, sm: 1 },
+                    flex: '1 1 180px'
+                  }}
+                >
+                  {loading ? 'Refreshing...' : isSmallMobile ? 'UTC Refresh' : utcRefreshMode === 'single' ? 'Refresh UTC Date' : 'Refresh UTC Range'}
+                </Button>
+              </Stack>
+
               {/* Row 3: Filters side by side */}
               <Stack direction="row" spacing={1}>
                 <FormControl size="small" fullWidth>
@@ -3452,6 +3573,64 @@ function FulfillmentDashboard() {
                     </Tooltip>
                   </>
                 )}
+              </Stack>
+
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                <FormControl size="small" sx={{ minWidth: 135 }}>
+                  <InputLabel id="utc-refresh-mode-label">UTC Mode</InputLabel>
+                  <Select
+                    labelId="utc-refresh-mode-label"
+                    label="UTC Mode"
+                    value={utcRefreshMode}
+                    onChange={(e) => {
+                      setUtcRefreshMode(e.target.value);
+                      if (e.target.value === 'single') setUtcRefreshEndDate(utcRefreshStartDate);
+                    }}
+                    sx={{ height: 40, fontSize: '0.85rem' }}
+                  >
+                    <MenuItem value="single">Single Date</MenuItem>
+                    <MenuItem value="range">Date Range</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  label={utcRefreshMode === 'single' ? 'UTC Date' : 'UTC Start'}
+                  type="date"
+                  size="small"
+                  value={utcRefreshStartDate}
+                  onChange={(e) => {
+                    const nextDate = e.target.value;
+                    setUtcRefreshStartDate(nextDate);
+                    if (!utcRefreshEndDate || utcRefreshEndDate === utcRefreshStartDate) setUtcRefreshEndDate(nextDate);
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ width: 150 }}
+                />
+                {utcRefreshMode === 'range' && (
+                  <TextField
+                    label="UTC End"
+                    type="date"
+                    size="small"
+                    value={utcRefreshEndDate}
+                    onChange={(e) => setUtcRefreshEndDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ width: 150 }}
+                  />
+                )}
+                <Tooltip title={selectedSeller ? 'Refresh existing eBay fields for the selected seller by UTC creation date' : 'Refresh existing eBay fields for all sellers by UTC creation date'}>
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      size="small"
+                      startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                      onClick={refreshExistingOrdersByUtcDate}
+                      disabled={loading || !utcRefreshStartDate || (utcRefreshMode === 'range' && !utcRefreshEndDate)}
+                      sx={{ minWidth: 210 }}
+                    >
+                      {loading ? 'Refreshing...' : utcRefreshMode === 'single' ? 'Refresh Existing UTC Date' : 'Refresh Existing UTC Range'}
+                    </Button>
+                  </span>
+                </Tooltip>
               </Stack>
 
               {/* Row 2: Filters, Toggles, Column Selector */}
