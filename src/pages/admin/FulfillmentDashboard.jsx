@@ -2372,7 +2372,7 @@ function FulfillmentDashboard() {
       : (utcRefreshEndDate || utcRefreshStartDate);
 
     if (!startDate || !endDate) {
-      setSnackbarMsg(utcRefreshMode === 'single' ? 'Select a UTC date first.' : 'Select a UTC start and end date first.');
+      setSnackbarMsg(utcRefreshMode === 'single' ? 'Select a PT date first.' : 'Select a PT start and end date first.');
       setSnackbarSeverity('warning');
       setSnackbarOpen(true);
       return;
@@ -2403,18 +2403,23 @@ function FulfillmentDashboard() {
 
         setSnackbarOrderIds(updatedDetails.map(u => u.orderId));
         setUpdatedOrderDetails(updatedDetails);
+        const changedFieldSummary = Object.entries(data.changedFieldCounts || {})
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([field, count]) => `${formatFieldName(field)} x${count}`)
+          .join(', ');
         setSnackbarMsg(
-          `UTC refresh complete! Updated: ${data.totalUpdated}, Ignored new: ${data.totalIgnoredNew || 0}`
+          `PT refresh complete! Fetched: ${data.totalFetched || 0}, Existing checked: ${data.totalExistingMatched || 0}, Updated: ${data.totalUpdated}, Ignored new: ${data.totalIgnoredNew || 0}${changedFieldSummary ? `. Fields: ${changedFieldSummary}` : ''}`
         );
         setSnackbarSeverity('success');
         setSnackbarOpen(true);
       } else if (data) {
-        setSnackbarMsg(`UTC refresh complete. No existing orders needed updates. Ignored new: ${data.totalIgnoredNew || 0}`);
+        setSnackbarMsg(`PT refresh complete. Fetched: ${data.totalFetched || 0}, Existing checked: ${data.totalExistingMatched || 0}, Updated: 0, Ignored new: ${data.totalIgnoredNew || 0}`);
         setSnackbarSeverity('info');
         setSnackbarOpen(true);
       }
     } catch (e) {
-      const message = e?.response?.data?.error || 'Failed to refresh existing orders by UTC date';
+      const message = e?.response?.data?.error || 'Failed to refresh existing orders by PT date';
       setError(message);
       setSnackbarMsg(message);
       setSnackbarSeverity('error');
@@ -2430,7 +2435,7 @@ function FulfillmentDashboard() {
       : (utcRefreshEndDate || utcRefreshStartDate);
 
     if (!utcRefreshStartDate || !endDate) {
-      setSnackbarMsg(utcRefreshMode === 'single' ? 'Select a UTC date first.' : 'Select a UTC start and end date first.');
+      setSnackbarMsg(utcRefreshMode === 'single' ? 'Select a PT date first.' : 'Select a PT start and end date first.');
       setSnackbarSeverity('warning');
       setSnackbarOpen(true);
       return;
@@ -3295,10 +3300,10 @@ function FulfillmentDashboard() {
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
                 <FormControl size="small" sx={{ flex: '1 1 120px' }}>
-                  <InputLabel id="utc-refresh-mode-mobile-label">UTC Mode</InputLabel>
+                  <InputLabel id="utc-refresh-mode-mobile-label">PT Mode</InputLabel>
                   <Select
                     labelId="utc-refresh-mode-mobile-label"
-                    label="UTC Mode"
+                    label="PT Mode"
                     value={utcRefreshMode}
                     onChange={(e) => {
                       setUtcRefreshMode(e.target.value);
@@ -3310,7 +3315,7 @@ function FulfillmentDashboard() {
                   </Select>
                 </FormControl>
                 <TextField
-                  label={utcRefreshMode === 'single' ? 'UTC Date' : 'UTC Start'}
+                  label={utcRefreshMode === 'single' ? 'PT Date' : 'PT Start'}
                   type="date"
                   size="small"
                   value={utcRefreshStartDate}
@@ -3324,7 +3329,7 @@ function FulfillmentDashboard() {
                 />
                 {utcRefreshMode === 'range' && (
                   <TextField
-                    label="UTC End"
+                    label="PT End"
                     type="date"
                     size="small"
                     value={utcRefreshEndDate}
@@ -3347,7 +3352,7 @@ function FulfillmentDashboard() {
                     flex: '1 1 180px'
                   }}
                 >
-                  {loading ? 'Refreshing...' : isSmallMobile ? 'UTC Refresh' : utcRefreshMode === 'single' ? 'Refresh UTC Date' : 'Refresh UTC Range'}
+                  {loading ? 'Refreshing...' : isSmallMobile ? 'PT Refresh' : utcRefreshMode === 'single' ? 'Refresh PT Date' : 'Refresh PT Range'}
                 </Button>
               </Stack>
 
@@ -3598,10 +3603,10 @@ function FulfillmentDashboard() {
 
               <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: 'wrap', width: '100%' }}>
                 <FormControl size="small" sx={{ minWidth: 135 }}>
-                  <InputLabel id="utc-refresh-mode-label">UTC Mode</InputLabel>
+                  <InputLabel id="utc-refresh-mode-label">PT Mode</InputLabel>
                   <Select
                     labelId="utc-refresh-mode-label"
-                    label="UTC Mode"
+                    label="PT Mode"
                     value={utcRefreshMode}
                     onChange={(e) => {
                       setUtcRefreshMode(e.target.value);
@@ -3614,7 +3619,7 @@ function FulfillmentDashboard() {
                   </Select>
                 </FormControl>
                 <TextField
-                  label={utcRefreshMode === 'single' ? 'UTC Date' : 'UTC Start'}
+                  label={utcRefreshMode === 'single' ? 'PT Date' : 'PT Start'}
                   type="date"
                   size="small"
                   value={utcRefreshStartDate}
@@ -3628,7 +3633,7 @@ function FulfillmentDashboard() {
                 />
                 {utcRefreshMode === 'range' && (
                   <TextField
-                    label="UTC End"
+                    label="PT End"
                     type="date"
                     size="small"
                     value={utcRefreshEndDate}
@@ -3637,7 +3642,7 @@ function FulfillmentDashboard() {
                     sx={{ width: 150 }}
                   />
                 )}
-                <Tooltip title={selectedSeller ? 'Refresh existing eBay fields for the selected seller by UTC creation date' : 'Refresh existing eBay fields for all sellers by UTC creation date'}>
+                <Tooltip title={selectedSeller ? 'Refresh existing eBay fields for the selected seller by Pacific Time creation date' : 'Refresh existing eBay fields for all sellers by Pacific Time creation date'}>
                   <span>
                     <Button
                       variant="outlined"
@@ -3648,7 +3653,7 @@ function FulfillmentDashboard() {
                       disabled={loading || !utcRefreshStartDate || (utcRefreshMode === 'range' && !utcRefreshEndDate)}
                       sx={{ minWidth: 210 }}
                     >
-                      {loading ? 'Refreshing...' : utcRefreshMode === 'single' ? 'Refresh Existing UTC Date' : 'Refresh Existing UTC Range'}
+                      {loading ? 'Refreshing...' : utcRefreshMode === 'single' ? 'Refresh Existing PT Date' : 'Refresh Existing PT Range'}
                     </Button>
                   </span>
                 </Tooltip>
@@ -5037,16 +5042,16 @@ function FulfillmentDashboard() {
             }
           }}
         >
-          <DialogTitle>Confirm UTC Refresh</DialogTitle>
+          <DialogTitle>Confirm PT Refresh</DialogTitle>
           <DialogContent>
             <Stack spacing={1.5}>
               <Alert severity="warning" icon={<InfoIcon />}>
-                This will refresh existing DB orders from eBay for the selected UTC {utcRefreshMode === 'single' ? 'date' : 'date range'}.
+                This will refresh existing DB orders from eBay for the selected Pacific Time {utcRefreshMode === 'single' ? 'date' : 'date range'}.
               </Alert>
               <Typography variant="body2" color="text.secondary">
                 {utcRefreshMode === 'single'
-                  ? `UTC Date: ${utcRefreshStartDate}`
-                  : `UTC Range: ${utcRefreshStartDate} to ${utcRefreshEndDate || utcRefreshStartDate}`}
+                  ? `PT Date: ${utcRefreshStartDate}`
+                  : `PT Range: ${utcRefreshStartDate} to ${utcRefreshEndDate || utcRefreshStartDate}`}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Seller scope: {selectedSeller
