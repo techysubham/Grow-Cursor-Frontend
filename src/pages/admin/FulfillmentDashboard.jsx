@@ -1489,6 +1489,11 @@ function FulfillmentDashboard() {
 
   // Resync window state
   const [resyncDays, setResyncDays] = useState(10);
+  const todayUTC = new Date().toISOString().slice(0, 10);
+  const [utcRefreshMode, setUtcRefreshMode] = useState('single');
+  const [utcRefreshStartDate, setUtcRefreshStartDate] = useState(todayUTC);
+  const [utcRefreshEndDate, setUtcRefreshEndDate] = useState(todayUTC);
+  const [utcRefreshConfirmOpen, setUtcRefreshConfirmOpen] = useState(false);
 
   // Editing item status
   const [editingItemStatus, setEditingItemStatus] = useState({});
@@ -2360,6 +2365,90 @@ function FulfillmentDashboard() {
     }
   }
 
+  async function refreshExistingOrdersByUtcDate() {
+    const startDate = utcRefreshStartDate;
+    const endDate = utcRefreshMode === 'single'
+      ? utcRefreshStartDate
+      : (utcRefreshEndDate || utcRefreshStartDate);
+
+    if (!startDate || !endDate) {
+      setSnackbarMsg(utcRefreshMode === 'single' ? 'Select a PT date first.' : 'Select a PT start and end date first.');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setPollResults(null);
+    setSnackbarOrderIds([]);
+    setUpdatedOrderDetails([]);
+
+    try {
+      const payload = {
+        startDate,
+        endDate,
+        ...(selectedSeller ? { sellerId: selectedSeller } : {})
+      };
+      const { data } = await api.post('/ebay/resync-existing-orders-by-utc-date', payload);
+      setPollResults(data || null);
+
+      setCurrentPage(1);
+      await loadStoredOrders();
+
+      if (data && data.totalUpdated > 0) {
+        const updatedDetails = data.pollResults
+          .filter(r => r.success && r.updatedOrders && r.updatedOrders.length > 0)
+          .flatMap(r => r.updatedOrders);
+
+        setSnackbarOrderIds(updatedDetails.map(u => u.orderId));
+        setUpdatedOrderDetails(updatedDetails);
+        const changedFieldSummary = Object.entries(data.changedFieldCounts || {})
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([field, count]) => `${formatFieldName(field)} x${count}`)
+          .join(', ');
+        setSnackbarMsg(
+          `PT refresh complete! Fetched: ${data.totalFetched || 0}, Existing checked: ${data.totalExistingMatched || 0}, Updated: ${data.totalUpdated}, Ignored new: ${data.totalIgnoredNew || 0}${changedFieldSummary ? `. Fields: ${changedFieldSummary}` : ''}`
+        );
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+      } else if (data) {
+        setSnackbarMsg(`PT refresh complete. Fetched: ${data.totalFetched || 0}, Existing checked: ${data.totalExistingMatched || 0}, Updated: 0, Ignored new: ${data.totalIgnoredNew || 0}`);
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+      }
+    } catch (e) {
+      const message = e?.response?.data?.error || 'Failed to refresh existing orders by PT date';
+      setError(message);
+      setSnackbarMsg(message);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleOpenUtcRefreshConfirm() {
+    const endDate = utcRefreshMode === 'single'
+      ? utcRefreshStartDate
+      : (utcRefreshEndDate || utcRefreshStartDate);
+
+    if (!utcRefreshStartDate || !endDate) {
+      setSnackbarMsg(utcRefreshMode === 'single' ? 'Select a PT date first.' : 'Select a PT start and end date first.');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    setUtcRefreshConfirmOpen(true);
+  }
+
+  async function handleConfirmUtcRefresh() {
+    setUtcRefreshConfirmOpen(false);
+    await refreshExistingOrdersByUtcDate();
+  }
+
   const handleCopy = useCallback((text) => {
     const val = text || '-';
     if (val === '-') return;
@@ -3209,6 +3298,64 @@ function FulfillmentDashboard() {
                 )}
               </Stack>
 
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                <FormControl size="small" sx={{ flex: '1 1 120px' }}>
+                  <InputLabel id="utc-refresh-mode-mobile-label">PT Mode</InputLabel>
+                  <Select
+                    labelId="utc-refresh-mode-mobile-label"
+                    label="PT Mode"
+                    value={utcRefreshMode}
+                    onChange={(e) => {
+                      setUtcRefreshMode(e.target.value);
+                      if (e.target.value === 'single') setUtcRefreshEndDate(utcRefreshStartDate);
+                    }}
+                  >
+                    <MenuItem value="single">Single Date</MenuItem>
+                    <MenuItem value="range">Date Range</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  label={utcRefreshMode === 'single' ? 'PT Date' : 'PT Start'}
+                  type="date"
+                  size="small"
+                  value={utcRefreshStartDate}
+                  onChange={(e) => {
+                    const nextDate = e.target.value;
+                    setUtcRefreshStartDate(nextDate);
+                    if (!utcRefreshEndDate || utcRefreshEndDate === utcRefreshStartDate) setUtcRefreshEndDate(nextDate);
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ flex: '1 1 135px' }}
+                />
+                {utcRefreshMode === 'range' && (
+                  <TextField
+                    label="PT End"
+                    type="date"
+                    size="small"
+                    value={utcRefreshEndDate}
+                    onChange={(e) => setUtcRefreshEndDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ flex: '1 1 135px' }}
+                  />
+                )}
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />)}
+                  onClick={handleOpenUtcRefreshConfirm}
+                  disabled={loading || !utcRefreshStartDate || (utcRefreshMode === 'range' && !utcRefreshEndDate)}
+                  size="small"
+                  fullWidth
+                  sx={{
+                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                    px: { xs: 0.5, sm: 1 },
+                    flex: '1 1 180px'
+                  }}
+                >
+                  {loading ? 'Refreshing...' : isSmallMobile ? 'PT Refresh' : utcRefreshMode === 'single' ? 'Refresh PT Date' : 'Refresh PT Range'}
+                </Button>
+              </Stack>
+
               {/* Row 3: Filters side by side */}
               <Stack direction="row" spacing={1}>
                 <FormControl size="small" fullWidth>
@@ -3452,6 +3599,64 @@ function FulfillmentDashboard() {
                     </Tooltip>
                   </>
                 )}
+              </Stack>
+
+              <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: 'wrap', width: '100%' }}>
+                <FormControl size="small" sx={{ minWidth: 135 }}>
+                  <InputLabel id="utc-refresh-mode-label">PT Mode</InputLabel>
+                  <Select
+                    labelId="utc-refresh-mode-label"
+                    label="PT Mode"
+                    value={utcRefreshMode}
+                    onChange={(e) => {
+                      setUtcRefreshMode(e.target.value);
+                      if (e.target.value === 'single') setUtcRefreshEndDate(utcRefreshStartDate);
+                    }}
+                    sx={{ height: 40, fontSize: '0.85rem' }}
+                  >
+                    <MenuItem value="single">Single Date</MenuItem>
+                    <MenuItem value="range">Date Range</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  label={utcRefreshMode === 'single' ? 'PT Date' : 'PT Start'}
+                  type="date"
+                  size="small"
+                  value={utcRefreshStartDate}
+                  onChange={(e) => {
+                    const nextDate = e.target.value;
+                    setUtcRefreshStartDate(nextDate);
+                    if (!utcRefreshEndDate || utcRefreshEndDate === utcRefreshStartDate) setUtcRefreshEndDate(nextDate);
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ width: 150 }}
+                />
+                {utcRefreshMode === 'range' && (
+                  <TextField
+                    label="PT End"
+                    type="date"
+                    size="small"
+                    value={utcRefreshEndDate}
+                    onChange={(e) => setUtcRefreshEndDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ width: 150 }}
+                  />
+                )}
+                <Tooltip title={selectedSeller ? 'Refresh existing eBay fields for the selected seller by Pacific Time creation date' : 'Refresh existing eBay fields for all sellers by Pacific Time creation date'}>
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      size="small"
+                      startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                      onClick={handleOpenUtcRefreshConfirm}
+                      disabled={loading || !utcRefreshStartDate || (utcRefreshMode === 'range' && !utcRefreshEndDate)}
+                      sx={{ minWidth: 210 }}
+                    >
+                      {loading ? 'Refreshing...' : utcRefreshMode === 'single' ? 'Refresh Existing PT Date' : 'Refresh Existing PT Range'}
+                    </Button>
+                  </span>
+                </Tooltip>
               </Stack>
 
               {/* Row 2: Filters, Toggles, Column Selector */}
@@ -4817,6 +5022,59 @@ function FulfillmentDashboard() {
               disabled={loading || selectedExportColumns.length === 0}
             >
               {loading ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={utcRefreshConfirmOpen}
+          onClose={() => setUtcRefreshConfirmOpen(false)}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              position: { sm: 'fixed' },
+              right: { sm: 24 },
+              top: { sm: 88 },
+              m: { sm: 0 },
+              width: { sm: 420 },
+              maxWidth: { sm: 'calc(100vw - 48px)' }
+            }
+          }}
+        >
+          <DialogTitle>Confirm PT Refresh</DialogTitle>
+          <DialogContent>
+            <Stack spacing={1.5}>
+              <Alert severity="warning" icon={<InfoIcon />}>
+                This will refresh existing DB orders from eBay for the selected Pacific Time {utcRefreshMode === 'single' ? 'date' : 'date range'}.
+              </Alert>
+              <Typography variant="body2" color="text.secondary">
+                {utcRefreshMode === 'single'
+                  ? `PT Date: ${utcRefreshStartDate}`
+                  : `PT Range: ${utcRefreshStartDate} to ${utcRefreshEndDate || utcRefreshStartDate}`}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Seller scope: {selectedSeller
+                  ? (sellers.find(s => s._id === selectedSeller)?.user?.username || sellers.find(s => s._id === selectedSeller)?.user?.email || 'Selected seller')
+                  : 'All connected sellers'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                New eBay orders will be ignored. Existing matching orders may have eBay fields, totals, earnings, and profit-related values recalculated.
+              </Typography>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setUtcRefreshConfirmOpen(false)} color="inherit">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmUtcRefresh}
+              variant="contained"
+              color="secondary"
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SyncIcon />}
+            >
+              {loading ? 'Refreshing...' : 'Confirm Refresh'}
             </Button>
           </DialogActions>
         </Dialog>
