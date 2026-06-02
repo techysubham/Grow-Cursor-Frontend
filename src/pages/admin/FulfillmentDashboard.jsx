@@ -1493,6 +1493,7 @@ function FulfillmentDashboard() {
   const [utcRefreshMode, setUtcRefreshMode] = useState('single');
   const [utcRefreshStartDate, setUtcRefreshStartDate] = useState(todayUTC);
   const [utcRefreshEndDate, setUtcRefreshEndDate] = useState(todayUTC);
+  const [utcRefreshConfirmOpen, setUtcRefreshConfirmOpen] = useState(false);
 
   // Editing item status
   const [editingItemStatus, setEditingItemStatus] = useState({});
@@ -2423,6 +2424,26 @@ function FulfillmentDashboard() {
     }
   }
 
+  function handleOpenUtcRefreshConfirm() {
+    const endDate = utcRefreshMode === 'single'
+      ? utcRefreshStartDate
+      : (utcRefreshEndDate || utcRefreshStartDate);
+
+    if (!utcRefreshStartDate || !endDate) {
+      setSnackbarMsg(utcRefreshMode === 'single' ? 'Select a UTC date first.' : 'Select a UTC start and end date first.');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    setUtcRefreshConfirmOpen(true);
+  }
+
+  async function handleConfirmUtcRefresh() {
+    setUtcRefreshConfirmOpen(false);
+    await refreshExistingOrdersByUtcDate();
+  }
+
   const handleCopy = useCallback((text) => {
     const val = text || '-';
     if (val === '-') return;
@@ -3316,7 +3337,7 @@ function FulfillmentDashboard() {
                   variant="outlined"
                   color="secondary"
                   startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />)}
-                  onClick={refreshExistingOrdersByUtcDate}
+                  onClick={handleOpenUtcRefreshConfirm}
                   disabled={loading || !utcRefreshStartDate || (utcRefreshMode === 'range' && !utcRefreshEndDate)}
                   size="small"
                   fullWidth
@@ -3575,7 +3596,7 @@ function FulfillmentDashboard() {
                 )}
               </Stack>
 
-              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+              <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: 'wrap', width: '100%' }}>
                 <FormControl size="small" sx={{ minWidth: 135 }}>
                   <InputLabel id="utc-refresh-mode-label">UTC Mode</InputLabel>
                   <Select
@@ -3623,7 +3644,7 @@ function FulfillmentDashboard() {
                       color="secondary"
                       size="small"
                       startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
-                      onClick={refreshExistingOrdersByUtcDate}
+                      onClick={handleOpenUtcRefreshConfirm}
                       disabled={loading || !utcRefreshStartDate || (utcRefreshMode === 'range' && !utcRefreshEndDate)}
                       sx={{ minWidth: 210 }}
                     >
@@ -4996,6 +5017,59 @@ function FulfillmentDashboard() {
               disabled={loading || selectedExportColumns.length === 0}
             >
               {loading ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={utcRefreshConfirmOpen}
+          onClose={() => setUtcRefreshConfirmOpen(false)}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              position: { sm: 'fixed' },
+              right: { sm: 24 },
+              top: { sm: 88 },
+              m: { sm: 0 },
+              width: { sm: 420 },
+              maxWidth: { sm: 'calc(100vw - 48px)' }
+            }
+          }}
+        >
+          <DialogTitle>Confirm UTC Refresh</DialogTitle>
+          <DialogContent>
+            <Stack spacing={1.5}>
+              <Alert severity="warning" icon={<InfoIcon />}>
+                This will refresh existing DB orders from eBay for the selected UTC {utcRefreshMode === 'single' ? 'date' : 'date range'}.
+              </Alert>
+              <Typography variant="body2" color="text.secondary">
+                {utcRefreshMode === 'single'
+                  ? `UTC Date: ${utcRefreshStartDate}`
+                  : `UTC Range: ${utcRefreshStartDate} to ${utcRefreshEndDate || utcRefreshStartDate}`}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Seller scope: {selectedSeller
+                  ? (sellers.find(s => s._id === selectedSeller)?.user?.username || sellers.find(s => s._id === selectedSeller)?.user?.email || 'Selected seller')
+                  : 'All connected sellers'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                New eBay orders will be ignored. Existing matching orders may have eBay fields, totals, earnings, and profit-related values recalculated.
+              </Typography>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setUtcRefreshConfirmOpen(false)} color="inherit">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmUtcRefresh}
+              variant="contained"
+              color="secondary"
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SyncIcon />}
+            >
+              {loading ? 'Refreshing...' : 'Confirm Refresh'}
             </Button>
           </DialogActions>
         </Dialog>
