@@ -9,8 +9,11 @@ import {
   CircularProgress,
   Divider,
   Fade,
+  LinearProgress,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography
 } from '@mui/material';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
@@ -31,6 +34,15 @@ const getPTDate = (offsetDays = 0) => {
 };
 
 const numberFmt = new Intl.NumberFormat('en-US');
+
+const getDateLabel = (filter) => {
+  if (filter.mode === 'range') {
+    if (filter.from && filter.to) return `${filter.from} to ${filter.to}`;
+    if (filter.from) return `${filter.from} onward`;
+    if (filter.to) return `Through ${filter.to}`;
+  }
+  return filter.single;
+};
 
 function StatBlock({ icon, label, value, tone = 'default' }) {
   const color =
@@ -54,7 +66,18 @@ function StatBlock({ icon, label, value, tone = 'default' }) {
 }
 
 export default function DailyListingComparisonPage() {
-  const [selectedDate, setSelectedDate] = useState(() => getPTDate());
+  const [draftDateFilter, setDraftDateFilter] = useState(() => ({
+    mode: 'single',
+    single: getPTDate(),
+    from: getPTDate(-6),
+    to: getPTDate()
+  }));
+  const [appliedDateFilter, setAppliedDateFilter] = useState(() => ({
+    mode: 'single',
+    single: getPTDate(),
+    from: getPTDate(-6),
+    to: getPTDate()
+  }));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -63,8 +86,14 @@ export default function DailyListingComparisonPage() {
     setLoading(true);
     setError(null);
     try {
+      const params = appliedDateFilter.mode === 'range'
+        ? {
+            startDate: appliedDateFilter.from || undefined,
+            endDate: appliedDateFilter.to || undefined
+          }
+        : { date: appliedDateFilter.single };
       const { data } = await api.get('/ebay/feed/daily-listing-comparison', {
-        params: { date: selectedDate }
+        params
       });
       setRows(data || []);
     } catch (err) {
@@ -72,7 +101,7 @@ export default function DailyListingComparisonPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [appliedDateFilter]);
 
   useEffect(() => {
     fetchComparison();
@@ -87,6 +116,24 @@ export default function DailyListingComparisonPage() {
     },
     { successfulListings: 0, endedListings: 0, netListings: 0 }
   ), [rows]);
+
+  const maxVolume = useMemo(() => rows.reduce((max, row) => {
+    const total = (row.successfulListings || 0) + (row.endedListings || 0);
+    return Math.max(max, total);
+  }, 0), [rows]);
+
+  const hasPendingFilterChanges = JSON.stringify(draftDateFilter) !== JSON.stringify(appliedDateFilter);
+
+  const handleApplyFilters = () => {
+    setAppliedDateFilter(draftDateFilter);
+  };
+
+  const handleResetToday = () => {
+    const today = getPTDate();
+    const next = { mode: 'single', single: today, from: getPTDate(-6), to: today };
+    setDraftDateFilter(next);
+    setAppliedDateFilter(next);
+  };
 
   const summaryCards = [
     { label: 'Successful Listings', value: totals.successfulListings, tone: 'success' },
@@ -114,33 +161,87 @@ export default function DailyListingComparisonPage() {
 
             <Chip
               icon={<CompareArrowsIcon />}
-              label={`${numberFmt.format(totals.netListings)} Net Listings`}
+              label={`${getDateLabel(appliedDateFilter)} PT`}
               sx={{
                 height: 40,
                 px: 1,
                 borderRadius: `${dashboardSignatureTokens.radius.pill}px`,
                 border: '1px solid',
-                borderColor: totals.netListings >= 0 ? dashboardSignatureTokens.tones.info.border : dashboardSignatureTokens.tones.amazon.border,
-                backgroundColor: totals.netListings >= 0 ? dashboardSignatureTokens.tones.info.background : dashboardSignatureTokens.tones.amazon.background,
-                color: totals.netListings >= 0 ? dashboardSignatureTokens.tones.info.color : dashboardSignatureTokens.tones.amazon.color,
+                borderColor: dashboardSignatureTokens.tones.info.border,
+                backgroundColor: dashboardSignatureTokens.tones.info.background,
+                color: dashboardSignatureTokens.tones.info.color,
                 '& .MuiChip-icon': {
-                  color: totals.netListings >= 0 ? dashboardSignatureTokens.tones.info.color : dashboardSignatureTokens.tones.amazon.color
+                  color: dashboardSignatureTokens.tones.info.color
                 }
               }}
             />
           </Stack>
 
           <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
-              <TextField
-                label="Date"
-                type="date"
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }} flexWrap="wrap">
+              <ToggleButtonGroup
                 size="small"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                sx={{ minWidth: 200 }}
-              />
+                exclusive
+                value={draftDateFilter.mode}
+                onChange={(_, mode) => {
+                  if (!mode) return;
+                  setDraftDateFilter(prev => ({ ...prev, mode }));
+                }}
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    height: 40,
+                    px: 2,
+                    textTransform: 'none',
+                    fontWeight: 700
+                  }
+                }}
+              >
+                <ToggleButton value="single">Single Day</ToggleButton>
+                <ToggleButton value="range">Date Range</ToggleButton>
+              </ToggleButtonGroup>
+
+              {draftDateFilter.mode === 'single' ? (
+                <TextField
+                  label="Date"
+                  type="date"
+                  size="small"
+                  value={draftDateFilter.single}
+                  onChange={(e) => setDraftDateFilter(prev => ({ ...prev, single: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ minWidth: 200 }}
+                />
+              ) : (
+                <>
+                  <TextField
+                    label="From"
+                    type="date"
+                    size="small"
+                    value={draftDateFilter.from}
+                    onChange={(e) => setDraftDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 180 }}
+                  />
+                  <TextField
+                    label="To"
+                    type="date"
+                    size="small"
+                    value={draftDateFilter.to}
+                    onChange={(e) => setDraftDateFilter(prev => ({ ...prev, to: e.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 180 }}
+                  />
+                </>
+              )}
+
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleApplyFilters}
+                disabled={loading || !hasPendingFilterChanges}
+                sx={{ ...yellowFilledButtonSx, height: 40 }}
+              >
+                Apply Filters
+              </Button>
               <Button
                 variant="contained"
                 size="small"
@@ -150,6 +251,15 @@ export default function DailyListingComparisonPage() {
                 sx={{ ...yellowFilledButtonSx, height: 40 }}
               >
                 Refresh
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleResetToday}
+                disabled={loading}
+                sx={{ height: 40, textTransform: 'none', fontWeight: 700 }}
+              >
+                Today
               </Button>
             </Stack>
 
@@ -178,24 +288,40 @@ export default function DailyListingComparisonPage() {
         <Alert severity="info">No successful feed uploads or end-listing stats found for this date.</Alert>
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' }, gap: 1.5 }}>
-          {rows.map((row) => {
+          {rows.map((row, index) => {
             const isPositive = row.netListings >= 0;
+            const totalVolume = (row.successfulListings || 0) + (row.endedListings || 0);
+            const progress = maxVolume > 0 ? Math.max(4, Math.round((totalVolume / maxVolume) * 100)) : 0;
             return (
               <Card
                 key={row.sellerId || row.sellerName}
                 sx={{
                   borderRadius: `${dashboardSignatureTokens.radius.card}px`,
                   border: '1px solid',
-                  borderColor: 'divider',
+                  borderColor: isPositive ? dashboardSignatureTokens.tones.success.border : dashboardSignatureTokens.tones.warning.border,
                   boxShadow: dashboardSignatureTokens.shadows.card,
-                  minWidth: 0
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  position: 'relative',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    inset: '0 0 auto 0',
+                    height: 4,
+                    backgroundColor: isPositive ? dashboardSignatureTokens.tones.success.border : dashboardSignatureTokens.tones.warning.border
+                  }
                 }}
               >
                 <CardContent sx={{ p: 1.75, '&:last-child': { pb: 1.75 } }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1} sx={{ mb: 1.5 }}>
-                    <Typography variant="subtitle2" fontWeight={800} noWrap title={row.sellerName} sx={{ minWidth: 0 }}>
-                      {row.sellerName}
-                    </Typography>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                        #{index + 1}
+                      </Typography>
+                      <Typography variant="subtitle2" fontWeight={800} noWrap title={row.sellerName} sx={{ minWidth: 0 }}>
+                        {row.sellerName}
+                      </Typography>
+                    </Box>
                     <Chip
                       size="small"
                       label={`${isPositive ? '+' : ''}${numberFmt.format(row.netListings)} net`}
@@ -209,6 +335,25 @@ export default function DailyListingComparisonPage() {
                     <StatBlock icon={<CloudUploadIcon fontSize="small" />} label="Successful" value={row.successfulListings} tone="good" />
                     <StatBlock icon={<RemoveCircleOutlineIcon fontSize="small" />} label="Ended" value={row.endedListings} tone="bad" />
                   </Stack>
+                  <Box sx={{ mt: 1.75 }}>
+                    <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={700}>Activity</Typography>
+                      <Typography variant="caption" color="text.secondary">{numberFmt.format(totalVolume)}</Typography>
+                    </Stack>
+                    <LinearProgress
+                      variant="determinate"
+                      value={progress}
+                      sx={{
+                        height: 6,
+                        borderRadius: 999,
+                        backgroundColor: 'action.hover',
+                        '& .MuiLinearProgress-bar': {
+                          borderRadius: 999,
+                          backgroundColor: isPositive ? dashboardSignatureTokens.tones.success.color : dashboardSignatureTokens.tones.warning.color
+                        }
+                      }}
+                    />
+                  </Box>
                 </CardContent>
               </Card>
             );
