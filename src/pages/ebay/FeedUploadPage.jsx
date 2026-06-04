@@ -260,10 +260,9 @@ const FeedUploadPage = () => {
         setLoadingTasks(true);
         try {
             const params = { sellerId: selectedSeller, limit: rowsPerPage, offset: (pg - 1) * rowsPerPage };
-            // Send local-timezone ISO strings so the server filter matches what the user sees.
-            // e.g. selecting "2026-05-09" in IST → dateFrom = 2026-05-08T18:30:00.000Z (IST midnight)
-            if (filterDateFrom) params.dateFrom = new Date(filterDateFrom + 'T00:00:00').toISOString();
-            if (filterDateTo)   params.dateTo   = new Date(filterDateTo   + 'T23:59:59').toISOString();
+            // Send date-only values; the API applies Pacific-day boundaries.
+            if (filterDateFrom) params.dateFrom = filterDateFrom;
+            if (filterDateTo)   params.dateTo   = filterDateTo;
             if (filterCountry) params.country = filterCountry;
             if (filterResult) params.result = filterResult;
             const res = await api.get('/ebay/feed/tasks', { params });
