@@ -836,10 +836,11 @@ export default function TemplateListingsPage() {
 
       // Open modal immediately with loading state for all ASINs
       const loadingItems = asins.map(asin => ({
-        id: `loading-${asin}`,
+        id: `preview-${asin}`,
         asin,
         sku: `${sellerId}-${asin}`,
         status: 'loading',
+        progressStage: 'queued',
         sourceData: null,
         generatedListing: null,
         pricingCalculation: null,
@@ -885,8 +886,38 @@ export default function TemplateListingsPage() {
             case 'started':
               setProcessingLog(prev => [
                 ...prev,
-                `🚀 Processing ${message.total} ASINs in parallel...`
+                `🚀 Processing ${message.total} ASINs with up to ${message.concurrency || 'several'} active at once...`
               ]);
+              break;
+
+            case 'ping':
+              break;
+
+            case 'item_started':
+              setPreviewItems(prev => prev.map(item => (
+                item.asin === message.asin
+                  ? {
+                      ...item,
+                      id: message.id || item.id,
+                      status: 'loading',
+                      progressStage: message.progressStage || 'fetching'
+                    }
+                  : item
+              )));
+              break;
+
+            case 'amazon_loaded':
+              setPreviewItems(prev => prev.map(item => (
+                item.asin === message.asin
+                  ? {
+                      ...item,
+                      id: message.id || item.id,
+                      status: 'loading',
+                      progressStage: message.progressStage || 'generating',
+                      sourceData: message.sourceData || item.sourceData
+                    }
+                  : item
+              )));
               break;
               
             case 'item':
@@ -895,7 +926,10 @@ export default function TemplateListingsPage() {
                 const updated = [...prev];
                 const index = updated.findIndex(i => i.asin === message.item.asin);
                 if (index !== -1) {
-                  updated[index] = message.item;
+                  updated[index] = {
+                    ...message.item,
+                    progressStage: message.item.progressStage || 'complete'
+                  };
                 }
                 return updated;
               });
