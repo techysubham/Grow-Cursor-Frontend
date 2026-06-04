@@ -35,6 +35,14 @@ const getPTDate = (offsetDays = 0) => {
 
 const numberFmt = new Intl.NumberFormat('en-US');
 
+const countryLabel = (country) => {
+  if (country === 'US') return 'US';
+  if (country === 'UK') return 'UK';
+  if (country === 'AU') return 'AU';
+  if (country === 'Canada') return 'CA';
+  return country || 'Unknown';
+};
+
 const getDateLabel = (filter) => {
   if (filter.mode === 'range') {
     if (filter.from && filter.to) return `${filter.from} to ${filter.to}`;
@@ -292,6 +300,9 @@ export default function DailyListingComparisonPage() {
             const isPositive = row.netListings >= 0;
             const totalVolume = (row.successfulListings || 0) + (row.endedListings || 0);
             const progress = maxVolume > 0 ? Math.max(4, Math.round((totalVolume / maxVolume) * 100)) : 0;
+            const marketplaceBreakdown = [...(row.marketplaces || [])]
+              .filter(marketplace => (marketplace.successfulListings || 0) > 0)
+              .sort((a, b) => (b.successfulListings || 0) - (a.successfulListings || 0));
             return (
               <Card
                 key={row.sellerId || row.sellerName}
@@ -335,9 +346,35 @@ export default function DailyListingComparisonPage() {
                     <StatBlock icon={<CloudUploadIcon fontSize="small" />} label="Successful" value={row.successfulListings} tone="good" />
                     <StatBlock icon={<RemoveCircleOutlineIcon fontSize="small" />} label="Ended" value={row.endedListings} tone="bad" />
                   </Stack>
+                  {marketplaceBreakdown.length > 0 && (
+                    <Box sx={{ mt: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: 'block', mb: 0.75 }}>
+                        Successful by marketplace
+                      </Typography>
+                      <Stack direction="row" flexWrap="wrap" gap={0.75}>
+                        {marketplaceBreakdown.map((marketplace) => (
+                          <Chip
+                            key={marketplace.country}
+                            size="small"
+                            label={`${countryLabel(marketplace.country)} ${numberFmt.format(marketplace.successfulListings || 0)}`}
+                            sx={{
+                              height: 24,
+                              borderRadius: `${dashboardSignatureTokens.radius.pill}px`,
+                              border: '1px solid',
+                              borderColor: dashboardSignatureTokens.tones.success.border,
+                              backgroundColor: dashboardSignatureTokens.tones.success.background,
+                              color: dashboardSignatureTokens.tones.success.color,
+                              fontWeight: 700,
+                              '& .MuiChip-label': { px: 1 }
+                            }}
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
                   <Box sx={{ mt: 1.75 }}>
                     <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={700}>Activity</Typography>
+                      <Typography variant="caption" color="text.secondary" fontWeight={700}>Total activity vs busiest seller</Typography>
                       <Typography variant="caption" color="text.secondary">{numberFmt.format(totalVolume)}</Typography>
                     </Stack>
                     <LinearProgress
