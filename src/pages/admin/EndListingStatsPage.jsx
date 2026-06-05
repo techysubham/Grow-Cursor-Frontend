@@ -12,9 +12,9 @@ import LayersClearIcon from '@mui/icons-material/LayersClear';
 import AdminPageShell from '../../components/AdminPageShell';
 import api from '../../lib/api';
 
-const getISTDate = (offsetDays = 0) => {
+const getPTDate = (offsetDays = 0) => {
   const d = new Date(Date.now() + offsetDays * 86400000);
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(d);
 };
 
 export default function EndListingStatsPage() {
@@ -24,9 +24,9 @@ export default function EndListingStatsPage() {
   const [error, setError] = useState(null);
 
   const [dateMode, setDateMode] = useState('single');
-  const [selectedDate, setSelectedDate] = useState(() => getISTDate());
-  const [startDate, setStartDate] = useState(() => getISTDate(-7));
-  const [endDate, setEndDate] = useState(() => getISTDate());
+  const [selectedDate, setSelectedDate] = useState(() => getPTDate());
+  const [startDate, setStartDate] = useState(() => getPTDate(-7));
+  const [endDate, setEndDate] = useState(() => getPTDate());
   const [sellerFilter, setSellerFilter] = useState('all');
 
   const fetchGenRef = useRef(0);

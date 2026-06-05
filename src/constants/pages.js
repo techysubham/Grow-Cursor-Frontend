@@ -77,6 +77,7 @@ export const PAGE_REGISTRY = [
   // Direct items
   { id: 'FeedUpload', name: 'Feed Upload (CSV)', path: '/feed-upload', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin', 'lister'] },
   { id: 'FeedUploadStats', name: 'Feed Upload Stats', path: '/feed-upload-stats', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'DailyListingComparison', name: 'Daily Listing Comparison', path: '/daily-listing-comparison', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'SellerUploadLimits', name: 'Seller Upload Limits', path: '/seller-upload-limits', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'CsvStorage', name: 'CSV Storage', path: '/csv-storage', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin', 'lister'] },
   { id: 'ProductResearch', name: 'Product Research', path: '/research', category: 'listingResearch', defaultRoles: ['superadmin', 'productadmin'] },

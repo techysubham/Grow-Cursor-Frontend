@@ -17,8 +17,13 @@ import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../t
 import api from '../../lib/api';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, ResponsiveContainer } from 'recharts';
 
-const todayStr = new Date().toISOString().slice(0, 10);
-const currentMonthStr = new Date().toISOString().slice(0, 7);
+const getPTDate = (offsetDays = 0) => {
+  const d = new Date(Date.now() + offsetDays * 86400000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(d);
+};
+
+const todayStr = getPTDate();
+const currentMonthStr = todayStr.slice(0, 7);
 
 function monthBounds(ym) {
   const [y, m] = ym.split('-').map(Number);
