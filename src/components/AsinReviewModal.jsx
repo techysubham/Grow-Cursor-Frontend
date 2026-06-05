@@ -1002,38 +1002,13 @@ export default function AsinReviewModal({
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
 
-                {currentItem.status === 'loading' ? (
+                {currentItem.sourceData ? (
                   <Stack spacing={2}>
-                    <Box>
-                      <Skeleton variant="text" width="30%" />
-                      <Skeleton variant="text" width="60%" />
-                    </Box>
-                    <Box>
-                      <Skeleton variant="text" width="40%" />
-                      <Skeleton variant="rectangular" height={40} />
-                    </Box>
-                    <Box>
-                      <Skeleton variant="text" width="30%" />
-                      <Skeleton variant="text" width="50%" />
-                    </Box>
-                    <Box>
-                      <Skeleton variant="text" width="25%" />
-                      <Skeleton variant="text" width="40%" />
-                    </Box>
-                    <Box>
-                      <Skeleton variant="rectangular" height={150} />
-                    </Box>
-                    <Grid container spacing={1}>
-                      <Grid item xs={6}>
-                        <Skeleton variant="rectangular" height={120} />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Skeleton variant="rectangular" height={120} />
-                      </Grid>
-                    </Grid>
-                  </Stack>
-                ) : currentItem.sourceData ? (
-                  <Stack spacing={2}>
+                    {currentItem.status === 'loading' && (
+                      <Alert severity="info" variant="outlined">
+                        Amazon data is ready. Generated listing fields are still being prepared.
+                      </Alert>
+                    )}
                     <Box>
                       <Typography variant="caption" color="text.secondary">
                         ASIN
@@ -1175,6 +1150,36 @@ export default function AsinReviewModal({
                       );
                     })()}
                   </Stack>
+                ) : currentItem.status === 'loading' ? (
+                  <Stack spacing={2}>
+                    <Box>
+                      <Skeleton variant="text" width="30%" />
+                      <Skeleton variant="text" width="60%" />
+                    </Box>
+                    <Box>
+                      <Skeleton variant="text" width="40%" />
+                      <Skeleton variant="rectangular" height={40} />
+                    </Box>
+                    <Box>
+                      <Skeleton variant="text" width="30%" />
+                      <Skeleton variant="text" width="50%" />
+                    </Box>
+                    <Box>
+                      <Skeleton variant="text" width="25%" />
+                      <Skeleton variant="text" width="40%" />
+                    </Box>
+                    <Box>
+                      <Skeleton variant="rectangular" height={150} />
+                    </Box>
+                    <Grid container spacing={1}>
+                      <Grid item xs={6}>
+                        <Skeleton variant="rectangular" height={120} />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Skeleton variant="rectangular" height={120} />
+                      </Grid>
+                    </Grid>
+                  </Stack>
                 ) : !currentItem.sourceData ? (
                   <Stack spacing={2}>
                     <Alert severity="info" variant="outlined">
@@ -1230,7 +1235,7 @@ export default function AsinReviewModal({
                         <Chip
                           size="small"
                           label="1. Fetching data"
-                          color={currentItem.progressStage === 'fetching' || currentItem.progressStage === 'generating' ? 'primary' : 'default'}
+                          color={currentItem.progressStage === 'fetching' || currentItem.progressStage === 'generating' || currentItem.sourceData ? 'primary' : 'default'}
                           variant={currentItem.progressStage === 'generating' ? 'outlined' : 'filled'}
                         />
                         <Typography variant="caption" color="text.disabled">→</Typography>
@@ -1242,7 +1247,11 @@ export default function AsinReviewModal({
                         />
                       </Stack>
                       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                        Please be patient — this may take a moment.
+                        {currentItem.progressStage === 'generating'
+                          ? 'Amazon data is loaded. Generating listing fields now.'
+                          : currentItem.progressStage === 'queued'
+                            ? 'Queued for processing.'
+                            : 'Fetching Amazon product data.'}
                       </Typography>
                     </Box>
                   </Stack>
