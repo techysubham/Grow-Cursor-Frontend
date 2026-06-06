@@ -20,6 +20,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -67,6 +68,7 @@ export default function AiListingUsagePage() {
   const [userFilter, setUserFilter] = useState('all');
   const [sellerFilter, setSellerFilter] = useState('all');
   const [templateFilter, setTemplateFilter] = useState('all');
+  const [ipFilter, setIpFilter] = useState('all');
 
   const fetchUsage = async () => {
     try {
@@ -77,7 +79,8 @@ export default function AiListingUsagePage() {
         endDate,
         userId: userFilter,
         sellerId: sellerFilter,
-        templateId: templateFilter
+        templateId: templateFilter,
+        ipAddress: ipFilter
       };
       const { data } = await api.get('/template-listings/api/openai-usage-summary', { params });
       setRows(data.rows || []);
@@ -98,6 +101,13 @@ export default function AiListingUsagePage() {
   const userOptions = useMemo(() => uniqueOptions(rows, 'userId', 'username', 'Unknown user'), [rows]);
   const sellerOptions = useMemo(() => uniqueOptions(rows, 'sellerId', 'sellerName', 'Unknown seller'), [rows]);
   const templateOptions = useMemo(() => uniqueOptions(rows, 'templateId', 'templateName', 'Unknown template'), [rows]);
+  const ipOptions = useMemo(() => {
+    const ips = new Set();
+    rows.forEach((row) => {
+      if (row.ipAddress && row.ipAddress !== 'Unknown IP') ips.add(row.ipAddress);
+    });
+    return Array.from(ips).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
 
   return (
     <Container maxWidth="xl" sx={{ py: 2 }}>
@@ -151,6 +161,13 @@ export default function AiListingUsagePage() {
               {templateOptions.map(([id, label]) => <MenuItem key={id} value={id}>{label}</MenuItem>)}
             </Select>
           </FormControl>
+          <FormControl size="small" sx={{ minWidth: 190 }}>
+            <InputLabel>IP Address</InputLabel>
+            <Select value={ipFilter} label="IP Address" onChange={(e) => setIpFilter(e.target.value)}>
+              <MenuItem value="all">All IPs</MenuItem>
+              {ipOptions.map((ip) => <MenuItem key={ip} value={ip}>{ip}</MenuItem>)}
+            </Select>
+          </FormControl>
           <Button variant="contained" onClick={fetchUsage} disabled={loading} startIcon={<CalendarMonthIcon />}>
             Apply
           </Button>
@@ -191,18 +208,19 @@ export default function AiListingUsagePage() {
               <CardContent>
                 <StoreIcon sx={{ color: '#374151', mb: 1 }} />
                 <Typography variant="h4" fontWeight={700}>{formatNumber(rows.length)}</Typography>
-                <Typography variant="body2" color="text.secondary">User/Seller/Template Rows</Typography>
+                <Typography variant="body2" color="text.secondary">User/Seller/Template/IP Rows</Typography>
               </CardContent>
             </Card>
           </Stack>
 
-          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>Usage By User, Seller, Template</Typography>
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>Usage By User, Seller, Template, IP</Typography>
           <TableContainer component={Paper} sx={{ mb: 3, maxHeight: 520 }}>
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>User</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Seller</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>IP Address</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Template</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Successful ASINs</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
@@ -216,12 +234,12 @@ export default function AiListingUsagePage() {
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                    <TableCell colSpan={11} align="center" sx={{ py: 5, color: 'text.secondary' }}>
                       No OpenAI listing usage found for this date range.
                     </TableCell>
                   </TableRow>
                 ) : rows.map((row) => (
-                  <TableRow key={`${row.userId || 'unknown'}-${row.sellerId || 'unknown'}-${row.templateId || 'unknown'}`} hover>
+                  <TableRow key={`${row.userId || 'unknown'}-${row.sellerId || 'unknown'}-${row.templateId || 'unknown'}-${row.ipAddress || 'unknown'}`} hover>
                     <TableCell>
                       <Typography variant="body2" fontWeight={600}>{row.username}</Typography>
                       <Typography variant="caption" color="text.secondary">{row.userRole || row.userEmail || ''}</Typography>
@@ -229,6 +247,11 @@ export default function AiListingUsagePage() {
                     <TableCell>
                       <Typography variant="body2">{row.sellerName}</Typography>
                       <Typography variant="caption" color="text.secondary">{row.sellerEmail || ''}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={(row.userAgents || []).join('\n') || 'No user agent recorded'}>
+                        <span>{row.ipAddress || '-'}</span>
+                      </Tooltip>
                     </TableCell>
                     <TableCell>{row.templateName}</TableCell>
                     <TableCell align="right">{formatNumber(row.successfulAsinCount)}</TableCell>
