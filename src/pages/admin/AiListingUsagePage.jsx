@@ -249,7 +249,7 @@ export default function AiListingUsagePage() {
                       <Typography variant="caption" color="text.secondary">{row.sellerEmail || ''}</Typography>
                     </TableCell>
                     <TableCell>
-                      <Tooltip title={(row.userAgents || []).join('\n') || 'No user agent recorded'}>
+                      <Tooltip title={`Source: ${row.ipSource || 'unknown'}\n${(row.userAgents || []).join('\n') || 'No user agent recorded'}`}>
                         <span>{row.ipAddress || '-'}</span>
                       </Tooltip>
                     </TableCell>
