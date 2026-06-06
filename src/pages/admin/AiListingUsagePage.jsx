@@ -92,6 +92,8 @@ function UsageFilter({ label, allLabel, value, options, onChange, minWidth = 190
 export default function AiListingUsagePage() {
   const [rows, setRows] = useState([]);
   const [fieldBreakdown, setFieldBreakdown] = useState([]);
+  const [fieldAsinBreakdown, setFieldAsinBreakdown] = useState([]);
+  const [asinCallBreakdown, setAsinCallBreakdown] = useState([]);
   const [ipBreakdown, setIpBreakdown] = useState([]);
   const [filterOptions, setFilterOptions] = useState({ users: [], sellers: [], templates: [], ips: [] });
   const [totals, setTotals] = useState({});
@@ -128,6 +130,8 @@ export default function AiListingUsagePage() {
       const { data } = await api.get('/template-listings/api/openai-usage-summary', { params });
       setRows(data.rows || []);
       setFieldBreakdown(data.fieldBreakdown || []);
+      setFieldAsinBreakdown(data.fieldAsinBreakdown || []);
+      setAsinCallBreakdown(data.asinCallBreakdown || []);
       setIpBreakdown(data.ipBreakdown || []);
       setFilterOptions(data.filterOptions || { users: [], sellers: [], templates: [], ips: [] });
       setTotals(data.totals || {});
@@ -303,6 +307,8 @@ export default function AiListingUsagePage() {
                   <TableCell sx={{ fontWeight: 700 }}>Seller</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>IP Address</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Template</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Expected AI Fields</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Over Expected Calls</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls / Successful ASINs</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Successful ASINs</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
@@ -316,7 +322,7 @@ export default function AiListingUsagePage() {
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={12} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                    <TableCell colSpan={14} align="center" sx={{ py: 5, color: 'text.secondary' }}>
                       No OpenAI listing usage found for this date range.
                     </TableCell>
                   </TableRow>
@@ -336,6 +342,10 @@ export default function AiListingUsagePage() {
                       </Tooltip>
                     </TableCell>
                     <TableCell>{row.templateName}</TableCell>
+                    <TableCell align="right">{formatNumber(row.expectedAiFieldCount)}</TableCell>
+                    <TableCell align="right" sx={{ color: (row.overExpectedCalls || 0) > 0 ? 'error.main' : 'text.primary', fontWeight: (row.overExpectedCalls || 0) > 0 ? 700 : 400 }}>
+                      {formatNumber(row.overExpectedCalls)}
+                    </TableCell>
                     <TableCell align="right">{formatCallsPerAsin(row.aiCalls, row.successfulAsinCount)}</TableCell>
                     <TableCell align="right">{formatNumber(row.successfulAsinCount)}</TableCell>
                     <TableCell align="right">{formatNumber(row.aiCalls)}</TableCell>
@@ -351,8 +361,8 @@ export default function AiListingUsagePage() {
           </TableContainer>
 
           <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>IP Summary</Typography>
-          <TableContainer component={Paper} sx={{ mb: 3 }}>
-            <Table size="small">
+          <TableContainer component={Paper} sx={{ mb: 3, maxHeight: 520 }}>
+            <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>IP Address</TableCell>
@@ -399,8 +409,8 @@ export default function AiListingUsagePage() {
           </TableContainer>
 
           <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>Token Usage By Field</Typography>
-          <TableContainer component={Paper}>
-            <Table size="small">
+          <TableContainer component={Paper} sx={{ mb: 3, maxHeight: 520 }}>
+            <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>Field</TableCell>
@@ -428,6 +438,92 @@ export default function AiListingUsagePage() {
                     <TableCell align="right" sx={{ fontWeight: 700 }}>{formatNumber(row.totalTokens)}</TableCell>
                     <TableCell align="right">{formatNumber(row.promptTokens)}</TableCell>
                     <TableCell align="right">{formatNumber(row.completionTokens)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>Repeated Field Calls By ASIN</Typography>
+          <TableContainer component={Paper} sx={{ mb: 3, maxHeight: 520 }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700 }}>Field</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>ASIN</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Successful Calls</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Failed Calls</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tokens</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Prompt Tokens</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Output Tokens</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>First Used</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Last Used</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {fieldAsinBreakdown.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                      No repeated field calls found for this filter.
+                    </TableCell>
+                  </TableRow>
+                ) : fieldAsinBreakdown.map((row, index) => (
+                  <TableRow key={`${row.fieldName || 'field'}-${row.asin || 'asin'}-${index}`} hover>
+                    <TableCell>{row.fieldName || 'Unknown field'}</TableCell>
+                    <TableCell>{row.asin || 'Unknown ASIN'}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>{formatNumber(row.aiCalls)}</TableCell>
+                    <TableCell align="right">{formatNumber(row.successfulCalls)}</TableCell>
+                    <TableCell align="right">{formatNumber(row.failedCalls)}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>{formatNumber(row.totalTokens)}</TableCell>
+                    <TableCell align="right">{formatNumber(row.promptTokens)}</TableCell>
+                    <TableCell align="right">{formatNumber(row.completionTokens)}</TableCell>
+                    <TableCell>{formatDateTime(row.firstUsedAt)}</TableCell>
+                    <TableCell>{formatDateTime(row.lastUsedAt)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>ASINs Over Expected AI Calls</Typography>
+          <TableContainer component={Paper} sx={{ maxHeight: 520 }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700 }}>Seller</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Template</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>ASIN</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Expected AI Fields</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Actual AI Calls</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Over Expected</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Unique Fields</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Successful Calls</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Failed Calls</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tokens</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Last Used</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {asinCallBreakdown.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={11} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                      No ASINs exceeded the expected AI field count for this filter.
+                    </TableCell>
+                  </TableRow>
+                ) : asinCallBreakdown.map((row, index) => (
+                  <TableRow key={`${row.sellerId || 'seller'}-${row.templateId || 'template'}-${row.asin || 'asin'}-${index}`} hover>
+                    <TableCell>{row.sellerName || 'Unknown seller'}</TableCell>
+                    <TableCell>{row.templateName || 'Unknown template'}</TableCell>
+                    <TableCell>{row.asin || 'Unknown ASIN'}</TableCell>
+                    <TableCell align="right">{formatNumber(row.expectedAiFieldCount)}</TableCell>
+                    <TableCell align="right">{formatNumber(row.aiCalls)}</TableCell>
+                    <TableCell align="right" sx={{ color: 'error.main', fontWeight: 700 }}>{formatNumber(row.overExpectedCalls)}</TableCell>
+                    <TableCell align="right">{formatNumber(row.fieldCount)}</TableCell>
+                    <TableCell align="right">{formatNumber(row.successfulCalls)}</TableCell>
+                    <TableCell align="right">{formatNumber(row.failedCalls)}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>{formatNumber(row.totalTokens)}</TableCell>
+                    <TableCell>{formatDateTime(row.lastUsedAt)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
