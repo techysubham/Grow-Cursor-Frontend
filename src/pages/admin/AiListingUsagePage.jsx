@@ -14,6 +14,7 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableFooter,
   TableHead,
   TableRow,
   TextField,
@@ -215,6 +216,14 @@ export default function AiListingUsagePage() {
     () => ipBreakdown.filter((row) => (row.userCount || 0) > 1).length,
     [ipBreakdown]
   );
+  const visibleSuccessfulAsinTotal = useMemo(
+    () => rows.reduce((sum, row) => sum + Number(row.successfulAsinCount || 0), 0),
+    [rows]
+  );
+  const visibleOverExpectedTotal = useMemo(
+    () => rows.reduce((sum, row) => sum + Number(row.overExpectedCalls || 0), 0),
+    [rows]
+  );
 
   const tableContainerSx = {
     mb: 3,
@@ -402,6 +411,13 @@ export default function AiListingUsagePage() {
               <CardContent>
                 <Inventory2Icon sx={{ color: '#16a34a', mb: 1 }} />
                 <Typography variant="h4" fontWeight={700}>{formatNumber(totals.successfulAsinCount)}</Typography>
+                <Typography variant="body2" color="text.secondary">Distinct ASINs</Typography>
+              </CardContent>
+            </Card>
+            <Card sx={{ ...metricCardSx, bgcolor: '#ecfdf5' }}>
+              <CardContent>
+                <Inventory2Icon sx={{ color: '#059669', mb: 1 }} />
+                <Typography variant="h4" fontWeight={700}>{formatNumber(visibleSuccessfulAsinTotal)}</Typography>
                 <Typography variant="body2" color="text.secondary">Successful ASINs</Typography>
               </CardContent>
             </Card>
@@ -502,6 +518,19 @@ export default function AiListingUsagePage() {
                   </TableRow>
                 ))}
               </TableBody>
+              {rows.length > 0 && (
+                <TableFooter>
+                  <TableRow sx={{ '& td': { bgcolor: '#f8fafc', borderTop: '2px solid #dbe3ef', fontWeight: 800 } }}>
+                    <TableCell colSpan={5} align="right">Total</TableCell>
+                    <TableCell align="right" sx={{ color: visibleOverExpectedTotal > 0 ? 'error.main' : 'text.primary' }}>
+                      {formatNumber(visibleOverExpectedTotal)}
+                    </TableCell>
+                    <TableCell />
+                    <TableCell align="right">{formatNumber(visibleSuccessfulAsinTotal)}</TableCell>
+                    <TableCell colSpan={6} />
+                  </TableRow>
+                </TableFooter>
+              )}
             </Table>
           </TableContainer>
 
