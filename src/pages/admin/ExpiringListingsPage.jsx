@@ -56,6 +56,13 @@ const COUNTRY_OPTIONS = [
   { value: 'GBP', label: '\uD83C\uDDEC\uD83C\uDDE7 eBay UK' },
 ];
 
+const CURRENCY_TO_COUNTRY = {
+  USD: 'US',
+  AUD: 'AU',
+  CAD: 'Canada',
+  GBP: 'UK',
+};
+
 // ─── component ────────────────────────────────────────────────────────────────
 
 export default function ExpiringListingsPage() {
@@ -65,6 +72,7 @@ export default function ExpiringListingsPage() {
   const [fetching, setFetching]             = useState(false);
   const [listings, setListings]             = useState([]);
   const [fetchError, setFetchError]         = useState('');
+  const [fetchWarning, setFetchWarning]     = useState('');
   const [fetchProgress, setFetchProgress]   = useState(null); // { page, totalPages, count }
 
   // ── selection — global across all pages ───────────────────────────────────
@@ -110,6 +118,7 @@ export default function ExpiringListingsPage() {
     if (!selectedSeller) return;
     setFetching(true);
     setFetchError('');
+    setFetchWarning('');
     setListings([]);
     setFetchProgress(null);
     setSelectedItems(new Set());
@@ -145,6 +154,8 @@ export default function ExpiringListingsPage() {
           const evt = JSON.parse(line.slice(6));
           if (evt.type === 'progress') {
             setFetchProgress({ page: evt.page, totalPages: evt.totalPages, count: evt.count });
+          } else if (evt.type === 'warning') {
+            setFetchWarning(evt.warning || 'Some listing view data was unavailable.');
           } else if (evt.type === 'done') {
             setListings(evt.listings || []);
           } else if (evt.type === 'error') {
@@ -213,6 +224,8 @@ export default function ExpiringListingsPage() {
           itemId: item.itemId,
           endingReason: 'NotAvailable',
           source: 'expiry_listing',
+          country: CURRENCY_TO_COUNTRY[item.currency] || item.country || null,
+          marketplaceId: item.marketplaceId || null,
         });
         results.success.push(item.itemId);
       } catch (err) {
@@ -265,7 +278,7 @@ export default function ExpiringListingsPage() {
           >
             <PageHeader
               title="Expiring Low-Activity Listings"
-              subtitle={`Active listings expiring within ${hoursRange} h · <${maxWatchers} watchers · <${maxViews} views (30-day) · 0 sold.`}
+              subtitle={`Active listings expiring within ${hoursRange} h · up to ${maxWatchers} watchers · up to ${maxViews} views (30-day) · 0 sold.`}
               sx={{ pt: 0, pb: 0 }}
             />
 
@@ -304,6 +317,7 @@ export default function ExpiringListingsPage() {
                     setListings([]);
                     setEndingResults(null);
                     setFetchError('');
+                    setFetchWarning('');
                     setFetchProgress(null);
                     setSelectedItems(new Set());
                   }}
@@ -364,6 +378,7 @@ export default function ExpiringListingsPage() {
                     setListings([]);
                     setEndingResults(null);
                     setFetchError('');
+                    setFetchWarning('');
                     setFetchProgress(null);
                     setSelectedItems(new Set());
                   }}
@@ -432,6 +447,12 @@ export default function ExpiringListingsPage() {
         {fetchError && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setFetchError('')}>
             {fetchError}
+          </Alert>
+        )}
+
+        {fetchWarning && (
+          <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setFetchWarning('')}>
+            {fetchWarning}
           </Alert>
         )}
 
@@ -860,7 +881,7 @@ export default function ExpiringListingsPage() {
               No expiring low-activity listings found
             </Typography>
             <Typography variant="body2" color="text.disabled">
-              No active listings match: expiring &lt;{hoursRange} h · watchers &lt;5 · views &lt;5 · sold = 0
+              No active listings match: expiring within {hoursRange} h · watchers ≤ {maxWatchers} · views ≤ {maxViews} · sold = 0
             </Typography>
           </SectionCard>
         )}

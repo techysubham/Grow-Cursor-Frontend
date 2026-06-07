@@ -17,6 +17,14 @@ const getPTDate = (offsetDays = 0) => {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(d);
 };
 
+const countryLabel = (country) => {
+  if (country === 'US') return 'US';
+  if (country === 'UK') return 'UK';
+  if (country === 'AU') return 'AU';
+  if (country === 'Canada') return 'CA';
+  return country || 'Unknown';
+};
+
 export default function EndListingStatsPage() {
   const [rows, setRows] = useState([]);
   const [sellers, setSellers] = useState([]);
@@ -208,6 +216,7 @@ export default function EndListingStatsPage() {
                   <TableCell>Seller</TableCell>
                   <TableCell align="center">Duplicate SKU</TableCell>
                   <TableCell align="center">Expiry Listing</TableCell>
+                  <TableCell>Breakdown</TableCell>
                   <TableCell align="center">Total</TableCell>
                 </TableRow>
               </TableHead>
@@ -230,6 +239,24 @@ export default function EndListingStatsPage() {
                         <Typography variant="body2" color="text.disabled">—</Typography>
                       )}
                     </TableCell>
+                    <TableCell>
+                      {row.countryBreakdown?.length > 0 ? (
+                        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                          {row.countryBreakdown.map(countryRow => (
+                            <Chip
+                              key={countryRow.country}
+                              size="small"
+                              variant="outlined"
+                              label={`${countryLabel(countryRow.country)}: ${countryRow.total}`}
+                              title={`Duplicate SKU: ${countryRow.duplicateSkuCount || 0}, Expiry Listings: ${countryRow.expiryListingCount || 0}`}
+                              sx={{ fontWeight: 600 }}
+                            />
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.disabled">-</Typography>
+                      )}
+                    </TableCell>
                     <TableCell align="center">
                       <Chip label={row.total} color="error" size="small" sx={{ fontWeight: 700 }} />
                     </TableCell>
@@ -240,12 +267,13 @@ export default function EndListingStatsPage() {
                 {rows.length > 1 && (
                   <>
                     <TableRow>
-                      <TableCell colSpan={5}><Divider /></TableCell>
+                      <TableCell colSpan={6}><Divider /></TableCell>
                     </TableRow>
                     <TableRow sx={{ '& td': { fontWeight: 700, bgcolor: 'action.hover' } }}>
                       <TableCell colSpan={2}>TOTAL</TableCell>
                       <TableCell align="center">{totalDupSku}</TableCell>
                       <TableCell align="center">{totalExpiry}</TableCell>
+                      <TableCell />
                       <TableCell align="center">{grandTotal}</TableCell>
                     </TableRow>
                   </>

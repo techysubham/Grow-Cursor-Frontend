@@ -9,7 +9,11 @@ import {
   CircularProgress,
   Divider,
   Fade,
+  FormControl,
+  InputLabel,
   LinearProgress,
+  MenuItem,
+  Select,
   Stack,
   TextField,
   ToggleButton,
@@ -35,6 +39,15 @@ const getPTDate = (offsetDays = 0) => {
 
 const numberFmt = new Intl.NumberFormat('en-US');
 
+const COUNTRY_OPTIONS = [
+  { value: 'ALL', label: 'All Countries' },
+  { value: 'US', label: 'US' },
+  { value: 'UK', label: 'UK' },
+  { value: 'AU', label: 'AU' },
+  { value: 'Canada', label: 'CA' },
+  { value: 'Unknown', label: 'Unknown' },
+];
+
 const countryLabel = (country) => {
   if (country === 'US') return 'US';
   if (country === 'UK') return 'UK';
@@ -42,6 +55,8 @@ const countryLabel = (country) => {
   if (country === 'Canada') return 'CA';
   return country || 'Unknown';
 };
+
+const formatSignedNumber = (value) => `${value >= 0 ? '+' : ''}${numberFmt.format(value)}`;
 
 const getDateLabel = (filter) => {
   if (filter.mode === 'range') {
@@ -87,6 +102,7 @@ export default function DailyListingComparisonPage() {
     to: getPTDate()
   }));
   const [rows, setRows] = useState([]);
+  const [countryFilter, setCountryFilter] = useState('ALL');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -115,7 +131,28 @@ export default function DailyListingComparisonPage() {
     fetchComparison();
   }, [fetchComparison]);
 
-  const totals = useMemo(() => rows.reduce(
+  const displayedRows = useMemo(() => {
+    if (countryFilter === 'ALL') return rows;
+
+    return rows
+      .map(row => {
+        const marketplaces = (row.marketplaces || []).filter(marketplace => marketplace.country === countryFilter);
+        const successfulListings = marketplaces.reduce((sum, marketplace) => sum + (marketplace.successfulListings || 0), 0);
+        const endedListings = marketplaces.reduce((sum, marketplace) => sum + (marketplace.endedListings || 0), 0);
+        const netListings = successfulListings - endedListings;
+
+        return {
+          ...row,
+          successfulListings,
+          endedListings,
+          netListings,
+          marketplaces,
+        };
+      })
+      .filter(row => (row.successfulListings || 0) > 0 || (row.endedListings || 0) > 0);
+  }, [rows, countryFilter]);
+
+  const totals = useMemo(() => displayedRows.reduce(
     (acc, row) => {
       acc.successfulListings += row.successfulListings || 0;
       acc.endedListings += row.endedListings || 0;
@@ -123,12 +160,12 @@ export default function DailyListingComparisonPage() {
       return acc;
     },
     { successfulListings: 0, endedListings: 0, netListings: 0 }
-  ), [rows]);
+  ), [displayedRows]);
 
-  const maxVolume = useMemo(() => rows.reduce((max, row) => {
+  const maxVolume = useMemo(() => displayedRows.reduce((max, row) => {
     const total = (row.successfulListings || 0) + (row.endedListings || 0);
     return Math.max(max, total);
-  }, 0), [rows]);
+  }, 0), [displayedRows]);
 
   const hasPendingFilterChanges = JSON.stringify(draftDateFilter) !== JSON.stringify(appliedDateFilter);
 
@@ -147,7 +184,7 @@ export default function DailyListingComparisonPage() {
     { label: 'Successful Listings', value: totals.successfulListings, tone: 'success' },
     { label: 'Ended Listings', value: totals.endedListings, tone: 'warning' },
     { label: 'Net Listings', value: totals.netListings, tone: totals.netListings >= 0 ? 'info' : 'amazon' },
-    { label: 'Sellers', value: rows.length, tone: 'neutral' }
+    { label: 'Sellers', value: displayedRows.length, tone: 'neutral' }
   ];
 
   return (
@@ -241,6 +278,21 @@ export default function DailyListingComparisonPage() {
                 </>
               )}
 
+              <FormControl size="small" sx={{ minWidth: 170 }}>
+                <InputLabel>Country</InputLabel>
+                <Select
+                  label="Country"
+                  value={countryFilter}
+                  onChange={(e) => setCountryFilter(e.target.value)}
+                >
+                  {COUNTRY_OPTIONS.map(option => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
               <Button
                 variant="contained"
                 size="small"
@@ -292,17 +344,25 @@ export default function DailyListingComparisonPage() {
         <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
           <CircularProgress />
         </Box>
-      ) : rows.length === 0 ? (
-        <Alert severity="info">No successful feed uploads or end-listing stats found for this date.</Alert>
+      ) : displayedRows.length === 0 ? (
+        <Alert severity="info">No successful feed uploads or end-listing stats found for this date and country.</Alert>
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' }, gap: 1.5 }}>
-          {rows.map((row, index) => {
+          {displayedRows.map((row, index) => {
             const isPositive = row.netListings >= 0;
             const totalVolume = (row.successfulListings || 0) + (row.endedListings || 0);
             const progress = maxVolume > 0 ? Math.max(4, Math.round((totalVolume / maxVolume) * 100)) : 0;
             const marketplaceBreakdown = [...(row.marketplaces || [])]
-              .filter(marketplace => (marketplace.successfulListings || 0) > 0)
-              .sort((a, b) => (b.successfulListings || 0) - (a.successfulListings || 0));
+              .filter(marketplace => (marketplace.successfulListings || 0) > 0 || (marketplace.endedListings || 0) > 0)
+              .map(marketplace => ({
+                ...marketplace,
+                netListings: marketplace.netListings ?? ((marketplace.successfulListings || 0) - (marketplace.endedListings || 0)),
+              }))
+              .sort((a, b) => {
+                const bTotal = (b.successfulListings || 0) + (b.endedListings || 0);
+                const aTotal = (a.successfulListings || 0) + (a.endedListings || 0);
+                return bTotal - aTotal;
+              });
             return (
               <Card
                 key={row.sellerId || row.sellerName}
@@ -343,32 +403,89 @@ export default function DailyListingComparisonPage() {
                   </Stack>
                   <Divider sx={{ mb: 1.5 }} />
                   <Stack direction="row" justifyContent="space-between" spacing={1.5}>
-                    <StatBlock icon={<CloudUploadIcon fontSize="small" />} label="Successful" value={row.successfulListings} tone="good" />
+                    <StatBlock
+                      icon={<CloudUploadIcon fontSize="small" />}
+                      label={countryFilter === 'ALL' ? 'Successful' : 'Net'}
+                      value={countryFilter === 'ALL' ? row.successfulListings : row.netListings}
+                      tone={(countryFilter === 'ALL' || row.netListings >= 0) ? 'good' : 'bad'}
+                    />
                     <StatBlock icon={<RemoveCircleOutlineIcon fontSize="small" />} label="Ended" value={row.endedListings} tone="bad" />
                   </Stack>
                   {marketplaceBreakdown.length > 0 && (
                     <Box sx={{ mt: 1.5 }}>
                       <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: 'block', mb: 0.75 }}>
-                        Successful by marketplace
+                        Marketplace breakdown
                       </Typography>
                       <Stack direction="row" flexWrap="wrap" gap={0.75}>
                         {marketplaceBreakdown.map((marketplace) => (
                           <Chip
                             key={marketplace.country}
                             size="small"
-                            label={`${countryLabel(marketplace.country)} ${numberFmt.format(marketplace.successfulListings || 0)}`}
+                            label={`${countryLabel(marketplace.country)} ${formatSignedNumber(marketplace.netListings || 0)}`}
                             sx={{
                               height: 24,
                               borderRadius: `${dashboardSignatureTokens.radius.pill}px`,
                               border: '1px solid',
-                              borderColor: dashboardSignatureTokens.tones.success.border,
-                              backgroundColor: dashboardSignatureTokens.tones.success.background,
-                              color: dashboardSignatureTokens.tones.success.color,
+                              borderColor: (marketplace.netListings || 0) >= 0
+                                ? dashboardSignatureTokens.tones.success.border
+                                : dashboardSignatureTokens.tones.warning.border,
+                              backgroundColor: (marketplace.netListings || 0) >= 0
+                                ? dashboardSignatureTokens.tones.success.background
+                                : dashboardSignatureTokens.tones.warning.background,
+                              color: (marketplace.netListings || 0) >= 0
+                                ? dashboardSignatureTokens.tones.success.color
+                                : dashboardSignatureTokens.tones.warning.color,
                               fontWeight: 700,
                               '& .MuiChip-label': { px: 1 }
                             }}
                           />
                         ))}
+                      </Stack>
+                      <Stack spacing={0.75} sx={{ mt: 1 }}>
+                        <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+                          <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                            Successful
+                          </Typography>
+                          {marketplaceBreakdown.map((marketplace) => (
+                            <Chip
+                              key={`successful-${marketplace.country}`}
+                              size="small"
+                              label={`${countryLabel(marketplace.country)} ${numberFmt.format(marketplace.successfulListings || 0)}`}
+                              sx={{
+                                height: 22,
+                                borderRadius: `${dashboardSignatureTokens.radius.pill}px`,
+                                border: '1px solid',
+                                borderColor: dashboardSignatureTokens.tones.success.border,
+                                backgroundColor: dashboardSignatureTokens.tones.success.background,
+                                color: dashboardSignatureTokens.tones.success.color,
+                                fontWeight: 700,
+                                '& .MuiChip-label': { px: 1 }
+                              }}
+                            />
+                          ))}
+                        </Stack>
+                        <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+                          <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                            Ended
+                          </Typography>
+                          {marketplaceBreakdown.map((marketplace) => (
+                            <Chip
+                              key={`ended-${marketplace.country}`}
+                              size="small"
+                              label={`${countryLabel(marketplace.country)} ${numberFmt.format(marketplace.endedListings || 0)}`}
+                              sx={{
+                                height: 22,
+                                borderRadius: `${dashboardSignatureTokens.radius.pill}px`,
+                                border: '1px solid',
+                                borderColor: dashboardSignatureTokens.tones.warning.border,
+                                backgroundColor: dashboardSignatureTokens.tones.warning.background,
+                                color: dashboardSignatureTokens.tones.warning.color,
+                                fontWeight: 700,
+                                '& .MuiChip-label': { px: 1 }
+                              }}
+                            />
+                          ))}
+                        </Stack>
                       </Stack>
                     </Box>
                   )}
