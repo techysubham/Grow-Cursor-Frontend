@@ -143,7 +143,7 @@ export default function App() {
           <AttendanceModal />
           <TimerPausedModal />
           <AttendanceTimer />
-          <ErrorBoundary>
+          <ErrorBoundary resetKey={location.pathname}>
           <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
@@ -201,7 +201,7 @@ export default function App() {
           </ErrorBoundary>
         </AttendanceProvider>
       ) : (
-        <ErrorBoundary>
+        <ErrorBoundary resetKey={location.pathname}>
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />

@@ -1126,7 +1126,7 @@ export default function AdminLayout({ user, onLogout }) {
       </Box>
       <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${sidebarOpen ? drawerWidth : 56}px)` }, transition: 'width 0.2s' }}>
         <Toolbar />
-        <ErrorBoundary>
+        <ErrorBoundary resetKey={location.pathname}>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* Welcome / Home page */}
