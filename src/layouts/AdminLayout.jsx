@@ -791,12 +791,12 @@ export default function AdminLayout({ user, onLogout }) {
       <Toolbar />
       <Divider sx={{ borderColor: 'rgba(0, 0, 0, 0.08)' }} />
       <List sx={{ px: 0.5, py: 1, overflowY: 'auto', flexGrow: 1 }}>
-        {/* Back to Lister Dashboard - visible only to listers */}
+        {/* My Dashboard - visible only to listers */}
         {isAnyLister && (
           <ListItem disablePadding>
             <ListItemButton
               component={Link}
-              to="/lister"
+              to="/admin/welcome"
               onClick={() => setMobileOpen(false)}
               sx={{
                 ...selectedMenuItemStyle,
@@ -804,7 +804,7 @@ export default function AdminLayout({ user, onLogout }) {
               }}
             >
               <ListItemIcon sx={{ minWidth: 40 }}>
-                <NavIcon icon={HomeIcon} label="Back to My Dashboard" sidebarOpen={sidebarOpen} />
+                <NavIcon icon={HomeIcon} label="My Dashboard" sidebarOpen={sidebarOpen} />
               </ListItemIcon>
               {sidebarOpen && <ListItemText primary="My Dashboard" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
             </ListItemButton>

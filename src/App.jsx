@@ -94,11 +94,8 @@ function useAuth() {
     localStorage.setItem('user', JSON.stringify(u));
 
     // Navigation Logic
-    if (u.role === 'lister') navigate('/lister');
-    else if (u.role === 'advancelister') navigate('/lister');
-    else if (u.role === 'trainee') navigate('/lister');
-    else if (u.role === 'seller') navigate('/seller-ebay');
-    // All admin-area roles land on the welcome page
+    if (u.role === 'seller') navigate('/seller-ebay');
+    // All admin-area roles, including listers, land on the welcome page.
     else navigate('/admin/welcome');
   };
   const logout = () => {
@@ -183,7 +180,7 @@ export default function App() {
             />
             <Route
               path="/lister"
-              element={user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee' ? <ListerDashboard user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
+              element={user.role === 'lister' || user.role === 'advancelister' || user.role === 'trainee' ? <Navigate to="/admin/welcome" replace /> : <Navigate to="/login" replace />}
             />
             <Route
               path="/seller-ebay"

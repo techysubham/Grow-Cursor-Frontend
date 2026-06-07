@@ -14,6 +14,7 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableFooter,
   TableHead,
   TableRow,
   TextField,
@@ -31,6 +32,11 @@ import TokenIcon from '@mui/icons-material/Token';
 import api from '../../lib/api';
 
 const numberFmt = new Intl.NumberFormat('en-US');
+const knownIpLabels = {
+  '103.75.43.140': 'GROWMENTALITY',
+  '122.172.171.84': 'Airtel_Table 3',
+  '122.177.190.139': 'Airtel_sach_2412'
+};
 
 function getDefaultStartDate() {
   const date = new Date();
@@ -40,6 +46,14 @@ function getDefaultStartDate() {
 
 function getDefaultEndDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function toDateTimeLocal(dateValue, timeValue = '00:00') {
+  return `${dateValue}T${timeValue}`;
+}
+
+function toIsoDateTime(value) {
+  return value ? new Date(value).toISOString() : undefined;
 }
 
 function formatNumber(value) {
@@ -54,6 +68,12 @@ function formatCallsPerAsin(aiCalls, successfulAsinCount) {
 function formatDateTime(value) {
   if (!value) return '-';
   return new Date(value).toLocaleString();
+}
+
+function formatIpAddress(value) {
+  if (!value) return 'Unknown IP';
+  const label = knownIpLabels[value];
+  return label ? `${value} (${label})` : value;
 }
 
 function findSelectedOption(options, id, allLabel) {
@@ -92,8 +112,6 @@ function UsageFilter({ label, allLabel, value, options, onChange, minWidth = 190
 export default function AiListingUsagePage() {
   const [rows, setRows] = useState([]);
   const [fieldBreakdown, setFieldBreakdown] = useState([]);
-  const [fieldAsinBreakdown, setFieldAsinBreakdown] = useState([]);
-  const [asinCallBreakdown, setAsinCallBreakdown] = useState([]);
   const [ipBreakdown, setIpBreakdown] = useState([]);
   const [filterOptions, setFilterOptions] = useState({ users: [], sellers: [], templates: [], ips: [] });
   const [totals, setTotals] = useState({});
@@ -103,7 +121,11 @@ export default function AiListingUsagePage() {
   const [startDate, setStartDate] = useState(getDefaultStartDate);
   const [endDate, setEndDate] = useState(getDefaultEndDate);
   const [singleDate, setSingleDate] = useState(getDefaultEndDate);
-  const [dateMode, setDateMode] = useState('range');
+  const [startDateTime, setStartDateTime] = useState(() => toDateTimeLocal(getDefaultStartDate()));
+  const [endDateTime, setEndDateTime] = useState(() => toDateTimeLocal(getDefaultEndDate(), '23:59'));
+  const [singleDateTime, setSingleDateTime] = useState(() => toDateTimeLocal(getDefaultEndDate()));
+  const [dateMode, setDateMode] = useState('single');
+  const [timeFilterEnabled, setTimeFilterEnabled] = useState(false);
   const [userFilter, setUserFilter] = useState('all');
   const [sellerFilter, setSellerFilter] = useState('all');
   const [templateFilter, setTemplateFilter] = useState('all');
@@ -117,6 +139,10 @@ export default function AiListingUsagePage() {
       const activeStartDate = overrides.startDate ?? startDate;
       const activeEndDate = overrides.endDate ?? endDate;
       const activeSingleDate = overrides.singleDate ?? singleDate;
+      const activeStartDateTime = overrides.startDateTime ?? startDateTime;
+      const activeEndDateTime = overrides.endDateTime ?? endDateTime;
+      const activeSingleDateTime = overrides.singleDateTime ?? singleDateTime;
+      const activeTimeFilterEnabled = overrides.timeFilterEnabled ?? timeFilterEnabled;
       const selectedStartDate = activeDateMode === 'single' ? activeSingleDate : activeStartDate;
       const selectedEndDate = activeDateMode === 'single' ? activeSingleDate : activeEndDate;
       const params = {
@@ -127,11 +153,19 @@ export default function AiListingUsagePage() {
         templateId: overrides.templateFilter ?? templateFilter,
         ipAddress: overrides.ipFilter ?? ipFilter
       };
+      if (activeTimeFilterEnabled) {
+        params.startDate = undefined;
+        params.endDate = undefined;
+        params.startDateTime = activeDateMode === 'single'
+          ? toIsoDateTime(activeSingleDateTime)
+          : toIsoDateTime(activeStartDateTime);
+        params.endDateTime = activeDateMode === 'single'
+          ? undefined
+          : toIsoDateTime(activeEndDateTime);
+      }
       const { data } = await api.get('/template-listings/api/openai-usage-summary', { params });
       setRows(data.rows || []);
       setFieldBreakdown(data.fieldBreakdown || []);
-      setFieldAsinBreakdown(data.fieldAsinBreakdown || []);
-      setAsinCallBreakdown(data.asinCallBreakdown || []);
       setIpBreakdown(data.ipBreakdown || []);
       setFilterOptions(data.filterOptions || { users: [], sellers: [], templates: [], ips: [] });
       setTotals(data.totals || {});
@@ -145,19 +179,27 @@ export default function AiListingUsagePage() {
   const clearFilters = () => {
     const defaultStartDate = getDefaultStartDate();
     const defaultEndDate = getDefaultEndDate();
-    setDateMode('range');
+    setDateMode('single');
     setStartDate(defaultStartDate);
     setEndDate(defaultEndDate);
     setSingleDate(defaultEndDate);
+    setStartDateTime(toDateTimeLocal(defaultStartDate));
+    setEndDateTime(toDateTimeLocal(defaultEndDate, '23:59'));
+    setSingleDateTime(toDateTimeLocal(defaultEndDate));
+    setTimeFilterEnabled(false);
     setUserFilter('all');
     setSellerFilter('all');
     setTemplateFilter('all');
     setIpFilter('all');
     fetchUsage({
-      dateMode: 'range',
+      dateMode: 'single',
       startDate: defaultStartDate,
       endDate: defaultEndDate,
       singleDate: defaultEndDate,
+      startDateTime: toDateTimeLocal(defaultStartDate),
+      endDateTime: toDateTimeLocal(defaultEndDate, '23:59'),
+      singleDateTime: toDateTimeLocal(defaultEndDate),
+      timeFilterEnabled: false,
       userFilter: 'all',
       sellerFilter: 'all',
       templateFilter: 'all',
@@ -174,9 +216,55 @@ export default function AiListingUsagePage() {
     () => ipBreakdown.filter((row) => (row.userCount || 0) > 1).length,
     [ipBreakdown]
   );
+  const visibleSuccessfulAsinTotal = useMemo(
+    () => rows.reduce((sum, row) => sum + Number(row.successfulAsinCount || 0), 0),
+    [rows]
+  );
+  const visibleOverExpectedTotal = useMemo(
+    () => rows.reduce((sum, row) => sum + Number(row.overExpectedCalls || 0), 0),
+    [rows]
+  );
+
+  const tableContainerSx = {
+    mb: 3,
+    maxHeight: 620,
+    overflow: 'auto',
+    border: '1px solid #e5e7eb',
+    borderRadius: 2,
+    boxShadow: '0 12px 28px rgba(15, 23, 42, 0.06)'
+  };
+  const tableSx = {
+    '& th': {
+      bgcolor: '#f8fafc',
+      color: '#334155',
+      fontSize: 12,
+      fontWeight: 800,
+      letterSpacing: 0,
+      whiteSpace: 'nowrap',
+      px: 1,
+      borderBottom: '1px solid #dbe3ef'
+    },
+    '& td': {
+      px: 1,
+      py: 1.1,
+      whiteSpace: 'nowrap',
+      borderBottom: '1px solid #edf2f7',
+      fontSize: 13
+    },
+    '& tbody tr:hover td': {
+      bgcolor: '#f8fafc'
+    }
+  };
+  const metricCardSx = {
+    flex: 1,
+    minWidth: 190,
+    border: '1px solid #e5e7eb',
+    borderRadius: 2,
+    boxShadow: '0 10px 22px rgba(15, 23, 42, 0.05)'
+  };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 2 }}>
+    <Container maxWidth={false} sx={{ py: 2.5, px: { xs: 2, lg: 3 }, bgcolor: '#f6f8fb', minHeight: '100vh' }}>
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
         <Typography variant="h5" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <AutoAwesomeIcon color="primary" /> AI Listing Usage
@@ -186,7 +274,7 @@ export default function AiListingUsagePage() {
         </Button>
       </Box>
 
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: 2, mb: 3, borderRadius: 2, border: '1px solid #e5e7eb', boxShadow: '0 12px 28px rgba(15, 23, 42, 0.06)' }}>
         <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', rowGap: 2 }}>
           <ToggleButtonGroup
             exclusive
@@ -200,42 +288,100 @@ export default function AiListingUsagePage() {
             <ToggleButton value="single">Single Date</ToggleButton>
             <ToggleButton value="range">Date Range</ToggleButton>
           </ToggleButtonGroup>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={timeFilterEnabled ? 'time' : 'date'}
+            onChange={(_, value) => {
+              if (value) setTimeFilterEnabled(value === 'time');
+            }}
+            aria-label="Time filter mode"
+          >
+            <ToggleButton value="date">Date Only</ToggleButton>
+            <ToggleButton value="time">Date + Time</ToggleButton>
+          </ToggleButtonGroup>
           {dateMode === 'single' ? (
-            <TextField
-              label="Date"
-              type="date"
-              size="small"
-              value={singleDate}
-              onChange={(e) => setSingleDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              sx={{ minWidth: 160 }}
-            />
+            timeFilterEnabled ? (
+              <TextField
+                label="Show After"
+                type="datetime-local"
+                size="small"
+                value={singleDateTime}
+                onChange={(e) => setSingleDateTime(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ minWidth: 220 }}
+              />
+            ) : (
+              <TextField
+                label="Date"
+                type="date"
+                size="small"
+                value={singleDate}
+                onChange={(e) => setSingleDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ minWidth: 160 }}
+              />
+            )
           ) : (
             <>
-              <TextField
-                label="Start Date"
-                type="date"
-                size="small"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                sx={{ minWidth: 160 }}
-              />
-              <TextField
-                label="End Date"
-                type="date"
-                size="small"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                sx={{ minWidth: 160 }}
-              />
+              {timeFilterEnabled ? (
+                <>
+                  <TextField
+                    label="Start Date & Time"
+                    type="datetime-local"
+                    size="small"
+                    value={startDateTime}
+                    onChange={(e) => setStartDateTime(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 220 }}
+                  />
+                  <TextField
+                    label="End Date & Time"
+                    type="datetime-local"
+                    size="small"
+                    value={endDateTime}
+                    onChange={(e) => setEndDateTime(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 220 }}
+                  />
+                </>
+              ) : (
+                <>
+                  <TextField
+                    label="Start Date"
+                    type="date"
+                    size="small"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 160 }}
+                  />
+                  <TextField
+                    label="End Date"
+                    type="date"
+                    size="small"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 160 }}
+                  />
+                </>
+              )}
             </>
           )}
           <UsageFilter label="User" allLabel="All Users" value={userFilter} options={filterOptions.users || []} onChange={setUserFilter} />
           <UsageFilter label="Seller" allLabel="All Sellers" value={sellerFilter} options={filterOptions.sellers || []} onChange={setSellerFilter} />
           <UsageFilter label="Template" allLabel="All Templates" value={templateFilter} options={filterOptions.templates || []} onChange={setTemplateFilter} minWidth={220} />
-          <UsageFilter label="IP Address" allLabel="All IPs" value={ipFilter} options={filterOptions.ips || []} onChange={setIpFilter} />
+          <UsageFilter
+            label="IP Address"
+            allLabel="All IPs"
+            value={ipFilter}
+            options={(filterOptions.ips || []).map((option) => ({
+              ...option,
+              label: formatIpAddress(option.label || option.id)
+            }))}
+            onChange={setIpFilter}
+          />
           <Button variant="contained" onClick={fetchUsage} disabled={loading} startIcon={<CalendarMonthIcon />}>
             Apply
           </Button>
@@ -254,42 +400,49 @@ export default function AiListingUsagePage() {
       ) : (
         <>
           <Stack direction="row" spacing={2} sx={{ mb: 3, flexWrap: 'wrap', rowGap: 2 }}>
-            <Card sx={{ flex: 1, minWidth: 190, border: '1px solid #dbeafe', bgcolor: '#eff6ff' }}>
+            <Card sx={{ ...metricCardSx, bgcolor: '#eff6ff' }}>
               <CardContent>
                 <TokenIcon sx={{ color: '#2563eb', mb: 1 }} />
                 <Typography variant="h4" fontWeight={700}>{formatNumber(totals.totalTokens)}</Typography>
                 <Typography variant="body2" color="text.secondary">Total Tokens</Typography>
               </CardContent>
             </Card>
-            <Card sx={{ flex: 1, minWidth: 190, border: '1px solid #dcfce7', bgcolor: '#f0fdf4' }}>
+            <Card sx={{ ...metricCardSx, bgcolor: '#f0fdf4' }}>
               <CardContent>
                 <Inventory2Icon sx={{ color: '#16a34a', mb: 1 }} />
                 <Typography variant="h4" fontWeight={700}>{formatNumber(totals.successfulAsinCount)}</Typography>
+                <Typography variant="body2" color="text.secondary">Distinct ASINs</Typography>
+              </CardContent>
+            </Card>
+            <Card sx={{ ...metricCardSx, bgcolor: '#ecfdf5' }}>
+              <CardContent>
+                <Inventory2Icon sx={{ color: '#059669', mb: 1 }} />
+                <Typography variant="h4" fontWeight={700}>{formatNumber(visibleSuccessfulAsinTotal)}</Typography>
                 <Typography variant="body2" color="text.secondary">Successful ASINs</Typography>
               </CardContent>
             </Card>
-            <Card sx={{ flex: 1, minWidth: 190, border: '1px solid #fef3c7', bgcolor: '#fffbeb' }}>
+            <Card sx={{ ...metricCardSx, bgcolor: '#fffbeb' }}>
               <CardContent>
                 <AutoAwesomeIcon sx={{ color: '#d97706', mb: 1 }} />
                 <Typography variant="h4" fontWeight={700}>{formatNumber(totals.aiCalls)}</Typography>
                 <Typography variant="body2" color="text.secondary">AI Field Calls</Typography>
               </CardContent>
             </Card>
-            <Card sx={{ flex: 1, minWidth: 190, border: '1px solid #e5e7eb', bgcolor: '#f9fafb' }}>
+            <Card sx={{ ...metricCardSx, bgcolor: '#ffffff' }}>
               <CardContent>
                 <StoreIcon sx={{ color: '#374151', mb: 1 }} />
                 <Typography variant="h4" fontWeight={700}>{formatNumber(rows.length)}</Typography>
                 <Typography variant="body2" color="text.secondary">User/Seller/Template/IP Rows</Typography>
               </CardContent>
             </Card>
-            <Card sx={{ flex: 1, minWidth: 190, border: '1px solid #e0e7ff', bgcolor: '#eef2ff' }}>
+            <Card sx={{ ...metricCardSx, bgcolor: '#eef2ff' }}>
               <CardContent>
                 <StoreIcon sx={{ color: '#4f46e5', mb: 1 }} />
                 <Typography variant="h4" fontWeight={700}>{formatNumber(totals.uniqueIpCount)}</Typography>
                 <Typography variant="body2" color="text.secondary">Unique IP Addresses</Typography>
               </CardContent>
             </Card>
-            <Card sx={{ flex: 1, minWidth: 190, border: '1px solid #fee2e2', bgcolor: '#fff1f2' }}>
+            <Card sx={{ ...metricCardSx, bgcolor: '#fff1f2' }}>
               <CardContent>
                 <StoreIcon sx={{ color: '#e11d48', mb: 1 }} />
                 <Typography variant="h4" fontWeight={700}>{formatNumber(repeatedIpCount)}</Typography>
@@ -298,15 +451,15 @@ export default function AiListingUsagePage() {
             </Card>
           </Stack>
 
-          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>Usage By User, Seller, Template, IP</Typography>
-          <TableContainer component={Paper} sx={{ mb: 3, maxHeight: 520 }}>
-            <Table stickyHeader size="small">
+          <Typography variant="h6" fontWeight={800} sx={{ mb: 1.25, color: '#0f172a' }}>Usage By User, Seller, Template, IP</Typography>
+          <TableContainer component={Paper} sx={tableContainerSx}>
+            <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 1560 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>User</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Seller</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>IP Address</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Template</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>User</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 150 }}>Seller</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 170 }}>IP Address</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 190 }}>Template</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Expected AI Fields</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Over Expected Calls</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls / Successful ASINs</TableCell>
@@ -316,7 +469,7 @@ export default function AiListingUsagePage() {
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Prompt</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Output</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Failed</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Last Used</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>Last Used</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -326,8 +479,12 @@ export default function AiListingUsagePage() {
                       No OpenAI listing usage found for this date range.
                     </TableCell>
                   </TableRow>
-                ) : rows.map((row) => (
-                  <TableRow key={`${row.userId || 'unknown'}-${row.sellerId || 'unknown'}-${row.templateId || 'unknown'}-${row.ipAddress || 'unknown'}`} hover>
+                ) : rows.map((row, index) => (
+                  <TableRow
+                    key={`${row.userId || 'unknown'}-${row.sellerId || 'unknown'}-${row.templateId || 'unknown'}-${row.ipAddress || 'unknown'}`}
+                    hover
+                    sx={{ bgcolor: index % 2 === 0 ? '#ffffff' : '#fcfcfd' }}
+                  >
                     <TableCell>
                       <Typography variant="body2" fontWeight={600}>{row.username}</Typography>
                       <Typography variant="caption" color="text.secondary">{row.userRole || row.userEmail || ''}</Typography>
@@ -338,10 +495,14 @@ export default function AiListingUsagePage() {
                     </TableCell>
                     <TableCell>
                       <Tooltip title={`Source: ${row.ipSource || 'unknown'}\n${(row.userAgents || []).join('\n') || 'No user agent recorded'}`}>
-                        <span>{row.ipAddress || '-'}</span>
+                        <span>{formatIpAddress(row.ipAddress)}</span>
                       </Tooltip>
                     </TableCell>
-                    <TableCell>{row.templateName}</TableCell>
+                    <TableCell sx={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <Tooltip title={row.templateName || ''}>
+                        <span>{row.templateName}</span>
+                      </Tooltip>
+                    </TableCell>
                     <TableCell align="right">{formatNumber(row.expectedAiFieldCount)}</TableCell>
                     <TableCell align="right" sx={{ color: (row.overExpectedCalls || 0) > 0 ? 'error.main' : 'text.primary', fontWeight: (row.overExpectedCalls || 0) > 0 ? 700 : 400 }}>
                       {formatNumber(row.overExpectedCalls)}
@@ -357,16 +518,29 @@ export default function AiListingUsagePage() {
                   </TableRow>
                 ))}
               </TableBody>
+              {rows.length > 0 && (
+                <TableFooter>
+                  <TableRow sx={{ '& td': { bgcolor: '#f8fafc', borderTop: '2px solid #dbe3ef', fontWeight: 800 } }}>
+                    <TableCell colSpan={5} align="right">Total</TableCell>
+                    <TableCell align="right" sx={{ color: visibleOverExpectedTotal > 0 ? 'error.main' : 'text.primary' }}>
+                      {formatNumber(visibleOverExpectedTotal)}
+                    </TableCell>
+                    <TableCell />
+                    <TableCell align="right">{formatNumber(visibleSuccessfulAsinTotal)}</TableCell>
+                    <TableCell colSpan={6} />
+                  </TableRow>
+                </TableFooter>
+              )}
             </Table>
           </TableContainer>
 
-          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>IP Summary</Typography>
-          <TableContainer component={Paper} sx={{ mb: 3, maxHeight: 520 }}>
-            <Table stickyHeader size="small">
+          <Typography variant="h6" fontWeight={800} sx={{ mb: 1.25, color: '#0f172a' }}>IP Summary</Typography>
+          <TableContainer component={Paper} sx={tableContainerSx}>
+            <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 1480 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>IP Address</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Source</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 210 }}>IP Address</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 150 }}>Source</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Repeated?</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Times Used</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls / Successful ASINs</TableCell>
@@ -376,8 +550,8 @@ export default function AiListingUsagePage() {
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Users</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Sellers</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Templates</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>First Seen</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Last Seen</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 190 }}>First Seen</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>Last Seen</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -387,9 +561,9 @@ export default function AiListingUsagePage() {
                       No IP usage found.
                     </TableCell>
                   </TableRow>
-                ) : ipBreakdown.map((row) => (
-                  <TableRow key={row.ipAddress} hover>
-                    <TableCell sx={{ fontWeight: 600 }}>{row.ipAddress || 'Unknown IP'}</TableCell>
+                ) : ipBreakdown.map((row, index) => (
+                  <TableRow key={row.ipAddress} hover sx={{ bgcolor: index % 2 === 0 ? '#ffffff' : '#fcfcfd' }}>
+                    <TableCell sx={{ fontWeight: 600 }}>{formatIpAddress(row.ipAddress)}</TableCell>
                     <TableCell>{(row.ipSources || []).join(', ') || 'unknown'}</TableCell>
                     <TableCell>{(row.userCount || 0) > 1 ? 'Yes' : 'No'}</TableCell>
                     <TableCell align="right">{formatNumber(row.aiCalls)}</TableCell>
@@ -408,12 +582,12 @@ export default function AiListingUsagePage() {
             </Table>
           </TableContainer>
 
-          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>Token Usage By Field</Typography>
-          <TableContainer component={Paper} sx={{ mb: 3, maxHeight: 520 }}>
-            <Table stickyHeader size="small">
+          <Typography variant="h6" fontWeight={800} sx={{ mb: 1.25, color: '#0f172a' }}>Token Usage By Field</Typography>
+          <TableContainer component={Paper} sx={tableContainerSx}>
+            <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 980 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Field</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 260 }}>Field</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls / Successful ASINs</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Successful ASINs</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
@@ -430,7 +604,7 @@ export default function AiListingUsagePage() {
                     </TableCell>
                   </TableRow>
                 ) : fieldBreakdown.map((row, index) => (
-                  <TableRow key={row.fieldName || `field-${index}`} hover>
+                  <TableRow key={row.fieldName || `field-${index}`} hover sx={{ bgcolor: index % 2 === 0 ? '#ffffff' : '#fcfcfd' }}>
                     <TableCell>{row.fieldName || 'Unknown field'}</TableCell>
                     <TableCell align="right">{formatCallsPerAsin(row.aiCalls, row.successfulAsinCount)}</TableCell>
                     <TableCell align="right">{formatNumber(row.successfulAsinCount)}</TableCell>
@@ -444,91 +618,6 @@ export default function AiListingUsagePage() {
             </Table>
           </TableContainer>
 
-          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>Repeated Field Calls By ASIN</Typography>
-          <TableContainer component={Paper} sx={{ mb: 3, maxHeight: 520 }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Field</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>ASIN</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Successful Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Failed Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tokens</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Prompt Tokens</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Output Tokens</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>First Used</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Last Used</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {fieldAsinBreakdown.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                      No repeated field calls found for this filter.
-                    </TableCell>
-                  </TableRow>
-                ) : fieldAsinBreakdown.map((row, index) => (
-                  <TableRow key={`${row.fieldName || 'field'}-${row.asin || 'asin'}-${index}`} hover>
-                    <TableCell>{row.fieldName || 'Unknown field'}</TableCell>
-                    <TableCell>{row.asin || 'Unknown ASIN'}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>{formatNumber(row.aiCalls)}</TableCell>
-                    <TableCell align="right">{formatNumber(row.successfulCalls)}</TableCell>
-                    <TableCell align="right">{formatNumber(row.failedCalls)}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>{formatNumber(row.totalTokens)}</TableCell>
-                    <TableCell align="right">{formatNumber(row.promptTokens)}</TableCell>
-                    <TableCell align="right">{formatNumber(row.completionTokens)}</TableCell>
-                    <TableCell>{formatDateTime(row.firstUsedAt)}</TableCell>
-                    <TableCell>{formatDateTime(row.lastUsedAt)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>ASINs Over Expected AI Calls</Typography>
-          <TableContainer component={Paper} sx={{ maxHeight: 520 }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Seller</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Template</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>ASIN</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Expected AI Fields</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Actual AI Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Over Expected</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Unique Fields</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Successful Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Failed Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tokens</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Last Used</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {asinCallBreakdown.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={11} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                      No ASINs exceeded the expected AI field count for this filter.
-                    </TableCell>
-                  </TableRow>
-                ) : asinCallBreakdown.map((row, index) => (
-                  <TableRow key={`${row.sellerId || 'seller'}-${row.templateId || 'template'}-${row.asin || 'asin'}-${index}`} hover>
-                    <TableCell>{row.sellerName || 'Unknown seller'}</TableCell>
-                    <TableCell>{row.templateName || 'Unknown template'}</TableCell>
-                    <TableCell>{row.asin || 'Unknown ASIN'}</TableCell>
-                    <TableCell align="right">{formatNumber(row.expectedAiFieldCount)}</TableCell>
-                    <TableCell align="right">{formatNumber(row.aiCalls)}</TableCell>
-                    <TableCell align="right" sx={{ color: 'error.main', fontWeight: 700 }}>{formatNumber(row.overExpectedCalls)}</TableCell>
-                    <TableCell align="right">{formatNumber(row.fieldCount)}</TableCell>
-                    <TableCell align="right">{formatNumber(row.successfulCalls)}</TableCell>
-                    <TableCell align="right">{formatNumber(row.failedCalls)}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>{formatNumber(row.totalTokens)}</TableCell>
-                    <TableCell>{formatDateTime(row.lastUsedAt)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
         </>
       )}
     </Container>
