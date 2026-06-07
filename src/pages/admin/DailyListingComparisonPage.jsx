@@ -301,8 +301,12 @@ export default function DailyListingComparisonPage() {
             const totalVolume = (row.successfulListings || 0) + (row.endedListings || 0);
             const progress = maxVolume > 0 ? Math.max(4, Math.round((totalVolume / maxVolume) * 100)) : 0;
             const marketplaceBreakdown = [...(row.marketplaces || [])]
-              .filter(marketplace => (marketplace.successfulListings || 0) > 0)
-              .sort((a, b) => (b.successfulListings || 0) - (a.successfulListings || 0));
+              .filter(marketplace => (marketplace.successfulListings || 0) > 0 || (marketplace.endedListings || 0) > 0)
+              .sort((a, b) => {
+                const bTotal = (b.successfulListings || 0) + (b.endedListings || 0);
+                const aTotal = (a.successfulListings || 0) + (a.endedListings || 0);
+                return bTotal - aTotal;
+              });
             return (
               <Card
                 key={row.sellerId || row.sellerName}
@@ -349,21 +353,27 @@ export default function DailyListingComparisonPage() {
                   {marketplaceBreakdown.length > 0 && (
                     <Box sx={{ mt: 1.5 }}>
                       <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: 'block', mb: 0.75 }}>
-                        Successful by marketplace
+                        Marketplace breakdown
                       </Typography>
                       <Stack direction="row" flexWrap="wrap" gap={0.75}>
                         {marketplaceBreakdown.map((marketplace) => (
                           <Chip
                             key={marketplace.country}
                             size="small"
-                            label={`${countryLabel(marketplace.country)} ${numberFmt.format(marketplace.successfulListings || 0)}`}
+                            label={`${countryLabel(marketplace.country)} +${numberFmt.format(marketplace.successfulListings || 0)} / -${numberFmt.format(marketplace.endedListings || 0)}`}
                             sx={{
                               height: 24,
                               borderRadius: `${dashboardSignatureTokens.radius.pill}px`,
                               border: '1px solid',
-                              borderColor: dashboardSignatureTokens.tones.success.border,
-                              backgroundColor: dashboardSignatureTokens.tones.success.background,
-                              color: dashboardSignatureTokens.tones.success.color,
+                              borderColor: (marketplace.netListings || 0) >= 0
+                                ? dashboardSignatureTokens.tones.success.border
+                                : dashboardSignatureTokens.tones.warning.border,
+                              backgroundColor: (marketplace.netListings || 0) >= 0
+                                ? dashboardSignatureTokens.tones.success.background
+                                : dashboardSignatureTokens.tones.warning.background,
+                              color: (marketplace.netListings || 0) >= 0
+                                ? dashboardSignatureTokens.tones.success.color
+                                : dashboardSignatureTokens.tones.warning.color,
                               fontWeight: 700,
                               '& .MuiChip-label': { px: 1 }
                             }}

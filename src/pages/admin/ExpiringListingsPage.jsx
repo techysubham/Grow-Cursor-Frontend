@@ -56,6 +56,13 @@ const COUNTRY_OPTIONS = [
   { value: 'GBP', label: '\uD83C\uDDEC\uD83C\uDDE7 eBay UK' },
 ];
 
+const CURRENCY_TO_COUNTRY = {
+  USD: 'US',
+  AUD: 'AU',
+  CAD: 'Canada',
+  GBP: 'UK',
+};
+
 // ─── component ────────────────────────────────────────────────────────────────
 
 export default function ExpiringListingsPage() {
@@ -217,6 +224,8 @@ export default function ExpiringListingsPage() {
           itemId: item.itemId,
           endingReason: 'NotAvailable',
           source: 'expiry_listing',
+          country: CURRENCY_TO_COUNTRY[item.currency] || item.country || null,
+          marketplaceId: item.marketplaceId || null,
         });
         results.success.push(item.itemId);
       } catch (err) {
