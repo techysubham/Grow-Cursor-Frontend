@@ -58,6 +58,35 @@ const countryLabel = (country) => {
 
 const formatSignedNumber = (value) => `${value >= 0 ? '+' : ''}${numberFmt.format(value)}`;
 
+const TARGET_PROGRESS_SELLERS = new Set([
+  
+  'techmania',
+  'truxi',
+  'raveoli_cart',
+  'techvista',
+  'valueventure',
+  'ultimate',
+  'edgevolution',
+]);
+
+const isTargetProgressSeller = (sellerName = '') => (
+  TARGET_PROGRESS_SELLERS.has(String(sellerName).trim().toLowerCase())
+);
+
+const getSellerProgressConfig = (sellerName) => (
+  isTargetProgressSeller(sellerName)
+    ? { targetQuantity: 800, greenThreshold: 750 }
+    : { targetQuantity: 300, greenThreshold: 275 }
+);
+
+const getUsSuccessfulListings = (row) => (
+  row.usSuccessfulListings ?? (row.marketplaces || []).reduce((sum, marketplace) => (
+    marketplace.country === 'US'
+      ? sum + (marketplace.successfulListings || 0)
+      : sum
+  ), 0)
+);
+
 const getDateLabel = (filter) => {
   if (filter.mode === 'range') {
     if (filter.from && filter.to) return `${filter.from} to ${filter.to}`;
@@ -161,11 +190,6 @@ export default function DailyListingComparisonPage() {
     },
     { successfulListings: 0, endedListings: 0, netListings: 0 }
   ), [displayedRows]);
-
-  const maxVolume = useMemo(() => displayedRows.reduce((max, row) => {
-    const total = (row.successfulListings || 0) + (row.endedListings || 0);
-    return Math.max(max, total);
-  }, 0), [displayedRows]);
 
   const hasPendingFilterChanges = JSON.stringify(draftDateFilter) !== JSON.stringify(appliedDateFilter);
 
@@ -350,8 +374,11 @@ export default function DailyListingComparisonPage() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' }, gap: 1.5 }}>
           {displayedRows.map((row, index) => {
             const isPositive = row.netListings >= 0;
-            const totalVolume = (row.successfulListings || 0) + (row.endedListings || 0);
-            const progress = maxVolume > 0 ? Math.max(4, Math.round((totalVolume / maxVolume) * 100)) : 0;
+            const { targetQuantity, greenThreshold } = getSellerProgressConfig(row.sellerName);
+            const usSuccessfulListings = getUsSuccessfulListings(row);
+            const targetProgress = Math.min(100, Math.round((usSuccessfulListings / targetQuantity) * 100));
+            const progress = Math.max(usSuccessfulListings > 0 ? 4 : 0, targetProgress);
+            const isTargetMet = usSuccessfulListings >= greenThreshold;
             const marketplaceBreakdown = [...(row.marketplaces || [])]
               .filter(marketplace => (marketplace.successfulListings || 0) > 0 || (marketplace.endedListings || 0) > 0)
               .map(marketplace => ({
@@ -491,8 +518,12 @@ export default function DailyListingComparisonPage() {
                   )}
                   <Box sx={{ mt: 1.75 }}>
                     <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={700}>Total activity vs busiest seller</Typography>
-                      <Typography variant="caption" color="text.secondary">{numberFmt.format(totalVolume)}</Typography>
+                      <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                        US successful vs target
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {`${numberFmt.format(usSuccessfulListings)} / ${numberFmt.format(targetQuantity)}`}
+                      </Typography>
                     </Stack>
                     <LinearProgress
                       variant="determinate"
@@ -503,7 +534,7 @@ export default function DailyListingComparisonPage() {
                         backgroundColor: 'action.hover',
                         '& .MuiLinearProgress-bar': {
                           borderRadius: 999,
-                          backgroundColor: isPositive ? dashboardSignatureTokens.tones.success.color : dashboardSignatureTokens.tones.warning.color
+                          backgroundColor: isTargetMet ? dashboardSignatureTokens.tones.success.color : 'error.main'
                         }
                       }}
                     />
