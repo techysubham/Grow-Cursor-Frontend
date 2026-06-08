@@ -77,17 +77,7 @@ function formatDateTime(value) {
 }
 
 function getDuplicateAsinSummary(runs = [], expectedAiFieldCount = 0) {
-  const expectedCount = Math.max(0, Number(expectedAiFieldCount || 0));
-  const counts = getAsinRunCounts(runs);
-  const duplicateAsins = counts
-    .filter((item) => item.count > expectedCount)
-    .map(({ asin, count }) => ({
-      asin,
-      count,
-      expectedCount,
-      extraCount: count - expectedCount
-    }))
-    .sort((a, b) => b.extraCount - a.extraCount || b.count - a.count);
+  const duplicateAsins = getAsinRunGroups(runs, expectedAiFieldCount).overExpected;
   return {
     duplicateAsins,
     duplicateRunCount: duplicateAsins.reduce((sum, item) => sum + item.count, 0),
@@ -99,24 +89,27 @@ function getDuplicateAsinCount(row) {
   return getDuplicateAsinSummary(row?.successfulAsinRuns, row?.expectedAiFieldCount).duplicateAsins.length;
 }
 
-function getAsinRunCounts(runs = []) {
-  const counts = runs.reduce((acc, run) => {
-    if (run.asin) acc[run.asin] = (acc[run.asin] || 0) + 1;
-    return acc;
-  }, {});
-  return Object.entries(counts)
-    .map(([asin, count]) => ({ asin, count }))
-    .sort((a, b) => a.asin.localeCompare(b.asin));
-}
-
 function getAsinRunGroups(runs = [], expectedAiFieldCount = 0) {
   const expectedCount = Math.max(0, Number(expectedAiFieldCount || 0));
-  const counts = getAsinRunCounts(runs);
+  const byAsin = runs.reduce((acc, run) => {
+    if (!run.asin) return acc;
+    acc[run.asin] = (acc[run.asin] || 0) + 1;
+    return acc;
+  }, {});
+
+  const items = Object.entries(byAsin)
+    .map(([asin, count]) => ({
+      asin,
+      count,
+      extraCount: Math.max(0, count - expectedCount)
+    }))
+    .sort((a, b) => a.asin.localeCompare(b.asin));
+
   return {
-    withinExpected: counts.filter((item) => item.count <= expectedCount),
-    overExpected: counts
+    withinExpected: items.filter((item) => item.count <= expectedCount),
+    overExpected: items
       .filter((item) => item.count > expectedCount)
-      .map((item) => ({ ...item, extraCount: item.count - expectedCount }))
+      .sort((a, b) => b.extraCount - a.extraCount || b.count - a.count)
   };
 }
 
@@ -526,7 +519,7 @@ export default function AiListingUsagePage() {
 
           <Typography variant="h6" fontWeight={800} sx={{ mb: 1.25, color: '#0f172a' }}>Usage By User, Seller, Template, IP</Typography>
           <TableContainer component={Paper} sx={tableContainerSx}>
-            <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 1680 }}>
+            <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 1840 }}>
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>User</TableCell>
@@ -543,19 +536,20 @@ export default function AiListingUsagePage() {
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Prompt</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Output</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Failed</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>Run Started</TableCell>
                   <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>Last Used</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={15} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                    <TableCell colSpan={16} align="center" sx={{ py: 5, color: 'text.secondary' }}>
                       No OpenAI listing usage found for this date range.
                     </TableCell>
                   </TableRow>
                 ) : rows.map((row, index) => (
                   <TableRow
-                    key={`${row.userId || 'unknown'}-${row.sellerId || 'unknown'}-${row.templateId || 'unknown'}-${row.ipAddress || 'unknown'}`}
+                    key={`${row.userId || 'unknown'}-${row.sellerId || 'unknown'}-${row.templateId || 'unknown'}-${row.ipAddress || 'unknown'}-${row.aiRunId || index}`}
                     hover
                     sx={{ bgcolor: index % 2 === 0 ? '#ffffff' : '#fcfcfd' }}
                   >
@@ -610,6 +604,7 @@ export default function AiListingUsagePage() {
                     <TableCell align="right">{formatNumber(row.promptTokens)}</TableCell>
                     <TableCell align="right">{formatNumber(row.completionTokens)}</TableCell>
                     <TableCell align="right">{formatNumber(row.failedCalls)}</TableCell>
+                    <TableCell>{formatDateTime(row.aiRunStartedAt || row.firstUsedAt)}</TableCell>
                     <TableCell>{formatDateTime(row.lastUsedAt)}</TableCell>
                   </TableRow>
                 ))}
@@ -624,7 +619,7 @@ export default function AiListingUsagePage() {
                     <TableCell />
                     <TableCell align="right">{formatNumber(visibleSuccessfulAsinTotal)}</TableCell>
                     <TableCell />
-                    <TableCell colSpan={6} />
+                    <TableCell colSpan={7} />
                   </TableRow>
                 </TableFooter>
               )}
@@ -645,7 +640,7 @@ export default function AiListingUsagePage() {
                 <Chip label={`${formatNumber(asinDialogRow?.successfulAsinCount)} distinct ASINs`} color="success" variant="outlined" />
                 <Chip label={`${formatNumber(asinDialogRow?.successfulAsinRunCount)} successful runs`} color="primary" variant="outlined" />
                 <Chip
-                  label={`${formatNumber(asinDialogDuplicateSummary.duplicateAsins.length)} ASINs over expected fields`}
+                  label={`${formatNumber(asinDialogDuplicateSummary.duplicateAsins.length)} ASINs over expected in this run`}
                   color={asinDialogDuplicateSummary.duplicateAsins.length ? 'warning' : 'default'}
                   variant="outlined"
                 />
@@ -677,7 +672,11 @@ export default function AiListingUsagePage() {
                   ) : (
                     <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
                       {asinDialogGroups.withinExpected.map((item) => (
-                        <Chip key={item.asin} label={`${item.asin} x ${item.count}`} size="small" />
+                        <Chip
+                          key={item.asin}
+                          label={`${item.asin} x ${item.count}`}
+                          size="small"
+                        />
                       ))}
                     </Stack>
                   )}
@@ -686,7 +685,7 @@ export default function AiListingUsagePage() {
                 <Box>
                   <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
                     <Typography variant="subtitle2" fontWeight={800}>
-                      ASINs over Expected AI Fields ({formatNumber(asinDialogGroups.overExpected.length)})
+                      ASINs over Expected AI Fields in this run ({formatNumber(asinDialogGroups.overExpected.length)})
                     </Typography>
                     <Button
                       size="small"
