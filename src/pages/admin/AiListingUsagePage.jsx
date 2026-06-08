@@ -269,6 +269,10 @@ export default function AiListingUsagePage() {
     () => rows.reduce((sum, row) => sum + Number(row.successfulAsinCount || 0), 0),
     [rows]
   );
+  const visibleSavedTotal = useMemo(
+    () => rows.reduce((sum, row) => sum + Number(row.savedCount || 0), 0),
+    [rows]
+  );
   const visibleOverExpectedTotal = useMemo(
     () => rows.reduce((sum, row) => sum + Number(row.overExpectedCalls || 0), 0),
     [rows]
@@ -530,6 +534,7 @@ export default function AiListingUsagePage() {
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Over Expected Calls</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls / Successful ASINs</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Successful ASINs</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Saved</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Duplicate ASINs</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tokens</TableCell>
@@ -543,7 +548,7 @@ export default function AiListingUsagePage() {
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={16} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                    <TableCell colSpan={17} align="center" sx={{ py: 5, color: 'text.secondary' }}>
                       No OpenAI listing usage found for this date range.
                     </TableCell>
                   </TableRow>
@@ -587,6 +592,9 @@ export default function AiListingUsagePage() {
                         {formatNumber(row.successfulAsinCount)}
                       </Button>
                     </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      {formatNumber(row.savedCount)}
+                    </TableCell>
                     <TableCell align="right">
                       <Button
                         size="small"
@@ -618,6 +626,7 @@ export default function AiListingUsagePage() {
                     </TableCell>
                     <TableCell />
                     <TableCell align="right">{formatNumber(visibleSuccessfulAsinTotal)}</TableCell>
+                    <TableCell align="right">{formatNumber(visibleSavedTotal)}</TableCell>
                     <TableCell />
                     <TableCell colSpan={7} />
                   </TableRow>
