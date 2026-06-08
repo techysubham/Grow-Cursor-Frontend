@@ -6,8 +6,13 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   CircularProgress,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Paper,
   Stack,
   Table,
@@ -25,6 +30,7 @@ import {
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import StoreIcon from '@mui/icons-material/Store';
@@ -68,6 +74,43 @@ function formatCallsPerAsin(aiCalls, successfulAsinCount) {
 function formatDateTime(value) {
   if (!value) return '-';
   return new Date(value).toLocaleString();
+}
+
+function getDuplicateAsinSummary(runs = [], expectedAiFieldCount = 0) {
+  const duplicateAsins = getAsinRunGroups(runs, expectedAiFieldCount).overExpected;
+  return {
+    duplicateAsins,
+    duplicateRunCount: duplicateAsins.reduce((sum, item) => sum + item.count, 0),
+    extraRunCount: duplicateAsins.reduce((sum, item) => sum + item.extraCount, 0)
+  };
+}
+
+function getDuplicateAsinCount(row) {
+  return getDuplicateAsinSummary(row?.successfulAsinRuns, row?.expectedAiFieldCount).duplicateAsins.length;
+}
+
+function getAsinRunGroups(runs = [], expectedAiFieldCount = 0) {
+  const expectedCount = Math.max(0, Number(expectedAiFieldCount || 0));
+  const byAsin = runs.reduce((acc, run) => {
+    if (!run.asin) return acc;
+    acc[run.asin] = (acc[run.asin] || 0) + 1;
+    return acc;
+  }, {});
+
+  const items = Object.entries(byAsin)
+    .map(([asin, count]) => ({
+      asin,
+      count,
+      extraCount: Math.max(0, count - expectedCount)
+    }))
+    .sort((a, b) => a.asin.localeCompare(b.asin));
+
+  return {
+    withinExpected: items.filter((item) => item.count <= expectedCount),
+    overExpected: items
+      .filter((item) => item.count > expectedCount)
+      .sort((a, b) => b.extraCount - a.extraCount || b.count - a.count)
+  };
 }
 
 function formatIpAddress(value) {
@@ -130,6 +173,8 @@ export default function AiListingUsagePage() {
   const [sellerFilter, setSellerFilter] = useState('all');
   const [templateFilter, setTemplateFilter] = useState('all');
   const [ipFilter, setIpFilter] = useState('all');
+  const [asinDialogRow, setAsinDialogRow] = useState(null);
+  const [copiedAsinGroup, setCopiedAsinGroup] = useState('');
 
   const fetchUsage = async (overrides = {}) => {
     try {
@@ -212,6 +257,10 @@ export default function AiListingUsagePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    setCopiedAsinGroup('');
+  }, [asinDialogRow]);
+
   const repeatedIpCount = useMemo(
     () => ipBreakdown.filter((row) => (row.userCount || 0) > 1).length,
     [ipBreakdown]
@@ -220,10 +269,31 @@ export default function AiListingUsagePage() {
     () => rows.reduce((sum, row) => sum + Number(row.successfulAsinCount || 0), 0),
     [rows]
   );
+  const visibleSavedTotal = useMemo(
+    () => rows.reduce((sum, row) => sum + Number(row.savedCount || 0), 0),
+    [rows]
+  );
   const visibleOverExpectedTotal = useMemo(
     () => rows.reduce((sum, row) => sum + Number(row.overExpectedCalls || 0), 0),
     [rows]
   );
+  const asinDialogRuns = asinDialogRow?.successfulAsinRuns || [];
+  const asinDialogDuplicateSummary = useMemo(
+    () => getDuplicateAsinSummary(asinDialogRuns, asinDialogRow?.expectedAiFieldCount),
+    [asinDialogRuns, asinDialogRow?.expectedAiFieldCount]
+  );
+  const asinDialogGroups = useMemo(
+    () => getAsinRunGroups(asinDialogRuns, asinDialogRow?.expectedAiFieldCount),
+    [asinDialogRuns, asinDialogRow?.expectedAiFieldCount]
+  );
+
+  const copyAsins = async (items, groupName) => {
+    const text = items.map((item) => item.asin).join('\n');
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopiedAsinGroup(groupName);
+    setTimeout(() => setCopiedAsinGroup(''), 1600);
+  };
 
   const tableContainerSx = {
     mb: 3,
@@ -453,7 +523,7 @@ export default function AiListingUsagePage() {
 
           <Typography variant="h6" fontWeight={800} sx={{ mb: 1.25, color: '#0f172a' }}>Usage By User, Seller, Template, IP</Typography>
           <TableContainer component={Paper} sx={tableContainerSx}>
-            <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 1560 }}>
+            <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 1840 }}>
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>User</TableCell>
@@ -464,24 +534,27 @@ export default function AiListingUsagePage() {
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Over Expected Calls</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls / Successful ASINs</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Successful ASINs</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Saved</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Duplicate ASINs</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tokens</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Prompt</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Output</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Failed</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>Run Started</TableCell>
                   <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>Last Used</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                    <TableCell colSpan={17} align="center" sx={{ py: 5, color: 'text.secondary' }}>
                       No OpenAI listing usage found for this date range.
                     </TableCell>
                   </TableRow>
                 ) : rows.map((row, index) => (
                   <TableRow
-                    key={`${row.userId || 'unknown'}-${row.sellerId || 'unknown'}-${row.templateId || 'unknown'}-${row.ipAddress || 'unknown'}`}
+                    key={`${row.userId || 'unknown'}-${row.sellerId || 'unknown'}-${row.templateId || 'unknown'}-${row.ipAddress || 'unknown'}-${row.aiRunId || index}`}
                     hover
                     sx={{ bgcolor: index % 2 === 0 ? '#ffffff' : '#fcfcfd' }}
                   >
@@ -508,12 +581,38 @@ export default function AiListingUsagePage() {
                       {formatNumber(row.overExpectedCalls)}
                     </TableCell>
                     <TableCell align="right">{formatCallsPerAsin(row.aiCalls, row.successfulAsinCount)}</TableCell>
-                    <TableCell align="right">{formatNumber(row.successfulAsinCount)}</TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => setAsinDialogRow(row)}
+                        disabled={!row.successfulAsinRunCount}
+                        sx={{ minWidth: 0, px: 0.75, fontWeight: 800 }}
+                      >
+                        {formatNumber(row.successfulAsinCount)}
+                      </Button>
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      {formatNumber(row.savedCount)}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        variant={getDuplicateAsinCount(row) > 0 ? 'contained' : 'text'}
+                        color={getDuplicateAsinCount(row) > 0 ? 'warning' : 'inherit'}
+                        onClick={() => setAsinDialogRow(row)}
+                        disabled={!row.successfulAsinRunCount}
+                        sx={{ minWidth: 0, px: 0.75, fontWeight: 800 }}
+                      >
+                        {formatNumber(getDuplicateAsinCount(row))}
+                      </Button>
+                    </TableCell>
                     <TableCell align="right">{formatNumber(row.aiCalls)}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>{formatNumber(row.totalTokens)}</TableCell>
                     <TableCell align="right">{formatNumber(row.promptTokens)}</TableCell>
                     <TableCell align="right">{formatNumber(row.completionTokens)}</TableCell>
                     <TableCell align="right">{formatNumber(row.failedCalls)}</TableCell>
+                    <TableCell>{formatDateTime(row.aiRunStartedAt || row.firstUsedAt)}</TableCell>
                     <TableCell>{formatDateTime(row.lastUsedAt)}</TableCell>
                   </TableRow>
                 ))}
@@ -527,12 +626,137 @@ export default function AiListingUsagePage() {
                     </TableCell>
                     <TableCell />
                     <TableCell align="right">{formatNumber(visibleSuccessfulAsinTotal)}</TableCell>
-                    <TableCell colSpan={6} />
+                    <TableCell align="right">{formatNumber(visibleSavedTotal)}</TableCell>
+                    <TableCell />
+                    <TableCell colSpan={7} />
                   </TableRow>
                 </TableFooter>
               )}
             </Table>
           </TableContainer>
+
+          <Dialog open={Boolean(asinDialogRow)} onClose={() => setAsinDialogRow(null)} maxWidth="md" fullWidth>
+            <DialogTitle sx={{ pr: 3 }}>
+              Successful ASIN Runs
+              {asinDialogRow && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {asinDialogRow.username} - {asinDialogRow.sellerName} - {formatIpAddress(asinDialogRow.ipAddress)} - {asinDialogRow.templateName}
+                </Typography>
+              )}
+            </DialogTitle>
+            <DialogContent dividers>
+              <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', rowGap: 1 }}>
+                <Chip label={`${formatNumber(asinDialogRow?.successfulAsinCount)} distinct ASINs`} color="success" variant="outlined" />
+                <Chip label={`${formatNumber(asinDialogRow?.successfulAsinRunCount)} successful runs`} color="primary" variant="outlined" />
+                <Chip
+                  label={`${formatNumber(asinDialogDuplicateSummary.duplicateAsins.length)} ASINs over expected in this run`}
+                  color={asinDialogDuplicateSummary.duplicateAsins.length ? 'warning' : 'default'}
+                  variant="outlined"
+                />
+                <Chip
+                  label={`${formatNumber(asinDialogDuplicateSummary.extraRunCount)} extra runs`}
+                  color={asinDialogDuplicateSummary.extraRunCount ? 'warning' : 'default'}
+                  variant="outlined"
+                />
+              </Stack>
+
+              <Stack spacing={2} sx={{ mb: 2 }}>
+                <Box>
+                  <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                    <Typography variant="subtitle2" fontWeight={800}>
+                      Distinct ASINs not over Expected AI Fields ({formatNumber(asinDialogGroups.withinExpected.length)})
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<ContentCopyIcon fontSize="small" />}
+                      onClick={() => copyAsins(asinDialogGroups.withinExpected, 'within')}
+                      disabled={asinDialogGroups.withinExpected.length === 0}
+                    >
+                      {copiedAsinGroup === 'within' ? 'Copied' : 'Copy ASINs'}
+                    </Button>
+                  </Stack>
+                  {asinDialogGroups.withinExpected.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">No ASINs stayed within the expected run count.</Typography>
+                  ) : (
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+                      {asinDialogGroups.withinExpected.map((item) => (
+                        <Chip
+                          key={item.asin}
+                          label={`${item.asin} x ${item.count}`}
+                          size="small"
+                        />
+                      ))}
+                    </Stack>
+                  )}
+                </Box>
+
+                <Box>
+                  <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                    <Typography variant="subtitle2" fontWeight={800}>
+                      ASINs over Expected AI Fields in this run ({formatNumber(asinDialogGroups.overExpected.length)})
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="warning"
+                      startIcon={<ContentCopyIcon fontSize="small" />}
+                      onClick={() => copyAsins(asinDialogGroups.overExpected, 'over')}
+                      disabled={asinDialogGroups.overExpected.length === 0}
+                    >
+                      {copiedAsinGroup === 'over' ? 'Copied' : 'Copy ASINs'}
+                    </Button>
+                  </Stack>
+                  {asinDialogGroups.overExpected.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">No ASINs ran more than Expected AI Fields.</Typography>
+                  ) : (
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+                      {asinDialogGroups.overExpected.map((item) => (
+                        <Chip
+                          key={item.asin}
+                          label={`${item.asin} x ${item.count} (${item.extraCount} extra)`}
+                          color="warning"
+                          size="small"
+                        />
+                      ))}
+                    </Stack>
+                  )}
+                </Box>
+              </Stack>
+
+              <TableContainer component={Paper} sx={{ maxHeight: 420, border: '1px solid #e5e7eb' }}>
+                <Table stickyHeader size="small" sx={tableSx}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>#</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>ASIN</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Field</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Run Time</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {asinDialogRuns.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                          No successful ASIN runs recorded for this row.
+                        </TableCell>
+                      </TableRow>
+                    ) : asinDialogRuns.map((run, index) => (
+                      <TableRow key={`${run.asin}-${run.fieldName || 'field'}-${run.timestamp || index}-${index}`}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: 700 }}>{run.asin}</TableCell>
+                        <TableCell>{run.fieldName || 'Unknown field'}</TableCell>
+                        <TableCell>{formatDateTime(run.timestamp)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setAsinDialogRow(null)}>Close</Button>
+            </DialogActions>
+          </Dialog>
 
           <Typography variant="h6" fontWeight={800} sx={{ mb: 1.25, color: '#0f172a' }}>IP Summary</Typography>
           <TableContainer component={Paper} sx={tableContainerSx}>
