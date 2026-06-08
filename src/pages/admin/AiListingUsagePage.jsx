@@ -119,6 +119,14 @@ function formatIpAddress(value) {
   return label ? `${value} (${label})` : value;
 }
 
+function HeaderTooltip({ title, children }) {
+  return (
+    <Tooltip title={title} arrow placement="top">
+      <span>{children}</span>
+    </Tooltip>
+  );
+}
+
 function findSelectedOption(options, id, allLabel) {
   if (!id || id === 'all') return { id: 'all', label: allLabel };
   return options.find((option) => option.id === id) || { id, label: id };
@@ -526,23 +534,23 @@ export default function AiListingUsagePage() {
             <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 1840 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>User</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 150 }}>Seller</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 170 }}>IP Address</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 190 }}>Template</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Expected AI Fields</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Over Expected Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls / Successful ASINs</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Successful ASINs</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Saved</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Duplicate ASINs</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tokens</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Prompt</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Output</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Failed</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>Run Started</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>Last Used</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}><HeaderTooltip title="User who triggered the OpenAI listing generation or saved a zero-call duplicate run.">User</HeaderTooltip></TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 150 }}><HeaderTooltip title="Seller selected for this listing generation run.">Seller</HeaderTooltip></TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 170 }}><HeaderTooltip title="Client IP captured for OpenAI calls. Zero-call duplicate rows show No OpenAI calls.">IP Address</HeaderTooltip></TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 190 }}><HeaderTooltip title="Template whose ASIN automation fields were used for this run.">Template</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Number of enabled AI-sourced fields configured on the effective template.">Expected AI Fields</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="AI calls above the expected count for the successful ASINs in this row.">Over Expected Calls</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Average OpenAI calls made per distinct successful ASIN.">AI Calls / Successful ASINs</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Distinct ASINs with at least one successful OpenAI field call. Duplicate-only skipped rows can be 0.">Successful ASINs</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Listings saved from the review flow for this run, including duplicate-update saves with zero AI calls.">Saved</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="ASINs whose successful OpenAI call count exceeded the expected AI field count. This measures repeated AI generation, not duplicate_updateable listings.">Duplicate ASINs</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Total OpenAI requests recorded for this row.">AI Calls</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Total OpenAI tokens used, including prompt and output tokens.">Total Tokens</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Tokens sent to OpenAI in prompts.">Prompt</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Tokens generated by OpenAI in responses.">Output</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="OpenAI calls that failed and fell back to defaults or error handling.">Failed</HeaderTooltip></TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}><HeaderTooltip title="When this AI run started, or when a zero-call duplicate save run was recorded.">Run Started</HeaderTooltip></TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}><HeaderTooltip title="Most recent OpenAI call time or saved duplicate-run time for this row.">Last Used</HeaderTooltip></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -763,19 +771,19 @@ export default function AiListingUsagePage() {
             <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 1480 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 210 }}>IP Address</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 150 }}>Source</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Repeated?</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Times Used</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls / Successful ASINs</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Successful ASINs</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tokens</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Users</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Sellers</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Templates</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 190 }}>First Seen</TableCell>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}>Last Seen</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 210 }}><HeaderTooltip title="Client IP address recorded on OpenAI usage rows.">IP Address</HeaderTooltip></TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 150 }}><HeaderTooltip title="Header or request field used to resolve the client IP.">Source</HeaderTooltip></TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}><HeaderTooltip title="Yes when more than one user appears under the same IP.">Repeated?</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Total OpenAI calls recorded from this IP.">Times Used</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Average OpenAI calls made per distinct successful ASIN from this IP.">AI Calls / Successful ASINs</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Distinct ASINs with at least one successful OpenAI call from this IP.">Successful ASINs</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Total OpenAI requests recorded from this IP.">AI Calls</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Total OpenAI prompt plus output tokens from this IP.">Total Tokens</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Number of distinct users seen from this IP.">Users</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Number of distinct sellers associated with this IP.">Sellers</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Number of distinct templates associated with this IP.">Templates</HeaderTooltip></TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 190 }}><HeaderTooltip title="First OpenAI usage time seen for this IP in the selected filters.">First Seen</HeaderTooltip></TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 165 }}><HeaderTooltip title="Most recent OpenAI usage time seen for this IP in the selected filters.">Last Seen</HeaderTooltip></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -811,13 +819,13 @@ export default function AiListingUsagePage() {
             <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 980 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700, minWidth: 260 }}>Field</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls / Successful ASINs</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Successful ASINs</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>AI Calls</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tokens</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Prompt Tokens</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Output Tokens</TableCell>
+                  <TableCell sx={{ fontWeight: 700, minWidth: 260 }}><HeaderTooltip title="AI-generated field name from the template configuration.">Field</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Average OpenAI calls for this field per distinct successful ASIN.">AI Calls / Successful ASINs</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Distinct ASINs with a successful OpenAI call for this field.">Successful ASINs</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Total OpenAI requests recorded for this field.">AI Calls</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Prompt plus output tokens used by this field.">Total Tokens</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Tokens sent to OpenAI for this field.">Prompt Tokens</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Tokens generated by OpenAI for this field.">Output Tokens</HeaderTooltip></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
