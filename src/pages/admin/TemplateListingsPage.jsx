@@ -864,12 +864,20 @@ export default function TemplateListingsPage() {
       const authToken = getAuthToken();
       const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(region)}&token=${encodeURIComponent(authToken)}`;
       
+      if (window._currentEventSource) {
+        window._currentEventSource.close();
+        window._currentEventSource = null;
+      }
+
       // Create EventSource for SSE
       const eventSource = new EventSource(api.defaults.baseURL + sseUrl);
       
       eventSource.onmessage = (event) => {
         if (event.data === '[DONE]') {
           eventSource.close();
+          if (window._currentEventSource === eventSource) {
+            window._currentEventSource = null;
+          }
           const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
           setProcessingLog(prev => [
             ...prev,
