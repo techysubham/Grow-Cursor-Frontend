@@ -69,6 +69,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import InfoIcon from '@mui/icons-material/Info';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SyncIcon from '@mui/icons-material/Sync';
+import HistoryIcon from '@mui/icons-material/History';
 
 
 import SearchIcon from '@mui/icons-material/Search';
@@ -1403,6 +1404,87 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
   );
 });
 
+const formatPTWordDate = (dateStr) => {
+  if (!dateStr) return '-';
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return dateStr;
+  
+  const [_, y, m, d] = match;
+  const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+  if (isNaN(date.getTime())) return dateStr;
+
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    const parts = formatter.formatToParts(date);
+    const getPart = (type) => parts.find(p => p.type === type)?.value || '';
+
+    const day = parseInt(getPart('day'), 10);
+    const month = getPart('month');
+    const year = getPart('year');
+
+    const getOrdinal = (dVal) => {
+      if (dVal > 3 && dVal < 21) return 'th';
+      switch (dVal % 10) {
+        case 1:  return "st";
+        case 2:  return "nd";
+        case 3:  return "rd";
+        default: return "th";
+      }
+    };
+
+    return `${day}${getOrdinal(day)} ${month} ${year}`;
+  } catch (e) {
+    return dateStr;
+  }
+};
+
+const formatISTWordDate = (utcDateStr) => {
+  if (!utcDateStr) return '-';
+  const date = new Date(utcDateStr);
+  if (isNaN(date.getTime())) return utcDateStr;
+
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+    const parts = formatter.formatToParts(date);
+    const getPart = (type) => parts.find(p => p.type === type)?.value || '';
+
+    const day = parseInt(getPart('day'), 10);
+    const month = getPart('month');
+    const year = getPart('year');
+    const hour = getPart('hour');
+    const minute = getPart('minute');
+    const second = getPart('second');
+    const dayPeriod = getPart('dayPeriod');
+
+    const getOrdinal = (dVal) => {
+      if (dVal > 3 && dVal < 21) return 'th';
+      switch (dVal % 10) {
+        case 1:  return "st";
+        case 2:  return "nd";
+        case 3:  return "rd";
+        default: return "th";
+      }
+    };
+
+    return `${day}${getOrdinal(day)} ${month} ${year}, ${hour}:${minute}:${second} ${dayPeriod} IST`;
+  } catch (e) {
+    return utcDateStr;
+  }
+};
+
 function FulfillmentDashboard() {
   // Get user role for permission checks
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -1494,6 +1576,10 @@ function FulfillmentDashboard() {
   const [utcRefreshStartDate, setUtcRefreshStartDate] = useState(todayUTC);
   const [utcRefreshEndDate, setUtcRefreshEndDate] = useState(todayUTC);
   const [utcRefreshConfirmOpen, setUtcRefreshConfirmOpen] = useState(false);
+  const utcRefreshClickTimeRef = useRef(null);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [historyLogs, setHistoryLogs] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Editing item status
   const [editingItemStatus, setEditingItemStatus] = useState({});
@@ -2365,7 +2451,7 @@ function FulfillmentDashboard() {
     }
   }
 
-  async function refreshExistingOrdersByUtcDate() {
+  async function refreshExistingOrdersByUtcDate(clickedRefreshAt, clickedConfirmAt) {
     const startDate = utcRefreshStartDate;
     const endDate = utcRefreshMode === 'single'
       ? utcRefreshStartDate
@@ -2388,6 +2474,9 @@ function FulfillmentDashboard() {
       const payload = {
         startDate,
         endDate,
+        dateMode: utcRefreshMode,
+        clickedRefreshAt,
+        clickedConfirmAt,
         ...(selectedSeller ? { sellerId: selectedSeller } : {})
       };
       const { data } = await api.post('/ebay/resync-existing-orders-by-utc-date', payload);
@@ -2441,13 +2530,35 @@ function FulfillmentDashboard() {
       return;
     }
 
+    utcRefreshClickTimeRef.current = new Date().toISOString();
     setUtcRefreshConfirmOpen(true);
   }
 
   async function handleConfirmUtcRefresh() {
+    const confirmTime = new Date().toISOString();
     setUtcRefreshConfirmOpen(false);
-    await refreshExistingOrdersByUtcDate();
+    await refreshExistingOrdersByUtcDate(utcRefreshClickTimeRef.current, confirmTime);
   }
+
+  const fetchPtRefreshHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const { data } = await api.get('/ebay/pt-refresh-history');
+      setHistoryLogs(data || []);
+    } catch (e) {
+      console.error('Failed to load refresh history:', e);
+      setSnackbarMsg('Failed to load refresh history.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleOpenHistoryDialog = () => {
+    setHistoryDialogOpen(true);
+    fetchPtRefreshHistory();
+  };
 
   const handleCopy = useCallback((text) => {
     const val = text || '-';
@@ -3354,6 +3465,21 @@ function FulfillmentDashboard() {
                 >
                   {loading ? 'Refreshing...' : isSmallMobile ? 'PT Refresh' : utcRefreshMode === 'single' ? 'Refresh PT Date' : 'Refresh PT Range'}
                 </Button>
+                <Button
+                  variant="outlined"
+                  color="info"
+                  startIcon={<HistoryIcon />}
+                  onClick={handleOpenHistoryDialog}
+                  size="small"
+                  fullWidth
+                  sx={{
+                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                    px: { xs: 0.5, sm: 1 },
+                    flex: '1 1 120px'
+                  }}
+                >
+                  See History
+                </Button>
               </Stack>
 
               {/* Row 3: Filters side by side */}
@@ -3657,6 +3783,15 @@ function FulfillmentDashboard() {
                     </Button>
                   </span>
                 </Tooltip>
+                <Button
+                  variant="outlined"
+                  color="info"
+                  size="small"
+                  startIcon={<HistoryIcon />}
+                  onClick={handleOpenHistoryDialog}
+                >
+                  See History
+                </Button>
               </Stack>
 
               {/* Row 2: Filters, Toggles, Column Selector */}
@@ -5075,6 +5210,117 @@ function FulfillmentDashboard() {
               startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SyncIcon />}
             >
               {loading ? 'Refreshing...' : 'Confirm Refresh'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={historyDialogOpen}
+          onClose={() => setHistoryDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" fontWeight="bold">PT Refresh History</Typography>
+            <IconButton onClick={() => setHistoryDialogOpen(false)} size="small">
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            {historyLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : historyLogs.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                No refresh history found.
+              </Typography>
+            ) : (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: 'action.hover' }}>
+                      <TableCell>User</TableCell>
+                      <TableCell>Mode</TableCell>
+                      <TableCell>PT Dates</TableCell>
+                      <TableCell>Confirmed (IST)</TableCell>
+                      <TableCell>Status / Outcome</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {historyLogs.map((log) => (
+                      <TableRow key={log._id}>
+                        <TableCell>
+                          <Stack>
+                            <Typography variant="body2" fontWeight="medium">
+                              {log.user?.username || 'Unknown'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {log.user?.email || ''}
+                            </Typography>
+                          </Stack>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={log.dateMode === 'single' ? 'Single' : 'Range'} 
+                            size="small" 
+                            color={log.dateMode === 'single' ? 'primary' : 'secondary'} 
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>
+                            {log.dateMode === 'single' 
+                              ? formatPTWordDate(log.startDate) 
+                              : `${formatPTWordDate(log.startDate)} to ${formatPTWordDate(log.endDate)}`}
+                          </Typography>
+                          {log.sellerId && (
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Seller: {log.sellerId?.user?.username || log.sellerId?.user?.email || 'Filtered'}
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>{formatISTWordDate(log.clickedConfirmAt)}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          {log.status === 'processing' ? (
+                            <Stack spacing={0.5}>
+                              <Chip label="Processing" color="info" size="small" variant="filled" sx={{ width: 'fit-content' }} />
+                              <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: '0.75rem' }}>
+                                Sync in progress...
+                              </Typography>
+                            </Stack>
+                          ) : log.status === 'completed' || log.success ? (
+                            <Stack spacing={0.5}>
+                              <Chip label="Success" color="success" size="small" variant="filled" sx={{ width: 'fit-content' }} />
+                              <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: '0.75rem' }}>
+                                Fetch: {log.totalFetched} | Match: {log.totalExistingMatched} | Upd: {log.totalUpdated}
+                              </Typography>
+                            </Stack>
+                          ) : (
+                            <Stack spacing={0.5}>
+                              <Chip label="Failed" color="error" size="small" variant="filled" sx={{ width: 'fit-content' }} />
+                              {log.errorMessage && (
+                                <Tooltip title={log.errorMessage}>
+                                  <Typography variant="caption" color="error" sx={{ cursor: 'pointer', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
+                                    {log.errorMessage}
+                                  </Typography>
+                                </Tooltip>
+                              )}
+                            </Stack>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setHistoryDialogOpen(false)} color="inherit">
+              Close
             </Button>
           </DialogActions>
         </Dialog>
