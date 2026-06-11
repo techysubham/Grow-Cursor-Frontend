@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box, Typography, Paper, Button, Checkbox, Chip, CircularProgress,
   Alert, FormControl, InputLabel, Select, MenuItem, LinearProgress,
@@ -186,24 +186,31 @@ export default function ExpiringListingsPage() {
     ? listings
     : listings.filter(l => l.currency === countryFilter);
 
-  // across displayed listings
-  const allSelected  = displayListings.length > 0 && displayListings.every(l => selectedItems.has(l.itemId));
-  const someSelected = displayListings.some(l => selectedItems.has(l.itemId)) && !allSelected;
+  // current page listings
+  const pagedListings = displayListings.slice(tablePage * rowsPerPage, tablePage * rowsPerPage + rowsPerPage);
+
+  // selection states scoped to the current page
+  const allSelected  = pagedListings.length > 0 && pagedListings.every(l => selectedItems.has(l.itemId));
+  const someSelected = pagedListings.some(l => selectedItems.has(l.itemId)) && !allSelected;
 
   const toggleSelectAll = () => {
     if (allSelected) {
       setSelectedItems(prev => {
         const next = new Set(prev);
-        displayListings.forEach(l => next.delete(l.itemId));
+        pagedListings.forEach(l => next.delete(l.itemId));
         return next;
       });
     } else {
       setSelectedItems(prev => {
         const next = new Set(prev);
-        displayListings.forEach(l => next.add(l.itemId));
+        pagedListings.forEach(l => next.add(l.itemId));
         return next;
       });
     }
+  };
+
+  const selectAllDisplayedListings = () => {
+    setSelectedItems(new Set(displayListings.map(l => l.itemId)));
   };
 
   // ── end listings ──────────────────────────────────────────────────────────
@@ -251,7 +258,6 @@ export default function ExpiringListingsPage() {
   };
 
   // ── derived ───────────────────────────────────────────────────────────────
-  const pagedListings = displayListings.slice(tablePage * rowsPerPage, tablePage * rowsPerPage + rowsPerPage);
   const sellerName    = sellers.find(s => s._id === selectedSeller)?.user?.username || '';
   const pct           = fetchProgress && fetchProgress.totalPages > 0
     ? Math.round((fetchProgress.page / fetchProgress.totalPages) * 100)
@@ -548,7 +554,7 @@ export default function ExpiringListingsPage() {
             </Box>
 
             {/* Cross-page "select all" helper banner */}
-            {someSelected && (
+            {selectedItems.size > 0 && selectedItems.size < displayListings.length && (
               <Box
                 sx={{
                   px: 2.5,
@@ -568,7 +574,7 @@ export default function ExpiringListingsPage() {
                 <Button
                   size="small"
                   variant="text"
-                  onClick={toggleSelectAll}
+                  onClick={selectAllDisplayedListings}
                   sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.78rem', p: 0, minWidth: 0 }}
                 >
                   Select all {displayListings.length}
