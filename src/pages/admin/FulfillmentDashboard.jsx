@@ -1185,6 +1185,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
   searchAzOrderId, setSearchAzOrderId,
   searchBuyerName, setSearchBuyerName,
   searchItemId, setSearchItemId,
+  searchSku, setSearchSku,
   searchProductName, setSearchProductName,
   setSearchPaymentStatus,
   dateFilter, setDateFilter,
@@ -1213,6 +1214,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
   const [localAzOrderId, setLocalAzOrderId] = useState(searchAzOrderId);
   const [localBuyerName, setLocalBuyerName] = useState(searchBuyerName);
   const [localItemId, setLocalItemId] = useState(searchItemId);
+  const [localSku, setLocalSku] = useState(searchSku);
   const [localProductName, setLocalProductName] = useState(searchProductName);
   const [localDateFilter, setLocalDateFilter] = useState(() => normalizeDateFilter(dateFilter));
 
@@ -1221,6 +1223,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
   useEffect(() => { setLocalAzOrderId(searchAzOrderId); }, [searchAzOrderId]);
   useEffect(() => { setLocalBuyerName(searchBuyerName); }, [searchBuyerName]);
   useEffect(() => { setLocalItemId(searchItemId); }, [searchItemId]);
+  useEffect(() => { setLocalSku(searchSku); }, [searchSku]);
   useEffect(() => { setLocalProductName(searchProductName); }, [searchProductName]);
   useEffect(() => { setLocalDateFilter(normalizeDateFilter(dateFilter)); }, [dateFilter]);
 
@@ -1230,6 +1233,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
     setSearchAzOrderId(localAzOrderId);
     setSearchBuyerName(localBuyerName);
     setSearchItemId(localItemId);
+    setSearchSku(localSku);
     setSearchProductName(localProductName);
     setDateFilter(normalizeDateFilter(localDateFilter));
   };
@@ -1241,6 +1245,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
     setLocalAzOrderId('');
     setLocalBuyerName('');
     setLocalItemId('');
+    setLocalSku('');
     setLocalProductName('');
     setLocalDateFilter(clearedDateFilter);
 
@@ -1248,6 +1253,7 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
     setSearchAzOrderId('');
     setSearchBuyerName('');
     setSearchItemId('');
+    setSearchSku('');
     setSearchProductName('');
     setDateFilter(clearedDateFilter);
   };
@@ -1308,6 +1314,16 @@ const SearchFiltersPanel = memo(function SearchFiltersPanel({
               onChange={(e) => setLocalItemId(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Search by item ID..."
+              sx={{ flex: 1 }}
+              fullWidth
+            />
+            <TextField
+              size="small"
+              label="SKU"
+              value={localSku}
+              onChange={(e) => setLocalSku(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Search by SKU..."
               sx={{ flex: 1 }}
               fullWidth
             />
@@ -1539,6 +1555,7 @@ function FulfillmentDashboard() {
   const [searchAzOrderId, setSearchAzOrderId] = useState(() => getInitialState('searchAzOrderId', ''));
   const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
   const [searchItemId, setSearchItemId] = useState(() => getInitialState('searchItemId', ''));
+  const [searchSku, setSearchSku] = useState(() => getInitialState('searchSku', ''));
   const [searchProductName, setSearchProductName] = useState(() => getInitialState('searchProductName', ''));
   //const [searchSoldDate, setSearchSoldDate] = useState('');
   const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
@@ -1999,6 +2016,7 @@ function FulfillmentDashboard() {
     searchAzOrderId,
     searchBuyerName,
     searchItemId,
+    searchSku,
     searchProductName,
     searchMarketplace,
     searchPaymentStatus,
@@ -2053,6 +2071,7 @@ function FulfillmentDashboard() {
       prev.searchAzOrderId !== searchAzOrderId ||
       prev.searchBuyerName !== searchBuyerName ||
       prev.searchItemId !== searchItemId ||
+      prev.searchSku !== searchSku ||
       prev.searchProductName !== searchProductName ||
       prev.selectedSeller !== selectedSeller ||
       prev.searchMarketplace !== searchMarketplace ||
@@ -2069,6 +2088,7 @@ function FulfillmentDashboard() {
       searchAzOrderId,
       searchBuyerName,
       searchItemId,
+      searchSku,
       searchProductName,
       searchMarketplace,
       searchPaymentStatus,
@@ -2089,7 +2109,7 @@ function FulfillmentDashboard() {
       setCurrentPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchProductName, searchMarketplace, searchPaymentStatus, excludeClient, excludeLowValue, missingAmazonAccount, dateFilter]);
+  }, [selectedSeller, searchOrderId, searchAzOrderId, searchBuyerName, searchItemId, searchSku, searchProductName, searchMarketplace, searchPaymentStatus, excludeClient, excludeLowValue, missingAmazonAccount, dateFilter]);
 
   // orderEarnings is now read-only (auto-calculated server-side)
   // No manual editing handlers needed
@@ -2120,6 +2140,7 @@ function FulfillmentDashboard() {
       if (searchAzOrderId.trim()) params.searchAzOrderId = searchAzOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
+      if (searchSku.trim()) params.searchSku = searchSku.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
       params.excludeClient = excludeClient;
@@ -3036,6 +3057,7 @@ function FulfillmentDashboard() {
       if (searchAzOrderId.trim()) params.searchAzOrderId = searchAzOrderId.trim();
       if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
       if (searchItemId.trim()) params.searchItemId = searchItemId.trim();
+      if (searchSku.trim()) params.searchSku = searchSku.trim();
       if (searchMarketplace) params.searchMarketplace = searchMarketplace;
       if (searchPaymentStatus) params.paymentStatus = searchPaymentStatus;
       params.excludeClient = excludeClient;
@@ -3900,6 +3922,8 @@ function FulfillmentDashboard() {
             setSearchBuyerName={setSearchBuyerName}
             searchItemId={searchItemId}
             setSearchItemId={setSearchItemId}
+            searchSku={searchSku}
+            setSearchSku={setSearchSku}
             searchProductName={searchProductName}
             setSearchProductName={setSearchProductName}
             setSearchPaymentStatus={setSearchPaymentStatus}
