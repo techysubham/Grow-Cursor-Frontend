@@ -20,6 +20,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import MarkAsUnreadIcon from '@mui/icons-material/MarkAsUnread';
+import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import MenuIcon from '@mui/icons-material/Menu';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -124,6 +125,7 @@ export default function BuyerChatPage() {
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [markingUnread, setMarkingUnread] = useState(false);
+  const [markingRead, setMarkingRead] = useState(false);
   const [copiedText, setCopiedText] = useState('');
   const [templateAnchorEl, setTemplateAnchorEl] = useState(null);
   const [chatTemplates, setChatTemplates] = useState([]);
@@ -528,28 +530,28 @@ export default function BuyerChatPage() {
       setSidebarOpen(false);
     }
 
-    // 1. OPTIMISTIC UPDATE: Remove Red Dot Immediately
-    if (thread.unreadCount > 0) {
-      setThreads(prevThreads =>
-        prevThreads.map(t => {
-          // Match by OrderId OR (Buyer + Item)
-          const isMatch = t.orderId
-            ? t.orderId === thread.orderId
-            : (t.buyerUsername === thread.buyerUsername && t.itemId === thread.itemId);
-
-          if (isMatch) {
-            return { ...t, unreadCount: 0 }; // Zero out unread count
-          }
-          return t;
-        })
-      );
-    }
-
-    // 2. Load Messages (Backend will mark as read in DB)
+    // Load messages without changing read state. Read/unread is now explicit.
     if (!thread.isNew) {
+      await syncThreadMessages(thread);
       await loadMessages(thread, true);
     } else {
       setMessages([]);
+    }
+  }
+
+  async function syncThreadMessages(thread) {
+    if (!thread?.sellerId || !thread?.buyerUsername) return;
+
+    try {
+      await api.post('/ebay/sync-thread', {
+        sellerId: thread.sellerId,
+        buyerUsername: thread.buyerUsername,
+        itemId: thread.itemId
+      });
+    } catch (e) {
+      if (e.response?.status !== 401) {
+        console.error('Failed to sync thread messages', e);
+      }
     }
   }
 
@@ -642,6 +644,13 @@ export default function BuyerChatPage() {
     return seller?.user?.username || 'Unknown Seller';
   };
 
+  const isSameThread = (thread, target) => {
+    if (!thread || !target) return false;
+    return thread.orderId
+      ? thread.orderId === target.orderId
+      : (thread.buyerUsername === target.buyerUsername && thread.itemId === target.itemId);
+  };
+
   async function handleFileSelect(e) {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -717,11 +726,7 @@ export default function BuyerChatPage() {
       // Update local thread state to show unread badge
       setThreads(prevThreads =>
         prevThreads.map(t => {
-          const isMatch = t.orderId
-            ? t.orderId === selectedThread.orderId
-            : (t.buyerUsername === selectedThread.buyerUsername && t.itemId === selectedThread.itemId);
-
-          if (isMatch) {
+          if (isSameThread(t, selectedThread)) {
             // Count buyer messages to set unread count
             const buyerMessageCount = messages.filter(m => m.sender === 'BUYER').length;
             return { ...t, unreadCount: buyerMessageCount };
@@ -745,6 +750,38 @@ export default function BuyerChatPage() {
       setSnackbarOpen(true);
     } finally {
       setMarkingUnread(false);
+    }
+  }
+
+  async function handleMarkAsRead() {
+    if (!selectedThread) return;
+
+    setMarkingRead(true);
+    try {
+      const payload = {
+        orderId: selectedThread.orderId,
+        buyerUsername: selectedThread.buyerUsername,
+        itemId: selectedThread.itemId
+      };
+
+      await api.post('/ebay/chat/mark-read', payload);
+
+      setThreads(prevThreads =>
+        prevThreads.map(t => isSameThread(t, selectedThread) ? { ...t, unreadCount: 0 } : t)
+      );
+      setSelectedThread(prev => prev ? { ...prev, unreadCount: 0 } : prev);
+      setMessages(prev => prev.map(m => m.sender === 'BUYER' ? { ...m, read: true } : m));
+
+      setSnackbarMsg('Conversation marked as read');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+
+    } catch (err) {
+      setSnackbarMsg('Failed to mark as read: ' + (err.response?.data?.error || err.message));
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setMarkingRead(false);
     }
   }
 
@@ -1261,16 +1298,28 @@ export default function BuyerChatPage() {
                     </Button>
                   </Tooltip>
                   {!selectedThread.isNew && (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={handleMarkAsUnread}
-                      disabled={markingUnread}
-                      startIcon={markingUnread ? <CircularProgress size={12} color="inherit" /> : <MarkAsUnreadIcon sx={{ fontSize: '14px !important' }} />}
-                      sx={{ height: 28, fontSize: '0.72rem', px: 1 }}
-                    >
-                      {markingUnread ? 'Marking...' : 'Mark Unread'}
-                    </Button>
+                    <>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={handleMarkAsRead}
+                        disabled={markingRead}
+                        startIcon={markingRead ? <CircularProgress size={12} color="inherit" /> : <MarkEmailReadIcon sx={{ fontSize: '14px !important' }} />}
+                        sx={{ height: 28, fontSize: '0.72rem', px: 1 }}
+                      >
+                        {markingRead ? 'Marking...' : 'Mark Read'}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={handleMarkAsUnread}
+                        disabled={markingUnread}
+                        startIcon={markingUnread ? <CircularProgress size={12} color="inherit" /> : <MarkAsUnreadIcon sx={{ fontSize: '14px !important' }} />}
+                        sx={{ height: 28, fontSize: '0.72rem', px: 1 }}
+                      >
+                        {markingUnread ? 'Marking...' : 'Mark Unread'}
+                      </Button>
+                    </>
                   )}
                   <IconButton
                     onClick={() => setSelectedThread(null)}
@@ -1710,7 +1759,7 @@ export default function BuyerChatPage() {
                             fontSize: { xs: '0.7rem', md: '0.75rem' }
                           }}
                         >
-                          {new Date(msg.messageDate).toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} UTC
+                          {new Date(msg.messageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} PT
                           {msg.sender === 'SELLER' && (msg.read ? ' • Read' : ' • Sent')}
                         </Typography>
                       </Box>
