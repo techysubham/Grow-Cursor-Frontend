@@ -532,9 +532,26 @@ export default function BuyerChatPage() {
 
     // Load messages without changing read state. Read/unread is now explicit.
     if (!thread.isNew) {
+      await syncThreadMessages(thread);
       await loadMessages(thread, true);
     } else {
       setMessages([]);
+    }
+  }
+
+  async function syncThreadMessages(thread) {
+    if (!thread?.sellerId || !thread?.buyerUsername) return;
+
+    try {
+      await api.post('/ebay/sync-thread', {
+        sellerId: thread.sellerId,
+        buyerUsername: thread.buyerUsername,
+        itemId: thread.itemId
+      });
+    } catch (e) {
+      if (e.response?.status !== 401) {
+        console.error('Failed to sync thread messages', e);
+      }
     }
   }
 
