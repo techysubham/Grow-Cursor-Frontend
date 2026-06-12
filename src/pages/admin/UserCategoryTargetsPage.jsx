@@ -68,7 +68,7 @@ export default function UserCategoryTargetsPage() {
       const [usersRes, sellersRes, categoriesRes, targetsRes] = await Promise.all([
         api.get('/users'),
         api.get('/sellers/all'),
-        api.get('/categories'),
+        api.get('/asin-list-categories'),
         api.get('/user-category-targets'),
       ]);
 

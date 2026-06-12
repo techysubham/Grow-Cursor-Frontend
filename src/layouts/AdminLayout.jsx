@@ -145,6 +145,7 @@ const AsinListPage = lazy(() => import('../pages/admin/AsinListPage.jsx'));
 const CRPComparisonPage = lazy(() => import('../pages/admin/CRPComparisonPage.jsx'));
 const UserSellerAssignmentPage = lazy(() => import('../pages/admin/UserSellerAssignmentPage.jsx'));
 const UserCategoryTargetsPage = lazy(() => import('../pages/admin/UserCategoryTargetsPage.jsx'));
+const UserListingPerformancePage = lazy(() => import('../pages/admin/UserListingPerformancePage.jsx'));
 const MeetingsPage = lazy(() => import('../pages/admin/MeetingsPage.jsx'));
 const UserPerformancePage = lazy(() => import('../pages/admin/UserPerformancePage.jsx'));
 const AiFitmentUsagePage = lazy(() => import('../pages/admin/AiFitmentUsagePage.jsx'));
@@ -336,6 +337,7 @@ const COMPONENT_MAP = {
   'AddUser': AddListerPage,
   'UserSellerAssignments': UserSellerAssignmentPage,
   'UserCategoryTargets': UserCategoryTargetsPage,
+  'UserListingPerformance': UserListingPerformancePage,
   'Meetings': MeetingsPage,
   'ViewAllMessages': InternalMessagesAdminPage,
   'Attendance': AttendanceAdminPage,
