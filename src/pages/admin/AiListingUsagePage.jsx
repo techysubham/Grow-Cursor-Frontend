@@ -285,6 +285,13 @@ export default function AiListingUsagePage() {
     () => rows.reduce((sum, row) => sum + Number(row.updateableDuplicateCount || 0), 0),
     [rows]
   );
+  const visibleTotalAsinsCalledTotal = useMemo(
+    () => rows.reduce(
+      (sum, row) => sum + Number(row.successfulAsinCount || 0) + Number(row.updateableDuplicateCount || 0),
+      0
+    ),
+    [rows]
+  );
   const visibleOverExpectedTotal = useMemo(
     () => rows.reduce((sum, row) => sum + Number(row.overExpectedCalls || 0), 0),
     [rows]
@@ -535,7 +542,7 @@ export default function AiListingUsagePage() {
 
           <Typography variant="h6" fontWeight={800} sx={{ mb: 1.25, color: '#0f172a' }}>Usage By User, Seller, Template, IP</Typography>
           <TableContainer component={Paper} sx={tableContainerSx}>
-            <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 1960 }}>
+            <Table stickyHeader size="small" sx={{ ...tableSx, minWidth: 2080 }}>
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700, minWidth: 165 }}><HeaderTooltip title="User who triggered the OpenAI listing generation or saved a zero-call duplicate run.">User</HeaderTooltip></TableCell>
@@ -548,6 +555,7 @@ export default function AiListingUsagePage() {
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Distinct ASINs with at least one successful OpenAI field call. Duplicate-only skipped rows can be 0.">Successful ASINs</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Listings saved from the review flow for this run, including duplicate-update saves with zero AI calls.">Saved</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Duplicate-updateable ASINs saved from the review flow. These usually skip OpenAI generation.">Updateable Duplicates</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Successful ASINs plus updateable duplicates, showing the total ASINs represented in this run.">Total ASINs Called</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="ASINs whose successful OpenAI call count exceeded the expected AI field count. This measures repeated AI generation, not duplicate_updateable listings.">Duplicate ASINs</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Total OpenAI requests recorded for this row.">AI Calls</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Total OpenAI tokens used, including prompt and output tokens.">Total Tokens</HeaderTooltip></TableCell>
@@ -561,7 +569,7 @@ export default function AiListingUsagePage() {
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={18} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                    <TableCell colSpan={19} align="center" sx={{ py: 5, color: 'text.secondary' }}>
                       No OpenAI listing usage found for this date range.
                     </TableCell>
                   </TableRow>
@@ -611,6 +619,9 @@ export default function AiListingUsagePage() {
                     <TableCell align="right" sx={{ fontWeight: 700 }}>
                       {formatNumber(row.updateableDuplicateCount)}
                     </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      {formatNumber(Number(row.successfulAsinCount || 0) + Number(row.updateableDuplicateCount || 0))}
+                    </TableCell>
                     <TableCell align="right">
                       <Button
                         size="small"
@@ -644,6 +655,7 @@ export default function AiListingUsagePage() {
                     <TableCell align="right">{formatNumber(visibleSuccessfulAsinTotal)}</TableCell>
                     <TableCell align="right">{formatNumber(visibleSavedTotal)}</TableCell>
                     <TableCell align="right">{formatNumber(visibleUpdateableDuplicateTotal)}</TableCell>
+                    <TableCell align="right">{formatNumber(visibleTotalAsinsCalledTotal)}</TableCell>
                     <TableCell />
                     <TableCell colSpan={7} />
                   </TableRow>
