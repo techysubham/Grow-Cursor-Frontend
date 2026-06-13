@@ -122,6 +122,8 @@ export const PAGE_REGISTRY = [
   { id: 'EmployeeManagement', name: 'Employee Management', path: '/employee-management', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin'] },
   { id: 'AddUser', name: 'Add User', path: '/add-user', category: 'hrManagement', defaultRoles: ['superadmin', 'listingadmin', 'hradmin', 'operationhead'] },
   { id: 'UserSellerAssignments', name: 'User-Seller Assignments', path: '/user-seller-assignments', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin', 'hr'] },
+  { id: 'UserCategoryTargets', name: 'User Category Targets', path: '/user-category-targets', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin', 'hr'] },
+  { id: 'UserListingPerformance', name: 'Listing Performance', path: '/user-listing-performance', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin', 'hr'] },
   { id: 'Meetings', name: 'Meetings', path: '/meetings', category: 'hrManagement', defaultRoles: ['superadmin', 'productadmin', 'listingadmin', 'lister', 'advancelister', 'compatibilityadmin', 'compatibilityeditor', 'fulfillmentadmin', 'hradmin', 'hr', 'operationhead', 'trainee', 'hoc', 'compliancemanager'] },
   { id: 'ViewAllMessages', name: 'View All Messages', path: '/internal-messages-admin', category: 'hrManagement', defaultRoles: ['superadmin'] },
   { id: 'Attendance', name: 'Working Hours Tracking', path: '/attendance', category: 'hrManagement', defaultRoles: ['superadmin'] },
