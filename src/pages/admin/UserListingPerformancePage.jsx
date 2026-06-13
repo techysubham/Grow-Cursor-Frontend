@@ -31,7 +31,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import api from '../../lib/api';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { yellowFilledButtonSx } from '../../theme/tableStyles.js';
-import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
 
 const getPTDate = (offsetDays = 0) => {
   const date = new Date(Date.now() + offsetDays * 86400000);
@@ -77,6 +77,25 @@ function QuotaTooltip({ active, payload }) {
           </Box>
         ))}
       </Stack>
+    </Paper>
+  );
+}
+
+function SubmissionTimeTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
+
+  return (
+    <Paper elevation={6} sx={{ p: 1.5, borderRadius: 1.5, border: `1px solid ${alpha(BRAND_DARK, 0.12)}` }}>
+      <Typography variant="subtitle2" fontWeight={800} sx={{ color: BRAND_DARK }}>
+        {row.label} IST
+      </Typography>
+      <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.62), display: 'block', fontWeight: 700 }}>
+        CSV uploads: {row.uploadCount.toLocaleString()}
+      </Typography>
+      <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.62), display: 'block', fontWeight: 700 }}>
+        Successful listings: {row.successfulListings.toLocaleString()}
+      </Typography>
     </Paper>
   );
 }
@@ -179,6 +198,8 @@ export default function UserListingPerformancePage() {
 
   const summary = performance?.summary || {};
   const cards = performance?.cards || [];
+  const submissionTimeRows = performance?.submissionTimeDistribution || [];
+  const hasSubmissionTimeRows = submissionTimeRows.some((row) => row.uploadCount > 0);
 
   const metricCards = useMemo(() => ([
     { label: 'Total Successful Listings', value: summary.totalSuccessfulListings || 0, helper: `${summary.totalTargetQuantity || 0} target listings` },
@@ -435,6 +456,52 @@ export default function UserListingPerformancePage() {
                     fill={BRAND_DARK}
                     fontSize={12}
                     fontWeight={800}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Box>
+        </Paper>
+      )}
+
+      {!loading && hasSubmissionTimeRows && (
+        <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}` }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={800} sx={{ color: BRAND_DARK }}>
+                Submission Time Distribution
+              </Typography>
+              <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.52), fontWeight: 600 }}>
+                CSV upload times from matching feed uploads, shown in IST
+              </Typography>
+            </Box>
+          </Stack>
+          <Box sx={{ width: '100%', height: { xs: 300, md: 360 } }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={submissionTimeRows} margin={{ top: 18, right: 18, bottom: 12, left: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(BRAND_DARK, 0.1)} />
+                <XAxis
+                  dataKey="label"
+                  interval={2}
+                  tick={{ fill: BRAND_DARK, fontSize: 12, fontWeight: 700 }}
+                  axisLine={{ stroke: alpha(BRAND_DARK, 0.18) }}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fill: alpha(BRAND_DARK, 0.7), fontSize: 12, fontWeight: 700 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <RechartsTooltip content={<SubmissionTimeTooltip />} cursor={{ fill: alpha(BRAND_YELLOW, 0.08) }} />
+                <Bar dataKey="uploadCount" fill={BRAND_YELLOW_DARK} radius={[7, 7, 0, 0]} barSize={22}>
+                  <LabelList
+                    dataKey="uploadCount"
+                    position="top"
+                    fill={BRAND_DARK}
+                    fontSize={11}
+                    fontWeight={800}
+                    formatter={(value) => (value > 0 ? value.toLocaleString() : '')}
                   />
                 </Bar>
               </BarChart>
