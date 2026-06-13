@@ -7,11 +7,14 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  FormControl,
   Grid,
   InputAdornment,
+  InputLabel,
   LinearProgress,
   MenuItem,
   Paper,
+  Select,
   Stack,
   TextField,
   ToggleButton,
@@ -41,6 +44,8 @@ const RANGE_OPTIONS = [
   { value: 'custom', label: 'Custom' },
 ];
 
+const MARKETPLACES = ['US', 'UK', 'AU', 'Canada'];
+
 const statusMeta = {
   onTrack: { label: 'On Track', color: '#1b7f3a', bg: '#e8f5e9', Icon: TaskAltIcon },
   behind: { label: 'Behind', color: '#a05a00', bg: '#fff4de', Icon: WarningAmberIcon },
@@ -52,9 +57,12 @@ export default function UserListingPerformancePage() {
   const [users, setUsers] = useState([]);
   const [sellers, setSellers] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [ranges, setRanges] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedSeller, setSelectedSeller] = useState(null);
+  const [selectedMarketplace, setSelectedMarketplace] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedRange, setSelectedRange] = useState(null);
   const [rangeMode, setRangeMode] = useState('today');
   const [startDate, setStartDate] = useState(() => getPTDate());
   const [endDate, setEndDate] = useState(() => getPTDate());
@@ -84,18 +92,20 @@ export default function UserListingPerformancePage() {
 
   useEffect(() => {
     fetchPerformance();
-  }, [selectedUser, selectedSeller, selectedCategory, startDate, endDate]);
+  }, [selectedUser, selectedSeller, selectedMarketplace, selectedCategory, selectedRange, startDate, endDate]);
 
   const loadOptions = async () => {
     try {
-      const [usersRes, sellersRes, categoriesRes] = await Promise.all([
+      const [usersRes, sellersRes, categoriesRes, rangesRes] = await Promise.all([
         api.get('/users'),
         api.get('/sellers/all'),
         api.get('/asin-list-categories'),
+        api.get('/asin-list-ranges', { params: { all: true } }),
       ]);
       setUsers((usersRes.data || []).filter((user) => user.role !== 'seller'));
       setSellers(sellersRes.data || []);
       setCategories(categoriesRes.data || []);
+      setRanges(rangesRes.data || []);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load filters.');
     }
@@ -111,7 +121,9 @@ export default function UserListingPerformancePage() {
       };
       if (selectedUser?._id) params.userId = selectedUser._id;
       if (selectedSeller?._id) params.sellerId = selectedSeller._id;
+      if (selectedMarketplace) params.marketplace = selectedMarketplace;
       if (selectedCategory?._id) params.categoryId = selectedCategory._id;
+      if (selectedRange?._id) params.rangeId = selectedRange._id;
 
       const { data } = await api.get('/user-category-targets/performance', { params });
       setPerformance(data);
@@ -130,6 +142,11 @@ export default function UserListingPerformancePage() {
 
   const getSellerLabel = (seller) => seller?.user?.username || seller?.user?.email || seller?.storeName || seller?._id || '';
   const getCategoryLabel = (category) => category?.name || '';
+  const getRangeLabel = (range) => range?.name || '';
+
+  const filteredRanges = selectedCategory
+    ? ranges.filter((range) => String(range.categoryId?._id || range.categoryId) === selectedCategory._id)
+    : ranges;
 
   const summary = performance?.summary || {};
   const cards = performance?.cards || [];
@@ -238,14 +255,46 @@ export default function UserListingPerformancePage() {
               sx={{ minWidth: 220, flex: 1 }}
               renderInput={(params) => <TextField {...params} label="All Sellers" sx={inputSx} />}
             />
+            <FormControl sx={{ minWidth: 170 }}>
+              <InputLabel sx={{ '&.Mui-focused': { color: BRAND_YELLOW_DARK } }}>All Marketplaces</InputLabel>
+              <Select
+                value={selectedMarketplace}
+                label="All Marketplaces"
+                onChange={(event) => setSelectedMarketplace(event.target.value)}
+                sx={{
+                  borderRadius: 1.5,
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${BRAND_YELLOW_DARK} !important` },
+                }}
+              >
+                <MenuItem value="">All Marketplaces</MenuItem>
+                {MARKETPLACES.map((marketplace) => (
+                  <MenuItem key={marketplace} value={marketplace}>{marketplace}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <Autocomplete
               options={categories}
               getOptionLabel={getCategoryLabel}
               value={selectedCategory}
-              onChange={(_, value) => setSelectedCategory(value)}
+              onChange={(_, value) => {
+                setSelectedCategory(value);
+                setSelectedRange(null);
+              }}
               isOptionEqualToValue={(option, value) => option._id === value._id}
               sx={{ minWidth: 240, flex: 1 }}
               renderInput={(params) => <TextField {...params} label="All Categories" sx={inputSx} />}
+            />
+            <Autocomplete
+              options={filteredRanges}
+              getOptionLabel={(range) => {
+                const categoryName = range.categoryName ? `${range.categoryName} / ` : '';
+                return `${categoryName}${getRangeLabel(range)}`;
+              }}
+              value={selectedRange}
+              onChange={(_, value) => setSelectedRange(value)}
+              isOptionEqualToValue={(option, value) => option._id === value._id}
+              sx={{ minWidth: 240, flex: 1 }}
+              renderInput={(params) => <TextField {...params} label="All Ranges" sx={inputSx} />}
             />
           </Stack>
         </Stack>
@@ -300,7 +349,10 @@ export default function UserListingPerformancePage() {
                           {card.user?.username || 'Unknown User'}
                         </Typography>
                         <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.62) }}>
-                          {getSellerLabel(card.seller)} / {card.category?.name || 'Unknown Category'}
+                          {getSellerLabel(card.seller)} / {card.marketplace || '-'} / {card.category?.name || 'Unknown Category'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.5), fontWeight: 600 }}>
+                          {card.range?.name ? `Range: ${card.range.name}` : 'Range: All ranges'}
                         </Typography>
                       </Box>
                       <Stack direction="row" alignItems="center" spacing={0.75} sx={{ px: 1, py: 0.5, borderRadius: 1.5, backgroundColor: meta.bg, color: meta.color }}>

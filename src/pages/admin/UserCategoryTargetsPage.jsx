@@ -5,8 +5,12 @@ import {
   Box,
   Button,
   CircularProgress,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -30,15 +34,20 @@ import { tableBodyCellSx, tableBodyRowSx, tableHeaderCellSx, yellowFilledButtonS
 const EMPTY_FORM = {
   user: null,
   seller: null,
+  marketplace: '',
   category: null,
+  range: null,
   dailyDesiredQuantity: '',
 };
+
+const MARKETPLACES = ['US', 'UK', 'AU', 'Canada'];
 
 export default function UserCategoryTargetsPage() {
   const theme = useTheme();
   const [users, setUsers] = useState([]);
   const [sellers, setSellers] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [ranges, setRanges] = useState([]);
   const [targets, setTargets] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
@@ -65,16 +74,18 @@ export default function UserCategoryTargetsPage() {
     setLoading(true);
     setError('');
     try {
-      const [usersRes, sellersRes, categoriesRes, targetsRes] = await Promise.all([
+      const [usersRes, sellersRes, categoriesRes, rangesRes, targetsRes] = await Promise.all([
         api.get('/users'),
         api.get('/sellers/all'),
         api.get('/asin-list-categories'),
+        api.get('/asin-list-ranges', { params: { all: true } }),
         api.get('/user-category-targets'),
       ]);
 
       setUsers((usersRes.data || []).filter((user) => user.role !== 'seller'));
       setSellers(sellersRes.data || []);
       setCategories(categoriesRes.data || []);
+      setRanges(rangesRes.data || []);
       setTargets(targetsRes.data || []);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load desired quantity targets.');
@@ -97,6 +108,11 @@ export default function UserCategoryTargetsPage() {
   const getSellerLabel = (seller) => seller?.user?.username || seller?.user?.email || seller?.storeName || seller?._id || '';
 
   const getCategoryLabel = (category) => category?.name || '';
+  const getRangeLabel = (range) => range?.name || '';
+
+  const filteredRanges = form.category
+    ? ranges.filter((range) => String(range.categoryId?._id || range.categoryId) === form.category._id)
+    : [];
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -108,7 +124,9 @@ export default function UserCategoryTargetsPage() {
     setForm({
       user: users.find((user) => user._id === target.user?._id) || target.user || null,
       seller: sellers.find((seller) => seller._id === target.seller?._id) || target.seller || null,
+      marketplace: target.marketplace || '',
       category: categories.find((category) => category._id === target.category?._id) || target.category || null,
+      range: ranges.find((range) => range._id === target.range?._id) || target.range || null,
       dailyDesiredQuantity: String(target.dailyDesiredQuantity ?? 0),
     });
     setError('');
@@ -122,6 +140,7 @@ export default function UserCategoryTargetsPage() {
 
     if (!form.user) return setError('Please select a user.');
     if (!form.seller) return setError('Please select a seller.');
+    if (!form.marketplace) return setError('Please select a marketplace.');
     if (!form.category) return setError('Please select a category.');
 
     const quantity = Number(form.dailyDesiredQuantity);
@@ -134,7 +153,9 @@ export default function UserCategoryTargetsPage() {
       await api.post('/user-category-targets', {
         userId: form.user._id,
         sellerId: form.seller._id,
+        marketplace: form.marketplace,
         categoryId: form.category._id,
+        rangeId: form.range?._id || null,
         dailyDesiredQuantity: quantity,
       });
       setMessage(editingId ? 'Desired quantity updated.' : 'Desired quantity saved.');
@@ -214,14 +235,40 @@ export default function UserCategoryTargetsPage() {
             sx={{ minWidth: 240, flex: 1 }}
             renderInput={(params) => <TextField {...params} label="Seller" sx={inputSx} />}
           />
+          <FormControl sx={{ minWidth: 170 }}>
+            <InputLabel sx={{ '&.Mui-focused': { color: BRAND_YELLOW_DARK } }}>Marketplace</InputLabel>
+            <Select
+              value={form.marketplace}
+              label="Marketplace"
+              onChange={(event) => setForm((prev) => ({ ...prev, marketplace: event.target.value }))}
+              sx={{
+                borderRadius: 1.5,
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${BRAND_YELLOW_DARK} !important` },
+              }}
+            >
+              {MARKETPLACES.map((marketplace) => (
+                <MenuItem key={marketplace} value={marketplace}>{marketplace}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Autocomplete
             options={categories}
             getOptionLabel={getCategoryLabel}
             value={form.category}
-            onChange={(_, value) => setForm((prev) => ({ ...prev, category: value }))}
+            onChange={(_, value) => setForm((prev) => ({ ...prev, category: value, range: null }))}
             isOptionEqualToValue={(option, value) => option._id === value._id}
             sx={{ minWidth: 220, flex: 1 }}
             renderInput={(params) => <TextField {...params} label="Category" sx={inputSx} />}
+          />
+          <Autocomplete
+            options={filteredRanges}
+            getOptionLabel={getRangeLabel}
+            value={form.range}
+            onChange={(_, value) => setForm((prev) => ({ ...prev, range: value }))}
+            isOptionEqualToValue={(option, value) => option._id === value._id}
+            disabled={!form.category}
+            sx={{ minWidth: 220, flex: 1 }}
+            renderInput={(params) => <TextField {...params} label="Range (Optional)" sx={inputSx} />}
           />
           <TextField
             label="Daily Desired Quantity"
@@ -288,7 +335,9 @@ export default function UserCategoryTargetsPage() {
                   <TableCell sx={tableHeaderCellSx}>User</TableCell>
                   <TableCell sx={tableHeaderCellSx}>Department</TableCell>
                   <TableCell sx={tableHeaderCellSx}>Seller</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Marketplace</TableCell>
                   <TableCell sx={tableHeaderCellSx}>Category</TableCell>
+                  <TableCell sx={tableHeaderCellSx}>Range</TableCell>
                   <TableCell sx={tableHeaderCellSx} align="right">Daily Desired Quantity</TableCell>
                   <TableCell sx={tableHeaderCellSx} align="center">Actions</TableCell>
                 </TableRow>
@@ -301,7 +350,9 @@ export default function UserCategoryTargetsPage() {
                       <TableCell sx={tableBodyCellSx}>{getUserLabel(target.user)}</TableCell>
                       <TableCell sx={tableBodyCellSx}>{target.user?.department || '-'}</TableCell>
                       <TableCell sx={tableBodyCellSx}>{getSellerLabel(target.seller)}</TableCell>
+                      <TableCell sx={tableBodyCellSx}>{target.marketplace || '-'}</TableCell>
                       <TableCell sx={tableBodyCellSx}>{target.category?.name || '-'}</TableCell>
+                      <TableCell sx={tableBodyCellSx}>{target.range?.name || 'All ranges'}</TableCell>
                       <TableCell sx={{ ...tableBodyCellSx, fontWeight: 700 }} align="right">
                         {Number(target.dailyDesiredQuantity || 0).toLocaleString()}
                       </TableCell>
