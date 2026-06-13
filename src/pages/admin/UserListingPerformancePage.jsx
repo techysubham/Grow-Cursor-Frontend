@@ -31,6 +31,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import api from '../../lib/api';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { yellowFilledButtonSx } from '../../theme/tableStyles.js';
+import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
 
 const getPTDate = (offsetDays = 0) => {
   const date = new Date(Date.now() + offsetDays * 86400000);
@@ -51,6 +52,34 @@ const statusMeta = {
   behind: { label: 'Behind', color: '#a05a00', bg: '#fff4de', Icon: WarningAmberIcon },
   critical: { label: 'Critical', color: '#b3261e', bg: '#fde8e8', Icon: ErrorOutlineIcon },
 };
+
+function QuotaTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
+
+  return (
+    <Paper elevation={6} sx={{ p: 1.5, borderRadius: 1.5, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, maxWidth: 420 }}>
+      <Typography variant="subtitle2" fontWeight={800} sx={{ color: BRAND_DARK }}>
+        {row.userName}
+      </Typography>
+      <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.58), fontWeight: 700 }}>
+        {row.successfulListings.toLocaleString()} / {row.targetQuantity.toLocaleString()} listings • {row.completionPercent}%
+      </Typography>
+      <Stack spacing={0.75} sx={{ mt: 1 }}>
+        {row.assignments.map((assignment) => (
+          <Box key={assignment.targetId} sx={{ borderTop: `1px solid ${alpha(BRAND_DARK, 0.08)}`, pt: 0.75 }}>
+            <Typography variant="caption" fontWeight={800} sx={{ color: BRAND_DARK, display: 'block' }}>
+              {assignment.sellerName} / {assignment.marketplace} / {assignment.categoryName}
+            </Typography>
+            <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.58), display: 'block' }}>
+              {assignment.rangeName} • {assignment.successfulListings.toLocaleString()} / {assignment.targetQuantity.toLocaleString()} • {assignment.completionPercent}%
+            </Typography>
+          </Box>
+        ))}
+      </Stack>
+    </Paper>
+  );
+}
 
 export default function UserListingPerformancePage() {
   const theme = useTheme();
@@ -159,6 +188,46 @@ export default function UserListingPerformancePage() {
     { label: 'Critical', value: summary.critical || 0, helper: 'Less than 60%', tone: 'error' },
     { label: 'Total Missed', value: summary.totalMissedListings || 0, helper: 'Items not listed' },
   ]), [summary]);
+
+  const userQuotaRows = useMemo(() => {
+    const userMap = new Map();
+
+    cards.forEach((card) => {
+      const userId = card.user?._id || card.user?.username || 'unknown';
+      const userName = card.user?.username || 'Unknown User';
+      const existing = userMap.get(userId) || {
+        userId,
+        userName,
+        targetQuantity: 0,
+        successfulListings: 0,
+        assignments: [],
+      };
+
+      existing.targetQuantity += card.targetQuantity || 0;
+      existing.successfulListings += card.successfulListings || 0;
+      existing.assignments.push({
+        targetId: card.targetId,
+        sellerName: getSellerLabel(card.seller) || 'Unknown Seller',
+        marketplace: card.marketplace || '-',
+        categoryName: card.category?.name || 'Unknown Category',
+        rangeName: card.range?.name ? `Range: ${card.range.name}` : 'Range: All ranges',
+        targetQuantity: card.targetQuantity || 0,
+        successfulListings: card.successfulListings || 0,
+        completionPercent: card.completionPercent || 0,
+      });
+
+      userMap.set(userId, existing);
+    });
+
+    return Array.from(userMap.values())
+      .map((row) => ({
+        ...row,
+        completionPercent: row.targetQuantity > 0
+          ? Math.round((row.successfulListings / row.targetQuantity) * 100)
+          : 0,
+      }))
+      .sort((a, b) => b.completionPercent - a.completionPercent || b.successfulListings - a.successfulListings);
+  }, [cards]);
 
   return (
     <Box sx={{ px: { xs: 2, md: 3 }, pb: 5, backgroundColor: theme.palette.background.paper, minHeight: '100vh' }}>
@@ -321,6 +390,58 @@ export default function UserListingPerformancePage() {
           </Grid>
         ))}
       </Grid>
+
+      {!loading && userQuotaRows.length > 0 && (
+        <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}` }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={800} sx={{ color: BRAND_DARK }}>
+                Quota Utilization per Lister
+              </Typography>
+              <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.52), fontWeight: 600 }}>
+                Total successful listings against desired quantity across selected marketplaces, sellers, categories, and ranges
+              </Typography>
+            </Box>
+          </Stack>
+          <Box sx={{ width: '100%', height: Math.max(220, userQuotaRows.length * 54 + 40) }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={userQuotaRows}
+                layout="vertical"
+                margin={{ top: 8, right: 76, bottom: 8, left: 24 }}
+              >
+                <XAxis type="number" domain={[0, 100]} hide />
+                <YAxis
+                  type="category"
+                  dataKey="userName"
+                  width={120}
+                  tick={{ fill: BRAND_DARK, fontSize: 13, fontWeight: 700 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <RechartsTooltip content={<QuotaTooltip />} cursor={{ fill: alpha(BRAND_YELLOW, 0.08) }} />
+                <Bar dataKey="completionPercent" radius={[0, 7, 7, 0]} barSize={18} background={{ fill: alpha(BRAND_DARK, 0.08), radius: 7 }}>
+                  {userQuotaRows.map((row) => {
+                    const color = row.completionPercent >= 95
+                      ? statusMeta.onTrack.color
+                      : row.completionPercent >= 60
+                        ? statusMeta.behind.color
+                        : statusMeta.critical.color;
+                    return <Cell key={row.userId} fill={color} />;
+                  })}
+                  <LabelList
+                    dataKey={(row) => `${row.completionPercent}%  ${row.successfulListings.toLocaleString()}/${row.targetQuantity.toLocaleString()}`}
+                    position="right"
+                    fill={BRAND_DARK}
+                    fontSize={12}
+                    fontWeight={800}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Box>
+        </Paper>
+      )}
 
       {loading ? (
         <Box sx={{ p: 4, textAlign: 'center' }}>
