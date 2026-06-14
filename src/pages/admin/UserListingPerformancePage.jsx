@@ -53,34 +53,6 @@ const statusMeta = {
   critical: { label: 'Critical', color: '#b3261e', bg: '#fde8e8', Icon: ErrorOutlineIcon },
 };
 
-function QuotaTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0].payload;
-
-  return (
-    <Paper elevation={6} sx={{ p: 1.5, borderRadius: 1.5, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, maxWidth: 420 }}>
-      <Typography variant="subtitle2" fontWeight={800} sx={{ color: BRAND_DARK }}>
-        {row.userName}
-      </Typography>
-      <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.58), fontWeight: 700 }}>
-        {row.successfulListings.toLocaleString()} / {row.targetQuantity.toLocaleString()} listings • {row.completionPercent}%
-      </Typography>
-      <Stack spacing={0.75} sx={{ mt: 1 }}>
-        {row.assignments.map((assignment) => (
-          <Box key={assignment.targetId} sx={{ borderTop: `1px solid ${alpha(BRAND_DARK, 0.08)}`, pt: 0.75 }}>
-            <Typography variant="caption" fontWeight={800} sx={{ color: BRAND_DARK, display: 'block' }}>
-              {assignment.sellerName} / {assignment.marketplace} / {assignment.categoryName}
-            </Typography>
-            <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.58), display: 'block' }}>
-              {assignment.rangeName} • {assignment.successfulListings.toLocaleString()} / {assignment.targetQuantity.toLocaleString()} • {assignment.completionPercent}%
-            </Typography>
-          </Box>
-        ))}
-      </Stack>
-    </Paper>
-  );
-}
-
 function SubmissionTimeTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
@@ -221,21 +193,10 @@ export default function UserListingPerformancePage() {
         userName,
         targetQuantity: 0,
         successfulListings: 0,
-        assignments: [],
       };
 
       existing.targetQuantity += card.targetQuantity || 0;
       existing.successfulListings += card.successfulListings || 0;
-      existing.assignments.push({
-        targetId: card.targetId,
-        sellerName: getSellerLabel(card.seller) || 'Unknown Seller',
-        marketplace: card.marketplace || '-',
-        categoryName: card.category?.name || 'Unknown Category',
-        rangeName: card.range?.name ? `Range: ${card.range.name}` : 'Range: All ranges',
-        targetQuantity: card.targetQuantity || 0,
-        successfulListings: card.successfulListings || 0,
-        completionPercent: card.completionPercent || 0,
-      });
 
       userMap.set(userId, existing);
     });
@@ -429,18 +390,17 @@ export default function UserListingPerformancePage() {
               <BarChart
                 data={userQuotaRows}
                 layout="vertical"
-                margin={{ top: 8, right: 76, bottom: 8, left: 24 }}
+                margin={{ top: 8, right: 96, bottom: 8, left: 8 }}
               >
                 <XAxis type="number" domain={[0, 100]} hide />
                 <YAxis
                   type="category"
                   dataKey="userName"
-                  width={120}
+                  width={230}
                   tick={{ fill: BRAND_DARK, fontSize: 13, fontWeight: 700 }}
                   axisLine={false}
                   tickLine={false}
                 />
-                <RechartsTooltip content={<QuotaTooltip />} cursor={{ fill: alpha(BRAND_YELLOW, 0.08) }} />
                 <Bar dataKey="completionPercent" radius={[0, 7, 7, 0]} barSize={18} background={{ fill: alpha(BRAND_DARK, 0.08), radius: 7 }}>
                   {userQuotaRows.map((row) => {
                     const color = row.completionPercent >= 95
