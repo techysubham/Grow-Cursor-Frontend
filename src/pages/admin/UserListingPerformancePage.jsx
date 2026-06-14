@@ -619,7 +619,7 @@ export default function UserListingPerformancePage() {
       <Dialog
         open={Boolean(selectedBreakdownUser)}
         onClose={() => setSelectedBreakdownUser(null)}
-        maxWidth="lg"
+        maxWidth="xl"
         fullWidth
       >
         <DialogTitle sx={{ pr: 6 }}>
@@ -667,22 +667,25 @@ export default function UserListingPerformancePage() {
               </Grid>
 
               <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={7}>
                   <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}`, height: '100%' }}>
                     <Typography variant="subtitle2" fontWeight={900} sx={{ color: BRAND_DARK, mb: 1 }}>
                       Category Breakdown
                     </Typography>
-                    <Box sx={{ height: 260 }}>
+                    <Box sx={{ height: { xs: 360, md: 340 } }}>
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
+                        <PieChart margin={{ top: 12, right: 170, bottom: 12, left: 12 }}>
                           <Pie
                             data={selectedBreakdownUser.categoryRows}
                             dataKey="successfulListings"
                             nameKey="categoryName"
-                            innerRadius={54}
-                            outerRadius={92}
+                            cx="42%"
+                            cy="50%"
+                            innerRadius={72}
+                            outerRadius={118}
                             paddingAngle={2}
-                            label={({ categoryName, successfulListings }) => `${categoryName}: ${successfulListings}`}
+                            labelLine={false}
+                            label={({ successfulListings }) => successfulListings > 0 ? successfulListings.toLocaleString() : ''}
                           >
                             {selectedBreakdownUser.categoryRows.map((entry, index) => (
                               <Cell key={entry.categoryId} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
@@ -691,14 +694,19 @@ export default function UserListingPerformancePage() {
                           <RechartsTooltip
                             formatter={(value, name) => [`${Number(value).toLocaleString()} listed`, name]}
                           />
-                          <Legend verticalAlign="bottom" height={48} />
+                          <Legend
+                            layout="vertical"
+                            align="right"
+                            verticalAlign="middle"
+                            wrapperStyle={{ maxWidth: 160, fontSize: 12, lineHeight: '20px' }}
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                     </Box>
                   </Paper>
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={5}>
                   <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}`, height: '100%' }}>
                     <Typography variant="subtitle2" fontWeight={900} sx={{ color: BRAND_DARK, mb: 1 }}>
                       Submission Timeline (IST)
