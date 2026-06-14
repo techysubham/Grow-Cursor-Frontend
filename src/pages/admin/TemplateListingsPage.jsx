@@ -1030,7 +1030,7 @@ export default function TemplateListingsPage() {
   };
 
   // Save listings from review modal
-  const handleSaveFromReview = async (listings) => {
+  const handleSaveFromReview = async (listings, reviewStats = {}) => {
     setLoading(true);
     setError('');
     setSuccess('');
@@ -1040,6 +1040,7 @@ export default function TemplateListingsPage() {
         templateId,
         sellerId,
         listings,
+        reviewStats,
         options: {
           skipDuplicates: true
         }
