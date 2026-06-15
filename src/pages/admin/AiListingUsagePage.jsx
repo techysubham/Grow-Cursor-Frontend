@@ -71,6 +71,10 @@ function formatCallsPerAsin(aiCalls, successfulAsinCount) {
   return (Number(aiCalls || 0) / Number(successfulAsinCount)).toFixed(2);
 }
 
+function getTotalUpdateableDuplicateCount(row = {}) {
+  return Number(row.updateableDuplicateCount || 0) + Number(row.dismissedUpdateableDuplicateCount || 0);
+}
+
 function formatDateTime(value) {
   if (!value) return '-';
   return new Date(value).toLocaleString();
@@ -282,12 +286,12 @@ export default function AiListingUsagePage() {
     [rows]
   );
   const visibleUpdateableDuplicateTotal = useMemo(
-    () => rows.reduce((sum, row) => sum + Number(row.updateableDuplicateCount || 0), 0),
+    () => rows.reduce((sum, row) => sum + getTotalUpdateableDuplicateCount(row), 0),
     [rows]
   );
   const visibleTotalAsinsCalledTotal = useMemo(
     () => rows.reduce(
-      (sum, row) => sum + Number(row.successfulAsinCount || 0) + Number(row.updateableDuplicateCount || 0),
+      (sum, row) => sum + Number(row.successfulAsinCount || 0) + getTotalUpdateableDuplicateCount(row),
       0
     ),
     [rows]
@@ -566,8 +570,8 @@ export default function AiListingUsagePage() {
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Average OpenAI calls made per distinct successful ASIN.">AI Calls / Successful ASINs</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Distinct ASINs with at least one successful OpenAI field call. Duplicate-only skipped rows can be 0.">Successful ASINs</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Listings saved from the review flow for this run, including duplicate-update saves with zero AI calls.">Saved</HeaderTooltip></TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Duplicate-updateable ASINs saved from the review flow. These usually skip OpenAI generation.">Updateable Duplicates</HeaderTooltip></TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Successful ASINs plus updateable duplicates, showing the total ASINs represented in this run.">Total ASINs Called</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Duplicate-updateable ASINs reviewed in this run, including saved and dismissed updateable duplicates. These usually skip OpenAI generation.">Updateable Duplicates</HeaderTooltip></TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Successful ASINs plus all updateable duplicates, showing the total ASINs represented in this run.">Total ASINs Called</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Eligible ASINs dismissed in the review modal before saving.">Dismissed</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="New AI-generated ASINs dismissed in the review modal before saving.">Dismissed New</HeaderTooltip></TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}><HeaderTooltip title="Duplicate-updateable ASINs dismissed in the review modal before saving.">Dismissed Updateable</HeaderTooltip></TableCell>
@@ -632,10 +636,10 @@ export default function AiListingUsagePage() {
                       {formatNumber(row.savedCount)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      {formatNumber(row.updateableDuplicateCount)}
+                      {formatNumber(getTotalUpdateableDuplicateCount(row))}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      {formatNumber(Number(row.successfulAsinCount || 0) + Number(row.updateableDuplicateCount || 0))}
+                      {formatNumber(Number(row.successfulAsinCount || 0) + getTotalUpdateableDuplicateCount(row))}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>
                       {formatNumber(row.dismissedFromReviewCount)}
