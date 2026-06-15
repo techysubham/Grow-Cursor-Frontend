@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -49,6 +49,14 @@ import {
   saveRemarkTemplates
 } from '../../constants/remarkTemplates';
 import AmazonArrivalsSkeleton from '../../components/skeletons/AmazonArrivalsSkeleton';
+
+const REMARK_COUNT_CARDS = [
+  { key: 'Processing', label: 'Processing', color: '#2563eb' },
+  { key: 'Shipped', label: 'Shipped', color: '#059669' },
+  { key: 'Late Message', label: 'Late Message', color: '#d97706' },
+  { key: 'Delayed', label: 'Delayed', color: '#dc2626' },
+  { key: 'Delivered', label: 'Delivered', color: '#7c3aed' }
+];
 
 function NotesCell({
   order,
@@ -147,6 +155,7 @@ export default function AmazonArrivalsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [remarkCounts, setRemarkCounts] = useState({});
 
   // Sort State
   const [arrivalSort, setArrivalSort] = useState('asc'); // 'asc' or 'desc'
@@ -174,6 +183,14 @@ export default function AmazonArrivalsPage() {
 
   // REF: To prevent unnecessary re-fetches
   const lastFetchedParams = useRef('');
+
+  const remarkCountCards = useMemo(
+    () => REMARK_COUNT_CARDS.map(card => ({
+      ...card,
+      count: remarkCounts?.[card.key] || 0
+    })),
+    [remarkCounts]
+  );
 
   // 1. Fetch Sellers and Amazon Accounts on Mount
   useEffect(() => {
@@ -263,6 +280,7 @@ export default function AmazonArrivalsPage() {
         setTotalPages(data.pagination.totalPages);
         setTotalOrders(data.pagination.totalOrders);
       }
+      setRemarkCounts(data?.remarkCounts || {});
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to load Amazon arrivals');
     } finally {
@@ -324,12 +342,27 @@ export default function AmazonArrivalsPage() {
       .replace(/\{\{order_id\}\}/g, order?.orderId || '');
   };
 
+  const updateRemarkCountCards = (previousRemark, nextRemark) => {
+    setRemarkCounts(prev => {
+      const next = { ...(prev || {}) };
+      if (previousRemark) {
+        next[previousRemark] = Math.max((next[previousRemark] || 0) - 1, 0);
+      }
+      if (nextRemark) {
+        next[nextRemark] = (next[nextRemark] || 0) + 1;
+      }
+      return next;
+    });
+  };
+
   const applyRemarkUpdateOnly = async (orderId, remarkValue) => {
     try {
       const normalizedRemark = remarkValue && String(remarkValue).trim().toLowerCase() !== 'select'
         ? String(remarkValue).trim()
         : null;
+      const previousRemark = orders.find(o => o._id === orderId)?.remark || null;
       await api.patch(`/ebay/orders/${orderId}/manual-fields`, { remark: normalizedRemark });
+      updateRemarkCountCards(previousRemark, normalizedRemark);
       if (normalizedRemark === 'Delivered') {
         // Remove the delivered order from the arrivals list
         setOrders(prev => prev.filter(o => o._id !== orderId));
@@ -600,6 +633,33 @@ export default function AmazonArrivalsPage() {
             </Button>
           </Stack>
         </SectionCard>
+
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+          sx={{ mb: 2, flexShrink: 0, flexWrap: { sm: 'wrap' } }}
+        >
+          {remarkCountCards.map(card => (
+            <SectionCard
+              key={card.key}
+              sx={{
+                px: 2,
+                py: 1.5,
+                minWidth: { xs: '100%', sm: 150 },
+                flex: { xs: '1 1 auto', sm: '0 1 170px' },
+                borderLeft: '4px solid',
+                borderLeftColor: card.color
+              }}
+            >
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>
+                {card.label}
+              </Typography>
+              <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 700, color: card.color, lineHeight: 1 }}>
+                {card.count}
+              </Typography>
+            </SectionCard>
+          ))}
+        </Stack>
 
         {/* Loading & Error States */}
         {loading && !orders.length ? (
