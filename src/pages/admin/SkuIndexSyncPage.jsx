@@ -46,7 +46,7 @@ export default function SkuIndexSyncPage() {
 
     useEffect(() => {
         if (sellers.length === 0) return undefined;
-        const id = window.setInterval(() => refreshStatuses(sellers), 15000);
+        const id = window.setInterval(() => refreshStatuses(sellers), 120000);
         return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sellers]);
@@ -79,7 +79,7 @@ export default function SkuIndexSyncPage() {
                     status: mapStatus(data),
                     dbCount: data.dbCount,
                     syncedAt: data.syncedAt || null,
-                    progress: prev[sellerId]?.status === 'running' ? prev[sellerId]?.progress || null : null,
+                    progress: data.progress || (prev[sellerId]?.status === 'running' ? prev[sellerId]?.progress || null : null),
                     errorMsg: data.error || null,
                     source: data.source || null,
                     runnerId: data.runnerId || null,
