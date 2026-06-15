@@ -171,6 +171,43 @@ function getMatchedKnownImageUrls(htmlContent, imageUrls = []) {
   return uniqueImageUrls.filter(url => htmlContent.includes(url));
 }
 
+function getItemAiRunId(item = {}) {
+  const listing = item.generatedListing || {};
+  return listing._aiRunId || listing.aiRunId || item._aiRunId || item.aiRunId || null;
+}
+
+function buildDismissedReviewStats(previewItems = [], dismissedItems = new Set()) {
+  const byRunId = new Map();
+  const eligibleStatuses = new Set(['success', 'warning', 'duplicate_updateable', 'ready']);
+
+  previewItems.forEach((item) => {
+    if (!dismissedItems.has(item.id) || !eligibleStatuses.has(item.status)) return;
+
+    const aiRunId = getItemAiRunId(item);
+    if (!aiRunId) return;
+
+    const current = byRunId.get(aiRunId) || {
+      aiRunId,
+      dismissedCount: 0,
+      dismissedNewAsinCount: 0,
+      dismissedUpdateableDuplicateCount: 0
+    };
+
+    current.dismissedCount += 1;
+    if (item.status === 'duplicate_updateable') {
+      current.dismissedUpdateableDuplicateCount += 1;
+    } else {
+      current.dismissedNewAsinCount += 1;
+    }
+
+    byRunId.set(aiRunId, current);
+  });
+
+  return {
+    dismissedByRunId: [...byRunId.values()]
+  };
+}
+
 export default function AsinReviewModal({ 
   open, 
   onClose, 
@@ -463,7 +500,7 @@ export default function AsinReviewModal({
           return listingData;
         });
       
-      await onSave(listingsToSave);
+      await onSave(listingsToSave, buildDismissedReviewStats(previewItems, dismissedItems));
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Save failed:', error);
@@ -876,7 +913,7 @@ export default function AsinReviewModal({
                       }
                       return listingData;
                     });
-                  onListDirectly(listingsToSave);
+                  onListDirectly(listingsToSave, buildDismissedReviewStats(previewItems, dismissedItems));
                 }}
                 disabled={saving || activeItems.every(i => ['error', 'loading', 'blocked'].includes(i.status))}
                 sx={{ fontSize: showAmazonPreview ? '0.7rem' : undefined, whiteSpace: 'nowrap' }}
