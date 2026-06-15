@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  ButtonBase,
   Checkbox,
   Chip,
   CircularProgress,
@@ -71,6 +72,7 @@ export default function AsinPrecheckPage() {
   const [rows, setRows] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [imagePreview, setImagePreview] = useState(null);
 
   const surfaceSx = {
     borderRadius: `${dashboardTheme.radius.card}px`,
@@ -366,7 +368,7 @@ export default function AsinPrecheckPage() {
 
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end" flexWrap="wrap">
               <Chip label={`Active: ${activeCount}`} color="success" variant="outlined" />
-              <Chip label={`Inactive: ${inactiveRows.length}`} color="default" variant="outlined" />
+              <Chip label={`Inactive: ${inactiveRows.length}`} color="error" variant="outlined" />
               <Chip label={`Selected: ${selectedIds.size}`} sx={{ bgcolor: alpha(BRAND_YELLOW, 0.24), fontWeight: 700 }} />
               <Button
                 variant="outlined"
@@ -414,11 +416,11 @@ export default function AsinPrecheckPage() {
                     disabled={completedRows.length === 0}
                   />
                 </TableCell>
-                <TableCell sx={tableHeaderCellSx}>ASIN</TableCell>
-                <TableCell sx={tableHeaderCellSx}>Amazon Image</TableCell>
-                <TableCell sx={tableHeaderCellSx}>Title</TableCell>
-                <TableCell sx={tableHeaderCellSx}>SKU</TableCell>
-                <TableCell sx={tableHeaderCellSx}>Active</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 130 }}>ASIN</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 132 }}>Amazon Image</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: '48%' }}>Title</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 130 }}>SKU</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 110 }}>Active</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -449,32 +451,47 @@ export default function AsinPrecheckPage() {
                     />
                   </TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>{row.asin}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ width: 132 }}>
                     {row.status === 'loading' ? (
                       <CircularProgress size={22} />
                     ) : row.image ? (
-                      <Box
-                        component="img"
-                        src={row.image}
-                        alt={row.asin}
+                      <ButtonBase
+                        onClick={() => setImagePreview({ src: row.image, asin: row.asin, title: row.title })}
                         sx={{
-                          width: 64,
-                          height: 64,
-                          objectFit: 'contain',
-                          borderRadius: 1,
+                          width: 96,
+                          height: 96,
+                          borderRadius: 1.5,
                           border: `1px solid ${alpha(BRAND_DARK, 0.1)}`,
-                          bgcolor: '#fff'
+                          bgcolor: '#fff',
+                          overflow: 'hidden',
+                          '&:hover': {
+                            borderColor: BRAND_YELLOW_DARK,
+                            boxShadow: `0 0 0 3px ${alpha(BRAND_YELLOW, 0.24)}`
+                          }
                         }}
-                      />
+                      >
+                        <Box
+                          component="img"
+                          src={row.image}
+                          alt={row.asin}
+                          sx={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain'
+                          }}
+                        />
+                      </ButtonBase>
                     ) : (
                       <Typography variant="caption" color="text.secondary">No image</Typography>
                     )}
                   </TableCell>
-                  <TableCell sx={{ minWidth: 280 }}>
+                  <TableCell sx={{ width: '48%', minWidth: 260, maxWidth: 620 }}>
                     {row.status === 'loading' ? (
                       <Typography variant="body2" color="text.secondary">Fetching...</Typography>
                     ) : row.title ? (
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.title}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.35 }}>
+                        {row.title}
+                      </Typography>
                     ) : (
                       <Typography variant="body2" color="error">
                         {row.errors?.[0] || 'No title'}
@@ -492,7 +509,7 @@ export default function AsinPrecheckPage() {
                     ) : row.active ? (
                       <Chip icon={<CheckCircleIcon />} label="Active" size="small" color="success" />
                     ) : (
-                      <Chip label="Inactive" size="small" />
+                      <Chip label="Inactive" size="small" color="error" variant="outlined" />
                     )}
                   </TableCell>
                 </TableRow>
@@ -588,6 +605,37 @@ export default function AsinPrecheckPage() {
           >
             Run Precheck
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!imagePreview} onClose={() => setImagePreview(null)} maxWidth="md" fullWidth>
+        <DialogTitle>{imagePreview?.asin || 'Amazon Image'}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} alignItems="center">
+            {imagePreview?.src && (
+              <Box
+                component="img"
+                src={imagePreview.src}
+                alt={imagePreview.asin || 'Amazon product'}
+                sx={{
+                  width: '100%',
+                  maxHeight: '70vh',
+                  objectFit: 'contain',
+                  bgcolor: '#fff',
+                  borderRadius: 1,
+                  border: `1px solid ${alpha(BRAND_DARK, 0.1)}`
+                }}
+              />
+            )}
+            {imagePreview?.title && (
+              <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'stretch' }}>
+                {imagePreview.title}
+              </Typography>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImagePreview(null)}>Close</Button>
         </DialogActions>
       </Dialog>
     </AdminPageShell>
