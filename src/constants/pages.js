@@ -27,7 +27,7 @@ export const SUBMENUS = {
     id: 'templateListing',
     name: 'Template Listing',
     category: 'listingResearch',
-    pages: ['ManageTemplates', 'ListingsDatabase', 'SelectSeller', 'ListingDirectory', 'TemplateDirectory'],
+    pages: ['ManageTemplates', 'ListingsDatabase', 'SelectSeller', 'AsinPrecheck', 'ListingDirectory', 'TemplateDirectory'],
   },
   asinImporter: {
     id: 'asinImporter',
@@ -69,6 +69,7 @@ export const PAGE_REGISTRY = [
   { id: 'ManageTemplates', name: 'Manage Templates', path: '/manage-templates', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin'] },
   { id: 'ListingsDatabase', name: 'Listings Database', path: '/listings-database', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin'] },
   { id: 'SelectSeller', name: 'Add Template Listings', path: '/select-seller', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin', 'lister', 'advancelister', 'trainee'] },
+  { id: 'AsinPrecheck', name: 'ASIN Precheck', path: '/asin-precheck', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin', 'lister', 'advancelister', 'trainee'] },
   { id: 'ListingDirectory', name: 'Listing Directory', path: '/listing-directory', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin', 'lister', 'advancelister', 'trainee'] },
   { id: 'TemplateDirectory', name: 'Template Directory', path: '/template-directory', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin', 'lister', 'advancelister', 'trainee'] },
   // ASIN Importer submenu
