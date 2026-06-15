@@ -7,8 +7,12 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   FormControl,
   Grid,
+  IconButton,
   InputAdornment,
   InputLabel,
   LinearProgress,
@@ -16,6 +20,12 @@ import {
   Paper,
   Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -28,10 +38,12 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import CloseIcon from '@mui/icons-material/Close';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import api from '../../lib/api';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { yellowFilledButtonSx } from '../../theme/tableStyles.js';
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Pie, PieChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
 
 const getPTDate = (offsetDays = 0) => {
   const date = new Date(Date.now() + offsetDays * 86400000);
@@ -53,33 +65,13 @@ const statusMeta = {
   critical: { label: 'Critical', color: '#b3261e', bg: '#fde8e8', Icon: ErrorOutlineIcon },
 };
 
-function QuotaTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0].payload;
+const CATEGORY_COLORS = ['#f2b400', '#264653', '#2a9d8f', '#e76f51', '#8a5cf6', '#457b9d', '#a05a00', '#1b7f3a'];
 
-  return (
-    <Paper elevation={6} sx={{ p: 1.5, borderRadius: 1.5, border: `1px solid ${alpha(BRAND_DARK, 0.12)}`, maxWidth: 420 }}>
-      <Typography variant="subtitle2" fontWeight={800} sx={{ color: BRAND_DARK }}>
-        {row.userName}
-      </Typography>
-      <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.58), fontWeight: 700 }}>
-        {row.successfulListings.toLocaleString()} / {row.targetQuantity.toLocaleString()} listings • {row.completionPercent}%
-      </Typography>
-      <Stack spacing={0.75} sx={{ mt: 1 }}>
-        {row.assignments.map((assignment) => (
-          <Box key={assignment.targetId} sx={{ borderTop: `1px solid ${alpha(BRAND_DARK, 0.08)}`, pt: 0.75 }}>
-            <Typography variant="caption" fontWeight={800} sx={{ color: BRAND_DARK, display: 'block' }}>
-              {assignment.sellerName} / {assignment.marketplace} / {assignment.categoryName}
-            </Typography>
-            <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.58), display: 'block' }}>
-              {assignment.rangeName} • {assignment.successfulListings.toLocaleString()} / {assignment.targetQuantity.toLocaleString()} • {assignment.completionPercent}%
-            </Typography>
-          </Box>
-        ))}
-      </Stack>
-    </Paper>
-  );
-}
+const getCompletionStatus = (percent) => {
+  if (percent >= 95) return 'onTrack';
+  if (percent >= 60) return 'behind';
+  return 'critical';
+};
 
 function SubmissionTimeTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
@@ -117,6 +109,7 @@ export default function UserListingPerformancePage() {
   const [performance, setPerformance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedBreakdownUser, setSelectedBreakdownUser] = useState(null);
 
   const inputSx = {
     '& label.Mui-focused': { color: `${BRAND_YELLOW_DARK} !important` },
@@ -210,7 +203,7 @@ export default function UserListingPerformancePage() {
     { label: 'Total Missed', value: summary.totalMissedListings || 0, helper: 'Items not listed' },
   ]), [summary]);
 
-  const userQuotaRows = useMemo(() => {
+  const userBreakdownRows = useMemo(() => {
     const userMap = new Map();
 
     cards.forEach((card) => {
@@ -221,20 +214,45 @@ export default function UserListingPerformancePage() {
         userName,
         targetQuantity: 0,
         successfulListings: 0,
+        missedListings: 0,
+        categories: new Map(),
         assignments: [],
+        submissionTimeDistribution: Array.from({ length: 24 }, (_, hour) => ({
+          hour,
+          label: new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour: 'numeric',
+            hour12: true,
+          }).format(new Date(Date.UTC(2026, 0, 1, hour - 5, 30))),
+          uploadCount: 0,
+          successfulListings: 0,
+        })),
       };
 
       existing.targetQuantity += card.targetQuantity || 0;
       existing.successfulListings += card.successfulListings || 0;
-      existing.assignments.push({
-        targetId: card.targetId,
-        sellerName: getSellerLabel(card.seller) || 'Unknown Seller',
-        marketplace: card.marketplace || '-',
-        categoryName: card.category?.name || 'Unknown Category',
-        rangeName: card.range?.name ? `Range: ${card.range.name}` : 'Range: All ranges',
-        targetQuantity: card.targetQuantity || 0,
-        successfulListings: card.successfulListings || 0,
-        completionPercent: card.completionPercent || 0,
+      existing.missedListings += card.missedListings || 0;
+      existing.assignments.push(card);
+
+      const categoryId = card.category?._id || card.category?.name || 'unknown';
+      const categoryName = card.category?.name || 'Unknown Category';
+      const category = existing.categories.get(categoryId) || {
+        categoryId,
+        categoryName,
+        targetQuantity: 0,
+        successfulListings: 0,
+        missedListings: 0,
+      };
+      category.targetQuantity += card.targetQuantity || 0;
+      category.successfulListings += card.successfulListings || 0;
+      category.missedListings += card.missedListings || 0;
+      existing.categories.set(categoryId, category);
+
+      (card.submissionTimeDistribution || []).forEach((timeRow) => {
+        const existingTime = existing.submissionTimeDistribution[timeRow.hour];
+        if (!existingTime) return;
+        existingTime.uploadCount += timeRow.uploadCount || 0;
+        existingTime.successfulListings += timeRow.successfulListings || 0;
       });
 
       userMap.set(userId, existing);
@@ -246,9 +264,21 @@ export default function UserListingPerformancePage() {
         completionPercent: row.targetQuantity > 0
           ? Math.round((row.successfulListings / row.targetQuantity) * 100)
           : 0,
+        status: getCompletionStatus(row.targetQuantity > 0 ? Math.round((row.successfulListings / row.targetQuantity) * 100) : 0),
+        categoryRows: Array.from(row.categories.values())
+          .map((category) => ({
+            ...category,
+            completionPercent: category.targetQuantity > 0
+              ? Math.round((category.successfulListings / category.targetQuantity) * 100)
+              : 0,
+          }))
+          .sort((a, b) => b.successfulListings - a.successfulListings),
       }))
       .sort((a, b) => b.completionPercent - a.completionPercent || b.successfulListings - a.successfulListings);
   }, [cards]);
+
+  const selectedUserHasTimeline = selectedBreakdownUser?.submissionTimeDistribution?.some((row) => row.uploadCount > 0);
+
 
   return (
     <Box sx={{ px: { xs: 2, md: 3 }, pb: 5, backgroundColor: theme.palette.background.paper, minHeight: '100vh' }}>
@@ -412,7 +442,7 @@ export default function UserListingPerformancePage() {
         ))}
       </Grid>
 
-      {!loading && userQuotaRows.length > 0 && (
+      {!loading && userBreakdownRows.length > 0 && (
         <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}` }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
             <Box>
@@ -424,25 +454,24 @@ export default function UserListingPerformancePage() {
               </Typography>
             </Box>
           </Stack>
-          <Box sx={{ width: '100%', height: Math.max(220, userQuotaRows.length * 54 + 40) }}>
+          <Box sx={{ width: '100%', height: Math.max(220, userBreakdownRows.length * 54 + 40) }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={userQuotaRows}
+                data={userBreakdownRows}
                 layout="vertical"
-                margin={{ top: 8, right: 76, bottom: 8, left: 24 }}
+                margin={{ top: 8, right: 96, bottom: 8, left: 8 }}
               >
                 <XAxis type="number" domain={[0, 100]} hide />
                 <YAxis
                   type="category"
                   dataKey="userName"
-                  width={120}
+                  width={230}
                   tick={{ fill: BRAND_DARK, fontSize: 13, fontWeight: 700 }}
                   axisLine={false}
                   tickLine={false}
                 />
-                <RechartsTooltip content={<QuotaTooltip />} cursor={{ fill: alpha(BRAND_YELLOW, 0.08) }} />
                 <Bar dataKey="completionPercent" radius={[0, 7, 7, 0]} barSize={18} background={{ fill: alpha(BRAND_DARK, 0.08), radius: 7 }}>
-                  {userQuotaRows.map((row) => {
+                  {userBreakdownRows.map((row) => {
                     const color = row.completionPercent >= 95
                       ? statusMeta.onTrack.color
                       : row.completionPercent >= 60
@@ -451,7 +480,7 @@ export default function UserListingPerformancePage() {
                     return <Cell key={row.userId} fill={color} />;
                   })}
                   <LabelList
-                    dataKey={(row) => `${row.completionPercent}%  ${row.successfulListings.toLocaleString()}/${row.targetQuantity.toLocaleString()}`}
+                    dataKey={(row) => `${row.completionPercent}% ${row.successfulListings.toLocaleString()}/${row.targetQuantity.toLocaleString()}`}
                     position="right"
                     fill={BRAND_DARK}
                     fontSize={12}
@@ -461,6 +490,71 @@ export default function UserListingPerformancePage() {
               </BarChart>
             </ResponsiveContainer>
           </Box>
+        </Paper>
+      )}
+
+      {!loading && userBreakdownRows.length > 0 && (
+        <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}` }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={800} sx={{ color: BRAND_DARK }}>
+                Lister Breakdown
+              </Typography>
+              <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.52), fontWeight: 600 }}>
+                Assigned users for the selected date range, with category drill-down available in details
+              </Typography>
+            </Box>
+          </Stack>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 800, color: BRAND_DARK }}>Lister</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Listed</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Quota</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Missed</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Quota %</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: BRAND_DARK }}>Categories</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: BRAND_DARK }}>Status</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Details</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {userBreakdownRows.map((row) => {
+                  const meta = statusMeta[row.status] || statusMeta.critical;
+                  const Icon = meta.Icon;
+                  return (
+                    <TableRow key={row.userId} hover>
+                      <TableCell sx={{ fontWeight: 800, color: BRAND_DARK }}>{row.userName}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>{row.successfulListings.toLocaleString()}</TableCell>
+                      <TableCell align="right">{row.targetQuantity.toLocaleString()}</TableCell>
+                      <TableCell align="right" sx={{ color: row.missedListings > 0 ? '#b3261e' : BRAND_DARK, fontWeight: 800 }}>
+                        {row.missedListings.toLocaleString()}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>{row.completionPercent}%</TableCell>
+                      <TableCell sx={{ maxWidth: 360 }}>
+                        <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.7) }}>
+                          {row.categoryRows.slice(0, 3).map((category) => category.categoryName).join(', ')}
+                          {row.categoryRows.length > 3 ? ` +${row.categoryRows.length - 3} more` : ''}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ px: 1, py: 0.5, borderRadius: 1.5, width: 'fit-content', backgroundColor: meta.bg, color: meta.color }}>
+                          <Icon sx={{ fontSize: 17 }} />
+                          <Typography variant="caption" fontWeight={800}>{meta.label}</Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="right">
+                        <IconButton size="small" onClick={() => setSelectedBreakdownUser(row)} sx={{ color: BRAND_DARK }}>
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Paper>
       )}
 
@@ -514,83 +608,164 @@ export default function UserListingPerformancePage() {
         <Box sx={{ p: 4, textAlign: 'center' }}>
           <CircularProgress size={30} sx={{ color: BRAND_YELLOW_DARK }} />
         </Box>
-      ) : cards.length === 0 ? (
+      ) : userBreakdownRows.length === 0 ? (
         <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}` }}>
           <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.55) }}>
             No saved targets match the selected filters.
           </Typography>
         </Paper>
-      ) : (
-        <Grid container spacing={2}>
-          {cards.map((card) => {
-            const meta = statusMeta[card.status] || statusMeta.critical;
-            const Icon = meta.Icon;
-            const progress = Math.min(card.completionPercent || 0, 100);
-            return (
-              <Grid item xs={12} md={6} xl={4} key={card.targetId}>
-                <Card elevation={0} sx={{ height: '100%', borderRadius: 2, border: `1px solid ${alpha(meta.color, 0.28)}`, overflow: 'hidden' }}>
-                  <Box sx={{ height: 5, backgroundColor: meta.color }} />
-                  <CardContent>
-                    <Stack direction="row" justifyContent="space-between" spacing={2} alignItems="flex-start">
-                      <Box>
-                        <Typography variant="subtitle1" fontWeight={800} sx={{ color: BRAND_DARK }}>
-                          {card.user?.username || 'Unknown User'}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.62) }}>
-                          {getSellerLabel(card.seller)} / {card.marketplace || '-'} / {card.category?.name || 'Unknown Category'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.5), fontWeight: 600 }}>
-                          {card.range?.name ? `Range: ${card.range.name}` : 'Range: All ranges'}
-                        </Typography>
-                      </Box>
-                      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ px: 1, py: 0.5, borderRadius: 1.5, backgroundColor: meta.bg, color: meta.color }}>
-                        <Icon sx={{ fontSize: 17 }} />
-                        <Typography variant="caption" fontWeight={800}>{meta.label}</Typography>
-                      </Stack>
-                    </Stack>
+      ) : null}
 
-                    <Stack direction="row" spacing={3} sx={{ mt: 2.5, flexWrap: 'wrap' }}>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.5), fontWeight: 700 }}>Successful</Typography>
-                        <Typography variant="h5" fontWeight={800} sx={{ color: BRAND_DARK }}>{card.successfulListings.toLocaleString()}</Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.5), fontWeight: 700 }}>Target</Typography>
-                        <Typography variant="h5" fontWeight={800} sx={{ color: BRAND_DARK }}>{card.targetQuantity.toLocaleString()}</Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.5), fontWeight: 700 }}>Missed</Typography>
-                        <Typography variant="h5" fontWeight={800} sx={{ color: card.missedListings > 0 ? '#b3261e' : BRAND_DARK }}>{card.missedListings.toLocaleString()}</Typography>
-                      </Box>
-                    </Stack>
+      <Dialog
+        open={Boolean(selectedBreakdownUser)}
+        onClose={() => setSelectedBreakdownUser(null)}
+        maxWidth="xl"
+        fullWidth
+      >
+        <DialogTitle sx={{ pr: 6 }}>
+          <Typography variant="h6" fontWeight={900} sx={{ color: BRAND_DARK }}>
+            {selectedBreakdownUser?.userName || 'Lister'} Details
+          </Typography>
+          <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.55), fontWeight: 600 }}>
+            {startDate} to {endDate} PDT
+          </Typography>
+          <IconButton
+            onClick={() => setSelectedBreakdownUser(null)}
+            sx={{ position: 'absolute', right: 12, top: 12, color: BRAND_DARK }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedBreakdownUser && (
+            <Stack spacing={3}>
+              {selectedBreakdownUser.status !== 'onTrack' && (
+                <Alert severity={selectedBreakdownUser.status === 'behind' ? 'warning' : 'error'}>
+                  Quota alert: {selectedBreakdownUser.userName} is {selectedBreakdownUser.missedListings.toLocaleString()} items short
+                  ({selectedBreakdownUser.completionPercent}% complete).
+                </Alert>
+              )}
 
-                    <Box sx={{ mt: 2 }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
-                        <Typography variant="body2" fontWeight={700} sx={{ color: BRAND_DARK }}>
-                          {card.completionPercent}% complete
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.55), fontWeight: 600 }}>
-                          Daily target: {card.dailyDesiredQuantity.toLocaleString()}
-                        </Typography>
-                      </Stack>
-                      <LinearProgress
-                        variant="determinate"
-                        value={progress}
-                        sx={{
-                          height: 8,
-                          borderRadius: 8,
-                          backgroundColor: alpha(BRAND_DARK, 0.1),
-                          '& .MuiLinearProgress-bar': { backgroundColor: meta.color },
-                        }}
-                      />
-                    </Box>
-                  </CardContent>
-                </Card>
+              <Grid container spacing={2}>
+                {[
+                  { label: 'Total Listed', value: selectedBreakdownUser.successfulListings },
+                  { label: 'Quota %', value: `${selectedBreakdownUser.completionPercent}%` },
+                  { label: 'Gap', value: selectedBreakdownUser.missedListings },
+                  { label: 'Categories', value: selectedBreakdownUser.categoryRows.length },
+                ].map((metric) => (
+                  <Grid item xs={12} sm={6} md={3} key={metric.label}>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}` }}>
+                      <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.55), fontWeight: 800, textTransform: 'uppercase' }}>
+                        {metric.label}
+                      </Typography>
+                      <Typography variant="h5" fontWeight={900} sx={{ color: metric.label === 'Gap' && metric.value > 0 ? '#b3261e' : BRAND_DARK, mt: 0.5 }}>
+                        {typeof metric.value === 'number' ? metric.value.toLocaleString() : metric.value}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                ))}
               </Grid>
-            );
-          })}
-        </Grid>
-      )}
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={7}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}`, height: '100%' }}>
+                    <Typography variant="subtitle2" fontWeight={900} sx={{ color: BRAND_DARK, mb: 1 }}>
+                      Category Breakdown
+                    </Typography>
+                    <Box sx={{ height: { xs: 360, md: 340 } }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart margin={{ top: 12, right: 170, bottom: 12, left: 12 }}>
+                          <Pie
+                            data={selectedBreakdownUser.categoryRows}
+                            dataKey="successfulListings"
+                            nameKey="categoryName"
+                            cx="42%"
+                            cy="50%"
+                            innerRadius={72}
+                            outerRadius={118}
+                            paddingAngle={2}
+                            labelLine={false}
+                            label={({ successfulListings }) => successfulListings > 0 ? successfulListings.toLocaleString() : ''}
+                          >
+                            {selectedBreakdownUser.categoryRows.map((entry, index) => (
+                              <Cell key={entry.categoryId} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip
+                            formatter={(value, name) => [`${Number(value).toLocaleString()} listed`, name]}
+                          />
+                          <Legend
+                            layout="vertical"
+                            align="right"
+                            verticalAlign="middle"
+                            wrapperStyle={{ maxWidth: 160, fontSize: 12, lineHeight: '20px' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} md={5}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}`, height: '100%' }}>
+                    <Typography variant="subtitle2" fontWeight={900} sx={{ color: BRAND_DARK, mb: 1 }}>
+                      Submission Timeline (IST)
+                    </Typography>
+                    {selectedUserHasTimeline ? (
+                      <Box sx={{ height: 260 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={selectedBreakdownUser.submissionTimeDistribution} margin={{ top: 12, right: 16, bottom: 8, left: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha(BRAND_DARK, 0.1)} />
+                            <XAxis dataKey="label" interval={2} tick={{ fill: BRAND_DARK, fontSize: 11, fontWeight: 700 }} tickLine={false} />
+                            <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: alpha(BRAND_DARK, 0.7), fontSize: 12, fontWeight: 700 }} />
+                            <RechartsTooltip content={<SubmissionTimeTooltip />} cursor={{ fill: alpha(BRAND_YELLOW, 0.08) }} />
+                            <Bar dataKey="uploadCount" fill={BRAND_YELLOW_DARK} radius={[7, 7, 0, 0]} barSize={20}>
+                              <LabelList dataKey="uploadCount" position="top" fill={BRAND_DARK} fontSize={11} fontWeight={800} formatter={(value) => (value > 0 ? value.toLocaleString() : '')} />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.55), py: 4, textAlign: 'center' }}>
+                        No CSV upload timing found for this lister in the selected range.
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              <Paper elevation={0} sx={{ borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}`, overflow: 'hidden' }}>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 800 }}>Seller / Marketplace</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Category</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Range</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Listed</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Target</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Quota %</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {selectedBreakdownUser.assignments.map((card) => (
+                        <TableRow key={card.targetId}>
+                          <TableCell>{getSellerLabel(card.seller)} / {card.marketplace || '-'}</TableCell>
+                          <TableCell>{card.category?.name || 'Unknown Category'}</TableCell>
+                          <TableCell>{card.range?.name || 'All ranges'}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800 }}>{card.successfulListings.toLocaleString()}</TableCell>
+                          <TableCell align="right">{card.targetQuantity.toLocaleString()}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800 }}>{card.completionPercent}%</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Stack>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }
