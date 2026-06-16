@@ -4,6 +4,11 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Fade,
   FormControl,
   InputLabel,
@@ -24,6 +29,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import api from '../../lib/api';
 import AdminPageShell from '../../components/AdminPageShell.jsx';
 import SectionCard from '../../components/SectionCard.jsx';
@@ -59,6 +65,7 @@ export default function ManualEndListingPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [editForm, setEditForm] = useState(null);
+  const [deleteEntry, setDeleteEntry] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -153,6 +160,27 @@ export default function ManualEndListingPage() {
       setEntries(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update manual ended quantity.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteEntry) return;
+
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.delete(`/ebay/feed/manual-end-listings/${deleteEntry.id}`);
+      setSuccess('Manual entry deleted. Daily Listing Comparison will no longer include it.');
+      setDeleteEntry(null);
+      if (editingId === deleteEntry.id) cancelEditing();
+      const { data } = await api.get('/ebay/feed/manual-end-listings', { params: { limit: 50 } });
+      setEntries(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete manual ended quantity.');
     } finally {
       setSaving(false);
     }
@@ -363,16 +391,29 @@ export default function ManualEndListingPage() {
                               </Button>
                             </Stack>
                           ) : (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<EditIcon />}
-                              onClick={() => startEditing(entry)}
-                              disabled={saving || loading}
-                              sx={{ textTransform: 'none', fontWeight: 700 }}
-                            >
-                              Edit
-                            </Button>
+                            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<EditIcon />}
+                                onClick={() => startEditing(entry)}
+                                disabled={saving || loading}
+                                sx={{ textTransform: 'none', fontWeight: 700 }}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                startIcon={<DeleteOutlineIcon />}
+                                onClick={() => setDeleteEntry(entry)}
+                                disabled={saving || loading}
+                                sx={{ textTransform: 'none', fontWeight: 700 }}
+                              >
+                                Delete
+                              </Button>
+                            </Stack>
                           )}
                         </TableCell>
                       </TableRow>
@@ -383,6 +424,42 @@ export default function ManualEndListingPage() {
             </TableContainer>
           )}
         </SectionCard>
+
+        <Dialog
+          open={Boolean(deleteEntry)}
+          onClose={() => {
+            if (!saving) setDeleteEntry(null);
+          }}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>Delete Manual Entry?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              This will remove {deleteEntry?.quantity || 0} manual ended listings for {deleteEntry?.sellerName || 'this seller'} on {deleteEntry?.pdtDate || 'this date'}. Daily Listing Comparison will update after deletion.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={() => setDeleteEntry(null)}
+              disabled={saving}
+              sx={{ textTransform: 'none', fontWeight: 700 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <DeleteOutlineIcon />}
+              onClick={confirmDelete}
+              disabled={saving}
+              sx={{ textTransform: 'none', fontWeight: 800 }}
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       </AdminPageShell>
     </Fade>
   );
