@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   ButtonBase,
@@ -73,6 +74,7 @@ export default function AsinPrecheckPage() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [imagePreview, setImagePreview] = useState(null);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   const surfaceSx = {
     borderRadius: `${dashboardTheme.radius.card}px`,
@@ -179,12 +181,21 @@ export default function AsinPrecheckPage() {
       console.warn(`ASIN Precheck ignored ${stats.invalid} invalid ASIN(s)`);
     }
 
+    const existingAsins = new Set(rows.map(row => row.asin));
+    const asinsToCheck = asins.filter(asin => !existingAsins.has(asin));
+    const skippedCount = asins.length - asinsToCheck.length;
+
+    if (asinsToCheck.length === 0) {
+      setError('All entered ASINs are already in this precheck.');
+      return;
+    }
+
     if (window._asinPrecheckEventSource) {
       window._asinPrecheckEventSource.close();
       window._asinPrecheckEventSource = null;
     }
 
-    const initialRows = asins.map(asin => ({
+    const initialRows = asinsToCheck.map(asin => ({
       id: `asin-precheck-${asin}`,
       asin,
       sku: '',
@@ -196,14 +207,17 @@ export default function AsinPrecheckPage() {
       errors: []
     }));
 
-    setRows(initialRows);
-    setSelectedIds(new Set());
-    setProgress({ current: 0, total: asins.length });
+    setRows(prev => [...prev, ...initialRows]);
+    setProgress({ current: 0, total: asinsToCheck.length });
     setRunning(true);
     setSetupOpen(false);
+    setAsinInput('');
+    if (skippedCount > 0) {
+      setSuccess(`Skipped ${skippedCount} ASIN${skippedCount === 1 ? '' : 's'} already in this precheck.`);
+    }
 
     const authToken = getAuthToken();
-    const asinParam = asins.join(',');
+    const asinParam = asinsToCheck.join(',');
     const sseUrl = `/template-listings/asin-precheck-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(region)}&token=${encodeURIComponent(authToken)}`;
     const eventSource = new EventSource(api.defaults.baseURL + sseUrl);
 
@@ -222,7 +236,7 @@ export default function AsinPrecheckPage() {
 
         switch (message.type) {
           case 'started':
-            setProgress({ current: 0, total: message.total || asins.length });
+            setProgress({ current: 0, total: message.total || asinsToCheck.length });
             break;
           case 'ping':
             break;
@@ -235,7 +249,7 @@ export default function AsinPrecheckPage() {
             break;
           case 'item':
             updateRow(message.item);
-            setProgress({ current: message.progress || 0, total: message.total || asins.length });
+            setProgress({ current: message.progress || 0, total: message.total || asinsToCheck.length });
             break;
           case 'complete':
             setProgress(prev => ({ ...prev, current: message.total || prev.current }));
@@ -280,6 +294,7 @@ export default function AsinPrecheckPage() {
     if (selectedIds.size === 0) return;
     setRows(prev => prev.filter(row => !selectedIds.has(row.id)));
     setSelectedIds(new Set());
+    setDiscardConfirmOpen(false);
   };
 
   const copySelectedAsins = async () => {
@@ -311,6 +326,10 @@ export default function AsinPrecheckPage() {
       createdAt: Date.now()
     }));
 
+    setRows([]);
+    setSelectedIds(new Set());
+    setProgress({ current: 0, total: 0 });
+    setAsinInput('');
     navigate(`/admin/template-listings?templateId=${templateId}&sellerId=${sellerId}&fromAsinPrecheck=${nonce}`);
   };
 
@@ -358,7 +377,7 @@ export default function AsinPrecheckPage() {
               <Button
                 variant="outlined"
                 color="error"
-                onClick={discardSelected}
+                onClick={() => setDiscardConfirmOpen(true)}
                 disabled={selectedIds.size === 0}
                 startIcon={<DeleteIcon />}
               >
@@ -544,20 +563,17 @@ export default function AsinPrecheckPage() {
                       ))}
                     </Select>
                   </FormControl>
-                  <FormControl fullWidth>
-                    <InputLabel>Template</InputLabel>
-                    <Select
-                      value={templateId}
-                      label="Template"
-                      onChange={(event) => setTemplateId(event.target.value)}
-                    >
-                      {templates.map(template => (
-                        <MenuItem key={template._id} value={template._id}>
-                          {template.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <Autocomplete
+                    fullWidth
+                    options={templates}
+                    value={templates.find(template => template._id === templateId) || null}
+                    getOptionLabel={(option) => option?.name || ''}
+                    isOptionEqualToValue={(option, value) => option._id === value._id}
+                    onChange={(_, value) => setTemplateId(value?._id || '')}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Template" placeholder="Search template" />
+                    )}
+                  />
                   <FormControl sx={{ minWidth: 180 }}>
                     <InputLabel>Region</InputLabel>
                     <Select
@@ -636,6 +652,21 @@ export default function AsinPrecheckPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setImagePreview(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={discardConfirmOpen} onClose={() => setDiscardConfirmOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Discard Selected ASINs?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Discard {selectedIds.size} selected ASIN{selectedIds.size === 1 ? '' : 's'} from this precheck?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDiscardConfirmOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={discardSelected}>
+            Discard
+          </Button>
         </DialogActions>
       </Dialog>
     </AdminPageShell>
