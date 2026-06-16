@@ -22,6 +22,8 @@ import {
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import SaveIcon from '@mui/icons-material/Save';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import EditIcon from '@mui/icons-material/Edit';
+import CloseIcon from '@mui/icons-material/Close';
 import api from '../../lib/api';
 import AdminPageShell from '../../components/AdminPageShell.jsx';
 import SectionCard from '../../components/SectionCard.jsx';
@@ -55,6 +57,8 @@ export default function ManualEndListingPage() {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState('');
+  const [editForm, setEditForm] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -88,6 +92,11 @@ export default function ManualEndListingPage() {
     setSuccess('');
   };
 
+  const updateEditForm = (field) => (event) => {
+    setEditForm(prev => ({ ...prev, [field]: event.target.value }));
+    setSuccess('');
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -105,6 +114,45 @@ export default function ManualEndListingPage() {
       setEntries(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save manual ended quantity.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEditing = (entry) => {
+    setEditingId(entry.id);
+    setEditForm({
+      pdtDate: entry.pdtDate,
+      sellerId: entry.sellerId || '',
+      country: entry.country || 'US',
+      quantity: String(entry.quantity || ''),
+      note: entry.note || '',
+    });
+    setError('');
+    setSuccess('');
+  };
+
+  const cancelEditing = () => {
+    setEditingId('');
+    setEditForm(null);
+  };
+
+  const saveEdit = async (entryId) => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.put(`/ebay/feed/manual-end-listings/${entryId}`, {
+        ...editForm,
+        quantity: Number.parseInt(editForm.quantity, 10),
+      });
+      setSuccess('Manual entry updated. Daily Listing Comparison will use the updated quantity.');
+      cancelEditing();
+      const { data } = await api.get('/ebay/feed/manual-end-listings', { params: { limit: 50 } });
+      setEntries(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update manual ended quantity.');
     } finally {
       setSaving(false);
     }
@@ -223,19 +271,113 @@ export default function ManualEndListingPage() {
                     <TableCell align="right">Quantity</TableCell>
                     <TableCell>Note</TableCell>
                     <TableCell>Created By</TableCell>
+                    <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {entries.map((entry) => (
-                    <TableRow key={entry.id} hover>
-                      <TableCell>{entry.pdtDate}</TableCell>
-                      <TableCell>{entry.sellerName}</TableCell>
-                      <TableCell>{entry.country}</TableCell>
-                      <TableCell align="right">{entry.quantity}</TableCell>
-                      <TableCell>{entry.note || '-'}</TableCell>
-                      <TableCell>{entry.createdBy}</TableCell>
-                    </TableRow>
-                  ))}
+                  {entries.map((entry) => {
+                    const isEditing = editingId === entry.id;
+                    return (
+                      <TableRow key={entry.id} hover>
+                        <TableCell>
+                          {isEditing ? (
+                            <TextField
+                              type="date"
+                              size="small"
+                              value={editForm.pdtDate}
+                              onChange={updateEditForm('pdtDate')}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ minWidth: 150 }}
+                            />
+                          ) : entry.pdtDate}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <FormControl size="small" sx={{ minWidth: 200 }}>
+                              <Select value={editForm.sellerId} onChange={updateEditForm('sellerId')}>
+                                {sortedSellers.map((seller) => (
+                                  <MenuItem key={seller._id} value={seller._id}>
+                                    {getSellerName(seller)}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          ) : entry.sellerName}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <FormControl size="small" sx={{ minWidth: 120 }}>
+                              <Select value={editForm.country} onChange={updateEditForm('country')}>
+                                {COUNTRY_OPTIONS.map((option) => (
+                                  <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          ) : entry.country}
+                        </TableCell>
+                        <TableCell align="right">
+                          {isEditing ? (
+                            <TextField
+                              type="number"
+                              size="small"
+                              value={editForm.quantity}
+                              onChange={updateEditForm('quantity')}
+                              inputProps={{ min: 1, step: 1 }}
+                              sx={{ width: 110 }}
+                            />
+                          ) : entry.quantity}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <TextField
+                              size="small"
+                              value={editForm.note}
+                              onChange={updateEditForm('note')}
+                              sx={{ minWidth: 180 }}
+                            />
+                          ) : (entry.note || '-')}
+                        </TableCell>
+                        <TableCell>{entry.createdBy}</TableCell>
+                        <TableCell align="right">
+                          {isEditing ? (
+                            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon />}
+                                onClick={() => saveEdit(entry.id)}
+                                disabled={saving}
+                                sx={{ ...yellowFilledButtonSx, minWidth: 88 }}
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<CloseIcon />}
+                                onClick={cancelEditing}
+                                disabled={saving}
+                                sx={{ textTransform: 'none', fontWeight: 700 }}
+                              >
+                                Cancel
+                              </Button>
+                            </Stack>
+                          ) : (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<EditIcon />}
+                              onClick={() => startEditing(entry)}
+                              disabled={saving || loading}
+                              sx={{ textTransform: 'none', fontWeight: 700 }}
+                            >
+                              Edit
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
