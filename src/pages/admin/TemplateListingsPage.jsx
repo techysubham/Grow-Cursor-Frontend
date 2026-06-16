@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
 import { 
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
@@ -56,6 +56,7 @@ const MARKETPLACE_TO_COUNTRY = { Australia: 'AU', US: 'US', UK: 'UK', Canada: 'C
 export default function TemplateListingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
   const dashboardTheme = theme.customTokens?.dashboardSignature || dashboardSignatureTokens;
   const templateId = searchParams.get('templateId');
@@ -792,8 +793,12 @@ export default function TemplateListingsPage() {
     }
   };
 
-  const handleBulkAutofill = async () => {
-    if (!asinInput.trim()) {
+  const handleBulkAutofill = async (asinsOverride = null, regionOverride = null, preferCachedAmazonData = false) => {
+    const hasAsinOverride = Array.isArray(asinsOverride);
+    const sourceInput = hasAsinOverride ? asinsOverride.join('\n') : asinInput;
+    const effectiveRegion = regionOverride || region;
+
+    if (!sourceInput.trim()) {
       setAsinError('Please enter at least one ASIN');
       return;
     }
@@ -811,8 +816,8 @@ export default function TemplateListingsPage() {
 
     try {
       // Parse ASINs using flexible parser (supports commas, newlines, spaces, tabs, etc.)
-      const asins = parseAsins(asinInput);
-      const stats = getParsingStats(asinInput);
+      const asins = hasAsinOverride ? parseAsins(sourceInput) : parseAsins(asinInput);
+      const stats = hasAsinOverride ? { invalid: 0 } : getParsingStats(asinInput);
 
       if (asins.length === 0) {
         setAsinError('Please enter valid ASINs');
@@ -862,7 +867,8 @@ export default function TemplateListingsPage() {
       // Build SSE URL with auth token
       const asinParam = asins.join(',');
       const authToken = getAuthToken();
-      const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(region)}&token=${encodeURIComponent(authToken)}`;
+      const cacheParam = preferCachedAmazonData ? '&preferCachedAmazonData=true' : '';
+      const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(effectiveRegion)}&token=${encodeURIComponent(authToken)}${cacheParam}`;
       
       if (window._currentEventSource) {
         window._currentEventSource.close();
@@ -998,6 +1004,34 @@ export default function TemplateListingsPage() {
       // Note: setLoadingBulk(false) is handled by SSE events
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const handoffNonce = params.get('fromAsinPrecheck');
+    if (!handoffNonce || !sellerId || !templateId) return;
+
+    const rawHandoff = sessionStorage.getItem('asinPrecheckHandoff');
+    if (!rawHandoff) return;
+
+    try {
+      const handoff = JSON.parse(rawHandoff);
+      const handoffAsins = Array.isArray(handoff.asins) ? handoff.asins : [];
+      const isCurrentHandoff = handoff.nonce === handoffNonce
+        && handoff.sellerId === sellerId
+        && handoff.templateId === templateId;
+
+      if (!isCurrentHandoff || handoffAsins.length === 0) return;
+
+      sessionStorage.removeItem('asinPrecheckHandoff');
+      setAsinInput(handoffAsins.join('\n'));
+      if (handoff.region) setRegion(handoff.region);
+      handleBulkAutofill(handoffAsins, handoff.region, true);
+    } catch (handoffError) {
+      console.error('Failed to read ASIN precheck handoff:', handoffError);
+      sessionStorage.removeItem('asinPrecheckHandoff');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, sellerId, templateId]);
 
   const handleRemoveBulkResult = (asin) => {
     setBulkResults(bulkResults.filter(r => r.asin !== asin));
