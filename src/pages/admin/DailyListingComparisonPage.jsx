@@ -168,12 +168,14 @@ export default function DailyListingComparisonPage() {
         const marketplaces = (row.marketplaces || []).filter(marketplace => marketplace.country === countryFilter);
         const successfulListings = marketplaces.reduce((sum, marketplace) => sum + (marketplace.successfulListings || 0), 0);
         const endedListings = marketplaces.reduce((sum, marketplace) => sum + (marketplace.endedListings || 0), 0);
+        const manualEndedListings = marketplaces.reduce((sum, marketplace) => sum + (marketplace.manualEndedListings || 0), 0);
         const netListings = successfulListings - endedListings;
 
         return {
           ...row,
           successfulListings,
           endedListings,
+          manualEndedListings,
           netListings,
           marketplaces,
         };
