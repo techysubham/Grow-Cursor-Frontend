@@ -8,6 +8,7 @@ import {
   Collapse,
   Fade,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   LinearProgress,
@@ -23,6 +24,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Switch,
 } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -49,6 +51,7 @@ import {
 } from '../../theme/tableStyles.js';
 
 const T = dashboardSignatureTokens;
+const PAGE_SIZE = 50;
 
 function sellerName(seller) {
   return seller?.user?.username || seller?.user?.email || seller?._id || 'Unknown';
@@ -68,7 +71,14 @@ function inr(value) {
 
 function formatDate(value) {
   if (!value) return '-';
-  return new Date(value).toLocaleDateString();
+  return new Date(value).toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).replace(',', '') + ' PT';
 }
 
 function ToneChip({ label, tone = 'neutral' }) {
@@ -168,13 +178,14 @@ function SkuRow({ row, index }) {
               <DetailTable
                 title="Template Listings"
                 icon={<StorefrontIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.55) }} />}
-                columns={['Seller', 'Template', 'Price', 'Status', 'Title']}
+                columns={['Seller', 'Template', 'Created', 'Price', 'Status', 'Title']}
                 emptyLabel="No template listings found."
               >
                 {row.listings?.map(listing => (
                   <TableRow key={listing.id}>
                     <TableCell sx={tableBodyCellSx}>{listing.sellerName}</TableCell>
                     <TableCell sx={tableBodyCellSx}>{listing.templateName}</TableCell>
+                    <TableCell sx={tableBodyCellSx}>{formatDate(listing.createdAt)}</TableCell>
                     <TableCell sx={tableBodyCellSx}>{money(listing.startPrice)}</TableCell>
                     <TableCell sx={tableBodyCellSx}>{listing.status || '-'}</TableCell>
                     <TableCell sx={{ ...tableBodyCellSx, maxWidth: 360 }}>
@@ -186,13 +197,17 @@ function SkuRow({ row, index }) {
               <DetailTable
                 title="Recent Matching Orders"
                 icon={<ReceiptLongIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.55) }} />}
-                columns={['Order ID', 'Seller', 'Date', 'Subtotal', 'Profit', 'Product']}
+                columns={['Order ID', 'SKU', 'Seller', 'Marketplace', 'Date', 'Subtotal', 'Profit', 'Product']}
                 emptyLabel="No orders found for this SKU."
               >
                 {row.orders?.length ? row.orders.map(order => (
                   <TableRow key={order.orderId}>
                     <TableCell sx={tableBodyCellSx}>{order.orderId}</TableCell>
+                    <TableCell sx={tableBodyCellSx}>
+                      <Typography fontFamily="'JetBrains Mono', monospace" variant="body2">{order.sku || '-'}</Typography>
+                    </TableCell>
                     <TableCell sx={tableBodyCellSx}>{order.sellerName || '-'}</TableCell>
+                    <TableCell sx={tableBodyCellSx}>{order.marketplace || '-'}</TableCell>
                     <TableCell sx={tableBodyCellSx}>{formatDate(order.dateSold)}</TableCell>
                     <TableCell sx={tableBodyCellSx}>{money(order.subtotal)}</TableCell>
                     <TableCell sx={tableBodyCellSx}>{inr(order.profit)}</TableCell>
@@ -213,11 +228,14 @@ function SkuRow({ row, index }) {
 export default function SkuSellerProfitPage() {
   const [sellers, setSellers] = useState([]);
   const [sellerId, setSellerId] = useState('all');
+  const [marketplace, setMarketplace] = useState('');
+  const [excludeClient, setExcludeClient] = useState(true);
+  const [excludeLowValue, setExcludeLowValue] = useState(true);
   const [search, setSearch] = useState('');
   const [createdFrom, setCreatedFrom] = useState('');
   const [createdTo, setCreatedTo] = useState('');
   const [page, setPage] = useState(1);
-  const [result, setResult] = useState({ rows: [], pagination: { total: 0, pages: 0 } });
+  const [result, setResult] = useState({ rows: [], pagination: { total: 0, pages: 0, totalOrders: 0 } });
   const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingSellers, setLoadingSellers] = useState(true);
@@ -239,12 +257,14 @@ export default function SkuSellerProfitPage() {
       const { data } = await api.get('/template-listings/sku-seller-order-profit', {
         params: {
           sellerId,
+          marketplace,
+          excludeClient,
+          excludeLowValue,
           search: search.trim(),
           orderFrom: createdFrom,
           orderTo: createdTo,
           page: nextPage,
-          limit: 25,
-          ordersPerSku: 5,
+          limit: PAGE_SIZE,
         },
       });
       setResult(data);
@@ -255,10 +275,10 @@ export default function SkuSellerProfitPage() {
     } finally {
       setLoading(false);
     }
-  }, [createdFrom, createdTo, search, sellerId]);
+  }, [createdFrom, createdTo, excludeClient, excludeLowValue, marketplace, search, sellerId]);
 
   const rows = result.rows || [];
-  const pagination = result.pagination || { total: null, pages: null, hasNextPage: false };
+  const pagination = result.pagination || { total: 0, pages: 0, totalOrders: 0, hasNextPage: false };
 
   return (
     <Fade in timeout={500}>
@@ -287,6 +307,51 @@ export default function SkuSellerProfitPage() {
                   ))}
                 </Select>
               </FormControl>
+              <FormControl size="small" sx={{ minWidth: 180 }} disabled={loading}>
+                <InputLabel>Marketplace</InputLabel>
+                <Select
+                  label="Marketplace"
+                  value={marketplace}
+                  onChange={event => {
+                    setMarketplace(event.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <MenuItem value="">All marketplaces</MenuItem>
+                  <MenuItem value="EBAY_US">United States</MenuItem>
+                  <MenuItem value="EBAY_AU">Australia</MenuItem>
+                  <MenuItem value="EBAY_CA">Canada</MenuItem>
+                  <MenuItem value="EBAY_GB">England</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={excludeClient}
+                    onChange={event => {
+                      setExcludeClient(event.target.checked);
+                      setPage(1);
+                    }}
+                    color="primary"
+                  />
+                }
+                label={<Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Exclude Client</Typography>}
+                sx={{ m: 0, px: 1.25, minHeight: 40, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={excludeLowValue}
+                    onChange={event => {
+                      setExcludeLowValue(event.target.checked);
+                      setPage(1);
+                    }}
+                    color="primary"
+                  />
+                }
+                label={<Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Exclude &lt; $3 Orders</Typography>}
+                sx={{ m: 0, px: 1.25, minHeight: 40, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+              />
               <TextField
                 size="small"
                 label="Search SKU or title"
@@ -357,7 +422,13 @@ export default function SkuSellerProfitPage() {
                 Ordered SKUs and seller template presence
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center">
-                <ToneChip label={`Page ${page}`} tone={rows.length > 0 ? 'warning' : 'success'} />
+                <ToneChip label={`${Number(pagination.totalOrders || 0).toLocaleString()} orders`} tone="info" />
+                <ToneChip label={`${Number(pagination.totalFilteredOrders || 0).toLocaleString()} filtered`} tone="neutral" />
+                {Number(pagination.ordersWithoutUsableSku || 0) > 0 ? (
+                  <ToneChip label={`${Number(pagination.ordersWithoutUsableSku || 0).toLocaleString()} no SKU`} tone="danger" />
+                ) : null}
+                <ToneChip label={`${Number(pagination.total || 0).toLocaleString()} SKUs`} tone="warning" />
+                <ToneChip label={`Page ${page} of ${pagination.pages || 0}`} tone={rows.length > 0 ? 'warning' : 'success'} />
                 {pagination.scannedListings ? (
                   <Typography variant="caption" color="text.secondary">
                     scanned {pagination.scannedListings.toLocaleString()} listings
@@ -395,7 +466,7 @@ export default function SkuSellerProfitPage() {
                   </TableHead>
                   <TableBody>
                     {rows.map((row, index) => (
-                      <SkuRow key={row.sku} row={row} index={(page - 1) * 25 + index} />
+                      <SkuRow key={row.sku} row={row} index={(page - 1) * PAGE_SIZE + index} />
                     ))}
                   </TableBody>
                 </Table>
@@ -412,7 +483,7 @@ export default function SkuSellerProfitPage() {
                     >
                       Previous
                     </Button>
-                    <ToneChip label={`Page ${page}`} tone="neutral" />
+                    <ToneChip label={`Page ${page} of ${pagination.pages || 0}`} tone="neutral" />
                     <Button
                       variant="outlined"
                       endIcon={<NavigateNextIcon />}
