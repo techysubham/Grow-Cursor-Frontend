@@ -5,7 +5,10 @@ import {
   Box,
   Button,
   Chip,
-  Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Fade,
   FormControl,
   FormControlLabel,
@@ -27,8 +30,7 @@ import {
   Typography,
   Switch,
 } from '@mui/material';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import StorefrontIcon from '@mui/icons-material/Storefront';
@@ -58,6 +60,22 @@ const detailBodyCellSx = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
+  px: 1,
+};
+
+const detailTableRowSx = {
+  '&:nth-of-type(odd)': {
+    bgcolor: '#ffffff',
+  },
+  '&:nth-of-type(even)': {
+    bgcolor: alpha(BRAND_DARK, 0.025),
+  },
+  '&:hover': {
+    bgcolor: alpha(T.colors?.yellow || '#facc15', 0.12),
+  },
+  '& td': {
+    borderBottom: `1px solid ${alpha(BRAND_DARK, 0.08)}`,
+  },
 };
 
 function sellerName(seller) {
@@ -111,23 +129,42 @@ function ToneChip({ label, tone = 'neutral' }) {
   );
 }
 
-function DetailTable({ title, icon, columns, emptyLabel, children, minTableWidth = 960 }) {
+function DetailTable({ title, icon, columns, emptyLabel, children }) {
   return (
-    <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+    <Box
+      sx={{
+        minWidth: 0,
+        overflow: 'hidden',
+        bgcolor: '#fff',
+        border: `1px solid ${alpha(BRAND_DARK, 0.1)}`,
+        borderRadius: 1.5,
+        boxShadow: `0 8px 22px ${alpha(BRAND_DARK, 0.05)}`,
+      }}
+    >
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        sx={{
+          px: 1.25,
+          py: 1,
+          bgcolor: alpha(BRAND_DARK, 0.035),
+          borderBottom: `1px solid ${alpha(BRAND_DARK, 0.08)}`,
+        }}
+      >
         {icon}
         <Typography variant="subtitle2" fontWeight={900} sx={{ color: BRAND_DARK }}>
           {title}
         </Typography>
       </Stack>
-      <TableContainer sx={{ maxWidth: '100%', overflowX: 'auto' }}>
-        <Table size="small" sx={{ minWidth: minTableWidth, tableLayout: 'fixed' }}>
+      <TableContainer sx={{ maxWidth: '100%', overflowX: 'hidden' }}>
+        <Table size="small" sx={{ width: '100%', tableLayout: 'fixed' }}>
           <TableHead>
             <TableRow>
               {columns.map(column => (
                 <TableCell
                   key={column.label || column}
-                  sx={{ ...tableHeaderCellSx, py: 1, whiteSpace: 'nowrap', ...(column.sx || {}) }}
+                  sx={{ ...tableHeaderCellSx, py: 1, px: 1, whiteSpace: 'nowrap', ...(column.sx || {}) }}
                 >
                   {column.label || column}
                 </TableCell>
@@ -136,7 +173,7 @@ function DetailTable({ title, icon, columns, emptyLabel, children, minTableWidth
           </TableHead>
           <TableBody>
             {children || (
-              <TableRow>
+              <TableRow sx={detailTableRowSx}>
                 <TableCell colSpan={columns.length} sx={detailBodyCellSx}>
                   <Typography variant="body2" color="text.secondary">{emptyLabel}</Typography>
                 </TableCell>
@@ -159,6 +196,41 @@ function joinNames(names, fallback = 'none') {
 
 function plural(count, singular, pluralLabel = `${singular}s`) {
   return `${count} ${count === 1 ? singular : pluralLabel}`;
+}
+
+function SellerNameList({ names, fallback = 'None' }) {
+  const values = [...new Set((names || []).filter(Boolean))];
+  if (!values.length) {
+    return (
+      <Typography variant="body2" sx={{ color: BRAND_DARK, lineHeight: 1.45 }}>
+        {fallback}
+      </Typography>
+    );
+  }
+
+  return (
+    <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+      {values.map(name => (
+        <Box
+          key={name}
+          component="span"
+          sx={{
+            px: 1,
+            py: 0.35,
+            borderRadius: 1,
+            bgcolor: alpha(BRAND_DARK, 0.055),
+            color: BRAND_DARK,
+            fontSize: '0.82rem',
+            fontWeight: 900,
+            lineHeight: 1.2,
+            border: `1px solid ${alpha(BRAND_DARK, 0.08)}`,
+          }}
+        >
+          {name}
+        </Box>
+      ))}
+    </Stack>
+  );
 }
 
 function buildSkuStory(row) {
@@ -210,9 +282,13 @@ function SummaryLine({ label, value, tone = 'neutral' }) {
       <Typography variant="caption" fontWeight={900} sx={{ color: t.color, textTransform: 'uppercase' }}>
         {label}
       </Typography>
-      <Typography variant="body2" sx={{ color: BRAND_DARK, lineHeight: 1.45 }}>
-        {value}
-      </Typography>
+      {Array.isArray(value) ? (
+        <SellerNameList names={value} />
+      ) : (
+        <Typography variant="body2" sx={{ color: BRAND_DARK, lineHeight: 1.45 }}>
+          {value}
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -236,27 +312,27 @@ function SkuStory({ row }) {
       </Box>
       <SummaryLine
         label="Orders From Store"
-        value={story.orderStores.length ? joinNames(story.orderStores) : 'No matching orders in the selected filters'}
+        value={story.orderStores.length ? story.orderStores : 'No matching orders in the selected filters'}
         tone="info"
       />
       <SummaryLine
         label="Seller And Template Listings"
-        value={story.templateSellers.length ? joinNames(story.templateSellers) : 'No seller template listing found'}
+        value={story.templateSellers.length ? story.templateSellers : 'No seller template listing found'}
         tone="warning"
       />
       <SummaryLine
         label="Currently Active Seller"
-        value={story.presentTemplateSellers.length ? joinNames(story.presentTemplateSellers) : 'No template seller currently has this SKU in sync'}
+        value={story.presentTemplateSellers.length ? story.presentTemplateSellers : 'No template seller currently has this SKU in sync'}
         tone="success"
       />
       <SummaryLine
         label="Initially Had SKU, Not Present Now"
-        value={story.missingTemplateSellers.length ? joinNames(story.missingTemplateSellers) : 'None'}
+        value={story.missingTemplateSellers.length ? story.missingTemplateSellers : 'None'}
         tone="danger"
       />
       <SummaryLine
         label="Never In Template, Present In Sync"
-        value={story.syncOnlySellers.length ? joinNames(story.syncOnlySellers) : 'None'}
+        value={story.syncOnlySellers.length ? story.syncOnlySellers : 'None'}
         tone="neutral"
       />
     </Box>
@@ -269,7 +345,16 @@ function SkuRow({ row, index }) {
 
   return (
     <>
-      <TableRow hover sx={tableBodyRowSx}>
+      <TableRow
+        hover
+        sx={{
+          ...tableBodyRowSx,
+          bgcolor: index % 2 === 0 ? '#fff' : alpha(BRAND_DARK, 0.025),
+          '&:hover': {
+            bgcolor: alpha(T.colors?.yellow || '#facc15', 0.1),
+          },
+        }}
+      >
         <TableCell sx={{ ...tableBodyCellSx, width: 56 }}>
           <Box sx={{ ...tableIndexBadgeSx, width: 28, height: 28 }}>{index + 1}</Box>
         </TableCell>
@@ -304,23 +389,60 @@ function SkuRow({ row, index }) {
         <TableCell sx={tableBodyCellSx}>{money(row.totalSubtotal)}</TableCell>
         <TableCell sx={tableBodyCellSx}><ToneChip label={inr(row.totalProfit)} tone={profitTone} /></TableCell>
         <TableCell align="right" sx={tableBodyCellSx}>
-          <Tooltip title={open ? 'Hide details' : 'View listings and orders'}>
-            <IconButton onClick={() => setOpen(value => !value)} size="small">
-              {open ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          <Tooltip title="Open row details">
+            <IconButton
+              onClick={() => setOpen(true)}
+              size="small"
+              sx={{
+                width: 34,
+                height: 34,
+                color: BRAND_DARK,
+                bgcolor: alpha(BRAND_DARK, 0.04),
+                border: `1px solid ${alpha(BRAND_DARK, 0.12)}`,
+                '&:hover': {
+                  bgcolor: alpha(T.colors?.yellow || '#facc15', 0.2),
+                  borderColor: alpha(T.colors?.yellow || '#facc15', 0.7),
+                },
+              }}
+            >
+              <OpenInFullIcon sx={{ fontSize: 17 }} />
             </IconButton>
           </Tooltip>
         </TableCell>
       </TableRow>
-      <TableRow>
-        <TableCell colSpan={10} sx={{ p: 0, borderBottom: open ? `1px solid ${alpha(BRAND_DARK, 0.08)}` : 'none' }}>
-          <Collapse in={open} unmountOnExit>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        fullWidth
+        maxWidth={false}
+        PaperProps={{
+          sx: {
+            width: 'calc(100vw - 16px)',
+            maxWidth: 'none',
+            borderRadius: 2,
+            maxHeight: '92vh',
+            bgcolor: '#f6f7fb',
+            overflow: 'hidden',
+            border: `1px solid ${alpha(BRAND_DARK, 0.16)}`,
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1.25, bgcolor: '#fff', borderBottom: `1px solid ${alpha(BRAND_DARK, 0.1)}` }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+            <Typography fontFamily="'JetBrains Mono', monospace" fontWeight={900} sx={{ color: BRAND_DARK }}>
+              {row.sku}
+            </Typography>
+            <ToneChip label={`${row.orderCount} orders`} tone="info" />
+            <ToneChip label={`${row.listingCount} template listings`} tone="warning" />
+            <ToneChip label={`${row.skuIndexCount || 0} synced`} tone="success" />
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: '#f6f7fb', p: 2, overflowX: 'hidden' }}>
             <Box
               sx={{
                 display: 'grid',
                 gridTemplateColumns: { xs: 'minmax(0, 1fr)', xl: 'minmax(0, 1fr) minmax(0, 1fr)' },
-                gap: 2,
-                p: 2,
-                bgcolor: alpha(BRAND_DARK, 0.018),
+                gap: 2.5,
                 overflowX: 'hidden',
               }}
             >
@@ -329,20 +451,19 @@ function SkuRow({ row, index }) {
                 title="Template Listings"
                 icon={<StorefrontIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.55) }} />}
                 columns={[
-                  { label: 'Seller', sx: { width: 120 } },
-                  { label: 'Template', sx: { width: 145 } },
-                  { label: 'Created', sx: { width: 220 } },
-                  { label: 'Price', sx: { width: 95 } },
-                  { label: 'SKU Sync Index', sx: { width: 135 } },
-                  { label: 'ASIN / Amazon', sx: { width: 130 } },
-                  { label: 'Title', sx: { width: 80 } },
+                  { label: 'Seller', sx: { width: '13%' } },
+                  { label: 'Template', sx: { width: '14%' } },
+                  { label: 'Created', sx: { width: '20%' } },
+                  { label: 'Price', sx: { width: '9%' } },
+                  { label: 'Sync', sx: { width: '12%' } },
+                  { label: 'ASIN', sx: { width: '14%' } },
+                  { label: 'Title', sx: { width: '18%' } },
                 ]}
                 emptyLabel="No template listings found."
-                minTableWidth={925}
               >
                 {row.listings?.map(listing => (
-                  <TableRow key={listing.id}>
-                    <TableCell sx={detailBodyCellSx}>{listing.sellerName}</TableCell>
+                  <TableRow key={listing.id} sx={detailTableRowSx}>
+                    <TableCell sx={{ ...detailBodyCellSx, fontWeight: 900, color: BRAND_DARK }}>{listing.sellerName}</TableCell>
                     <TableCell sx={detailBodyCellSx}>{listing.templateName}</TableCell>
                     <TableCell sx={detailBodyCellSx}>{formatDate(listing.createdAt)}</TableCell>
                     <TableCell sx={detailBodyCellSx}>{money(listing.startPrice)}</TableCell>
@@ -370,8 +491,8 @@ function SkuRow({ row, index }) {
                     </TableCell>
                     <TableCell sx={detailBodyCellSx}>
                       <Tooltip title={listing.title || ''} placement="top" arrow disableHoverListener={!listing.title}>
-                        <Typography noWrap variant="body2" sx={{ fontWeight: 800, color: listing.title ? 'primary.main' : 'text.secondary' }}>
-                          {listing.title ? 'View' : '-'}
+                        <Typography noWrap variant="body2" sx={{ color: listing.title ? BRAND_DARK : 'text.secondary' }}>
+                          {listing.title || '-'}
                         </Typography>
                       </Tooltip>
                     </TableCell>
@@ -382,33 +503,32 @@ function SkuRow({ row, index }) {
                 title="Recent Matching Orders"
                 icon={<ReceiptLongIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.55) }} />}
                 columns={[
-                  { label: 'Order ID', sx: { width: 145 } },
-                  { label: 'SKU', sx: { width: 120 } },
-                  { label: 'Seller', sx: { width: 120 } },
-                  { label: 'Marketplace', sx: { width: 115 } },
-                  { label: 'Date', sx: { width: 220 } },
-                  { label: 'Subtotal', sx: { width: 100 } },
-                  { label: 'Profit', sx: { width: 105 } },
-                  { label: 'Product', sx: { width: 90 } },
+                  { label: 'Order ID', sx: { width: '15%' } },
+                  { label: 'SKU', sx: { width: '12%' } },
+                  { label: 'Seller', sx: { width: '12%' } },
+                  { label: 'Marketplace', sx: { width: '10%' } },
+                  { label: 'Date', sx: { width: '19%' } },
+                  { label: 'Subtotal', sx: { width: '9%' } },
+                  { label: 'Profit', sx: { width: '9%' } },
+                  { label: 'Product', sx: { width: '14%' } },
                 ]}
                 emptyLabel="No orders found for this SKU."
-                minTableWidth={1015}
               >
                 {row.orders?.length ? row.orders.map(order => (
-                  <TableRow key={order.orderId}>
+                  <TableRow key={order.orderId} sx={detailTableRowSx}>
                     <TableCell sx={detailBodyCellSx}>{order.orderId}</TableCell>
                     <TableCell sx={detailBodyCellSx}>
                       <Typography noWrap fontFamily="'JetBrains Mono', monospace" variant="body2">{order.sku || '-'}</Typography>
                     </TableCell>
-                    <TableCell sx={detailBodyCellSx}>{order.sellerName || '-'}</TableCell>
+                    <TableCell sx={{ ...detailBodyCellSx, fontWeight: 900, color: BRAND_DARK }}>{order.sellerName || '-'}</TableCell>
                     <TableCell sx={detailBodyCellSx}>{order.marketplace || '-'}</TableCell>
                     <TableCell sx={detailBodyCellSx}>{formatDate(order.dateSold)}</TableCell>
                     <TableCell sx={detailBodyCellSx}>{money(order.subtotal)}</TableCell>
                     <TableCell sx={detailBodyCellSx}>{inr(order.profit)}</TableCell>
                     <TableCell sx={detailBodyCellSx}>
                       <Tooltip title={order.productName || ''} placement="top" arrow disableHoverListener={!order.productName}>
-                        <Typography noWrap variant="body2" sx={{ fontWeight: 800, color: order.productName ? 'primary.main' : 'text.secondary' }}>
-                          {order.productName ? 'View' : '-'}
+                        <Typography noWrap variant="body2" sx={{ color: order.productName ? BRAND_DARK : 'text.secondary' }}>
+                          {order.productName || '-'}
                         </Typography>
                       </Tooltip>
                     </TableCell>
@@ -420,19 +540,18 @@ function SkuRow({ row, index }) {
                   title="SKU Seller Index Sync"
                   icon={<StorefrontIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.55) }} />}
                   columns={[
-                    { label: 'Seller', sx: { width: 150 } },
-                    { label: 'Item ID', sx: { width: 140 } },
-                    { label: 'SKU', sx: { width: 140 } },
-                    { label: 'Base SKU', sx: { width: 140 } },
-                    { label: 'Synced At', sx: { width: 220 } },
-                    { label: 'Title', sx: { width: 80 } },
+                    { label: 'Seller', sx: { width: '15%' } },
+                    { label: 'Item ID', sx: { width: '16%' } },
+                    { label: 'SKU', sx: { width: '16%' } },
+                    { label: 'Base SKU', sx: { width: '16%' } },
+                    { label: 'Synced At', sx: { width: '17%' } },
+                    { label: 'Title', sx: { width: '20%' } },
                   ]}
                   emptyLabel="No synced SKU index records found."
-                  minTableWidth={870}
                 >
                   {row.syncRecords?.length ? row.syncRecords.map(record => (
-                    <TableRow key={record.id || `${record.sellerId}-${record.itemId}`}>
-                      <TableCell sx={detailBodyCellSx}>{record.sellerName || '-'}</TableCell>
+                    <TableRow key={record.id || `${record.sellerId}-${record.itemId}`} sx={detailTableRowSx}>
+                      <TableCell sx={{ ...detailBodyCellSx, fontWeight: 900, color: BRAND_DARK }}>{record.sellerName || '-'}</TableCell>
                       <TableCell sx={detailBodyCellSx}>
                         <Typography noWrap fontFamily="'JetBrains Mono', monospace" variant="body2">{record.itemId || '-'}</Typography>
                       </TableCell>
@@ -445,8 +564,8 @@ function SkuRow({ row, index }) {
                       <TableCell sx={detailBodyCellSx}>{formatDate(record.syncedAt)}</TableCell>
                       <TableCell sx={detailBodyCellSx}>
                         <Tooltip title={record.title || ''} placement="top" arrow disableHoverListener={!record.title}>
-                          <Typography noWrap variant="body2" sx={{ fontWeight: 800, color: record.title ? 'primary.main' : 'text.secondary' }}>
-                            {record.title ? 'View' : '-'}
+                          <Typography noWrap variant="body2" sx={{ color: record.title ? BRAND_DARK : 'text.secondary' }}>
+                            {record.title || '-'}
                           </Typography>
                         </Tooltip>
                       </TableCell>
@@ -455,9 +574,13 @@ function SkuRow({ row, index }) {
                 </DetailTable>
               </Box>
             </Box>
-          </Collapse>
-        </TableCell>
-      </TableRow>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1.5, bgcolor: '#fff', borderTop: `1px solid ${alpha(BRAND_DARK, 0.1)}` }}>
+          <Button variant="outlined" onClick={() => setOpen(false)} sx={yellowOutlinedButtonSx}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
