@@ -88,6 +88,9 @@ function SubmissionTimeTooltip({ active, payload }) {
       <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.62), display: 'block', fontWeight: 700 }}>
         Successful listings: {row.successfulListings.toLocaleString()}
       </Typography>
+      <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.62), display: 'block', fontWeight: 700 }}>
+        Failed listings: {(row.failedListings || 0).toLocaleString()}
+      </Typography>
     </Paper>
   );
 }
@@ -196,6 +199,8 @@ export default function UserListingPerformancePage() {
 
   const metricCards = useMemo(() => ([
     { label: 'Total Successful Listings', value: summary.totalSuccessfulListings || 0, helper: `${summary.totalTargetQuantity || 0} target listings` },
+    { label: 'AI Saved Listings', value: summary.totalAiSavedCount || 0, helper: 'Saved from AI listing usage' },
+    { label: 'Failed Listings', value: summary.totalFailedListings || 0, helper: 'From feed upload failures', tone: 'error' },
     { label: 'Average Quota Fill', value: `${summary.averageCompletionPercent || 0}%`, helper: 'Across selected targets' },
     { label: 'On Track', value: summary.onTrack || 0, helper: '95% or above', tone: 'success' },
     { label: 'Behind', value: summary.behind || 0, helper: '60% to 94%', tone: 'warning' },
@@ -214,6 +219,8 @@ export default function UserListingPerformancePage() {
         userName,
         targetQuantity: 0,
         successfulListings: 0,
+        failedListings: 0,
+        aiSavedCount: 0,
         missedListings: 0,
         categories: new Map(),
         assignments: [],
@@ -226,11 +233,14 @@ export default function UserListingPerformancePage() {
           }).format(new Date(Date.UTC(2026, 0, 1, hour - 5, 30))),
           uploadCount: 0,
           successfulListings: 0,
+          failedListings: 0,
         })),
       };
 
       existing.targetQuantity += card.targetQuantity || 0;
       existing.successfulListings += card.successfulListings || 0;
+      existing.failedListings += card.failedListings || 0;
+      existing.aiSavedCount = Math.max(existing.aiSavedCount, card.aiSavedCount || 0);
       existing.missedListings += card.missedListings || 0;
       existing.assignments.push(card);
 
@@ -253,6 +263,7 @@ export default function UserListingPerformancePage() {
         if (!existingTime) return;
         existingTime.uploadCount += timeRow.uploadCount || 0;
         existingTime.successfulListings += timeRow.successfulListings || 0;
+        existingTime.failedListings += timeRow.failedListings || 0;
       });
 
       userMap.set(userId, existing);
@@ -511,6 +522,8 @@ export default function UserListingPerformancePage() {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 800, color: BRAND_DARK }}>Lister</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Listed</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>AI Saved</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Failed</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Quota</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Missed</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 800, color: BRAND_DARK }}>Quota %</TableCell>
@@ -527,6 +540,10 @@ export default function UserListingPerformancePage() {
                     <TableRow key={row.userId} hover>
                       <TableCell sx={{ fontWeight: 800, color: BRAND_DARK }}>{row.userName}</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 800 }}>{row.successfulListings.toLocaleString()}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>{row.aiSavedCount.toLocaleString()}</TableCell>
+                      <TableCell align="right" sx={{ color: row.failedListings > 0 ? '#b3261e' : BRAND_DARK, fontWeight: 800 }}>
+                        {row.failedListings.toLocaleString()}
+                      </TableCell>
                       <TableCell align="right">{row.targetQuantity.toLocaleString()}</TableCell>
                       <TableCell align="right" sx={{ color: row.missedListings > 0 ? '#b3261e' : BRAND_DARK, fontWeight: 800 }}>
                         {row.missedListings.toLocaleString()}
@@ -588,9 +605,9 @@ export default function UserListingPerformancePage() {
                   tickLine={false}
                 />
                 <RechartsTooltip content={<SubmissionTimeTooltip />} cursor={{ fill: alpha(BRAND_YELLOW, 0.08) }} />
-                <Bar dataKey="uploadCount" fill={BRAND_YELLOW_DARK} radius={[7, 7, 0, 0]} barSize={22}>
+                <Bar dataKey="successfulListings" name="Successful" fill={BRAND_YELLOW_DARK} radius={[7, 7, 0, 0]} barSize={18}>
                   <LabelList
-                    dataKey="uploadCount"
+                    dataKey="successfulListings"
                     position="top"
                     fill={BRAND_DARK}
                     fontSize={11}
@@ -598,6 +615,7 @@ export default function UserListingPerformancePage() {
                     formatter={(value) => (value > 0 ? value.toLocaleString() : '')}
                   />
                 </Bar>
+                <Bar dataKey="failedListings" name="Failed" fill="#b3261e" radius={[7, 7, 0, 0]} barSize={18} />
               </BarChart>
             </ResponsiveContainer>
           </Box>
@@ -648,17 +666,19 @@ export default function UserListingPerformancePage() {
 
               <Grid container spacing={2}>
                 {[
-                  { label: 'Total Listed', value: selectedBreakdownUser.successfulListings },
+                  { label: 'Successful Listings', value: selectedBreakdownUser.successfulListings },
+                  { label: 'AI Saved', value: selectedBreakdownUser.aiSavedCount },
+                  { label: 'Failed', value: selectedBreakdownUser.failedListings },
                   { label: 'Quota %', value: `${selectedBreakdownUser.completionPercent}%` },
                   { label: 'Gap', value: selectedBreakdownUser.missedListings },
                   { label: 'Categories', value: selectedBreakdownUser.categoryRows.length },
                 ].map((metric) => (
-                  <Grid item xs={12} sm={6} md={3} key={metric.label}>
+                  <Grid item xs={12} sm={6} md={2} key={metric.label}>
                     <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}` }}>
                       <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.55), fontWeight: 800, textTransform: 'uppercase' }}>
                         {metric.label}
                       </Typography>
-                      <Typography variant="h5" fontWeight={900} sx={{ color: metric.label === 'Gap' && metric.value > 0 ? '#b3261e' : BRAND_DARK, mt: 0.5 }}>
+                      <Typography variant="h5" fontWeight={900} sx={{ color: (metric.label === 'Gap' || metric.label === 'Failed') && metric.value > 0 ? '#b3261e' : BRAND_DARK, mt: 0.5 }}>
                         {typeof metric.value === 'number' ? metric.value.toLocaleString() : metric.value}
                       </Typography>
                     </Paper>
@@ -719,9 +739,10 @@ export default function UserListingPerformancePage() {
                             <XAxis dataKey="label" interval={2} tick={{ fill: BRAND_DARK, fontSize: 11, fontWeight: 700 }} tickLine={false} />
                             <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: alpha(BRAND_DARK, 0.7), fontSize: 12, fontWeight: 700 }} />
                             <RechartsTooltip content={<SubmissionTimeTooltip />} cursor={{ fill: alpha(BRAND_YELLOW, 0.08) }} />
-                            <Bar dataKey="uploadCount" fill={BRAND_YELLOW_DARK} radius={[7, 7, 0, 0]} barSize={20}>
-                              <LabelList dataKey="uploadCount" position="top" fill={BRAND_DARK} fontSize={11} fontWeight={800} formatter={(value) => (value > 0 ? value.toLocaleString() : '')} />
+                            <Bar dataKey="successfulListings" name="Successful" fill={BRAND_YELLOW_DARK} radius={[7, 7, 0, 0]} barSize={18}>
+                              <LabelList dataKey="successfulListings" position="top" fill={BRAND_DARK} fontSize={11} fontWeight={800} formatter={(value) => (value > 0 ? value.toLocaleString() : '')} />
                             </Bar>
+                            <Bar dataKey="failedListings" name="Failed" fill="#b3261e" radius={[7, 7, 0, 0]} barSize={18} />
                           </BarChart>
                         </ResponsiveContainer>
                       </Box>
@@ -743,6 +764,7 @@ export default function UserListingPerformancePage() {
                         <TableCell sx={{ fontWeight: 800 }}>Category</TableCell>
                         <TableCell sx={{ fontWeight: 800 }}>Range</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800 }}>Listed</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Failed</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800 }}>Target</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800 }}>Quota %</TableCell>
                       </TableRow>
@@ -754,6 +776,9 @@ export default function UserListingPerformancePage() {
                           <TableCell>{card.category?.name || 'Unknown Category'}</TableCell>
                           <TableCell>{card.range?.name || 'All ranges'}</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 800 }}>{card.successfulListings.toLocaleString()}</TableCell>
+                          <TableCell align="right" sx={{ color: card.failedListings > 0 ? '#b3261e' : BRAND_DARK, fontWeight: 800 }}>
+                            {(card.failedListings || 0).toLocaleString()}
+                          </TableCell>
                           <TableCell align="right">{card.targetQuantity.toLocaleString()}</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 800 }}>{card.completionPercent}%</TableCell>
                         </TableRow>
