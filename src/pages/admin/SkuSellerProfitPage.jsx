@@ -12,6 +12,7 @@ import {
   IconButton,
   InputLabel,
   LinearProgress,
+  Link,
   MenuItem,
   Select,
   Stack,
@@ -52,6 +53,12 @@ import {
 
 const T = dashboardSignatureTokens;
 const PAGE_SIZE = 50;
+const detailBodyCellSx = {
+  ...tableBodyCellSx,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
 
 function sellerName(seller) {
   return seller?.user?.username || seller?.user?.email || seller?._id || 'Unknown';
@@ -71,14 +78,19 @@ function inr(value) {
 
 function formatDate(value) {
   if (!value) return '-';
-  return new Date(value).toLocaleString('en-US', {
+  const date = new Date(value);
+  const datePart = date.toLocaleDateString('en-US', {
     timeZone: 'America/Los_Angeles',
     month: 'long',
     day: 'numeric',
     year: 'numeric',
+  });
+  const timePart = date.toLocaleTimeString('en-US', {
+    timeZone: 'America/Los_Angeles',
     hour: '2-digit',
     minute: '2-digit',
-  }).replace(',', '') + ' PT';
+  });
+  return `${datePart} at ${timePart} PT`;
 }
 
 function ToneChip({ label, tone = 'neutral' }) {
@@ -99,35 +111,40 @@ function ToneChip({ label, tone = 'neutral' }) {
   );
 }
 
-function DetailTable({ title, icon, columns, emptyLabel, children }) {
+function DetailTable({ title, icon, columns, emptyLabel, children, minTableWidth = 960 }) {
   return (
-    <Box sx={{ minWidth: 520 }}>
+    <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
         {icon}
         <Typography variant="subtitle2" fontWeight={900} sx={{ color: BRAND_DARK }}>
           {title}
         </Typography>
       </Stack>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            {columns.map(column => (
-              <TableCell key={column} sx={{ ...tableHeaderCellSx, py: 1 }}>
-                {column}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {children || (
+      <TableContainer sx={{ maxWidth: '100%', overflowX: 'auto' }}>
+        <Table size="small" sx={{ minWidth: minTableWidth, tableLayout: 'fixed' }}>
+          <TableHead>
             <TableRow>
-              <TableCell colSpan={columns.length} sx={tableBodyCellSx}>
-                <Typography variant="body2" color="text.secondary">{emptyLabel}</Typography>
-              </TableCell>
+              {columns.map(column => (
+                <TableCell
+                  key={column.label || column}
+                  sx={{ ...tableHeaderCellSx, py: 1, whiteSpace: 'nowrap', ...(column.sx || {}) }}
+                >
+                  {column.label || column}
+                </TableCell>
+              ))}
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHead>
+          <TableBody>
+            {children || (
+              <TableRow>
+                <TableCell colSpan={columns.length} sx={detailBodyCellSx}>
+                  <Typography variant="body2" color="text.secondary">{emptyLabel}</Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 }
@@ -147,8 +164,26 @@ function SkuRow({ row, index }) {
             {row.sku}
           </Typography>
         </TableCell>
-        <TableCell sx={tableBodyCellSx}><ToneChip label={`${row.sellerCount} sellers`} tone="info" /></TableCell>
-        <TableCell sx={tableBodyCellSx}><ToneChip label={`${row.listingCount} listings`} tone="warning" /></TableCell>
+        <TableCell sx={tableBodyCellSx}>
+          <Tooltip title="Sellers found in template listings for this SKU." arrow>
+            <Box component="span"><ToneChip label={`${row.sellerCount} sellers`} tone="info" /></Box>
+          </Tooltip>
+        </TableCell>
+        <TableCell sx={tableBodyCellSx}>
+          <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Tooltip title="Template listings found for this exact SKU." arrow>
+              <Box component="span"><ToneChip label={`${row.listingCount} listings`} tone="warning" /></Box>
+            </Tooltip>
+            <Tooltip title="Live synced eBay listings in SKU Seller Index for this base SKU." arrow>
+              <Box component="span">
+                <ToneChip
+                  label={`${row.skuIndexCount || 0} sync`}
+                  tone={Number(row.skuIndexCount || 0) >= Number(row.listingCount || 0) ? 'success' : 'neutral'}
+                />
+              </Box>
+            </Tooltip>
+          </Stack>
+        </TableCell>
         <TableCell sx={tableBodyCellSx}>{money(row.minTemplatePrice)} - {money(row.maxTemplatePrice)}</TableCell>
         <TableCell sx={tableBodyCellSx}>{money(row.avgTemplatePrice)}</TableCell>
         <TableCell sx={tableBodyCellSx}>{row.orderCount}</TableCell>
@@ -168,28 +203,62 @@ function SkuRow({ row, index }) {
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' },
+                gridTemplateColumns: { xs: 'minmax(0, 1fr)', xl: 'minmax(0, 1fr) minmax(0, 1fr)' },
                 gap: 2,
                 p: 2,
                 bgcolor: alpha(BRAND_DARK, 0.018),
-                overflowX: 'auto',
+                overflowX: 'hidden',
               }}
             >
               <DetailTable
                 title="Template Listings"
                 icon={<StorefrontIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.55) }} />}
-                columns={['Seller', 'Template', 'Created', 'Price', 'Status', 'Title']}
+                columns={[
+                  { label: 'Seller', sx: { width: 120 } },
+                  { label: 'Template', sx: { width: 145 } },
+                  { label: 'Created', sx: { width: 220 } },
+                  { label: 'Price', sx: { width: 95 } },
+                  { label: 'SKU Sync Index', sx: { width: 135 } },
+                  { label: 'ASIN / Amazon', sx: { width: 130 } },
+                  { label: 'Title', sx: { width: 80 } },
+                ]}
                 emptyLabel="No template listings found."
+                minTableWidth={925}
               >
                 {row.listings?.map(listing => (
                   <TableRow key={listing.id}>
-                    <TableCell sx={tableBodyCellSx}>{listing.sellerName}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>{listing.templateName}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>{formatDate(listing.createdAt)}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>{money(listing.startPrice)}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>{listing.status || '-'}</TableCell>
-                    <TableCell sx={{ ...tableBodyCellSx, maxWidth: 360 }}>
-                      <Typography noWrap variant="body2">{listing.title || '-'}</Typography>
+                    <TableCell sx={detailBodyCellSx}>{listing.sellerName}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>{listing.templateName}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>{formatDate(listing.createdAt)}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>{money(listing.startPrice)}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>
+                      <ToneChip
+                        label={listing.skuSyncIndex?.present ? `Present (${listing.skuSyncIndex.count || 1})` : 'Missing'}
+                        tone={listing.skuSyncIndex?.present ? 'success' : 'danger'}
+                      />
+                    </TableCell>
+                    <TableCell sx={detailBodyCellSx}>
+                      <Typography noWrap fontFamily="'JetBrains Mono', monospace" variant="body2">
+                        {listing.asin || '-'}
+                      </Typography>
+                      {listing.amazonLink ? (
+                        <Link
+                          href={listing.amazonLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          underline="hover"
+                          sx={{ display: 'block', mt: 0.25, fontSize: '0.76rem' }}
+                        >
+                          Open
+                        </Link>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell sx={detailBodyCellSx}>
+                      <Tooltip title={listing.title || ''} placement="top" arrow disableHoverListener={!listing.title}>
+                        <Typography noWrap variant="body2" sx={{ fontWeight: 800, color: listing.title ? 'primary.main' : 'text.secondary' }}>
+                          {listing.title ? 'View' : '-'}
+                        </Typography>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -197,26 +266,79 @@ function SkuRow({ row, index }) {
               <DetailTable
                 title="Recent Matching Orders"
                 icon={<ReceiptLongIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.55) }} />}
-                columns={['Order ID', 'SKU', 'Seller', 'Marketplace', 'Date', 'Subtotal', 'Profit', 'Product']}
+                columns={[
+                  { label: 'Order ID', sx: { width: 145 } },
+                  { label: 'SKU', sx: { width: 120 } },
+                  { label: 'Seller', sx: { width: 120 } },
+                  { label: 'Marketplace', sx: { width: 115 } },
+                  { label: 'Date', sx: { width: 220 } },
+                  { label: 'Subtotal', sx: { width: 100 } },
+                  { label: 'Profit', sx: { width: 105 } },
+                  { label: 'Product', sx: { width: 90 } },
+                ]}
                 emptyLabel="No orders found for this SKU."
+                minTableWidth={1015}
               >
                 {row.orders?.length ? row.orders.map(order => (
                   <TableRow key={order.orderId}>
-                    <TableCell sx={tableBodyCellSx}>{order.orderId}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>
-                      <Typography fontFamily="'JetBrains Mono', monospace" variant="body2">{order.sku || '-'}</Typography>
+                    <TableCell sx={detailBodyCellSx}>{order.orderId}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>
+                      <Typography noWrap fontFamily="'JetBrains Mono', monospace" variant="body2">{order.sku || '-'}</Typography>
                     </TableCell>
-                    <TableCell sx={tableBodyCellSx}>{order.sellerName || '-'}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>{order.marketplace || '-'}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>{formatDate(order.dateSold)}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>{money(order.subtotal)}</TableCell>
-                    <TableCell sx={tableBodyCellSx}>{inr(order.profit)}</TableCell>
-                    <TableCell sx={{ ...tableBodyCellSx, maxWidth: 360 }}>
-                      <Typography noWrap variant="body2">{order.productName || '-'}</Typography>
+                    <TableCell sx={detailBodyCellSx}>{order.sellerName || '-'}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>{order.marketplace || '-'}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>{formatDate(order.dateSold)}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>{money(order.subtotal)}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>{inr(order.profit)}</TableCell>
+                    <TableCell sx={detailBodyCellSx}>
+                      <Tooltip title={order.productName || ''} placement="top" arrow disableHoverListener={!order.productName}>
+                        <Typography noWrap variant="body2" sx={{ fontWeight: 800, color: order.productName ? 'primary.main' : 'text.secondary' }}>
+                          {order.productName ? 'View' : '-'}
+                        </Typography>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 )) : null}
               </DetailTable>
+              <Box sx={{ gridColumn: '1 / -1', minWidth: 0 }}>
+                <DetailTable
+                  title="SKU Seller Index Sync"
+                  icon={<StorefrontIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.55) }} />}
+                  columns={[
+                    { label: 'Seller', sx: { width: 150 } },
+                    { label: 'Item ID', sx: { width: 140 } },
+                    { label: 'SKU', sx: { width: 140 } },
+                    { label: 'Base SKU', sx: { width: 140 } },
+                    { label: 'Synced At', sx: { width: 220 } },
+                    { label: 'Title', sx: { width: 80 } },
+                  ]}
+                  emptyLabel="No synced SKU index records found."
+                  minTableWidth={870}
+                >
+                  {row.syncRecords?.length ? row.syncRecords.map(record => (
+                    <TableRow key={record.id || `${record.sellerId}-${record.itemId}`}>
+                      <TableCell sx={detailBodyCellSx}>{record.sellerName || '-'}</TableCell>
+                      <TableCell sx={detailBodyCellSx}>
+                        <Typography noWrap fontFamily="'JetBrains Mono', monospace" variant="body2">{record.itemId || '-'}</Typography>
+                      </TableCell>
+                      <TableCell sx={detailBodyCellSx}>
+                        <Typography noWrap fontFamily="'JetBrains Mono', monospace" variant="body2">{record.sku || '-'}</Typography>
+                      </TableCell>
+                      <TableCell sx={detailBodyCellSx}>
+                        <Typography noWrap fontFamily="'JetBrains Mono', monospace" variant="body2">{record.baseSku || '-'}</Typography>
+                      </TableCell>
+                      <TableCell sx={detailBodyCellSx}>{formatDate(record.syncedAt)}</TableCell>
+                      <TableCell sx={detailBodyCellSx}>
+                        <Tooltip title={record.title || ''} placement="top" arrow disableHoverListener={!record.title}>
+                          <Typography noWrap variant="body2" sx={{ fontWeight: 800, color: record.title ? 'primary.main' : 'text.secondary' }}>
+                            {record.title ? 'View' : '-'}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  )) : null}
+                </DetailTable>
+              </Box>
             </Box>
           </Collapse>
         </TableCell>
