@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Autocomplete,
@@ -56,6 +56,10 @@ export default function UserCategoryTargetsPage() {
   const [deleteId, setDeleteId] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [targetFilters, setTargetFilters] = useState({
+    user: null,
+    search: '',
+  });
 
   const inputSx = {
     '& label.Mui-focused': { color: `${BRAND_YELLOW_DARK} !important` },
@@ -109,6 +113,48 @@ export default function UserCategoryTargetsPage() {
 
   const getCategoryLabel = (category) => category?.name || '';
   const getRangeLabel = (range) => range?.name || '';
+
+  const selectedUserTargets = useMemo(() => {
+    const normalizedSearch = targetFilters.search.trim().toLowerCase();
+
+    return targets.filter((target) => {
+      const matchesUser = !targetFilters.user || target.user?._id === targetFilters.user._id;
+      if (!matchesUser) return false;
+
+      if (!normalizedSearch) return true;
+
+      const searchableText = [
+        getUserLabel(target.user),
+        target.user?.department,
+        getSellerLabel(target.seller),
+        target.marketplace,
+        target.category?.name,
+        target.range?.name,
+        target.dailyDesiredQuantity,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearch);
+    });
+  }, [targetFilters, targets]);
+
+  const selectedUserSummary = useMemo(() => {
+    const sellerNames = new Set();
+    const categoryNames = new Set();
+    const totalQuantity = selectedUserTargets.reduce((sum, target) => {
+      if (target.seller) sellerNames.add(getSellerLabel(target.seller));
+      if (target.category?.name) categoryNames.add(target.category.name);
+      return sum + Number(target.dailyDesiredQuantity || 0);
+    }, 0);
+
+    return {
+      sellers: sellerNames.size,
+      categories: categoryNames.size,
+      totalQuantity,
+    };
+  }, [selectedUserTargets]);
 
   const filteredRanges = form.category
     ? ranges.filter((range) => String(range.categoryId?._id || range.categoryId) === form.category._id)
@@ -307,14 +353,55 @@ export default function UserCategoryTargetsPage() {
 
       <Paper elevation={0} sx={{ borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.1)}`, overflow: 'hidden' }}>
         <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${alpha(BRAND_DARK, 0.08)}` }}>
-          <Typography variant="subtitle1" fontWeight={700} sx={{ color: BRAND_DARK }}>
-            Saved Desired Quantities
-            {!loading && (
-              <Typography component="span" variant="caption" sx={{ ml: 1, color: alpha(BRAND_DARK, 0.45), fontWeight: 500 }}>
-                ({targets.length} record{targets.length === 1 ? '' : 's'})
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            alignItems={{ xs: 'stretch', md: 'center' }}
+            justifyContent="space-between"
+          >
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ color: BRAND_DARK }}>
+                Saved Desired Quantities
+                {!loading && (
+                  <Typography component="span" variant="caption" sx={{ ml: 1, color: alpha(BRAND_DARK, 0.45), fontWeight: 500 }}>
+                    ({selectedUserTargets.length} of {targets.length} record{targets.length === 1 ? '' : 's'})
+                  </Typography>
+                )}
               </Typography>
-            )}
-          </Typography>
+              {!loading && targetFilters.user && (
+                <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.55), fontWeight: 600 }}>
+                  {selectedUserSummary.totalQuantity.toLocaleString()} daily quota across {selectedUserSummary.sellers} seller{selectedUserSummary.sellers === 1 ? '' : 's'} and {selectedUserSummary.categories} categor{selectedUserSummary.categories === 1 ? 'y' : 'ies'}
+                </Typography>
+              )}
+            </Box>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ minWidth: { md: 680 } }}>
+              <Autocomplete
+                options={users}
+                getOptionLabel={getUserLabel}
+                value={targetFilters.user}
+                onChange={(_, value) => setTargetFilters((prev) => ({ ...prev, user: value }))}
+                isOptionEqualToValue={(option, value) => option._id === value._id}
+                sx={{ minWidth: { xs: '100%', sm: 280 }, flex: 1 }}
+                renderInput={(params) => <TextField {...params} label="View assignments for user" size="small" sx={inputSx} />}
+              />
+              <TextField
+                label="Search seller, category, range"
+                size="small"
+                value={targetFilters.search}
+                onChange={(event) => setTargetFilters((prev) => ({ ...prev, search: event.target.value }))}
+                sx={{ minWidth: { xs: '100%', sm: 260 }, flex: 1, ...inputSx }}
+              />
+              {(targetFilters.user || targetFilters.search) && (
+                <Button
+                  variant="outlined"
+                  onClick={() => setTargetFilters({ user: null, search: '' })}
+                  sx={{ borderRadius: 1.5, color: BRAND_DARK, borderColor: alpha(BRAND_DARK, 0.3), whiteSpace: 'nowrap' }}
+                >
+                  Clear
+                </Button>
+              )}
+            </Stack>
+          </Stack>
         </Box>
 
         {loading ? (
@@ -325,6 +412,12 @@ export default function UserCategoryTargetsPage() {
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.45) }}>
               No desired quantities saved yet.
+            </Typography>
+          </Box>
+        ) : selectedUserTargets.length === 0 ? (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.45) }}>
+              No saved desired quantities match the selected filters.
             </Typography>
           </Box>
         ) : (
@@ -343,7 +436,7 @@ export default function UserCategoryTargetsPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {targets.map((target) => {
+                {selectedUserTargets.map((target) => {
                   const isEditing = editingId === target._id;
                   return (
                     <TableRow key={target._id} sx={{ ...tableBodyRowSx, ...(isEditing ? { '& td': { backgroundColor: `${alpha(BRAND_YELLOW, 0.14)} !important` } } : {}) }}>
