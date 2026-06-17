@@ -149,6 +149,120 @@ function DetailTable({ title, icon, columns, emptyLabel, children, minTableWidth
   );
 }
 
+function joinNames(names, fallback = 'none') {
+  const uniqueNames = [...new Set(names.filter(Boolean))];
+  if (uniqueNames.length === 0) return fallback;
+  if (uniqueNames.length === 1) return uniqueNames[0];
+  if (uniqueNames.length === 2) return `${uniqueNames[0]} and ${uniqueNames[1]}`;
+  return `${uniqueNames.slice(0, -1).join(', ')}, and ${uniqueNames[uniqueNames.length - 1]}`;
+}
+
+function plural(count, singular, pluralLabel = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : pluralLabel}`;
+}
+
+function buildSkuStory(row) {
+  const orderSellerCounts = new Map();
+  (row.orders || []).forEach((order) => {
+    const name = order.sellerName || 'Unknown seller';
+    orderSellerCounts.set(name, (orderSellerCounts.get(name) || 0) + 1);
+  });
+
+  const templateSellers = [...new Set((row.listings || []).map(listing => listing.sellerName).filter(Boolean))];
+  const missingTemplateSellers = [...new Set((row.listings || [])
+    .filter(listing => !listing.skuSyncIndex?.present)
+    .map(listing => listing.sellerName)
+    .filter(Boolean))];
+  const presentTemplateSellers = [...new Set((row.listings || [])
+    .filter(listing => listing.skuSyncIndex?.present)
+    .map(listing => listing.sellerName)
+    .filter(Boolean))];
+  const syncSellerCounts = new Map();
+  (row.syncRecords || []).forEach((record) => {
+    const name = record.sellerName || 'Unknown seller';
+    syncSellerCounts.set(name, (syncSellerCounts.get(name) || 0) + 1);
+  });
+  const syncOnlySellers = [...syncSellerCounts.keys()].filter(name => !templateSellers.includes(name));
+  return {
+    orderStores: [...orderSellerCounts.entries()]
+      .map(([name, count]) => `${name} (${plural(count, 'order')})`),
+    templateSellers,
+    presentTemplateSellers,
+    missingTemplateSellers,
+    syncOnlySellers,
+  };
+}
+
+function SummaryLine({ label, value, tone = 'neutral' }) {
+  const t = T.tones[tone] || T.tones.neutral;
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', md: '260px minmax(0, 1fr)' },
+        gap: { xs: 0.25, md: 1.5 },
+        alignItems: 'start',
+        py: 0.85,
+        px: 1,
+        borderTop: `1px solid ${alpha(BRAND_DARK, 0.08)}`,
+      }}
+    >
+      <Typography variant="caption" fontWeight={900} sx={{ color: t.color, textTransform: 'uppercase' }}>
+        {label}
+      </Typography>
+      <Typography variant="body2" sx={{ color: BRAND_DARK, lineHeight: 1.45 }}>
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
+function SkuStory({ row }) {
+  const story = buildSkuStory(row);
+  return (
+    <Box
+      sx={{
+        gridColumn: '1 / -1',
+        border: `1px solid ${alpha(BRAND_DARK, 0.12)}`,
+        borderRadius: 1,
+        bgcolor: '#fff',
+        overflow: 'hidden',
+      }}
+    >
+      <Box sx={{ px: 1, py: 0.9, bgcolor: alpha(BRAND_DARK, 0.04) }}>
+        <Typography variant="subtitle2" fontWeight={900} sx={{ color: BRAND_DARK }}>
+          Row Summary
+        </Typography>
+      </Box>
+      <SummaryLine
+        label="Orders From Store"
+        value={story.orderStores.length ? joinNames(story.orderStores) : 'No matching orders in the selected filters'}
+        tone="info"
+      />
+      <SummaryLine
+        label="Seller And Template Listings"
+        value={story.templateSellers.length ? joinNames(story.templateSellers) : 'No seller template listing found'}
+        tone="warning"
+      />
+      <SummaryLine
+        label="Currently Active Seller"
+        value={story.presentTemplateSellers.length ? joinNames(story.presentTemplateSellers) : 'No template seller currently has this SKU in sync'}
+        tone="success"
+      />
+      <SummaryLine
+        label="Initially Had SKU, Not Present Now"
+        value={story.missingTemplateSellers.length ? joinNames(story.missingTemplateSellers) : 'None'}
+        tone="danger"
+      />
+      <SummaryLine
+        label="Never In Template, Present In Sync"
+        value={story.syncOnlySellers.length ? joinNames(story.syncOnlySellers) : 'None'}
+        tone="neutral"
+      />
+    </Box>
+  );
+}
+
 function SkuRow({ row, index }) {
   const [open, setOpen] = useState(false);
   const profitTone = Number(row.totalProfit || 0) >= 0 ? 'success' : 'danger';
@@ -210,6 +324,7 @@ function SkuRow({ row, index }) {
                 overflowX: 'hidden',
               }}
             >
+              <SkuStory row={row} />
               <DetailTable
                 title="Template Listings"
                 icon={<StorefrontIcon sx={{ fontSize: 18, color: alpha(BRAND_DARK, 0.55) }} />}
