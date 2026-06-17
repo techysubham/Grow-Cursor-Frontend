@@ -339,9 +339,13 @@ function SkuStory({ row }) {
   );
 }
 
-function SkuRow({ row, index }) {
+function SkuRow({ row, index, isSelected, onOpen }) {
   const [open, setOpen] = useState(false);
   const profitTone = Number(row.totalProfit || 0) >= 0 ? 'success' : 'danger';
+  const openDetails = () => {
+    onOpen?.(row.sku);
+    setOpen(true);
+  };
 
   return (
     <>
@@ -349,9 +353,15 @@ function SkuRow({ row, index }) {
         hover
         sx={{
           ...tableBodyRowSx,
-          bgcolor: index % 2 === 0 ? '#fff' : alpha(BRAND_DARK, 0.025),
+          bgcolor: isSelected ? alpha(T.colors?.yellow || '#820cb4', 0.18) : index % 2 === 0 ? '#fff' : alpha(BRAND_DARK, 0.025),
+          boxShadow: isSelected ? `inset 4px 0 0 ${T.colors?.yellow || '#facc15'}` : 'none',
           '&:hover': {
             bgcolor: alpha(T.colors?.yellow || '#facc15', 0.1),
+          },
+          '& td': {
+            borderBottom: isSelected
+              ? `1px solid ${alpha(T.colors?.yellow || '#15a2fa', 0.45)}`
+              : tableBodyRowSx?.['& td']?.borderBottom,
           },
         }}
       >
@@ -391,7 +401,7 @@ function SkuRow({ row, index }) {
         <TableCell align="right" sx={tableBodyCellSx}>
           <Tooltip title="Open row details">
             <IconButton
-              onClick={() => setOpen(true)}
+              onClick={openDetails}
               size="small"
               sx={{
                 width: 34,
@@ -600,6 +610,7 @@ export default function SkuSellerProfitPage() {
   const [loading, setLoading] = useState(false);
   const [loadingSellers, setLoadingSellers] = useState(true);
   const [error, setError] = useState('');
+  const [lastOpenedSku, setLastOpenedSku] = useState('');
 
   const sortedSellers = useMemo(() => [...sellers].sort((a, b) => sellerName(a).localeCompare(sellerName(b))), [sellers]);
 
@@ -826,7 +837,13 @@ export default function SkuSellerProfitPage() {
                   </TableHead>
                   <TableBody>
                     {rows.map((row, index) => (
-                      <SkuRow key={row.sku} row={row} index={(page - 1) * PAGE_SIZE + index} />
+                      <SkuRow
+                        key={row.sku}
+                        row={row}
+                        index={(page - 1) * PAGE_SIZE + index}
+                        isSelected={lastOpenedSku === row.sku}
+                        onOpen={setLastOpenedSku}
+                      />
                     ))}
                   </TableBody>
                 </Table>
