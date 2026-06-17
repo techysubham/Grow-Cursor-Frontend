@@ -198,8 +198,9 @@ function plural(count, singular, pluralLabel = `${singular}s`) {
   return `${count} ${count === 1 ? singular : pluralLabel}`;
 }
 
-function SellerNameList({ names, fallback = 'None' }) {
+function SellerNameList({ names, fallback = 'None', highlightNames = [] }) {
   const values = [...new Set((names || []).filter(Boolean))];
+  const highlightSet = new Set((highlightNames || []).filter(Boolean));
   if (!values.length) {
     return (
       <Typography variant="body2" sx={{ color: BRAND_DARK, lineHeight: 1.45 }}>
@@ -211,23 +212,29 @@ function SellerNameList({ names, fallback = 'None' }) {
   return (
     <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
       {values.map(name => (
-        <Box
-          key={name}
-          component="span"
-          sx={{
-            px: 1,
-            py: 0.35,
-            borderRadius: 1,
-            bgcolor: alpha(BRAND_DARK, 0.055),
-            color: BRAND_DARK,
-            fontSize: '0.82rem',
-            fontWeight: 900,
-            lineHeight: 1.2,
-            border: `1px solid ${alpha(BRAND_DARK, 0.08)}`,
-          }}
-        >
-          {name}
-        </Box>
+        (() => {
+          const highlighted = highlightSet.has(name);
+          const dangerTone = T.tones.danger;
+          return (
+            <Box
+              key={name}
+              component="span"
+              sx={{
+                px: 1,
+                py: 0.35,
+                borderRadius: 1,
+                bgcolor: highlighted ? dangerTone.background : alpha(BRAND_DARK, 0.055),
+                color: highlighted ? dangerTone.color : BRAND_DARK,
+                fontSize: '0.82rem',
+                fontWeight: 900,
+                lineHeight: 1.2,
+                border: `1px solid ${highlighted ? dangerTone.border : alpha(BRAND_DARK, 0.08)}`,
+              }}
+            >
+              {name}
+            </Box>
+          );
+        })()
       ))}
     </Stack>
   );
@@ -265,7 +272,7 @@ function buildSkuStory(row) {
   };
 }
 
-function SummaryLine({ label, value, tone = 'neutral' }) {
+function SummaryLine({ label, value, tone = 'neutral', highlightNames = [] }) {
   const t = T.tones[tone] || T.tones.neutral;
   return (
     <Box
@@ -283,7 +290,7 @@ function SummaryLine({ label, value, tone = 'neutral' }) {
         {label}
       </Typography>
       {Array.isArray(value) ? (
-        <SellerNameList names={value} />
+        <SellerNameList names={value} highlightNames={highlightNames} />
       ) : (
         <Typography variant="body2" sx={{ color: BRAND_DARK, lineHeight: 1.45 }}>
           {value}
@@ -318,6 +325,7 @@ function SkuStory({ row }) {
       <SummaryLine
         label="Seller And Template Listings"
         value={story.templateSellers.length ? story.templateSellers : 'No seller template listing found'}
+        highlightNames={story.missingTemplateSellers}
         tone="warning"
       />
       <SummaryLine
