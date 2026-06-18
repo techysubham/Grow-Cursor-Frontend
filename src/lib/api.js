@@ -95,7 +95,7 @@ export async function uploadEmployeeFile(fileType, file) {
 // Get file URL for viewing/downloading (admin)
 export function getEmployeeFileUrl(profileId, fileType) {
   const baseUrl = import.meta.env.VITE_API_URL || '';
-  const token = localStorage.getItem('auth_token');
+  const token = currentToken;
   const timestamp = new Date().getTime(); // Cache busting
   return `${baseUrl}/employee-profiles/${profileId}/file/${fileType}?token=${token}&t=${timestamp}`;
 }
@@ -103,7 +103,7 @@ export function getEmployeeFileUrl(profileId, fileType) {
 // Get current user's file URL
 export function getMyFileUrl(fileType) {
   const baseUrl = import.meta.env.VITE_API_URL || '';
-  const token = localStorage.getItem('auth_token');
+  const token = currentToken;
   const timestamp = new Date().getTime(); // Cache busting
   return `${baseUrl}/employee-profiles/me/file/${fileType}?token=${token}&t=${timestamp}`;
 }

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../lib/api';
+import api, { getAuthToken } from '../lib/api';
 
 export default function SellerProfilePage() {
   const navigate = useNavigate();
@@ -52,8 +52,8 @@ export default function SellerProfilePage() {
   }
 
   function handleConnectEbay() {
-    // Get the auth token from localStorage
-    const token = localStorage.getItem('auth_token');
+    // Get the auth token from the api module
+    const token = getAuthToken();
     if (!token) {
       setError('Authentication token not found. Please log in again.');
       return;

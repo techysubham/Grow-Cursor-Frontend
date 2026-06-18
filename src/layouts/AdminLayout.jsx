@@ -1,7 +1,8 @@
-import { useMemo, useState, useEffect } from 'react';
+import { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import { Link, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
+  Badge,
   Box,
   CssBaseline,
   Divider,
@@ -31,64 +32,60 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
-import ProductResearchPage from '../pages/admin/ProductResearchPage.jsx';
-import AddListerPage from '../pages/admin/AddListerPage.jsx';
-import ListingManagementPage from '../pages/admin/ListingManagementPage.jsx';
-import ManagePlatformsPage from '../pages/admin/ManagePlatformsPage.jsx';
-import ManageStoresPage from '../pages/admin/ManageStoresPage.jsx';
-import AdminAssignmentsPage from '../pages/admin/AdminAssignmentsPage.jsx';
-import ManageRangesPage from '../pages/admin/ManageRangesPage.jsx';
-import ManageCategoriesPage from '../pages/admin/ManageCategoriesPage.jsx';
-import ListingsSummaryPage from '../pages/admin/ListingsSummaryPage.jsx';
-import UserCredentialsPage from '../pages/admin/UserCredentialsPage.jsx';
-import ListingSheetPage from '../pages/admin/ListingSheetPage.jsx';
+
+// --- Lazy-loaded page components ---
+const ProductResearchPage = lazy(() => import('../pages/admin/ProductResearchPage.jsx'));
+const AddListerPage = lazy(() => import('../pages/admin/AddListerPage.jsx'));
+const ListingManagementPage = lazy(() => import('../pages/admin/ListingManagementPage.jsx'));
+const ManagePlatformsPage = lazy(() => import('../pages/admin/ManagePlatformsPage.jsx'));
+const ManageStoresPage = lazy(() => import('../pages/admin/ManageStoresPage.jsx'));
+const ManageRangesPage = lazy(() => import('../pages/admin/ManageRangesPage.jsx'));
+const ManageCategoriesPage = lazy(() => import('../pages/admin/ManageCategoriesPage.jsx'));
+const UserCredentialsPage = lazy(() => import('../pages/admin/UserCredentialsPage.jsx'));
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import TaskIcon from '@mui/icons-material/Task';
 import EditIcon from '@mui/icons-material/Edit';
 
-import TaskListPage from '../pages/admin/TaskListPage.jsx';
-import StockLedgerPage from '../pages/admin/StockLedgerPage.jsx';
-import StoreWiseTaskListPage from '../pages/admin/StoreWiseTaskListPage.jsx';
-import StoreTaskDetailPage from '../pages/admin/StoreTaskDetailPage.jsx';
-import StoreDailyTasksPage from '../pages/admin/StoreDailyTasksPage.jsx';
-import ListerInfoPage from '../pages/admin/ListerInfoPage.jsx';
-import ListerInfoDetailPage from '../pages/admin/ListerInfoDetailPage.jsx';
-import AdminTaskList from '../pages/compatibility/AdminTaskList.jsx';
-import EditorDashboard from '../pages/compatibility/EditorDashboard.jsx';
-import ProgressTrackingPage from '../pages/compatibility/ProgressTrackingPage.jsx';
-import CompatibilityBatchHistoryPage from '../pages/compatibility/CompatibilityBatchHistoryPage.jsx';
-import AutoCompatibilityPage from '../pages/compatibility/AutoCompatibilityPage.jsx';
-import AutoCompatReviewHistoryPage from '../pages/compatibility/AutoCompatReviewHistoryPage.jsx';
-import AutoCompatSellerHistoryPage from '../pages/compatibility/AutoCompatSellerHistoryPage.jsx';
+const StockLedgerPage = lazy(() => import('../pages/admin/StockLedgerPage.jsx'));
+const AdminTaskList = lazy(() => import('../pages/compatibility/AdminTaskList.jsx'));
+const EditorDashboard = lazy(() => import('../pages/compatibility/EditorDashboard.jsx'));
+const ProgressTrackingPage = lazy(() => import('../pages/compatibility/ProgressTrackingPage.jsx'));
+const CompatibilityBatchHistoryPage = lazy(() => import('../pages/compatibility/CompatibilityBatchHistoryPage.jsx'));
+const AutoCompatibilityPage = lazy(() => import('../pages/compatibility/AutoCompatibilityPage.jsx'));
+const AutoCompatReviewHistoryPage = lazy(() => import('../pages/compatibility/AutoCompatReviewHistoryPage.jsx'));
+const AutoCompatSellerHistoryPage = lazy(() => import('../pages/compatibility/AutoCompatSellerHistoryPage.jsx'));
 
-import FulfillmentDashboard from '../pages/admin/FulfillmentDashboard.jsx';
-import AllOrdersSheetPage from '../pages/admin/AllOrdersSheetPage.jsx';
-import MonitoringPage from '../pages/admin/MonitoringPage.jsx';
-import PriceChangeHistoryPage from '../pages/admin/PriceChangeHistoryPage.jsx';
-import AwaitingShipmentPage from '../pages/admin/AwaitingShipmentPage.jsx';
-import AwaitingSheetPage from '../pages/admin/AwaitingSheetPage.jsx';
-import AmazonArrivalsPage from '../pages/admin/AmazonArrivalsPage.jsx';
-import FulfillmentNotesPage from '../pages/admin/FulfillmentNotesPage.jsx';
-import ConversationTrackingPage from '../pages/admin/ConversationTrackingPage.jsx';
+const FulfillmentDashboard = lazy(() => import('../pages/admin/FulfillmentDashboard.jsx'));
+const AllOrdersSheetPage = lazy(() => import('../pages/admin/AllOrdersSheetPage.jsx'));
+const PriceChangeHistoryPage = lazy(() => import('../pages/admin/PriceChangeHistoryPage.jsx'));
+const AwaitingShipmentPage = lazy(() => import('../pages/admin/AwaitingShipmentPage.jsx'));
+const AwaitingSheetPage = lazy(() => import('../pages/admin/AwaitingSheetPage.jsx'));
+const AmazonArrivalsPage = lazy(() => import('../pages/admin/AmazonArrivalsPage.jsx'));
+const FulfillmentNotesPage = lazy(() => import('../pages/admin/FulfillmentNotesPage.jsx'));
+const ConversationTrackingPage = lazy(() => import('../pages/admin/ConversationTrackingPage.jsx'));
 // CancelledStatusPage is now embedded in Issues and Resolutions (DisputesPage)
-import DisputesPage from '../pages/admin/DisputesPage.jsx';
-import AccountHealthReportPage from '../pages/admin/AccountHealthReportPage.jsx';
-import PayoneerSheetPage from '../pages/admin/PayoneerSheetPage.jsx';
-import BankAccountsPage from '../pages/admin/BankAccountsPage.jsx';
-import TransactionPage from '../pages/admin/TransactionPage.jsx';
-import ExtraExpensePage from '../pages/admin/ExtraExpensePage.jsx';
-//import MessageReceivedPage from '../pages/admin/MessageReceivedPage.jsx';
-import AboutMePage from '../pages/AboutMePage.jsx';
-import EmployeeDetailsPage from '../pages/admin/EmployeeDetailsPage.jsx';
-import EmployeeManagementPage from '../pages/admin/EmployeeManagementPage.jsx';
-import BuyerChatPage from '../pages/admin/BuyerChatPage.jsx';
-import RangeAnalyzerPage from '../pages/admin/RangeAnalyzerPage.jsx';
-import FeedUploadPage from '../pages/ebay/FeedUploadPage.jsx';
-import SellingPrivilegesPage from '../pages/admin/SellingPrivilegesPage.jsx';
-import EbayApiUsagePage from '../pages/admin/EbayApiUsagePage.jsx';
-import FeedUploadStatsPage from '../pages/admin/FeedUploadStatsPage.jsx';
-import SalaryPage from '../pages/admin/SalaryPage.jsx';
-import SellerFundsPage from '../pages/admin/SellerFundsPage.jsx';
+const DisputesPage = lazy(() => import('../pages/admin/DisputesPage.jsx'));
+const AccountHealthReportPage = lazy(() => import('../pages/admin/AccountHealthReportPage.jsx'));
+const PayoneerSheetPage = lazy(() => import('../pages/admin/PayoneerSheetPage.jsx'));
+const MicroOrdersPage = lazy(() => import('../pages/admin/MicroOrdersPage.jsx'));
+const BankAccountsPage = lazy(() => import('../pages/admin/BankAccountsPage.jsx'));
+const TransactionPage = lazy(() => import('../pages/admin/TransactionPage.jsx'));
+const ExtraExpensePage = lazy(() => import('../pages/admin/ExtraExpensePage.jsx'));
+const AboutMePage = lazy(() => import('../pages/AboutMePage.jsx'));
+const EmployeeDetailsPage = lazy(() => import('../pages/admin/EmployeeDetailsPage.jsx'));
+const EmployeeManagementPage = lazy(() => import('../pages/admin/EmployeeManagementPage.jsx'));
+const BuyerChatPage = lazy(() => import('../pages/admin/BuyerChatPage.jsx'));
+const FeedUploadPage = lazy(() => import('../pages/ebay/FeedUploadPage.jsx'));
+const BestOffersPage = lazy(() => import('../pages/admin/BestOffersPage.jsx'));
+const SellingPrivilegesPage = lazy(() => import('../pages/admin/SellingPrivilegesPage.jsx'));
+const EbayApiUsagePage = lazy(() => import('../pages/admin/EbayApiUsagePage.jsx'));
+const FeedUploadStatsPage = lazy(() => import('../pages/admin/FeedUploadStatsPage.jsx'));
+const AiListingUsagePage = lazy(() => import('../pages/admin/AiListingUsagePage.jsx'));
+const DailyListingComparisonPage = lazy(() => import('../pages/admin/DailyListingComparisonPage.jsx'));
+const ManualEndListingPage = lazy(() => import('../pages/admin/ManualEndListingPage.jsx'));
+const SellerUploadLimitsPage = lazy(() => import('../pages/admin/SellerUploadLimitsPage.jsx'));
+const SalaryPage = lazy(() => import('../pages/admin/SalaryPage.jsx'));
+const SellerFundsPage = lazy(() => import('../pages/admin/SellerFundsPage.jsx'));
 
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -97,70 +94,79 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import MoneyOffIcon from '@mui/icons-material/MoneyOff';
-import CompatibilityDashboard from '../pages/compatibility/CompatibilityDashboard.jsx';
-import EditListingsDashboard from '../pages/listings/EditListingsDashboard.jsx';
+const CompatibilityDashboard = lazy(() => import('../pages/compatibility/CompatibilityDashboard.jsx'));
+const EditListingsDashboard = lazy(() => import('../pages/listings/EditListingsDashboard.jsx'));
 
-import ConversationManagementPage from '../pages/admin/ConversationManagementPage.jsx';
-import ManageAmazonAccountsPage from '../pages/admin/ManageAmazonAccountsPage.jsx';
-import InternalMessagesPage from '../pages/admin/InternalMessagesPage.jsx';
-import InternalMessagesAdminPage from '../pages/admin/InternalMessagesAdminPage.jsx';
-import ManageCreditCardsPage from '../pages/admin/ManageCreditCardsPage.jsx';
-import ManageCreditCardNamesPage from '../pages/admin/ManageCreditCardNamesPage.jsx';
-import AffiliateOrdersPage from '../pages/admin/AffiliateOrdersPage.jsx';
+const ConversationManagementPage = lazy(() => import('../pages/admin/ConversationManagementPage.jsx'));
+const ManageAmazonAccountsPage = lazy(() => import('../pages/admin/ManageAmazonAccountsPage.jsx'));
+const InternalMessagesPage = lazy(() => import('../pages/admin/InternalMessagesPage.jsx'));
+const InternalMessagesAdminPage = lazy(() => import('../pages/admin/InternalMessagesAdminPage.jsx'));
+const ManageCreditCardsPage = lazy(() => import('../pages/admin/ManageCreditCardsPage.jsx'));
+const ManageCreditCardNamesPage = lazy(() => import('../pages/admin/ManageCreditCardNamesPage.jsx'));
+const AffiliateOrdersPage = lazy(() => import('../pages/admin/AffiliateOrdersPage.jsx'));
 import LinkIcon from '@mui/icons-material/Link';
-import IdeasPage from '../pages/IdeasPage.jsx';
+const IdeasPage = lazy(() => import('../pages/IdeasPage.jsx'));
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
-import OrderAnalyticsPage from '../pages/admin/OrderAnalyticsPage.jsx';
-import CRPAnalyticsPage from '../pages/admin/CRPAnalyticsPage.jsx';
+const OrderAnalyticsPage = lazy(() => import('../pages/admin/OrderAnalyticsPage.jsx'));
+const LegacyItemAnalyticsPage = lazy(() => import('../pages/admin/LegacyItemAnalyticsPage.jsx'));
+const ActiveListingTiersPage = lazy(() => import('../pages/admin/ActiveListingTiersPage.jsx'));
+const ExpiringListingsPage = lazy(() => import('../pages/admin/ExpiringListingsPage.jsx'));
+const SkuIndexSyncPage = lazy(() => import('../pages/admin/SkuIndexSyncPage.jsx'));
+const DuplicateSkusPage = lazy(() => import('../pages/admin/DuplicateSkusPage.jsx'));
+const SkuSellerProfitPage = lazy(() => import('../pages/admin/SkuSellerProfitPage.jsx'));
+const EndListingStatsPage = lazy(() => import('../pages/admin/EndListingStatsPage.jsx'));
+const CRPAnalyticsPage = lazy(() => import('../pages/admin/CRPAnalyticsPage.jsx'));
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import SellerAnalyticsPage from '../pages/admin/SellerAnalyticsPage.jsx';
-import OrdersDepartmentDashboardPage from '../pages/admin/OrdersDepartmentDashboardPage.jsx';
+const SellerAnalyticsPage = lazy(() => import('../pages/admin/SellerAnalyticsPage.jsx'));
+const OrdersDepartmentDashboardPage = lazy(() => import('../pages/admin/OrdersDepartmentDashboardPage.jsx'));
 // WorksheetPage is now embedded in Issues and Resolutions (DisputesPage)
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ChatIcon from '@mui/icons-material/Chat';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import AmazonLookupPage from '../pages/admin/AmazonLookupPage.jsx';
-import SearchIcon from '@mui/icons-material/Search';
-import ManageProductUmbrellasPage from '../pages/admin/ManageProductUmbrellasPage.jsx';
-import UmbrellaIcon from '@mui/icons-material/Umbrella';
-import ASINStoragePage from '../pages/admin/ASINStoragePage.jsx';
-import StorageIcon from '@mui/icons-material/Storage';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import LayersIcon from '@mui/icons-material/Layers';
-import ColumnCreatorPage from '../pages/admin/ColumnCreatorPage.jsx';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
-import ManageTemplatesPage from '../pages/admin/ManageTemplatesPage.jsx';
-import TemplateListingsPage from '../pages/admin/TemplateListingsPage.jsx';
-import TemplateListingAnalyticsPage from '../pages/admin/TemplateListingAnalyticsPage.jsx';
-import SelectSellerPage from '../pages/admin/SelectSellerPage.jsx';
-import SellerTemplatesPage from '../pages/admin/SellerTemplatesPage.jsx';
-import ListingDirectoryPage from '../pages/admin/ListingDirectoryPage.jsx';
-import TemplateDirectoryPage from '../pages/admin/TemplateDirectoryPage.jsx';
-import TemplateDatabasePage from '../pages/admin/TemplateDatabasePage.jsx';
-import CsvStoragePage from '../pages/admin/CsvStoragePage.jsx';
+const ManageTemplatesPage = lazy(() => import('../pages/admin/ManageTemplatesPage.jsx'));
+const TemplateListingsPage = lazy(() => import('../pages/admin/TemplateListingsPage.jsx'));
+const TemplateListingAnalyticsPage = lazy(() => import('../pages/admin/TemplateListingAnalyticsPage.jsx'));
+const SelectSellerPage = lazy(() => import('../pages/admin/SelectSellerPage.jsx'));
+const AsinPrecheckPage = lazy(() => import('../pages/admin/AsinPrecheckPage.jsx'));
+const SellerTemplatesPage = lazy(() => import('../pages/admin/SellerTemplatesPage.jsx'));
+const ListingDirectoryPage = lazy(() => import('../pages/admin/ListingDirectoryPage.jsx'));
+const TemplateDirectoryPage = lazy(() => import('../pages/admin/TemplateDirectoryPage.jsx'));
+const TemplateDatabasePage = lazy(() => import('../pages/admin/TemplateDatabasePage.jsx'));
+const CsvStoragePage = lazy(() => import('../pages/admin/CsvStoragePage.jsx'));
 import DescriptionIcon from '@mui/icons-material/Description';
 import HomeIcon from '@mui/icons-material/Home';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import LeaveManagementPage from '../pages/LeaveManagementPage.jsx';
-import LeaveAdminPage from '../pages/admin/LeaveAdminPage.jsx';
-import AttendanceAdminPage from '../pages/admin/AttendanceAdminPage.jsx';
+const LeaveManagementPage = lazy(() => import('../pages/LeaveManagementPage.jsx'));
+const LeaveAdminPage = lazy(() => import('../pages/admin/LeaveAdminPage.jsx'));
+const AttendanceAdminPage = lazy(() => import('../pages/admin/AttendanceAdminPage.jsx'));
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import AsinDirectoryPage from '../pages/admin/AsinDirectoryPage.jsx';
-import AsinListPage from '../pages/admin/AsinListPage.jsx';
-import UserSellerAssignmentPage from '../pages/admin/UserSellerAssignmentPage.jsx';
-import UserPerformancePage from '../pages/admin/UserPerformancePage.jsx';
-import AiFitmentUsagePage from '../pages/admin/AiFitmentUsagePage.jsx';
-import ListingStatsPage from '../pages/admin/ListingStatsPage.jsx';
+const AsinDirectoryPage = lazy(() => import('../pages/admin/AsinDirectoryPage.jsx'));
+const AsinListPage = lazy(() => import('../pages/admin/AsinListPage.jsx'));
+const CRPComparisonPage = lazy(() => import('../pages/admin/CRPComparisonPage.jsx'));
+const UserSellerAssignmentPage = lazy(() => import('../pages/admin/UserSellerAssignmentPage.jsx'));
+const UserCategoryTargetsPage = lazy(() => import('../pages/admin/UserCategoryTargetsPage.jsx'));
+const UserListingPerformancePage = lazy(() => import('../pages/admin/UserListingPerformancePage.jsx'));
+const MeetingsPage = lazy(() => import('../pages/admin/MeetingsPage.jsx'));
+const UserPerformancePage = lazy(() => import('../pages/admin/UserPerformancePage.jsx'));
+const AiFitmentUsagePage = lazy(() => import('../pages/admin/AiFitmentUsagePage.jsx'));
+const ListingStatsPage = lazy(() => import('../pages/admin/ListingStatsPage.jsx'));
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import SecurityIcon from '@mui/icons-material/Security';
 
-import PageAccessManagementPage from '../pages/admin/PageAccessManagementPage.jsx';
-import PageAccessAuditLogPage from '../pages/admin/PageAccessAuditLogPage.jsx';
-import UserPasswordManagementPage from '../pages/admin/UserPasswordManagementPage.jsx';
+const PageAccessManagementPage = lazy(() => import('../pages/admin/PageAccessManagementPage.jsx'));
+const PageAccessAuditLogPage = lazy(() => import('../pages/admin/PageAccessAuditLogPage.jsx'));
+const UserPasswordManagementPage = lazy(() => import('../pages/admin/UserPasswordManagementPage.jsx'));
+const WelcomePage = lazy(() => import('../pages/admin/WelcomePage.jsx'));
 
+import PageLoader from '../components/PageLoader.jsx';
+import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import usePageAccess from '../hooks/usePageAccess';
+import api, { getAuthToken } from '../lib/api.js';
 import { PAGE_REGISTRY, PAGE_CATEGORIES, SUBMENUS } from '../constants/pages';
 import { BRAND_DARK, BRAND_DARK_ALT, BRAND_DARK_DEEP, BRAND_SIDEBAR_YELLOW, BRAND_SIDEBAR_YELLOW_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../constants/brandTheme';
 
@@ -173,9 +179,33 @@ const flyoutMenuPositionProps = {
 };
 
 // Helper component for sidebar icons with tooltips when collapsed
-const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
-  sidebarOpen ? (
+const renderNavIconGraphic = (Icon, badgeCount = 0) => (
+  <Badge
+    color="error"
+    badgeContent={badgeCount}
+    invisible={!badgeCount}
+    max={99}
+    overlap="circular"
+    anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+    sx={{
+      '& .MuiBadge-badge': {
+        minWidth: 18,
+        height: 18,
+        borderRadius: '999px',
+        fontSize: '0.65rem',
+        fontWeight: 700,
+        padding: '0 4px',
+        boxShadow: '0 0 0 2px #fff'
+      }
+    }}
+  >
     <Icon />
+  </Badge>
+);
+
+const NavIcon = ({ icon: Icon, label, sidebarOpen, badgeCount = 0 }) => (
+  sidebarOpen ? (
+    renderNavIconGraphic(Icon, badgeCount)
   ) : (
     <Tooltip
       title={label}
@@ -185,7 +215,7 @@ const NavIcon = ({ icon: Icon, label, sidebarOpen }) => (
       leaveDelay={200}
     >
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon />
+        {renderNavIconGraphic(Icon, badgeCount)}
       </span>
     </Tooltip>
   )
@@ -243,7 +273,9 @@ const flyoutMenuSx = {
 const COMPONENT_MAP = {
   'OrdersDashboard': OrdersDepartmentDashboardPage,
   'OrderAnalytics': OrderAnalyticsPage,
+  'LegacyItemAnalytics': LegacyItemAnalyticsPage,
   'CRPAnalytics': CRPAnalyticsPage,
+  'CRPComparison': CRPComparisonPage,
   'Fulfillment': FulfillmentDashboard,
   'AwaitingShipment': AwaitingShipmentPage,
   'AwaitingSheet': AwaitingSheetPage,
@@ -264,22 +296,27 @@ const COMPONENT_MAP = {
   'ManageTemplates': ManageTemplatesPage,
   'ListingsDatabase': TemplateDatabasePage,
   'SelectSeller': SelectSellerPage,
+  'AsinPrecheck': AsinPrecheckPage,
   'ListingDirectory': ListingDirectoryPage,
   'TemplateDirectory': TemplateDirectoryPage,
   'AsinDirectory': AsinDirectoryPage,
   'AsinLists': AsinListPage,
   'FeedUpload': FeedUploadPage,
   'FeedUploadStats': FeedUploadStatsPage,
+  'AiListingUsage': AiListingUsagePage,
+  'DailyListingComparison': DailyListingComparisonPage,
+  'ManualEndListing': ManualEndListingPage,
+  'SellerUploadLimits': SellerUploadLimitsPage,
   'CsvStorage': CsvStoragePage,
   'ProductResearch': ProductResearchPage,
   'Payoneer': PayoneerSheetPage,
+  'MicroOrders': MicroOrdersPage,
   'BankAccounts': BankAccountsPage,
   'Transactions': TransactionPage,
   'ExtraExpenses': ExtraExpensePage,
   'CreditCardNames': ManageCreditCardNamesPage,
   'Salary': SalaryPage,
   'AllOrdersSheet': AllOrdersSheetPage,
-  'Monitoring': MonitoringPage,
   'PriceChangeHistory': PriceChangeHistoryPage,
   'SellerAnalytics': SellerAnalyticsPage,
   'Disputes': DisputesPage,
@@ -292,12 +329,22 @@ const COMPONENT_MAP = {
   'SellingPrivileges': SellingPrivilegesPage,
   'EbayApiUsage': EbayApiUsagePage,
   'SellerFunds': SellerFundsPage,
+  'ActiveListingTiers': ActiveListingTiersPage,
+  'ExpiringListings': ExpiringListingsPage,
+  'SkuIndexSync': SkuIndexSyncPage,
+  'DuplicateSkus': DuplicateSkusPage,
+  'SkuSellerOrderProfit': SkuSellerProfitPage,
+  'EndListingStats': EndListingStatsPage,
+  'BestOffers': BestOffersPage,
   'IdeasAndIssues': IdeasPage,
   'TeamChat': InternalMessagesPage,
   'LeaveAdmin': LeaveAdminPage,
   'EmployeeManagement': EmployeeManagementPage,
   'AddUser': AddListerPage,
   'UserSellerAssignments': UserSellerAssignmentPage,
+  'UserCategoryTargets': UserCategoryTargetsPage,
+  'UserListingPerformance': UserListingPerformancePage,
+  'Meetings': MeetingsPage,
   'ViewAllMessages': InternalMessagesAdminPage,
   'Attendance': AttendanceAdminPage,
   'PageAccessManagement': PageAccessManagementPage,
@@ -307,18 +354,6 @@ const COMPONENT_MAP = {
   'ManagePlatforms': ManagePlatformsPage,
   'ManageStores': ManageStoresPage,
   'ProductTable': ListingManagementPage,
-  'TaskList': TaskListPage,
-  'Assignments': AdminAssignmentsPage,
-  'ListingsSummary': ListingsSummaryPage,
-  'ListingSheet': ListingSheetPage,
-  'StoreWiseTasks': StoreWiseTaskListPage,
-  'StoreDailyTasks': StoreDailyTasksPage,
-  'ListerInfo': ListerInfoPage,
-  'RangeAnalyzer': RangeAnalyzerPage,
-  'AmazonLookup': AmazonLookupPage,
-  'ProductUmbrellas': ManageProductUmbrellasPage,
-  'AsinStorage': ASINStoragePage,
-  'ColumnCreator': ColumnCreatorPage,
   'ManageRanges': ManageRangesPage,
   'UserCredentials': UserCredentialsPage,
   'UserPerformance': UserPerformancePage,
@@ -328,21 +363,46 @@ const COMPONENT_MAP = {
 export default function AdminLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [teamChatUnreadConversationCount, setTeamChatUnreadConversationCount] = useState(0);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const eventSourceRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const lastPlayedMessageIdRef = useRef(null);
+  const activeTeamChatConversationIdRef = useRef(null);
+  const locationPathRef = useRef(location.pathname);
 
   // Flyout menu anchor states
   const [menuAnchors, setMenuAnchors] = useState({});
-  
+
   // Submenu anchors
   const [submenuAnchors, setSubmenuAnchors] = useState({});
-
-  const navigate = useNavigate();
-  const location = useLocation();
 
   // Use the page access hook
   const { hasAccess, hasCategoryAccess, accessibleCategories, getAccessiblePages, getSubmenuPages, hasSubmenuAccess, isSuper } = usePageAccess(user);
 
   // --- ROLE DEFINITIONS (kept for special non-page logic like lister dashboard link) ---
   const isAnyLister = ['lister', 'advancelister', 'trainee'].includes(user?.role);
+  const canAccessTeamChat = hasAccess('TeamChat');
+  const hasUnreadTeamChats = teamChatUnreadConversationCount > 0;
+
+  const ROLE_LABELS = {
+    superadmin: 'Super Admin',
+    productadmin: 'Product Admin',
+    listingadmin: 'Listing Admin',
+    compatibilityadmin: 'Compatibility Admin',
+    compatibilityeditor: 'Compatibility Editor',
+    fulfillmentadmin: 'Fulfillment Admin',
+    hradmin: 'HR Admin',
+    hr: 'HR',
+    operationhead: 'Operation Head',
+    hoc: 'Head of Compliance',
+    compliancemanager: 'Compliance Manager',
+    lister: 'Lister',
+    advancelister: 'Advance Lister',
+    trainee: 'Trainee',
+    seller: 'Seller',
+  };
 
   // Close all flyout menus + mobile drawer
   const closeAllMenus = () => {
@@ -377,6 +437,163 @@ export default function AdminLayout({ user, onLogout }) {
     const pagePath = `/admin${page.path}`;
     return location.pathname === pagePath || location.pathname.startsWith(`${pagePath}/`);
   };
+
+  const buildTeamChatStreamUrl = () => {
+    const token = getAuthToken() || localStorage.getItem('auth_token');
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+
+    if (!token || !baseUrl) return null;
+
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}/internal-messages/unread-stream${separator}token=${encodeURIComponent(token)}`;
+  };
+
+  const refreshTeamChatUnreadConversationCount = async () => {
+    try {
+      const { data } = await api.get('/internal-messages/conversations');
+      const unreadConversationCount = Array.isArray(data)
+        ? data.filter((conversation) => Number(conversation.unreadCount || 0) > 0).length
+        : 0;
+
+      setTeamChatUnreadConversationCount(unreadConversationCount);
+    } catch {
+      // Leave the existing count unchanged if the fallback fetch fails.
+    }
+  };
+
+  const ensureAudioContext = async () => {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
+    }
+
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+
+    return audioContextRef.current;
+  };
+
+  const playTeamChatNotificationSound = async () => {
+    try {
+      const audioContext = await ensureAudioContext();
+      if (!audioContext) return;
+
+      const startAt = audioContext.currentTime + 0.01;
+      const firstOscillator = audioContext.createOscillator();
+      const secondOscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      firstOscillator.type = 'triangle';
+      secondOscillator.type = 'sine';
+      firstOscillator.frequency.setValueAtTime(740, startAt);
+      firstOscillator.frequency.exponentialRampToValueAtTime(988, startAt + 0.12);
+      secondOscillator.frequency.setValueAtTime(988, startAt + 0.08);
+      secondOscillator.frequency.exponentialRampToValueAtTime(1318, startAt + 0.24);
+
+      gainNode.gain.setValueAtTime(0.0001, startAt);
+      gainNode.gain.exponentialRampToValueAtTime(0.05, startAt + 0.03);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.34);
+
+      firstOscillator.connect(gainNode);
+      secondOscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      firstOscillator.start(startAt);
+      secondOscillator.start(startAt + 0.08);
+      firstOscillator.stop(startAt + 0.24);
+      secondOscillator.stop(startAt + 0.34);
+    } catch {
+      // Ignore blocked autoplay/audio errors.
+    }
+  };
+
+  useEffect(() => {
+    const primeAudio = () => {
+      ensureAudioContext().catch(() => { });
+    };
+
+    window.addEventListener('pointerdown', primeAudio);
+    window.addEventListener('keydown', primeAudio);
+
+    return () => {
+      window.removeEventListener('pointerdown', primeAudio);
+      window.removeEventListener('keydown', primeAudio);
+    };
+  }, []);
+
+  useEffect(() => {
+    locationPathRef.current = location.pathname;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleActiveConversationChange = (event) => {
+      activeTeamChatConversationIdRef.current = event.detail?.conversationId || null;
+    };
+
+    window.addEventListener('team-chat-active-conversation', handleActiveConversationChange);
+
+    return () => {
+      window.removeEventListener('team-chat-active-conversation', handleActiveConversationChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canAccessTeamChat) {
+      setTeamChatUnreadConversationCount(0);
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+      return undefined;
+    }
+
+    refreshTeamChatUnreadConversationCount();
+
+    const streamUrl = buildTeamChatStreamUrl();
+    if (!streamUrl) return undefined;
+
+    const source = new EventSource(streamUrl);
+    eventSourceRef.current = source;
+
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        const unreadConversationCount = Number(payload.unreadConversationCount || 0);
+
+        setTeamChatUnreadConversationCount(unreadConversationCount);
+        window.dispatchEvent(new CustomEvent('team-chat-notification', { detail: payload }));
+
+        const isSameConversationOpen =
+          locationPathRef.current === '/admin/internal-messages' &&
+          payload.conversationId &&
+          payload.conversationId === activeTeamChatConversationIdRef.current;
+
+        if (
+          payload.reason === 'message-received' &&
+          payload.messageId &&
+          payload.messageId !== lastPlayedMessageIdRef.current &&
+          !isSameConversationOpen
+        ) {
+          lastPlayedMessageIdRef.current = payload.messageId;
+          playTeamChatNotificationSound();
+        }
+      } catch {
+        // Ignore malformed SSE payloads.
+      }
+    };
+
+    source.onerror = () => {
+      refreshTeamChatUnreadConversationCount();
+    };
+
+    return () => {
+      source.close();
+      if (eventSourceRef.current === source) {
+        eventSourceRef.current = null;
+      }
+    };
+  }, [canAccessTeamChat]);
 
   const isSubmenuActive = (submenuId) => {
     const submenu = SUBMENUS[submenuId];
@@ -470,6 +687,7 @@ export default function AdminLayout({ user, onLogout }) {
     const IconComponent = categoryIcons[categoryId];
     const isActive = isCategoryActive(categoryId);
     const pages = getAccessiblePages(categoryId);
+    const teamChatCategoryBadgeCount = categoryId === 'hrManagement' ? teamChatUnreadConversationCount : 0;
 
     // Find which submenus belong to this category
     const categorySubmenus = Object.entries(SUBMENUS)
@@ -488,7 +706,7 @@ export default function AdminLayout({ user, onLogout }) {
           >
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <ListItemIcon sx={{ minWidth: 40 }}>
-                <NavIcon icon={IconComponent} label={category.name} sidebarOpen={sidebarOpen} />
+                <NavIcon icon={IconComponent} label={category.name} sidebarOpen={sidebarOpen} badgeCount={teamChatCategoryBadgeCount} />
               </ListItemIcon>
               {sidebarOpen && <ListItemText primary={category.name} primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
             </Box>
@@ -524,7 +742,26 @@ export default function AdminLayout({ user, onLogout }) {
               selected={isPageActive(page)}
               onClick={closeAllMenus}
             >
-              {page.name}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>{page.name}</span>
+                {page.id === 'TeamChat' && hasUnreadTeamChats && (
+                  <Badge
+                    color="error"
+                    badgeContent={teamChatUnreadConversationCount}
+                    max={99}
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        position: 'static',
+                        transform: 'none',
+                        minWidth: 18,
+                        height: 18,
+                        fontSize: '0.65rem',
+                        fontWeight: 700
+                      }
+                    }}
+                  />
+                )}
+              </Box>
             </MenuItem>
           ))}
         </Menu>
@@ -564,12 +801,12 @@ export default function AdminLayout({ user, onLogout }) {
       <Toolbar />
       <Divider sx={{ borderColor: 'rgba(0, 0, 0, 0.08)' }} />
       <List sx={{ px: 0.5, py: 1, overflowY: 'auto', flexGrow: 1 }}>
-        {/* Back to Lister Dashboard - visible only to listers */}
+        {/* My Dashboard - visible only to listers */}
         {isAnyLister && (
           <ListItem disablePadding>
             <ListItemButton
               component={Link}
-              to="/lister"
+              to="/admin/welcome"
               onClick={() => setMobileOpen(false)}
               sx={{
                 ...selectedMenuItemStyle,
@@ -577,7 +814,7 @@ export default function AdminLayout({ user, onLogout }) {
               }}
             >
               <ListItemIcon sx={{ minWidth: 40 }}>
-                <NavIcon icon={HomeIcon} label="Back to My Dashboard" sidebarOpen={sidebarOpen} />
+                <NavIcon icon={HomeIcon} label="My Dashboard" sidebarOpen={sidebarOpen} />
               </ListItemIcon>
               {sidebarOpen && <ListItemText primary="My Dashboard" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
             </ListItemButton>
@@ -586,6 +823,25 @@ export default function AdminLayout({ user, onLogout }) {
 
         {/* Divider after lister dashboard link */}
         {isAnyLister && <Divider sx={{ my: 1.5, mx: 2, borderColor: 'rgba(0, 0, 0, 0.08)' }} />}
+
+        {/* Home / Welcome - visible to all users */}
+        <ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            to="/admin/welcome"
+            onClick={() => setMobileOpen(false)}
+            selected={location.pathname === '/admin/welcome'}
+            sx={{
+              ...selectedMenuItemStyle,
+              minHeight: 44,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <NavIcon icon={HomeIcon} label="Home" sidebarOpen={sidebarOpen} />
+            </ListItemIcon>
+            {sidebarOpen && <ListItemText primary="Home" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }} />}
+          </ListItemButton>
+        </ListItem>
 
         {/* About Me - visible to all users except superadmin */}
         {!isSuper && (
@@ -668,7 +924,7 @@ export default function AdminLayout({ user, onLogout }) {
               sx={selectedMenuItemStyle}
             >
               <ListItemIcon>
-                <NavIcon icon={ChatIcon} label="Team Chat & Messaging" sidebarOpen={sidebarOpen} />
+                <NavIcon icon={ChatIcon} label="Team Chat & Messaging" sidebarOpen={sidebarOpen} badgeCount={teamChatUnreadConversationCount} />
               </ListItemIcon>
               {sidebarOpen && <ListItemText primary="Team Chat" />}
             </ListItemButton>
@@ -680,21 +936,7 @@ export default function AdminLayout({ user, onLogout }) {
   );
 
   // Determine default redirect page
-  const getDefaultRedirect = () => {
-    if (isSuper) return '/admin/crp-analytics';
-    // Check categories in priority order
-    const priorityPages = [
-      'ProductResearch', 'ProductTable', 'CompatibilityTasks', 'CompatibilityEditor',
-      'Fulfillment', 'EmployeeDetails', 'OrdersDashboard'
-    ];
-    for (const pageId of priorityPages) {
-      if (hasAccess(pageId)) {
-        const page = PAGE_REGISTRY.find(p => p.id === pageId);
-        if (page) return `/admin${page.path}`;
-      }
-    }
-    return '/admin/about-me';
-  };
+  const getDefaultRedirect = () => '/admin/welcome';
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -702,9 +944,11 @@ export default function AdminLayout({ user, onLogout }) {
       <AppBar
         position="fixed"
         elevation={0}
+        color="inherit"
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          background: `linear-gradient(160deg, ${BRAND_DARK} 0%, ${BRAND_DARK_ALT} 62%, ${BRAND_DARK_DEEP} 100%)`,
+          backgroundColor: '#0f0f17ff !important',
+          backgroundImage: 'none !important',
           color: BRAND_YELLOW,
           borderBottom: '1px solid rgba(245, 200, 66, 0.22)',
           boxShadow: '0 10px 28px rgba(15, 16, 32, 0.34)'
@@ -748,11 +992,33 @@ export default function AdminLayout({ user, onLogout }) {
               Admin Dashboard
             </Typography>
             <Typography variant="caption" sx={{ color: 'rgba(245, 200, 66, 0.72)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              Grow Mentality Operations Hub
+              Grow Mentality | Nurture Proper for The Future
             </Typography>
           </Box>
           <Button
-            startIcon={<ChatIcon />}
+            startIcon={(
+              <Badge
+                color="error"
+                badgeContent={teamChatUnreadConversationCount}
+                invisible={!hasUnreadTeamChats}
+                max={99}
+                overlap="circular"
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                sx={{
+                  '& .MuiBadge-badge': {
+                    minWidth: 18,
+                    height: 18,
+                    borderRadius: '999px',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    padding: '0 4px',
+                    boxShadow: '0 0 0 2px rgba(15, 15, 23, 0.9)'
+                  }
+                }}
+              >
+                <ChatIcon />
+              </Badge>
+            )}
             onClick={() => navigate('/admin/internal-messages')}
             sx={{
               mr: 1,
@@ -791,7 +1057,7 @@ export default function AdminLayout({ user, onLogout }) {
             <Typography variant="body2" sx={{ color: '#fffdf0', fontWeight: 600 }}>
               {user?.username}{' '}
               <Box component="span" sx={{ color: 'rgba(245, 200, 66, 0.76)', fontWeight: 500 }}>
-                ({user?.role})
+                ({ROLE_LABELS[user?.role] ?? user?.role})
               </Box>
             </Typography>
           </Box>
@@ -870,59 +1136,58 @@ export default function AdminLayout({ user, onLogout }) {
       </Box>
       <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${sidebarOpen ? drawerWidth : 56}px)` }, transition: 'width 0.2s' }}>
         <Toolbar />
-        <Routes>
-          {/* Ideas & Issues - accessible to ALL roles */}
-          <Route path="/ideas" element={<IdeasPage />} />
+        <ErrorBoundary resetKey={location.pathname}>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Welcome / Home page */}
+              <Route path="/welcome" element={<WelcomePage user={user} />} />
 
-          {/* About Me */}
-          {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
+              {/* Ideas & Issues - accessible to ALL roles */}
+              <Route path="/ideas" element={<IdeasPage />} />
 
-          {/* Leave Management - accessible to ALL authenticated users */}
-          <Route path="/my-leaves" element={<LeaveManagementPage />} />
+              {/* About Me */}
+              {!isSuper && <Route path="/about-me" element={<AboutMePage />} />}
 
-          {/* Internal Messages - accessible to ALL authenticated users */}
-          <Route path="/internal-messages" element={<InternalMessagesPage />} />
+              {/* Leave Management - accessible to ALL authenticated users */}
+              <Route path="/my-leaves" element={<LeaveManagementPage />} />
 
-          {/* User Performance - accessible to all */}
-          <Route path="/user-performance" element={<UserPerformancePage />} />
+              {/* Internal Messages - accessible to ALL authenticated users */}
+              <Route path="/internal-messages" element={<InternalMessagesPage />} />
 
-          {/* Dynamic page routes based on access */}
-          {PAGE_REGISTRY.map(page => {
-            if (!hasAccess(page.id)) return null;
-            const Component = COMPONENT_MAP[page.id];
-            if (!Component) return null;
-            return <Route key={page.id} path={page.path} element={<Component />} />;
-          })}
+              {/* User Performance - accessible to all */}
+              <Route path="/user-performance" element={<UserPerformancePage />} />
 
-          {/* Additional routes that don't map 1:1 to pages but need to exist */}
-          {hasAccess('Fulfillment') && (
-            <>
-              <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
-              <Route path="/cancelled-status" element={<DisputesPage initialTab={3} />} />
-              <Route path="/return-requested" element={<DisputesPage initialTab={2} />} />
-              <Route path="/worksheet" element={<DisputesPage initialTab={4} />} />
-            </>
-          )}
+              {/* Dynamic page routes based on access */}
+              {PAGE_REGISTRY.map(page => {
+                if (!hasAccess(page.id)) return null;
+                const Component = COMPONENT_MAP[page.id];
+                if (!Component) return null;
+                return <Route key={page.id} path={page.path} element={<Component />} />;
+              })}
 
-          {hasAccess('SelectSeller') && (
-            <>
-              <Route path="/template-listings" element={<TemplateListingsPage />} />
-              <Route path="/seller-templates" element={<SellerTemplatesPage />} />
-              <Route path="/template-listing-analytics" element={<TemplateListingAnalyticsPage />} />
-            </>
-          )}
+              {/* Additional routes that don't map 1:1 to pages but need to exist */}
+              {hasAccess('Fulfillment') && (
+                <>
+                  <Route path="/conversation-tracking" element={<ConversationTrackingPage />} />
+                  <Route path="/cancelled-status" element={<DisputesPage initialTab={3} />} />
+                  <Route path="/return-requested" element={<DisputesPage initialTab={2} />} />
+                  <Route path="/worksheet" element={<DisputesPage initialTab={4} />} />
+                </>
+              )}
 
-          {hasAccess('StoreWiseTasks') && (
-            <Route path="/store-wise-tasks/details" element={<StoreTaskDetailPage />} />
-          )}
+              {hasAccess('SelectSeller') && (
+                <>
+                  <Route path="/template-listings" element={<TemplateListingsPage />} />
+                  <Route path="/seller-templates" element={<SellerTemplatesPage />} />
+                  <Route path="/template-listing-analytics" element={<TemplateListingAnalyticsPage />} />
+                </>
+              )}
 
-          {hasAccess('ListerInfo') && (
-            <Route path="/lister-info/details" element={<ListerInfoDetailPage />} />
-          )}
-
-          {/* Default redirect */}
-          <Route path="*" element={<Navigate to={getDefaultRedirect()} replace />} />
-        </Routes>
+              {/* Default redirect */}
+              <Route path="*" element={<Navigate to={getDefaultRedirect()} replace />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </Box>
     </Box>
   );

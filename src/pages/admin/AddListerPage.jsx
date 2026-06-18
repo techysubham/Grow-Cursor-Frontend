@@ -23,12 +23,6 @@ export default function AddListerPage() {
     const raw = localStorage.getItem('user');
     return raw ? JSON.parse(raw) : null;
   }, []);
-  const isSuper = currentUser?.role === 'superadmin';
-  const isListingAdmin = currentUser?.role === 'listingadmin';
-  const isCompatibilityAdmin = currentUser?.role === 'compatibilityadmin';
-  const isHRAdmin = currentUser?.role === 'hradmin';
-  const isOperationHead = currentUser?.role === 'operationhead';
-  const isSuperLike = isSuper || isHRAdmin || isOperationHead;
 
   const clearFieldError = (field) =>
     setErrors(prev => ({ ...prev, [field]: '' }));
@@ -40,29 +34,17 @@ export default function AddListerPage() {
     setSubmitting(true);
 
     try {
-      // Determine role and department logic
-      let newRole = 'lister';
+      // Use selected role and department directly
+      let newRole = role;
       let newDepartment = department;
-      if (isSuperLike) {
-        newRole = role;
-        // For compatibilityadmin/compatibilityeditor, department is always Compatibility
-        if (role === 'compatibilityadmin' || role === 'compatibilityeditor') {
-          newDepartment = 'Compatibility';
-        }
-      } else if (isCompatibilityAdmin) {
-        newRole = 'compatibilityeditor';
+
+      // For compatibilityadmin/compatibilityeditor, department is always Compatibility
+      if (role === 'compatibilityadmin' || role === 'compatibilityeditor') {
         newDepartment = 'Compatibility';
-      } else if (isListingAdmin) {
-        newRole = 'lister';
-        newDepartment = 'Listing';
       }
 
       // Department required check
-      const needsDepartment = (
-        isSuperLike || isListingAdmin || isCompatibilityAdmin ||
-        ['lister', 'listingadmin', 'compatibilityadmin', 'compatibilityeditor', 'hoc', 'compliancemanager'].includes(newRole)
-      );
-      if (needsDepartment && !newDepartment) {
+      if (!newDepartment) {
         setMsg('Department is required');
         setSubmitting(false);
         return;
@@ -144,51 +126,42 @@ export default function AddListerPage() {
           required
           disabled={submitting}
         />
-        {isSuperLike ? (
-          <FormControl disabled={submitting}>
-            <InputLabel>Role</InputLabel>
-            <Select label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
-              <MenuItem value="productadmin">Product Research Admin</MenuItem>
-              <MenuItem value="listingadmin">Listing Admin</MenuItem>
-              <MenuItem value="compatibilityadmin">Compatibility Admin</MenuItem>
-              <MenuItem value="compatibilityeditor">Compatibility Editor</MenuItem>
-              <MenuItem value="fulfillmentadmin">Fulfillment Admin</MenuItem>
-              <MenuItem value="hradmin">HR Admin</MenuItem>
-              <MenuItem value="hr">HR</MenuItem>
-              <MenuItem value="operationhead">Operation Head</MenuItem>
-              <MenuItem value="lister">Lister</MenuItem>
-              <MenuItem value="advancelister">Advance Lister</MenuItem>
-              <MenuItem value="trainee">Trainee</MenuItem>
-              <MenuItem value="seller">Seller</MenuItem>
-              <MenuItem value="hoc">HOC</MenuItem>
-              <MenuItem value="compliancemanager">Compliance Manager</MenuItem>
-            </Select>
-          </FormControl>
-        ) : isListingAdmin ? (
-          <Typography variant="body2" color="text.secondary">Creating Lister (Department: Listing)</Typography>
-        ) : isCompatibilityAdmin ? (
-          <Typography variant="body2" color="text.secondary">Creating Compatibility Editor (Department: Compatibility)</Typography>
-        ) : null}
-        {isSuperLike ? (
-          <FormControl disabled={submitting || (isSuperLike && (role === 'compatibilityadmin' || role === 'compatibilityeditor'))}>
-            <InputLabel>Department</InputLabel>
-            <Select
-              label="Department"
-              value={isSuperLike && (role === 'compatibilityadmin' || role === 'compatibilityeditor') ? 'Compatibility' : department}
-              onChange={(e) => setDepartment(e.target.value)}
-              disabled={isSuperLike && (role === 'compatibilityadmin' || role === 'compatibilityeditor')}
-            >
-              <MenuItem value="">Select Department</MenuItem>
-              <MenuItem value="Product Research">Product Research Department</MenuItem>
-              <MenuItem value="Listing">Listing Department</MenuItem>
-              <MenuItem value="Compatibility">Compatibility Department</MenuItem>
-              <MenuItem value="HR">HR Department</MenuItem>
-              <MenuItem value="Operations">Operations Department</MenuItem>
-              <MenuItem value="Executives">Executives Department</MenuItem>
-              <MenuItem value="Compliance">Compliance Department</MenuItem>
-            </Select>
-          </FormControl>
-        ) : null}
+        <FormControl disabled={submitting}>
+          <InputLabel>Role</InputLabel>
+          <Select label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
+            <MenuItem value="productadmin">Product Research Admin</MenuItem>
+            <MenuItem value="listingadmin">Listing Admin</MenuItem>
+            <MenuItem value="compatibilityadmin">Compatibility Admin</MenuItem>
+            <MenuItem value="compatibilityeditor">Compatibility Editor</MenuItem>
+            <MenuItem value="fulfillmentadmin">Fulfillment Admin</MenuItem>
+            <MenuItem value="hradmin">HR Admin</MenuItem>
+            <MenuItem value="hr">HR</MenuItem>
+            <MenuItem value="operationhead">Operation Head</MenuItem>
+            <MenuItem value="lister">Lister</MenuItem>
+            <MenuItem value="advancelister">Advance Lister</MenuItem>
+            <MenuItem value="trainee">Trainee</MenuItem>
+            <MenuItem value="seller">Seller</MenuItem>
+            <MenuItem value="hoc">HOC</MenuItem>
+            <MenuItem value="compliancemanager">Compliance Manager</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl disabled={submitting || role === 'compatibilityadmin' || role === 'compatibilityeditor'}>
+          <InputLabel>Department</InputLabel>
+          <Select
+            label="Department"
+            value={role === 'compatibilityadmin' || role === 'compatibilityeditor' ? 'Compatibility' : department}
+            onChange={(e) => setDepartment(e.target.value)}
+          >
+            <MenuItem value="">Select Department</MenuItem>
+            <MenuItem value="Product Research">Product Research Department</MenuItem>
+            <MenuItem value="Listing">Listing Department</MenuItem>
+            <MenuItem value="Compatibility">Compatibility Department</MenuItem>
+            <MenuItem value="HR">HR Department</MenuItem>
+            <MenuItem value="Operations">Operations Department</MenuItem>
+            <MenuItem value="Executives">Executives Department</MenuItem>
+            <MenuItem value="Compliance">Compliance Department</MenuItem>
+          </Select>
+        </FormControl>
         <Box>
           <Button type="submit" variant="contained" disabled={submitting}>Create</Button>
         </Box>

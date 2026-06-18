@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box,
@@ -30,10 +30,14 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import FolderZipIcon from '@mui/icons-material/FolderZip';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { alpha, ThemeProvider, createTheme, useTheme } from '@mui/material/styles';
 import api from '../../lib/api';
 import ScheduleUploadDialog from '../../components/ScheduleUploadDialog';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { tableHeaderCellSx, tableBodyRowSx } from '../../theme/tableStyles.js';
 
 const statusColor = (status) => {
     switch (status) {
@@ -46,6 +50,74 @@ const statusColor = (status) => {
 
 export default function CsvStoragePage() {
     const navigate = useNavigate();
+    const theme = useTheme();
+
+    // ── Style tokens ──────────────────────────────────────────────────────────
+    const inputFocusSx = {
+        '& label.Mui-focused': { color: `${BRAND_YELLOW} !important` },
+        '& .MuiOutlinedInput-root': {
+            borderRadius: 1.5,
+            '& fieldset': { transition: 'border-color 0.2s ease' },
+            '&:hover fieldset': { borderColor: `${alpha(BRAND_DARK, 0.35)} !important` },
+            '&.Mui-focused fieldset': { borderColor: `${BRAND_YELLOW} !important`, borderWidth: '2px !important' },
+        },
+        '& input': { accentColor: BRAND_YELLOW }
+    };
+    const selectFocusSx = {
+        '& .MuiOutlinedInput-root': {
+            borderRadius: 1.5,
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${BRAND_YELLOW} !important`, borderWidth: '2px !important' },
+            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${alpha(BRAND_DARK, 0.35)} !important` },
+        },
+        '& label.Mui-focused': { color: `${BRAND_YELLOW} !important` },
+    };
+
+    const menuProps = {
+        PaperProps: {
+            sx: {
+                '& .MuiMenuItem-root.Mui-selected': {
+                    backgroundColor: alpha(BRAND_YELLOW, 0.2),
+                    '&:hover': { backgroundColor: alpha(BRAND_YELLOW, 0.3) }
+                }
+            }
+        }
+    };
+
+    const datePickerTheme = useMemo(() => createTheme({
+        palette: {
+            primary: { 
+                main: BRAND_YELLOW,
+                light: BRAND_YELLOW,
+                dark: BRAND_YELLOW,
+                contrastText: BRAND_DARK
+            },
+        },
+        components: {
+            MuiOutlinedInput: {
+                styleOverrides: {
+                    root: {
+                        borderRadius: 12, // 1.5 * 8
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: BRAND_YELLOW,
+                        }
+                    }
+                }
+            }
+        }
+    }), []);
+
+    const darkButtonSx = {
+        minHeight: 36, px: 2, borderRadius: 1.5,
+        color: '#fff', backgroundColor: BRAND_DARK, fontWeight: 700,
+        '&:hover': { backgroundColor: alpha(BRAND_DARK, 0.82) },
+        '&.Mui-disabled': { color: alpha('#fff', 0.35), backgroundColor: alpha(BRAND_DARK, 0.38) },
+    };
+    const outlinedButtonSx = {
+        minHeight: 36, px: 2, borderRadius: 1.5,
+        color: BRAND_DARK, borderColor: alpha(BRAND_DARK, 0.3), fontWeight: 600,
+        '&:hover': { borderColor: BRAND_YELLOW, backgroundColor: alpha(BRAND_YELLOW, 0.08) },
+        '&.Mui-disabled': { borderColor: alpha(BRAND_DARK, 0.15), color: alpha(BRAND_DARK, 0.3) },
+    };
 
     // Filters
     const [sellers, setSellers] = useState([]);
@@ -285,9 +357,14 @@ export default function CsvStoragePage() {
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h5" fontWeight={600} gutterBottom>
-                CSV Storage
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', p: 1, borderRadius: 2, backgroundColor: alpha(BRAND_YELLOW, 0.2) }}>
+                    <FolderZipIcon sx={{ color: BRAND_YELLOW_DARK, fontSize: 28 }} />
+                </Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: BRAND_DARK, letterSpacing: -0.5 }}>
+                    CSV Storage
+                </Typography>
+            </Stack>
 
             {error && (
                 <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
@@ -295,112 +372,129 @@ export default function CsvStoragePage() {
                 </Alert>
             )}
 
-            {/* ── Filters ── */}
             <Paper sx={{ p: 2, mb: 2 }}>
-                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <Stack spacing={2}>
-                        {/* Row 1 */}
-                        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-                            <DatePicker
-                                label="From"
-                                value={dateFrom}
-                                onChange={setDateFrom}
-                                slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
-                            />
-                            <DatePicker
-                                label="To"
-                                value={dateTo}
-                                onChange={setDateTo}
-                                slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
-                            />
-                            <FormControl size="small" sx={{ minWidth: 180 }}>
-                                <InputLabel>Store</InputLabel>
-                                <Select
-                                    value={selectedSeller}
-                                    label="Store"
-                                    onChange={(e) => setSelectedSeller(e.target.value)}
-                                >
-                                    <MenuItem value=""><em>All</em></MenuItem>
-                                    {sellers.map((s) => (
-                                        <MenuItem key={s._id} value={s._id}>
-                                            {s.storeName || s.user?.username || s._id}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <TextField
-                                size="small"
-                                label="Keyword"
-                                value={keyword}
-                                onChange={(e) => setKeyword(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                sx={{ minWidth: 200 }}
-                            />
-                        </Stack>
+                <ThemeProvider theme={datePickerTheme}>
+                    <LocalizationProvider dateAdapter={AdapterDateFns}>
+                        <Stack spacing={2}>
+                            {/* Row 1 */}
+                            <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+                                <DatePicker
+                                    label="From"
+                                    value={dateFrom}
+                                    onChange={(date) => {
+                                        if (!date) { setDateFrom(null); return; }
+                                        const y = date.getFullYear();
+                                        const m = String(date.getMonth() + 1).padStart(2, '0');
+                                        const d = String(date.getDate()).padStart(2, '0');
+                                        setDateFrom(new Date(`${y}-${m}-${d}T00:00:00`));
+                                    }}
+                                    slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
+                                />
+                                <DatePicker
+                                    label="To"
+                                    value={dateTo}
+                                    onChange={(date) => {
+                                        if (!date) { setDateTo(null); return; }
+                                        const y = date.getFullYear();
+                                        const m = String(date.getMonth() + 1).padStart(2, '0');
+                                        const d = String(date.getDate()).padStart(2, '0');
+                                        setDateTo(new Date(`${y}-${m}-${d}T23:59:59`));
+                                    }}
+                                    slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
+                                />
+                                <FormControl size="small" sx={{ minWidth: 180, ...selectFocusSx }}>
+                                    <InputLabel>Store</InputLabel>
+                                    <Select
+                                        value={selectedSeller}
+                                        label="Store"
+                                        onChange={(e) => setSelectedSeller(e.target.value)}
+                                        MenuProps={menuProps}
+                                    >
+                                        <MenuItem value=""><em>All</em></MenuItem>
+                                        {sellers.map((s) => (
+                                            <MenuItem key={s._id} value={s._id}>
+                                                {s.storeName || s.user?.username || s._id}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <TextField
+                                    size="small"
+                                    label="Keyword"
+                                    value={keyword}
+                                    onChange={(e) => setKeyword(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                    sx={{ minWidth: 200, ...inputFocusSx }}
+                                />
+                            </Stack>
 
-                        {/* Row 2 */}
-                        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
-                            <FormControl size="small" sx={{ minWidth: 160 }}>
-                                <InputLabel>Category</InputLabel>
-                                <Select
-                                    value={selectedCategory}
-                                    label="Category"
-                                    onChange={(e) => setSelectedCategory(e.target.value)}
-                                    disabled={loadingCategories}
-                                >
-                                    <MenuItem value=""><em>All</em></MenuItem>
-                                    {categories.map((c) => (
-                                        <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <FormControl size="small" sx={{ minWidth: 160 }}>
-                                <InputLabel>Range</InputLabel>
-                                <Select
-                                    value={selectedRange}
-                                    label="Range"
-                                    onChange={(e) => setSelectedRange(e.target.value)}
-                                    disabled={!selectedCategory || loadingRanges}
-                                >
-                                    <MenuItem value=""><em>All</em></MenuItem>
-                                    {ranges.map((r) => (
-                                        <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <FormControl size="small" sx={{ minWidth: 160 }}>
-                                <InputLabel>Product</InputLabel>
-                                <Select
-                                    value={selectedProduct}
-                                    label="Product"
-                                    onChange={(e) => setSelectedProduct(e.target.value)}
-                                    disabled={!selectedRange || loadingProducts}
-                                >
-                                    <MenuItem value=""><em>All</em></MenuItem>
-                                    {products.map((p) => (
-                                        <MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            {/* Row 2 */}
+                            <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
+                                <FormControl size="small" sx={{ minWidth: 160, ...selectFocusSx }}>
+                                    <InputLabel>Category</InputLabel>
+                                    <Select
+                                        value={selectedCategory}
+                                        label="Category"
+                                        onChange={(e) => setSelectedCategory(e.target.value)}
+                                        disabled={loadingCategories}
+                                        MenuProps={menuProps}
+                                    >
+                                        <MenuItem value=""><em>All</em></MenuItem>
+                                        {categories.map((c) => (
+                                            <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <FormControl size="small" sx={{ minWidth: 160, ...selectFocusSx }}>
+                                    <InputLabel>Range</InputLabel>
+                                    <Select
+                                        value={selectedRange}
+                                        label="Range"
+                                        onChange={(e) => setSelectedRange(e.target.value)}
+                                        disabled={!selectedCategory || loadingRanges}
+                                        MenuProps={menuProps}
+                                    >
+                                        <MenuItem value=""><em>All</em></MenuItem>
+                                        {ranges.map((r) => (
+                                            <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <FormControl size="small" sx={{ minWidth: 160, ...selectFocusSx }}>
+                                    <InputLabel>Product</InputLabel>
+                                    <Select
+                                        value={selectedProduct}
+                                        label="Product"
+                                        onChange={(e) => setSelectedProduct(e.target.value)}
+                                        disabled={!selectedRange || loadingProducts}
+                                        MenuProps={menuProps}
+                                    >
+                                        <MenuItem value=""><em>All</em></MenuItem>
+                                        {products.map((p) => (
+                                            <MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
 
-                            <Box sx={{ ml: 'auto' }}>
-                                <Stack direction="row" spacing={1}>
-                                    <Button variant="outlined" size="small" onClick={handleClearFilters}>
-                                        Clear
-                                    </Button>
-                                    <Button variant="contained" size="small" onClick={handleSearch}>
-                                        Search
-                                    </Button>
-                                    <Tooltip title="Refresh">
-                                        <IconButton size="small" onClick={() => fetchRecords(page)} disabled={loading}>
-                                            <RefreshIcon fontSize="small" />
-                                        </IconButton>
-                                    </Tooltip>
-                                </Stack>
-                            </Box>
+                                <Box sx={{ ml: 'auto' }}>
+                                    <Stack direction="row" spacing={1}>
+                                        <Button variant="outlined" size="small" onClick={handleClearFilters} sx={outlinedButtonSx}>
+                                            Clear
+                                        </Button>
+                                        <Button variant="contained" size="small" onClick={handleSearch} sx={darkButtonSx}>
+                                            Search
+                                        </Button>
+                                        <Tooltip title="Refresh">
+                                            <IconButton size="small" onClick={() => fetchRecords(page)} disabled={loading}>
+                                                <RefreshIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Stack>
+                                </Box>
+                            </Stack>
                         </Stack>
-                    </Stack>
-                </LocalizationProvider>
+                    </LocalizationProvider>
+                </ThemeProvider>
             </Paper>
 
             {/* ── Action bar ── */}
@@ -411,6 +505,7 @@ export default function CsvStoragePage() {
                     startIcon={<DownloadIcon />}
                     disabled={selectedCount === 0 || !!downloadingId}
                     onClick={handleDownloadSelected}
+                    sx={outlinedButtonSx}
                 >
                     Download{selectedCount > 0 ? ` (${selectedCount})` : ''}
                 </Button>
@@ -420,6 +515,7 @@ export default function CsvStoragePage() {
                     startIcon={uploadingId ? <CircularProgress size={14} color="inherit" /> : <CloudUploadIcon />}
                     disabled={selectedCount === 0 || !!uploadingId}
                     onClick={handleUploadSelected}
+                    sx={darkButtonSx}
                 >
                     Upload to eBay{selectedCount > 0 ? ` (${selectedCount})` : ''}
                 </Button>
@@ -430,7 +526,7 @@ export default function CsvStoragePage() {
                 <Table size="small">
                     <TableHead>
                         <TableRow>
-                            <TableCell padding="checkbox">
+                            <TableCell padding="checkbox" sx={{ ...tableHeaderCellSx, width: 48 }}>
                                 <Checkbox
                                     size="small"
                                     checked={isAllSelected}
@@ -439,15 +535,15 @@ export default function CsvStoragePage() {
                                     disabled={records.length === 0}
                                 />
                             </TableCell>
-                            <TableCell sx={{ width: 200, maxWidth: 200 }}>Name</TableCell>
-                            <TableCell sx={{ width: 130, whiteSpace: 'nowrap' }}>Source</TableCell>
-                            <TableCell sx={{ width: 120, whiteSpace: 'nowrap' }}>Store</TableCell>
-                            <TableCell>Date</TableCell>
-                            <TableCell align="center">Listings</TableCell>
-                            <TableCell>Category › Range › Product</TableCell>
-                            <TableCell align="center">Listed / Failed</TableCell>
-                            <TableCell align="center">Scheduled Upload</TableCell>
-                            <TableCell align="center">Actions</TableCell>
+                            <TableCell sx={{ ...tableHeaderCellSx, width: 200, maxWidth: 200 }}>Name</TableCell>
+                            <TableCell sx={{ ...tableHeaderCellSx, width: 130, whiteSpace: 'nowrap' }}>Source</TableCell>
+                            <TableCell sx={{ ...tableHeaderCellSx, width: 120, whiteSpace: 'nowrap' }}>Store</TableCell>
+                            <TableCell sx={tableHeaderCellSx}>Date</TableCell>
+                            <TableCell sx={tableHeaderCellSx} align="center">Listings</TableCell>
+                            <TableCell sx={tableHeaderCellSx}>Category › Range › Product</TableCell>
+                            <TableCell sx={tableHeaderCellSx} align="center">Listed / Failed</TableCell>
+                            <TableCell sx={tableHeaderCellSx} align="center">Scheduled Upload</TableCell>
+                            <TableCell sx={tableHeaderCellSx} align="center">Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -475,6 +571,7 @@ export default function CsvStoragePage() {
                                         key={record._id}
                                         hover
                                         selected={selectedIds.has(record._id)}
+                                        sx={tableBodyRowSx}
                                     >
                                         <TableCell padding="checkbox">
                                             <Checkbox
@@ -490,9 +587,17 @@ export default function CsvStoragePage() {
                                         </TableCell>
                                         <TableCell>
                                             {record.source === 'manual' ? (
-                                                <Chip label="Manual Upload" size="small" color="primary" variant="outlined" />
+                                                <Chip
+                                                    label="Manual Upload"
+                                                    size="small"
+                                                    sx={{ fontWeight: 600, backgroundColor: alpha(BRAND_YELLOW, 0.15), color: BRAND_YELLOW_DARK, border: `1px solid ${alpha(BRAND_YELLOW_DARK, 0.4)}` }}
+                                                />
                                             ) : record.source === 'asin_list' ? (
-                                                <Chip label="ASIN List" size="small" color="secondary" variant="outlined" />
+                                                <Chip
+                                                    label="ASIN List"
+                                                    size="small"
+                                                    sx={{ fontWeight: 600, backgroundColor: alpha(BRAND_DARK, 0.08), color: BRAND_DARK, border: `1px solid ${alpha(BRAND_DARK, 0.2)}` }}
+                                                />
                                             ) : (
                                                 <Typography variant="caption" color="text.disabled">—</Typography>
                                             )}
@@ -520,24 +625,27 @@ export default function CsvStoragePage() {
                                                 <Stack direction="row" spacing={0.5} justifyContent="center">
                                                     <Chip
                                                         label={`${feedUpload.uploadSummary?.successCount ?? 0} listed`}
-                                                        color="success"
                                                         size="small"
-                                                        variant="outlined"
+                                                        sx={{ fontWeight: 600, backgroundColor: alpha('#2e7d32', 0.1), color: '#2e7d32', border: `1px solid ${alpha('#2e7d32', 0.3)}` }}
                                                     />
                                                     {(feedUpload.uploadSummary?.failureCount ?? 0) > 0 && (
                                                         <Chip
                                                             label={`${feedUpload.uploadSummary.failureCount} failed`}
-                                                            color="error"
                                                             size="small"
-                                                            variant="outlined"
+                                                            sx={{ fontWeight: 600, backgroundColor: alpha('#d32f2f', 0.1), color: '#d32f2f', border: `1px solid ${alpha('#d32f2f', 0.3)}` }}
                                                         />
                                                     )}
                                                 </Stack>
                                             ) : (
                                                 <Chip
                                                     label={feedUpload.status}
-                                                    color={statusColor(feedUpload.status)}
                                                     size="small"
+                                                    sx={{
+                                                        fontWeight: 600,
+                                                        ...(feedUpload.status === 'COMPLETED' ? { backgroundColor: alpha('#2e7d32', 0.1), color: '#2e7d32', border: `1px solid ${alpha('#2e7d32', 0.3)}` }
+                                                        : feedUpload.status === 'FAILURE' ? { backgroundColor: alpha('#d32f2f', 0.1), color: '#d32f2f', border: `1px solid ${alpha('#d32f2f', 0.3)}` }
+                                                        : { backgroundColor: alpha(BRAND_YELLOW, 0.15), color: BRAND_YELLOW_DARK, border: `1px solid ${alpha(BRAND_YELLOW_DARK, 0.4)}` })
+                                                    }}
                                                 />
                                             )}
                                         </TableCell>
@@ -545,20 +653,24 @@ export default function CsvStoragePage() {
                                         <TableCell align="center">
                                             {record.scheduledUploadStatus === 'pending' && record.scheduledUploadAt ? (
                                                 <Chip
-                                                    icon={<ScheduleIcon />}
+                                                    icon={<ScheduleIcon sx={{ color: `${BRAND_YELLOW_DARK} !important` }} />}
                                                     label={new Date(record.scheduledUploadAt).toLocaleString()}
-                                                    color="warning"
                                                     size="small"
-                                                    variant="outlined"
                                                     onClick={() => setScheduleDialog({ open: true, record })}
-                                                    sx={{ cursor: 'pointer' }}
+                                                    sx={{ cursor: 'pointer', fontWeight: 600, backgroundColor: alpha(BRAND_YELLOW, 0.15), color: BRAND_YELLOW_DARK, border: `1px solid ${alpha(BRAND_YELLOW_DARK, 0.4)}` }}
                                                 />
                                             ) : record.scheduledUploadStatus === 'processing' ? (
-                                                <Chip icon={<CircularProgress size={12} />} label="Processing" size="small" color="info" />
+                                                <Chip icon={<CircularProgress size={12} />} label="Processing" size="small"
+                                                    sx={{ fontWeight: 600, backgroundColor: alpha('#0288d1', 0.1), color: '#0288d1', border: `1px solid ${alpha('#0288d1', 0.3)}` }}
+                                                />
                                             ) : record.scheduledUploadStatus === 'done' ? (
-                                                <Chip label="Auto-uploaded" size="small" color="success" variant="outlined" />
+                                                <Chip label="Auto-uploaded" size="small"
+                                                    sx={{ fontWeight: 600, backgroundColor: alpha('#2e7d32', 0.1), color: '#2e7d32', border: `1px solid ${alpha('#2e7d32', 0.3)}` }}
+                                                />
                                             ) : record.scheduledUploadStatus === 'failed' ? (
-                                                <Chip label="Auto-upload failed" size="small" color="error" variant="outlined" />
+                                                <Chip label="Auto-upload failed" size="small"
+                                                    sx={{ fontWeight: 600, backgroundColor: alpha('#d32f2f', 0.1), color: '#d32f2f', border: `1px solid ${alpha('#d32f2f', 0.3)}` }}
+                                                />
                                             ) : (
                                                 <Typography variant="caption" color="text.disabled">—</Typography>
                                             )}
@@ -657,8 +769,17 @@ export default function CsvStoragePage() {
                         count={totalPages}
                         page={page}
                         onChange={(_, val) => setPage(val)}
-                        color="primary"
                         size="small"
+                        sx={{
+                            '& .MuiPaginationItem-root.Mui-selected': {
+                                backgroundColor: `${BRAND_YELLOW} !important`,
+                                color: `${BRAND_DARK} !important`,
+                                fontWeight: 'bold',
+                                '&:hover': {
+                                    backgroundColor: `${alpha(BRAND_YELLOW, 0.8)} !important`,
+                                }
+                            }
+                        }}
                     />
                 </Stack>
             )}

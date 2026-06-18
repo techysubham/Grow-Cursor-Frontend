@@ -39,6 +39,40 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../../lib/api';
 import AllOrdersSheetSkeleton from '../../components/skeletons/AllOrdersSheetSkeleton';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import StatMetricCard from '../../components/StatMetricCard.jsx';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import { tableHeaderCellSx, tableBodyCellSx, tableBodyRowSx, tableContainerSx, yellowOutlinedButtonSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+
+const EXCHANGE_RATE_OPTIONS = [
+  { value: 'EBAY_US', label: 'eBay US', channel: 'EBAY' },
+  { value: 'EBAY_AU', label: 'eBay AU', channel: 'EBAY' },
+  { value: 'EBAY_GB', label: 'eBay GB', channel: 'EBAY' },
+  { value: 'EBAY_CA', label: 'eBay CA', channel: 'EBAY' },
+  { value: 'AMAZON_US', label: 'Amazon US', channel: 'AMAZON' },
+  { value: 'AMAZON_AU', label: 'Amazon AU', channel: 'AMAZON' },
+  { value: 'AMAZON_GB', label: 'Amazon GB', channel: 'AMAZON' },
+  { value: 'AMAZON_CA', label: 'Amazon CA', channel: 'AMAZON' }
+];
+
+const EXCHANGE_RATE_LABELS = EXCHANGE_RATE_OPTIONS.reduce((acc, option) => {
+  acc[option.value] = option.label;
+  return acc;
+}, {});
+
+const EXCHANGE_RATE_DEFAULTS = {
+  EBAY_US: 82,
+  EBAY_AU: 82,
+  EBAY_GB: 82,
+  EBAY_CA: 82,
+  AMAZON_US: 87,
+  AMAZON_AU: 87,
+  AMAZON_GB: 87,
+  AMAZON_CA: 87
+};
 
 export default function AllOrdersSheetPage() {
   const [sellers, setSellers] = useState([]);
@@ -57,13 +91,14 @@ export default function AllOrdersSheetPage() {
   });
   
   // Exchange rate management
-  const [currentExchangeRate, setCurrentExchangeRate] = useState(null);
-  const [amazonExchangeRate, setAmazonExchangeRate] = useState(null);
-  const [selectedMarketplace, setSelectedMarketplace] = useState('EBAY');
+  const [exchangeRatesByMarketplace, setExchangeRatesByMarketplace] = useState({});
+  const [selectedRateMarketplace, setSelectedRateMarketplace] = useState('EBAY_US');
+  const [rateApplicationMode, setRateApplicationMode] = useState('effective');
   const [newRate, setNewRate] = useState('');
   const [newRateDate, setNewRateDate] = useState('');
   const [rateHistory, setRateHistory] = useState([]);
   const [showRateHistory, setShowRateHistory] = useState(false);
+  const [updatingExchangeRates, setUpdatingExchangeRates] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
   
   // CSV Export modal
@@ -78,69 +113,59 @@ export default function AllOrdersSheetPage() {
   const [itemPriceUpdates, setItemPriceUpdates] = useState({}); // { legacyItemId: newPrice }
   const [updatingItemPrices, setUpdatingItemPrices] = useState({}); // { legacyItemId: boolean }
   const [updatedOrderIds, setUpdatedOrderIds] = useState(new Set()); // Track orders with price updates
-
-  // Session storage key for persisting state
-  const STORAGE_KEY = 'all_orders_sheet_state';
-
-  // Helper to get initial state from sessionStorage
-  const getInitialState = (key, defaultValue) => {
-    try {
-      const stored = sessionStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed[key] !== undefined ? parsed[key] : defaultValue;
-      }
-    } catch (e) {
-      console.error('Error reading sessionStorage:', e);
-    }
-    return defaultValue;
-  };
+  const [orderTotalUpdates, setOrderTotalUpdates] = useState({}); // { orderId: value }
+  const [updatingOrderTotals, setUpdatingOrderTotals] = useState({}); // { orderId: boolean }
+  const [confirmOrderTotal, setConfirmOrderTotal] = useState({ open: false, order: null, value: '' });
 
   // Search filters
-  const [selectedSeller, setSelectedSeller] = useState(() => getInitialState('selectedSeller', ''));
-  const [searchOrderId, setSearchOrderId] = useState(() => getInitialState('searchOrderId', ''));
-  const [searchBuyerName, setSearchBuyerName] = useState(() => getInitialState('searchBuyerName', ''));
-  const [searchItemNumber, setSearchItemNumber] = useState(() => getInitialState('searchItemNumber', ''));
-  const [searchProductName, setSearchProductName] = useState(() => getInitialState('searchProductName', ''));
-  const [searchMarketplace, setSearchMarketplace] = useState(() => getInitialState('searchMarketplace', ''));
-  const [filtersExpanded, setFiltersExpanded] = useState(() => getInitialState('filtersExpanded', false));
-  const [excludeLowValue, setExcludeLowValue] = useState(() => getInitialState('excludeLowValue', false));
-  const [excludeNoAmazonAccount, setExcludeNoAmazonAccount] = useState(() => getInitialState('excludeNoAmazonAccount', false));
+  const [selectedSeller, setSelectedSeller] = useState('');
+  const [searchOrderId, setSearchOrderId] = useState('');
+  const [searchBuyerName, setSearchBuyerName] = useState('');
+  const [searchItemNumber, setSearchItemNumber] = useState('');
+  const [searchProductName, setSearchProductName] = useState('');
+  const [searchMarketplace, setSearchMarketplace] = useState('');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [excludeLowValue, setExcludeLowValue] = useState(true);
+  const [excludeNoAmazonAccount, setExcludeNoAmazonAccount] = useState(true);
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(() => getInitialState('currentPage', 1));
+  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [rawCount, setRawCount] = useState(null);
   const [ordersPerPage] = useState(50);
 
   // Date filter
-  const [dateFilter, setDateFilter] = useState(() => getInitialState('dateFilter', {
+  const [dateFilter, setDateFilter] = useState({
     mode: 'none',
     single: '',
     from: '',
     to: ''
-  }));
+  });
 
   // Profit filter
-  const [profitFilter, setProfitFilter] = useState(() => getInitialState('profitFilter', {
+  const [profitFilter, setProfitFilter] = useState({
     mode: 'none',
     single: '',
     from: '',
     to: ''
-  }));
+  });
 
   // Subtotal filter
-  const [subtotalFilter, setSubtotalFilter] = useState(() => getInitialState('subtotalFilter', {
+  const [subtotalFilter, setSubtotalFilter] = useState({
     mode: 'none',
     single: '',
     from: '',
     to: ''
-  }));
+  });
+
+  // Cross-page filtered totals (from server aggregation, active when date filter is set)
+  const [filteredTotals, setFilteredTotals] = useState(null);
 
   // Toggle states for card sections
-  const [showProfitCards, setShowProfitCards] = useState(() => getInitialState('showProfitCards', true));
-  const [showSubtotalCards, setShowSubtotalCards] = useState(() => getInitialState('showSubtotalCards', true));
-  const [showExchangeRate, setShowExchangeRate] = useState(() => getInitialState('showExchangeRate', true));
+  const [showProfitCards, setShowProfitCards] = useState(false);
+  const [showSubtotalCards, setShowSubtotalCards] = useState(false);
+  const [showExchangeRate, setShowExchangeRate] = useState(false);
 
   // Modal state for showing category/range/product names
   const [namesModal, setNamesModal] = useState({
@@ -167,39 +192,17 @@ export default function AllOrdersSheetPage() {
 
   // Persist filter state to sessionStorage
   useEffect(() => {
-    const stateToSave = {
-      selectedSeller,
-      searchOrderId,
-      searchBuyerName,
-      searchItemNumber,
-      searchProductName,
-      searchMarketplace,
-      filtersExpanded,
-      currentPage,
-      dateFilter,
-      profitFilter,
-      subtotalFilter,
-      excludeLowValue,
-      excludeNoAmazonAccount,
-      showProfitCards,
-      showSubtotalCards,
-      showExchangeRate
-    };
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
-    } catch (e) {
-      console.error('Error saving to sessionStorage:', e);
-    }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemNumber, searchProductName, searchMarketplace, filtersExpanded, currentPage, dateFilter, profitFilter, subtotalFilter, excludeLowValue, excludeNoAmazonAccount, showProfitCards, showSubtotalCards, showExchangeRate]);
+    // Clear any stale filter state from previous sessions
+    try { sessionStorage.removeItem('all_orders_sheet_state'); } catch (_) {}
+  }, []);
 
   // Initial load
   useEffect(() => {
     if (!hasFetchedInitialData.current) {
       hasFetchedInitialData.current = true;
       fetchSellers();
-      fetchCurrentExchangeRate('EBAY');
-      fetchCurrentExchangeRate('AMAZON');
-      fetchRateHistory();
+      fetchAllCurrentExchangeRates();
+      fetchRateHistory('EBAY_US');
       loadOrders();
     }
   }, []);
@@ -207,9 +210,9 @@ export default function AllOrdersSheetPage() {
   // Refetch rate history when marketplace or showRateHistory changes
   useEffect(() => {
     if (showRateHistory) {
-      fetchRateHistory(selectedMarketplace);
+      fetchRateHistory(selectedRateMarketplace);
     }
-  }, [showRateHistory, selectedMarketplace]);
+  }, [showRateHistory, selectedRateMarketplace]);
 
   // Reload when page changes
   useEffect(() => {
@@ -220,45 +223,13 @@ export default function AllOrdersSheetPage() {
     loadOrders();
   }, [currentPage]);
 
-  // When filters change, reset to page 1
-  useEffect(() => {
-    const filtersChanged = 
-      prevFilters.current.selectedSeller !== selectedSeller ||
-      prevFilters.current.searchOrderId !== searchOrderId ||
-      prevFilters.current.searchBuyerName !== searchBuyerName ||
-      prevFilters.current.searchItemNumber !== searchItemNumber ||
-      prevFilters.current.searchProductName !== searchProductName ||
-      prevFilters.current.searchMarketplace !== searchMarketplace ||
-      prevFilters.current.excludeLowValue !== excludeLowValue ||
-      prevFilters.current.excludeNoAmazonAccount !== excludeNoAmazonAccount ||
-      JSON.stringify(prevFilters.current.dateFilter) !== JSON.stringify(dateFilter) ||
-      JSON.stringify(prevFilters.current.profitFilter) !== JSON.stringify(profitFilter) ||
-      JSON.stringify(prevFilters.current.subtotalFilter) !== JSON.stringify(subtotalFilter);
-    
-    prevFilters.current = {
-      selectedSeller,
-      searchOrderId,
-      searchBuyerName,
-      searchItemNumber,
-      searchProductName,
-      searchMarketplace,
-      excludeLowValue,
-      excludeNoAmazonAccount,
-      dateFilter,
-      profitFilter,
-      subtotalFilter
-    };
-
-    if (!hasFetchedInitialData.current) return;
-
-    if (filtersChanged) {
-      if (currentPage === 1) {
-        loadOrders();
-      } else {
-        setCurrentPage(1);
-      }
+  function handleApplyFilters() {
+    if (currentPage === 1) {
+      loadOrders();
+    } else {
+      setCurrentPage(1);
     }
-  }, [selectedSeller, searchOrderId, searchBuyerName, searchItemNumber, searchMarketplace, excludeLowValue, excludeNoAmazonAccount, dateFilter, profitFilter, subtotalFilter]);
+  }
 
   async function fetchSellers() {
     setError('');
@@ -270,20 +241,20 @@ export default function AllOrdersSheetPage() {
     }
   }
 
-  async function fetchCurrentExchangeRate(marketplace = 'EBAY') {
+  async function fetchCurrentExchangeRate(marketplace = 'EBAY_US') {
     try {
       const { data } = await api.get('/exchange-rates/current', { params: { marketplace } });
-      if (marketplace === 'EBAY') {
-        setCurrentExchangeRate(data);
-      } else if (marketplace === 'AMAZON') {
-        setAmazonExchangeRate(data);
-      }
+      setExchangeRatesByMarketplace(prev => ({ ...prev, [marketplace]: data }));
     } catch (e) {
       console.error(`Failed to fetch ${marketplace} exchange rate:`, e);
     }
   }
 
-  async function fetchRateHistory(marketplace = 'EBAY') {
+  async function fetchAllCurrentExchangeRates() {
+    await Promise.all(EXCHANGE_RATE_OPTIONS.map((option) => fetchCurrentExchangeRate(option.value)));
+  }
+
+  async function fetchRateHistory(marketplace = 'EBAY_US') {
     try {
       const { data } = await api.get('/exchange-rates/history', { params: { marketplace, limit: 20 } });
       setRateHistory(data || []);
@@ -299,21 +270,26 @@ export default function AllOrdersSheetPage() {
     }
 
     try {
-      await api.post('/exchange-rates', {
+      setUpdatingExchangeRates(true);
+      const { data } = await api.post('/exchange-rates', {
         rate: parseFloat(newRate),
         effectiveDate: newRateDate,
-        marketplace: selectedMarketplace,
-        notes: `Set via All Orders Sheet for ${selectedMarketplace}`
+        marketplace: selectedRateMarketplace,
+        applicationMode: rateApplicationMode,
+        updateExistingOrders: true,
+        notes: `Set via All Orders Sheet for ${selectedRateMarketplace} (${rateApplicationMode})`
       });
       
       setNewRate('');
       setNewRateDate('');
-      await fetchCurrentExchangeRate('EBAY');
-      await fetchCurrentExchangeRate('AMAZON');
-      await fetchRateHistory(selectedMarketplace);
-      alert(`${selectedMarketplace} exchange rate set successfully`);
+      await fetchAllCurrentExchangeRates();
+      await fetchRateHistory(selectedRateMarketplace);
+      await loadOrders();
+      alert(`${EXCHANGE_RATE_LABELS[selectedRateMarketplace]} rate set successfully. Updated ${data?.updatedOrders || 0} orders.`);
     } catch (e) {
       alert('Failed to set exchange rate: ' + (e?.response?.data?.error || e.message));
+    } finally {
+      setUpdatingExchangeRates(false);
     }
   }
 
@@ -329,11 +305,34 @@ export default function AllOrdersSheetPage() {
           page: 1,
           limit: 10000, // Large limit to get all orders
           startDate: csvStartDate,
-          endDate: csvEndDate
+          endDate: csvEndDate,
+          excludeCancelled: true
         };
         
         if (selectedSeller) params.sellerId = selectedSeller;
         if (searchMarketplace) params.searchMarketplace = searchMarketplace;
+        if (excludeLowValue) params.excludeLowValue = true;
+        if (excludeNoAmazonAccount) params.excludeNoAmazonAccount = true;
+        if (searchOrderId.trim()) params.searchOrderId = searchOrderId.trim();
+        if (searchBuyerName.trim()) params.searchBuyerName = searchBuyerName.trim();
+        if (searchItemNumber.trim()) params.searchItemNumber = searchItemNumber.trim();
+        if (searchProductName.trim()) params.productName = searchProductName.trim();
+
+        // Profit filter
+        if (profitFilter.mode === 'single' && profitFilter.single !== '') {
+          params.maxProfit = profitFilter.single;
+        } else if (profitFilter.mode === 'range') {
+          if (profitFilter.from !== '') params.minProfit = profitFilter.from;
+          if (profitFilter.to !== '') params.maxProfit = profitFilter.to;
+        }
+
+        // Subtotal filter
+        if (subtotalFilter.mode === 'single' && subtotalFilter.single !== '') {
+          params.maxSubtotal = subtotalFilter.single;
+        } else if (subtotalFilter.mode === 'range') {
+          if (subtotalFilter.from !== '') params.minSubtotal = subtotalFilter.from;
+          if (subtotalFilter.to !== '') params.maxSubtotal = subtotalFilter.to;
+        }
         
         const { data } = await api.get('/ebay/all-orders-usd', { params });
         ordersToExport = data.orders || [];
@@ -355,7 +354,7 @@ export default function AllOrdersSheetPage() {
         'Date Sold',
         'Product Name',
         'Marketplace',
-        // eBay Side (12 columns - removed Refunds)
+        // eBay Side
         'Subtotal',
         'Shipping',
         'Sales Tax',
@@ -363,6 +362,7 @@ export default function AllOrdersSheetPage() {
         'Transaction Fees',
         'Ad Fee',
         'Earnings',
+        'Order total',
         'TDS',
         'T.ID',
         'NET',
@@ -401,6 +401,7 @@ export default function AllOrdersSheetPage() {
         const adFeeGeneral = showZero ? 0 : (parseFloat(order.adFeeGeneral) || 0);
         const discount = showZero ? 0 : (parseFloat(order.discount) || 0);
         const shipping = showZero ? 0 : (parseFloat(order.shipping) || 0);
+        const orderTotal = showZero ? 0 : (order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0)));
         
         // Use DB fields for financial calculations
         const earnings = parseFloat(order.orderEarnings) || 0;
@@ -412,8 +413,8 @@ export default function AllOrdersSheetPage() {
         const pBalanceINR = parseFloat(order.pBalanceINR) || 0;
 
         // Use DB fields for Amazon financial calculations
-        const beforeTax = isCancelled ? 0 : (parseFloat(order.beforeTaxUSD) || 0);
-        const estimatedTax = isCancelled ? 0 : (parseFloat(order.estimatedTaxUSD) || 0);
+        const beforeTax = isCancelled ? 0 : (parseFloat(order.beforeTax) || 0);
+        const estimatedTax = isCancelled ? 0 : (parseFloat(order.estimatedTax) || 0);
         const amazonTotal = parseFloat(order.amazonTotal) || 0;
         const amazonExchangeRate = order.amazonExchangeRate || 87;
         const aTotalInr = parseFloat(order.amazonTotalINR) || 0;
@@ -437,6 +438,7 @@ export default function AllOrdersSheetPage() {
           transactionFees.toFixed(2),
           adFeeGeneral.toFixed(2),
           earnings.toFixed(2),
+          orderTotal.toFixed(2),
           tds.toFixed(2),
           tid.toFixed(2),
           net.toFixed(2),
@@ -454,18 +456,44 @@ export default function AllOrdersSheetPage() {
           order.amazonAccount || '-',
           order.orderId || '-',
           order.buyer?.buyerRegistrationAddress?.fullName || '-',
-          order.arrivingDate || '-'
+          (() => {
+            const d = order.arrivingDate;
+            if (!d) return '-';
+            const s = String(d).trim();
+            // YYYY-MM-DD or YYYY-MM-DDTHH:mm... (ISO / MongoDB string)
+            const m1 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m1) return `${m1[2]}/${m1[3]}/${m1[1]}`;
+            // MM-DD-YYYY (dash-separated, month-first)
+            const m2 = s.match(/^(\d{2})-(\d{2})-(\d{4})/);
+            if (m2) return `${m2[1]}/${m2[2]}/${m2[3]}`;
+            // Already MM/DD/YYYY
+            if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) return s.slice(0, 10);
+            return s;
+          })()
         ];
       });
 
       // Combine headers and rows
+      // Date column indices (0-based): 1=Date Sold, 29=Arriving
+      const DATE_COL_INDICES = new Set([1, 29]);
       const csvContent = [
         headers.join(','),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ...rows.map(row =>
+          row.map((cell, i) => {
+            const s = String(cell);
+            // For date columns, force Excel to treat as text by using ="..." syntax
+            // This prevents Excel from auto-converting MM/DD/YYYY to its own date serial
+            if (DATE_COL_INDICES.has(i) && /^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+              return `="${s}"`;
+            }
+            return `"${s.replace(/"/g, '""')}"`;
+          }).join(',')
+        )
       ].join('\n');
 
-      // Create blob and download
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      // Create blob with UTF-8 BOM so Excel opens with correct encoding
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       
@@ -547,11 +575,14 @@ export default function AllOrdersSheetPage() {
       if (data?.pagination) {
         setTotalPages(data.pagination.totalPages);
         setTotalOrders(data.pagination.totalOrders);
+        setRawCount(data.pagination.rawCount ?? null);
       }
 
       if (data?.counts) {
         setCounts(data.counts);
       }
+
+      setFilteredTotals(data?.filteredTotals || null);
     } catch (e) {
       setOrders([]);
       setCounts({ uniqueCategories: 0, uniqueRanges: 0, uniqueProducts: 0, categoryData: [], rangeData: [], productData: [] });
@@ -573,6 +604,58 @@ export default function AllOrdersSheetPage() {
     setPriceUpdateModal({ open: true, order });
     setTryPricing('');
     setItemPriceUpdates({});
+  }
+
+  function getOrderTotalInputValue(order) {
+    if (Object.prototype.hasOwnProperty.call(orderTotalUpdates, order._id)) {
+      return orderTotalUpdates[order._id];
+    }
+
+    const storedValue = order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
+    return storedValue == null ? '' : String(storedValue);
+  }
+
+  async function handleSaveOrderTotal(order, overrideValue) {
+    const rawValue = overrideValue !== undefined ? overrideValue : orderTotalUpdates[order._id];
+    const fallbackValue = order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
+    const nextValue = rawValue === undefined ? fallbackValue : rawValue;
+
+    if (nextValue === '' || nextValue === null || nextValue === undefined || Number.isNaN(parseFloat(nextValue))) {
+      alert('Please enter a valid order total');
+      return;
+    }
+
+    const parsedValue = parseFloat(nextValue);
+    const currentValue = order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
+    if (parsedValue === currentValue) {
+      setOrderTotalUpdates(prev => {
+        const updated = { ...prev };
+        delete updated[order._id];
+        return updated;
+      });
+      return;
+    }
+
+    setUpdatingOrderTotals(prev => ({ ...prev, [order._id]: true }));
+
+    try {
+      const { data } = await api.patch(`/ebay/orders/${order._id}/order-total`, {
+        orderTotal: parsedValue
+      });
+
+      setOrders(prev => prev.map(existingOrder => (
+        existingOrder._id === order._id ? data.order : existingOrder
+      )));
+      setOrderTotalUpdates(prev => {
+        const updated = { ...prev };
+        delete updated[order._id];
+        return updated;
+      });
+    } catch (err) {
+      alert('Failed to update order total: ' + (err?.response?.data?.error || err.message));
+    } finally {
+      setUpdatingOrderTotals(prev => ({ ...prev, [order._id]: false }));
+    }
   }
 
   // Handler for updating individual item price
@@ -640,13 +723,15 @@ export default function AllOrdersSheetPage() {
     const newDiscount = originalDiscount * ratio;
     const newTransactionFees = originalTransactionFees * ratio;
     const newAdFeeGeneral = originalAdFeeGeneral * ratio;
+    const originalOrderTotal = order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
+    const newOrderTotal = originalOrderTotal * ratio;
     
     // Calculate eBay earnings with new proportional fees (excluding sales tax)
     // Using high precision to match backend calculation
     const ebayEarnings = tryPrice + newDiscount - newTransactionFees - newAdFeeGeneral;
     
     // TDS and TID calculations (round to match backend)
-    const newTDS = Math.round(ebayEarnings * 0.01 * 100) / 100;
+    const newTDS = Math.round(newOrderTotal * 0.01 * 100) / 100;
     const newTID = 0.24;
     const newNet = Math.round((ebayEarnings - newTDS - newTID) * 100) / 100;
     
@@ -669,6 +754,7 @@ export default function AllOrdersSheetPage() {
         transactionFees: newTransactionFees,
         adFeeGeneral: newAdFeeGeneral,
         ebayEarnings,
+        orderTotal: newOrderTotal,
         tds: newTDS,
         tid: newTID,
         net: newNet,
@@ -684,6 +770,7 @@ export default function AllOrdersSheetPage() {
     if (!dateStr) return '-';
     try {
       const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '-';
       
       // Determine timezone based on marketplace
       let timezone = 'America/Los_Angeles'; // Default PT
@@ -691,17 +778,16 @@ export default function AllOrdersSheetPage() {
       else if (marketplaceId === 'EBAY_CA') timezone = 'America/Toronto';
       else if (marketplaceId === 'EBAY_GB') timezone = 'Europe/London';
       
-      // Format date only (no time for All Orders Sheet)
-      const dateOptions = { 
+      // Use formatToParts to guarantee MM/DD/YYYY with slashes regardless of OS locale
+      const formatter = new Intl.DateTimeFormat('en-US', { 
         month: '2-digit', 
         day: '2-digit', 
         year: 'numeric',
         timeZone: timezone
-      };
-      
-      const formattedDate = date.toLocaleDateString('en-US', dateOptions);
-      
-      return formattedDate;
+      });
+      const parts = formatter.formatToParts(date);
+      const p = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+      return `${p.month}/${p.day}/${p.year}`;
     } catch {
       return '-';
     }
@@ -711,14 +797,14 @@ export default function AllOrdersSheetPage() {
 
   return (
     <Fade in timeout={600}>
-    <Box sx={{ p: 3 }}>
+    <AdminPageShell>
       {/* CSV Export Modal */}
       <Dialog open={showExportModal} onClose={() => setShowExportModal(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Export Orders by Date Range</DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              Select a date range to download all orders within that period.
+              Select a date range to download all orders within that period. All currently active filters will be applied.
             </Typography>
             <TextField
               label="Start Date"
@@ -745,9 +831,39 @@ export default function AllOrdersSheetPage() {
               helperText="Leave empty for default name with date"
               fullWidth
             />
+            {/* Active filters summary */}
+            {(() => {
+              const activeFilters = [];
+              if (selectedSeller) {
+                const sellerObj = sellers.find(s => s._id === selectedSeller);
+                activeFilters.push(`Seller: ${sellerObj?.user?.username || selectedSeller}`);
+              }
+              if (searchMarketplace) activeFilters.push(`Marketplace: ${searchMarketplace.replace('EBAY_', 'eBay ')}`);
+              if (excludeLowValue) activeFilters.push('Excluding low-value orders');
+              if (excludeNoAmazonAccount) activeFilters.push('Excluding no Amazon account');
+              if (searchOrderId.trim()) activeFilters.push(`Order ID: ${searchOrderId.trim()}`);
+              if (searchBuyerName.trim()) activeFilters.push(`Buyer: ${searchBuyerName.trim()}`);
+              if (searchProductName.trim()) activeFilters.push(`Product: ${searchProductName.trim()}`);
+              if (profitFilter.mode === 'range' && (profitFilter.from || profitFilter.to))
+                activeFilters.push(`Profit: ${profitFilter.from || '*'} – ${profitFilter.to || '*'}`);
+              if (subtotalFilter.mode === 'range' && (subtotalFilter.from || subtotalFilter.to))
+                activeFilters.push(`Subtotal: ${subtotalFilter.from || '*'} – ${subtotalFilter.to || '*'}`);
+              if (activeFilters.length === 0) return null;
+              return (
+                <Alert severity="info" icon={false}>
+                  <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>Active filters that will be applied:</Typography>
+                  {activeFilters.map((f, i) => (
+                    <Typography key={i} variant="caption" sx={{ display: 'block' }}>• {f}</Typography>
+                  ))}
+                </Alert>
+              );
+            })()}
             {csvStartDate && csvEndDate && (
-              <Alert severity="info">
-                Will export all orders from {new Date(csvStartDate).toLocaleDateString()} to {new Date(csvEndDate).toLocaleDateString()}
+              <Alert severity="success">
+                Will export orders from{' '}
+                {new Date(csvStartDate + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}{' '}
+                to{' '}
+                {new Date(csvEndDate + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
               </Alert>
             )}
           </Stack>
@@ -764,42 +880,58 @@ export default function AllOrdersSheetPage() {
         </DialogActions>
       </Dialog>
 
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h4">All Orders Sheet (USD)</Typography>
-        <Stack direction="row" spacing={2}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => exportToCSV(false)}
-            disabled={exportingCSV || orders.length === 0}
-          >
-            {exportingCSV ? 'Exporting...' : 'Download Current Page'}
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => setShowExportModal(true)}
-            disabled={exportingCSV}
-          >
-            Download by Date Range
-          </Button>
-          <Button
-            variant="outlined"
-            color="primary"
-            size="small"
-            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-            onClick={loadOrders}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
-        </Stack>
-      </Stack>
+      <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3, background: dashboardSignatureTokens.surfaces.pageCard }}>
+        <PageHeader
+          title="All Orders Sheet (USD)"
+          subtitle="Financial summary of all eBay orders in USD with INR conversions."
+          actions={
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => exportToCSV(false)}
+                disabled={exportingCSV || orders.length === 0}
+                sx={{ ...yellowOutlinedButtonSx, height: 40 }}
+              >
+                {exportingCSV ? 'Exporting...' : 'Download Current Page'}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  // Pre-populate dates from active date filter
+                  if (dateFilter.mode === 'range') {
+                    if (dateFilter.from) setCsvStartDate(dateFilter.from);
+                    if (dateFilter.to) setCsvEndDate(dateFilter.to);
+                  } else if (dateFilter.mode === 'single' && dateFilter.single) {
+                    setCsvStartDate(dateFilter.single);
+                    setCsvEndDate(dateFilter.single);
+                  }
+                  setShowExportModal(true);
+                }}
+                disabled={exportingCSV}
+                sx={{ ...yellowOutlinedButtonSx, height: 40 }}
+              >
+                Download by Date Range
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+                onClick={loadOrders}
+                disabled={loading}
+                sx={{ ...yellowOutlinedButtonSx, height: 40 }}
+              >
+                Refresh
+              </Button>
+            </Stack>
+          }
+        />
+      </SectionCard>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* Top Controls: Seller & Marketplace */}
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <SectionCard sx={{ p: 2.5, mb: 2, background: dashboardSignatureTokens.surfaces.pageCard }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Select Seller</InputLabel>
@@ -842,6 +974,7 @@ export default function AllOrdersSheetPage() {
               />
             }
             label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Hide &lt;$3</Typography>}
+            sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
           />
           <FormControlLabel
             control={
@@ -853,13 +986,23 @@ export default function AllOrdersSheetPage() {
               />
             }
             label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Hide No Amazon Account</Typography>}
+            sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
           />
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleApplyFilters}
+            disabled={loading}
+            sx={{ ...yellowFilledButtonSx, ml: 'auto', height: 40 }}
+          >
+            Apply Filters
+          </Button>
         </Stack>
-      </Paper>
+      </SectionCard>
 
       {/* Search Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ mt: 2, p: 2, backgroundColor: 'action.hover', borderRadius: 1 }}>
+      <SectionCard sx={{ p: 2.5, mb: 2, background: dashboardSignatureTokens.surfaces.pageCard }}>
+        <Box sx={{ p: 2, backgroundColor: 'action.hover', borderRadius: 1 }}>
           <Box 
             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
             onClick={() => setFiltersExpanded(!filtersExpanded)}
@@ -1011,6 +1154,59 @@ export default function AllOrdersSheetPage() {
                 </>
               )}
 
+              {/* Subtotal Filter Mode Selector */}
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel id="subtotal-mode-label">Subtotal Filter</InputLabel>
+                <Select
+                  labelId="subtotal-mode-label"
+                  value={subtotalFilter.mode}
+                  label="Subtotal Filter"
+                  onChange={(e) => setSubtotalFilter(prev => ({ ...prev, mode: e.target.value }))}
+                >
+                  <MenuItem value="none">None</MenuItem>
+                  <MenuItem value="single">≤ Value</MenuItem>
+                  <MenuItem value="range">Range</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Single Subtotal Input (less than or equal) */}
+              {subtotalFilter.mode === 'single' && (
+                <TextField
+                  size="small"
+                  label="Max Subtotal ($)"
+                  type="number"
+                  value={subtotalFilter.single}
+                  onChange={(e) => setSubtotalFilter(prev => ({ ...prev, single: e.target.value }))}
+                  placeholder="e.g. 50"
+                  sx={{ width: 150 }}
+                  helperText="Show subtotal ≤ this value"
+                />
+              )}
+
+              {/* Range Inputs for Subtotal */}
+              {subtotalFilter.mode === 'range' && (
+                <>
+                  <TextField
+                    size="small"
+                    label="Min Subtotal ($)"
+                    type="number"
+                    value={subtotalFilter.from}
+                    onChange={(e) => setSubtotalFilter(prev => ({ ...prev, from: e.target.value }))}
+                    placeholder="e.g. 10"
+                    sx={{ width: 150 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Max Subtotal ($)"
+                    type="number"
+                    value={subtotalFilter.to}
+                    onChange={(e) => setSubtotalFilter(prev => ({ ...prev, to: e.target.value }))}
+                    placeholder="e.g. 100"
+                    sx={{ width: 150 }}
+                  />
+                </>
+              )}
+
               {/* Clear Button */}
               <Button
                 size="small"
@@ -1028,13 +1224,22 @@ export default function AllOrdersSheetPage() {
               >
                 CLEAR
               </Button>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={handleApplyFilters}
+                disabled={loading}
+                sx={yellowFilledButtonSx}
+              >
+                Apply Filters
+              </Button>
             </Stack>
           )}
         </Box>
-      </Paper>
+      </SectionCard>
 
       {/* Quick Filter Cards */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <SectionCard sx={{ p: 2.5, mb: 2, background: dashboardSignatureTokens.surfaces.pageCard }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Quick Filters</Typography>
           <Typography variant="caption" color="text.secondary">
@@ -1333,10 +1538,10 @@ export default function AllOrdersSheetPage() {
           </Stack>
           )}
         </Box>
-      </Paper>
+      </SectionCard>
 
       {/* Exchange Rate Management */}
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <SectionCard sx={{ p: 2.5, mb: 2, position: 'relative', overflow: 'hidden', background: dashboardSignatureTokens.surfaces.pageCard }}>
         <Stack spacing={2}>
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -1352,43 +1557,65 @@ export default function AllOrdersSheetPage() {
             </Button>
           </Stack>
 
+          {updatingExchangeRates && (
+            <Alert
+              severity="info"
+              icon={<CircularProgress size={18} color="inherit" />}
+            >
+              Recalculating affected orders. P.Balance (INR), A_total-inr, and Profit are being refreshed.
+            </Alert>
+          )}
+
           {showExchangeRate && (
           <>
-          <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap">
-            <Box>
-              <Typography variant="body2" color="text.secondary">eBay Rate</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                {currentExchangeRate?.rate || 82} INR
-              </Typography>
-              {currentExchangeRate?.effectiveDate && (
-                <Typography variant="caption" color="text.secondary">
-                  Effective: {new Date(currentExchangeRate.effectiveDate).toLocaleDateString()}
-                </Typography>
-              )}
-            </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary">Amazon Rate</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                {amazonExchangeRate?.rate || 87} INR
-              </Typography>
-              {amazonExchangeRate?.effectiveDate && (
-                <Typography variant="caption" color="text.secondary">
-                  Effective: {new Date(amazonExchangeRate.effectiveDate).toLocaleDateString()}
-                </Typography>
-              )}
-            </Box>
+          <Stack direction="row" spacing={2} alignItems="stretch" flexWrap="wrap">
+            {EXCHANGE_RATE_OPTIONS.map((option) => {
+              const rateInfo = exchangeRatesByMarketplace[option.value];
+              const accentColor = option.channel === 'AMAZON' ? 'success.main' : 'primary.main';
+
+              return (
+                <Paper key={option.value} variant="outlined" sx={{ p: 1.5, minWidth: 150 }}>
+                  <Typography variant="body2" color="text.secondary">{option.label}</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', color: accentColor }}>
+                    {rateInfo?.rate || EXCHANGE_RATE_DEFAULTS[option.value]} INR
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {rateInfo?.applicationMode === 'specific-date' ? 'Specific Date' : 'Effective'}
+                  </Typography>
+                  {rateInfo?.effectiveDate && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      {new Date(rateInfo.effectiveDate).toLocaleDateString()}
+                    </Typography>
+                  )}
+                </Paper>
+              );
+            })}
           </Stack>
 
           <Stack direction="row" spacing={2} alignItems="center">
             <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>Marketplace</InputLabel>
+              <InputLabel>Rate For</InputLabel>
               <Select
-                value={selectedMarketplace}
-                label="Marketplace"
-                onChange={(e) => setSelectedMarketplace(e.target.value)}
+                value={selectedRateMarketplace}
+                label="Rate For"
+                onChange={(e) => setSelectedRateMarketplace(e.target.value)}
+                disabled={updatingExchangeRates}
               >
-                <MenuItem value="EBAY">eBay</MenuItem>
-                <MenuItem value="AMAZON">Amazon</MenuItem>
+                {EXCHANGE_RATE_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Apply As</InputLabel>
+              <Select
+                value={rateApplicationMode}
+                label="Apply As"
+                onChange={(e) => setRateApplicationMode(e.target.value)}
+                disabled={updatingExchangeRates}
+              >
+                <MenuItem value="effective">Effective From</MenuItem>
+                <MenuItem value="specific-date">Specific Date Only</MenuItem>
               </Select>
             </FormControl>
             <TextField
@@ -1399,28 +1626,33 @@ export default function AllOrdersSheetPage() {
               onChange={(e) => setNewRate(e.target.value)}
               sx={{ width: 150 }}
               placeholder="e.g. 84"
+              disabled={updatingExchangeRates}
             />
             <TextField
               size="small"
-              label="Effective Date"
+              label={rateApplicationMode === 'specific-date' ? 'Specific Date' : 'Effective From'}
               type="date"
               value={newRateDate}
               onChange={(e) => setNewRateDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
+              helperText={rateApplicationMode === 'specific-date' ? 'Uses the same PST/PDT day pattern as the All Orders Sheet search date filter.' : 'Starts from this PST/PDT day, matching the All Orders Sheet search date filter.'}
               sx={{ width: 180 }}
+              disabled={updatingExchangeRates}
             />
             <Button
               variant="contained"
               onClick={handleSetExchangeRate}
-              disabled={!newRate || !newRateDate}
+              disabled={!newRate || !newRateDate || updatingExchangeRates}
+              startIcon={updatingExchangeRates ? <CircularProgress size={16} color="inherit" /> : null}
             >
-              Set {selectedMarketplace} Rate
+              {updatingExchangeRates ? 'Recalculating...' : `Set ${EXCHANGE_RATE_LABELS[selectedRateMarketplace]} Rate`}
             </Button>
             <Button
               size="small"
               variant="outlined"
               onClick={() => setShowRateHistory(!showRateHistory)}
               endIcon={showRateHistory ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              disabled={updatingExchangeRates}
             >
               {showRateHistory ? 'Hide' : 'Show'} History
             </Button>
@@ -1428,12 +1660,13 @@ export default function AllOrdersSheetPage() {
 
           {showRateHistory && rateHistory.length > 0 && (
             <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>{selectedMarketplace} Rate History</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>{EXCHANGE_RATE_LABELS[selectedRateMarketplace]} Rate History</Typography>
               <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 200 }}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Effective Date</TableCell>
+                      <TableCell>Mode</TableCell>
                       <TableCell>Rate (INR)</TableCell>
                       <TableCell>Created</TableCell>
                       <TableCell>Notes</TableCell>
@@ -1443,6 +1676,7 @@ export default function AllOrdersSheetPage() {
                     {rateHistory.map((rate) => (
                       <TableRow key={rate._id}>
                         <TableCell>{new Date(rate.effectiveDate).toLocaleDateString()}</TableCell>
+                        <TableCell>{rate.applicationMode === 'specific-date' ? 'Specific Date' : 'Effective'}</TableCell>
                         <TableCell><strong>{rate.rate}</strong></TableCell>
                         <TableCell>{new Date(rate.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>{rate.notes || '-'}</TableCell>
@@ -1456,22 +1690,43 @@ export default function AllOrdersSheetPage() {
           </>
           )}
         </Stack>
-      </Paper>
+      </SectionCard>
 
-      {/* Orders Count & Pagination - Enhanced visibility */}
+      {/* Orders Count & Pagination */}
       {!loading && (
-        <Paper sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
+        <SectionCard sx={{ p: 2.5, mb: 2, background: dashboardSignatureTokens.surfaces.pageCard }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" spacing={2}>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                {dateFilter.mode === 'single' ? (
-                  <>Total Results: {orders.length} order{orders.length !== 1 ? 's' : ''}</>
-                ) : (
-                  <>
-                    Showing {orders.length > 0 ? `${(currentPage - 1) * ordersPerPage + 1}-${(currentPage - 1) * ordersPerPage + orders.length}` : '0'} of {totalOrders} order{totalOrders !== 1 ? 's' : ''}
-                  </>
+              <Stack direction="row" spacing={1.5} alignItems="baseline" flexWrap="wrap">
+                <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                  {dateFilter.mode === 'single' ? (
+                    <>Filtered: {orders.length} order{orders.length !== 1 ? 's' : ''}</>
+                  ) : (
+                    <>Filtered: {orders.length > 0 ? `${(currentPage - 1) * ordersPerPage + 1}–${(currentPage - 1) * ordersPerPage + orders.length}` : '0'} of {totalOrders} order{totalOrders !== 1 ? 's' : ''}</>
+                  )}
+                </Typography>
+                {rawCount !== null && (
+                  <Tooltip title="Total orders in this date/seller/marketplace scope before any exclusion filters (matches Fulfillment Dashboard count)">
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: 'text.secondary',
+                        borderLeft: '1px solid #ccc',
+                        pl: 1.5,
+                        cursor: 'default',
+                        fontStyle: 'italic'
+                      }}
+                    >
+                      Raw total: {rawCount}
+                      {rawCount !== totalOrders && (
+                        <Typography component="span" sx={{ ml: 0.5, color: 'warning.main', fontWeight: 'bold', fontStyle: 'normal' }}>
+                          (−{rawCount - totalOrders} excluded)
+                        </Typography>
+                      )}
+                    </Typography>
+                  </Tooltip>
                 )}
-              </Typography>
+              </Stack>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                 {selectedSeller && 'Seller filter active • '}
                 {searchMarketplace && 'Marketplace filter active • '}
@@ -1493,11 +1748,11 @@ export default function AllOrdersSheetPage() {
                 sx={{ 
                   textAlign: 'center', 
                   px: 2, 
-                  borderLeft: '2px solid #1976d2', 
+                  borderLeft: `2px solid ${BRAND_YELLOW_DARK}`, 
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   '&:hover': {
-                    backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                    backgroundColor: `rgba(245,200,66,0.1)`,
                     transform: 'translateY(-2px)'
                   }
                 }}
@@ -1508,7 +1763,7 @@ export default function AllOrdersSheetPage() {
                   items: counts.categoryData
                 })}
               >
-                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: BRAND_YELLOW_DARK }}>
                   {counts.uniqueCategories}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -1519,11 +1774,11 @@ export default function AllOrdersSheetPage() {
                 sx={{ 
                   textAlign: 'center', 
                   px: 2, 
-                  borderLeft: '2px solid #1976d2', 
+                  borderLeft: `2px solid ${BRAND_YELLOW_DARK}`, 
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   '&:hover': {
-                    backgroundColor: 'rgba(46, 125, 50, 0.08)',
+                    backgroundColor: `rgba(245,200,66,0.1)`,
                     transform: 'translateY(-2px)'
                   }
                 }}
@@ -1534,7 +1789,7 @@ export default function AllOrdersSheetPage() {
                   items: counts.rangeData
                 })}
               >
-                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: BRAND_YELLOW_DARK }}>
                   {counts.uniqueRanges}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -1545,11 +1800,11 @@ export default function AllOrdersSheetPage() {
                 sx={{ 
                   textAlign: 'center', 
                   px: 2, 
-                  borderLeft: '2px solid #1976d2', 
+                  borderLeft: `2px solid ${BRAND_YELLOW_DARK}`, 
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   '&:hover': {
-                    backgroundColor: 'rgba(237, 108, 2, 0.08)',
+                    backgroundColor: `rgba(245,200,66,0.1)`,
                     transform: 'translateY(-2px)'
                   }
                 }}
@@ -1560,7 +1815,7 @@ export default function AllOrdersSheetPage() {
                   items: counts.productData
                 })}
               >
-                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: BRAND_YELLOW_DARK }}>
                   {counts.uniqueProducts}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -1578,106 +1833,206 @@ export default function AllOrdersSheetPage() {
               />
             )}
           </Stack>
-        </Paper>
+        </SectionCard>
+      )}
+
+      {/* Cross-page Filtered Totals — shown when a date filter is active */}
+      {filteredTotals && dateFilter.mode !== 'none' && (
+        <SectionCard sx={{ p: 2, mb: 2, background: dashboardSignatureTokens.surfaces.pageCard }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Totals for all {totalOrders} filtered order{totalOrders !== 1 ? 's' : ''} across {totalPages} page{totalPages !== 1 ? 's' : ''}
+          </Typography>
+          <Stack direction="row" flexWrap="nowrap" spacing={1.5} sx={{ overflowX: 'auto', pb: 0.5 }}>
+            <StatMetricCard
+              label="PROFIT (INR)"
+              value={`₹${(filteredTotals.profit ?? 0).toFixed(2)}`}
+              tone={filteredTotals.profit >= 0 ? 'success' : 'danger'}
+              sx={{ minWidth: 130, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="P.Balance (INR)"
+              value={`₹${(filteredTotals.pBalanceINR ?? 0).toFixed(2)}`}
+              tone="info"
+              sx={{ minWidth: 130, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Amazon Total (INR)"
+              value={`₹${(filteredTotals.amazonTotalINR ?? 0).toFixed(2)}`}
+              tone="amazon"
+              sx={{ minWidth: 130, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Total CC (INR)"
+              value={`₹${(filteredTotals.totalCC ?? 0).toFixed(2)}`}
+              tone="warning"
+              sx={{ minWidth: 120, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Mktplace Fee (INR)"
+              value={`₹${(filteredTotals.marketplaceFee ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 130, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="IGST (INR)"
+              value={`₹${(filteredTotals.igst ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 110, flexShrink: 0 }}
+            />
+            <Box sx={{ width: '1px', bgcolor: 'divider', alignSelf: 'stretch', flexShrink: 0 }} />
+            <StatMetricCard
+              label="Subtotal ($)"
+              value={`$${(filteredTotals.subtotal ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 110, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Shipping ($)"
+              value={`$${(filteredTotals.shipping ?? 0).toFixed(2)}`}
+              tone="shipping"
+              sx={{ minWidth: 110, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Sales Tax ($)"
+              value={`$${(filteredTotals.salesTax ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 110, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Earnings ($)"
+              value={`$${(filteredTotals.orderEarnings ?? 0).toFixed(2)}`}
+              tone="success"
+              sx={{ minWidth: 120, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="TDS ($)"
+              value={`$${(filteredTotals.tds ?? 0).toFixed(2)}`}
+              tone="neutral"
+              sx={{ minWidth: 90, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="NET ($)"
+              value={`$${(filteredTotals.net ?? 0).toFixed(2)}`}
+              tone="info"
+              sx={{ minWidth: 100, flexShrink: 0 }}
+            />
+            <StatMetricCard
+              label="Amazon Total ($)"
+              value={`$${(filteredTotals.amazonTotal ?? 0).toFixed(2)}`}
+              tone="amazon"
+              sx={{ minWidth: 120, flexShrink: 0 }}
+            />
+          </Stack>
+        </SectionCard>
       )}
 
       {/* Orders Table */}
       {orders.length === 0 ? (
         <Alert severity="info">No orders found{(selectedSeller || searchMarketplace || dateFilter.mode !== 'none' || profitFilter.mode !== 'none' || subtotalFilter.mode !== 'none' || excludeLowValue || excludeNoAmazonAccount || searchOrderId || searchBuyerName) ? ' with current filters' : ''}</Alert>
       ) : (
-        <TableContainer component={Paper} sx={{ overflowX: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
-          <Table size="small" stickyHeader sx={{ '& thead tr:nth-of-type(2) th': { top: 37, zIndex: 3 } }}>
+        <TableContainer component={Paper} sx={{ ...tableContainerSx, overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
+          <Table size="small" stickyHeader sx={{
+            '& thead tr:nth-of-type(1) th': { top: 0, zIndex: 5 },
+            '& thead tr:nth-of-type(2) th': { top: 47, zIndex: 4 },
+          }}>
             <TableHead>
               {/* First row: Section headers */}
               <TableRow>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 0, zIndex: 4, minWidth: 100 }}>Seller</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 100, zIndex: 4, minWidth: 110 }}>Date Sold</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 210, zIndex: 4, minWidth: 350 }}>Product Name</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9', position: 'sticky', left: 560, zIndex: 4, minWidth: 120, boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}>Marketplace</TableCell>
-                <TableCell colSpan={12} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderBottom: '2px solid #ffb74d', borderRight: '2px solid #90caf9' }}>eBay Side</TableCell>
-                <TableCell colSpan={5} align="center" sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', borderBottom: '2px solid #81c784', borderRight: '2px solid #90caf9' }}>Amazon Side</TableCell>
-                <TableCell colSpan={3} align="center" sx={{ fontWeight: 'bold', bgcolor: '#fce4ec', borderBottom: '2px solid #f48fb1', borderRight: '2px solid #90caf9' }}>Credit Card</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#fff9c4', borderRight: '2px solid #90caf9' }} align="right">PROFIT<br />(INR)</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Amazon<br />Acc</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Order ID</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Buyer<br />Name</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#e3f2fd', borderRight: '2px solid #90caf9' }}>Arriving</TableCell>
-                <TableCell rowSpan={2} sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderRight: '2px solid #90caf9', minWidth: 180 }}>Update Price</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 100 }}>Seller</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 110 }}>Date Sold</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 350 }}>Product Name</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 120 }}>Marketplace</TableCell>
+                <TableCell colSpan={13} align="center" sx={{ ...tableHeaderCellSx, borderBottom: `3px solid ${BRAND_YELLOW}`, borderRight: `2px solid ${BRAND_DARK}` }}>eBay Side</TableCell>
+                <TableCell colSpan={5} align="center" sx={{ ...tableHeaderCellSx, borderBottom: '3px solid #10b981', borderRight: `2px solid ${BRAND_DARK}` }}>Amazon Side</TableCell>
+                <TableCell colSpan={3} align="center" sx={{ ...tableHeaderCellSx, borderBottom: '3px solid #f43f5e', borderRight: `2px solid ${BRAND_DARK}` }}>Credit Card</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderBottom: `3px solid ${BRAND_YELLOW}`, borderRight: `2px solid ${BRAND_DARK}` }} align="right">PROFIT<br />(INR)</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Amazon<br />Acc</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Order ID</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Buyer<br />Name</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Arriving</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 180 }}>Update Price</TableCell>
               </TableRow>
               {/* Second row: eBay Side and Amazon Side column headers */}
               <TableRow>
                 <Tooltip title="Product price (excluding tax and shipping)" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Subtotal</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Subtotal</TableCell>
                 </Tooltip>
                 <Tooltip title="Shipping cost" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Shipping</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Shipping</TableCell>
                 </Tooltip>
                 <Tooltip title="Sales tax collected" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Sales Tax</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Sales Tax</TableCell>
                 </Tooltip>
                 <Tooltip title="Discount applied" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Discount</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Discount</TableCell>
                 </Tooltip>
                 <Tooltip title="eBay marketplace transaction fees" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Transaction Fees</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Transaction Fees</TableCell>
                 </Tooltip>
                 <Tooltip title="eBay advertising fees" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Ad Fee</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Ad Fee</TableCell>
                 </Tooltip>
                 <Tooltip title="Earnings = Subtotal + Discount - Sales Tax - Transaction Fees - Ad Fee - Shipping" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Earnings</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Earnings</TableCell>
                 </Tooltip>
-                <Tooltip title="TDS = Earnings × 1%" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">TDS</TableCell>
+                <Tooltip title="Order total = pricingSummary.total.value + salesTax" arrow placement="top">
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Order total</TableCell>
+                </Tooltip>
+                <Tooltip title="TDS = 1% of (pricingSummary.total.value + salesTax)" arrow placement="top">
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">TDS</TableCell>
                 </Tooltip>
                 <Tooltip title="T.ID = $0.24 (fixed transaction ID fee)" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">T.ID</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">T.ID</TableCell>
                 </Tooltip>
                 <Tooltip title="NET = Earnings - TDS - T.ID" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">NET</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">NET</TableCell>
                 </Tooltip>
                 <Tooltip title="Exchange Rate (USD to INR) based on order date" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', cursor: 'help' }} align="right">Exchange Rate</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Exchange Rate</TableCell>
                 </Tooltip>
                 <Tooltip title="P.Balance = NET × Exchange Rate (in INR)" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fff3e0', borderRight: '2px solid #90caf9', cursor: 'help' }} align="right">P.Balance (INR)</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, cursor: 'help' }} align="right">P.Balance (INR)</TableCell>
                 </Tooltip>
                 <Tooltip title="Amazon order cost before tax" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', cursor: 'help' }} align="right">Before Tax</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Before Tax</TableCell>
                 </Tooltip>
                 <Tooltip title="Amazon estimated tax" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', cursor: 'help' }} align="right">Estimated Tax</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Estimated Tax</TableCell>
                 </Tooltip>
                 <Tooltip title="Amazon Total = Before Tax + Estimated Tax" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', cursor: 'help' }} align="right">Amazon_total</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Amazon_total</TableCell>
                 </Tooltip>
                 <Tooltip title="Amazon Exchange Rate (USD to INR)" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', cursor: 'help' }} align="right">Amazon Exch Rate</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Amazon Exch Rate</TableCell>
                 </Tooltip>
                 <Tooltip title="A_total-inr = Amazon_total × Amazon Exchange Rate" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#e8f5e9', borderRight: '2px solid #90caf9', cursor: 'help' }} align="right">A_total-inr</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, cursor: 'help' }} align="right">A_total-inr</TableCell>
                 </Tooltip>
-                <Tooltip title="Marketplace Fee = 4% of A_total-inr" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fce4ec', cursor: 'help' }} align="right">Marketplace Fee</TableCell>
+                <Tooltip title="Marketplace Fee = 3.5% of A_total-inr" arrow placement="top">
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">Marketplace Fee</TableCell>
                 </Tooltip>
                 <Tooltip title="IGST = 18% of Marketplace Fee" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fce4ec', cursor: 'help' }} align="right">IGST</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, cursor: 'help' }} align="right">IGST</TableCell>
                 </Tooltip>
                 <Tooltip title="Total_CC = Marketplace Fee + IGST" arrow placement="top">
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#fce4ec', borderRight: '2px solid #90caf9', cursor: 'help' }} align="right">Total_CC</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, cursor: 'help' }} align="right">Total_CC</TableCell>
                 </Tooltip>
               </TableRow>
             </TableHead>
             <TableBody>
               {orders.map((order) => (
-                <TableRow key={order._id} hover>
-                  <TableCell sx={{ position: 'sticky', left: 0, zIndex: 1, bgcolor: 'background.paper' }}>{order.seller?.user?.username || '-'}</TableCell>
-                  <TableCell sx={{ position: 'sticky', left: 100, zIndex: 1, bgcolor: 'background.paper' }}>
+                <TableRow key={order._id} sx={{
+                  '& td': { borderBottomColor: dashboardSignatureTokens.table.rowBorder },
+                  '&:nth-of-type(even) td': { backgroundColor: '#f8fafc' },
+                  '&:hover td': { backgroundColor: 'rgba(37, 99, 235, 0.05) !important' },
+                }}>
+                  <TableCell>{order.seller?.user?.username || '-'}</TableCell>
+                  <TableCell>
                     <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.4, fontSize: '0.8rem' }}>
                       {formatDate(order.dateSold, order.purchaseMarketplaceId)}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={{ minWidth: 350, maxWidth: 500, position: 'sticky', left: 210, zIndex: 1, bgcolor: 'background.paper' }}>
+                  <TableCell sx={{ minWidth: 350, maxWidth: 500 }}>
                     <Stack spacing={0.5}>
                       {order.lineItems && order.lineItems.length > 0 ? (
                         order.lineItems.map((item, i) => (
@@ -1727,7 +2082,7 @@ export default function AllOrdersSheetPage() {
                       )}
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ position: 'sticky', left: 560, zIndex: 1, bgcolor: 'background.paper', boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}>
+                  <TableCell>
                     <Chip 
                       label={order.purchaseMarketplaceId?.replace('EBAY_', '') || '-'} 
                       size="small"
@@ -1757,6 +2112,42 @@ export default function AllOrdersSheetPage() {
                   {/* Earnings (from DB), TDS, T.ID, NET, Exchange Rate, P.Balance */}
                   <TableCell align="right">
                     {formatCurrency(order.orderEarnings)}
+                  </TableCell>
+                  <TableCell align="right">
+                    {(() => {
+                      const isCancelled = order.cancelState === 'CANCELED' || 
+                                         order.cancelState === 'CANCELLED' || 
+                                         order.cancelStatus?.cancelState === 'CANCELED' ||
+                                         order.cancelStatus?.cancelState === 'CANCELLED';
+                      const isPartiallyRefunded = order.orderPaymentStatus === 'PARTIALLY_REFUNDED';
+                      const showZero = isCancelled || isPartiallyRefunded;
+
+                      if (showZero) {
+                        return '$0.00';
+                      }
+
+                      return (
+                        <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end">
+                          <Typography variant="body2" sx={{ minWidth: 60, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                            {formatCurrency(getOrderTotalInputValue(order))}
+                          </Typography>
+                          <IconButton
+                            size="small"
+                            disabled={Boolean(updatingOrderTotals[order._id])}
+                            onClick={() => setConfirmOrderTotal({
+                              open: true,
+                              order,
+                              value: String(getOrderTotalInputValue(order))
+                            })}
+                            sx={{ p: 0.5 }}
+                          >
+                            {updatingOrderTotals[order._id]
+                              ? <CircularProgress size={14} />
+                              : <span style={{ fontSize: 14 }}>✏️</span>}
+                          </IconButton>
+                        </Stack>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell align="right">
                     {formatCurrency(order.tds)}
@@ -1818,7 +2209,7 @@ export default function AllOrdersSheetPage() {
                                          order.cancelState === 'CANCELLED' || 
                                          order.cancelStatus?.cancelState === 'CANCELED' ||
                                          order.cancelStatus?.cancelState === 'CANCELLED';
-                      return isCancelled ? '$0.00' : formatCurrency(order.beforeTaxUSD);
+                      return isCancelled ? '$0.00' : formatCurrency(order.beforeTax);
                     })()}
                   </TableCell>
                   <TableCell align="right">
@@ -1827,7 +2218,7 @@ export default function AllOrdersSheetPage() {
                                          order.cancelState === 'CANCELLED' || 
                                          order.cancelStatus?.cancelState === 'CANCELED' ||
                                          order.cancelStatus?.cancelState === 'CANCELLED';
-                      return isCancelled ? '$0.00' : formatCurrency(order.estimatedTaxUSD);
+                      return isCancelled ? '$0.00' : formatCurrency(order.estimatedTax);
                     })()}
                   </TableCell>
                   <TableCell align="right">
@@ -2005,6 +2396,7 @@ export default function AllOrdersSheetPage() {
                     acc.discount += parseFloat(order.discount) || 0;
                     acc.transactionFees += parseFloat(order.transactionFees) || 0;
                     acc.adFeeGeneral += parseFloat(order.adFeeGeneral) || 0;
+                    acc.orderTotal += order.orderTotal ?? ((parseFloat(order.pricingSummary?.total?.value) || 0) + (parseFloat(order.salesTax) || 0));
                   }
                   
                   acc.orderEarnings += parseFloat(order.orderEarnings) || 0;
@@ -2014,8 +2406,8 @@ export default function AllOrdersSheetPage() {
                   acc.pBalanceINR += parseFloat(order.pBalanceINR) || 0;
                   
                   if (!isCancelled) {
-                    acc.beforeTaxUSD += parseFloat(order.beforeTaxUSD) || 0;
-                    acc.estimatedTaxUSD += parseFloat(order.estimatedTaxUSD) || 0;
+                    acc.beforeTax += parseFloat(order.beforeTax) || 0;
+                    acc.estimatedTax += parseFloat(order.estimatedTax) || 0;
                     acc.amazonTotal += parseFloat(order.amazonTotal) || 0;
                     acc.amazonTotalINR += parseFloat(order.amazonTotalINR) || 0;
                     acc.marketplaceFee += parseFloat(order.marketplaceFee) || 0;
@@ -2031,17 +2423,17 @@ export default function AllOrdersSheetPage() {
                   return acc;
                 }, {
                   subtotal: 0, shipping: 0, salesTax: 0, discount: 0, transactionFees: 0,
-                  adFeeGeneral: 0, orderEarnings: 0, tds: 0, tid: 0, net: 0,
-                  pBalanceINR: 0, beforeTaxUSD: 0, estimatedTaxUSD: 0, amazonTotal: 0,
+                  adFeeGeneral: 0, orderEarnings: 0, orderTotal: 0, tds: 0, tid: 0, net: 0,
+                  pBalanceINR: 0, beforeTax: 0, estimatedTax: 0, amazonTotal: 0,
                   amazonTotalINR: 0, marketplaceFee: 0, igst: 0, totalCC: 0, profit: 0
                 });
                 
                 return (
                   <TableRow sx={{ bgcolor: '#f5f5f5', '& td': { fontWeight: 'bold', borderTop: '2px solid #000' } }}>
-                    <TableCell sx={{ position: 'sticky', left: 0, zIndex: 1, bgcolor: '#f5f5f5' }}>TOTALS</TableCell>
-                    <TableCell sx={{ position: 'sticky', left: 100, zIndex: 1, bgcolor: '#f5f5f5' }}></TableCell>
-                    <TableCell sx={{ position: 'sticky', left: 210, zIndex: 1, bgcolor: '#f5f5f5', minWidth: 350 }}></TableCell>
-                    <TableCell sx={{ position: 'sticky', left: 560, zIndex: 1, bgcolor: '#f5f5f5', boxShadow: '4px 0 5px rgba(0,0,0,0.12)' }}></TableCell>
+                    <TableCell sx={{ bgcolor: '#f5f5f5' }}>TOTALS</TableCell>
+                    <TableCell sx={{ bgcolor: '#f5f5f5' }}></TableCell>
+                    <TableCell sx={{ bgcolor: '#f5f5f5', minWidth: 350 }}></TableCell>
+                    <TableCell sx={{ bgcolor: '#f5f5f5' }}></TableCell>
                     <TableCell align="right">${totals.subtotal.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.shipping.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.salesTax.toFixed(2)}</TableCell>
@@ -2049,13 +2441,14 @@ export default function AllOrdersSheetPage() {
                     <TableCell align="right">${totals.transactionFees.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.adFeeGeneral.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.orderEarnings.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.orderTotal.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.tds.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.tid.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.net.toFixed(2)}</TableCell>
                     <TableCell align="right">-</TableCell>
                     <TableCell align="right">₹{totals.pBalanceINR.toFixed(2)}</TableCell>
-                    <TableCell align="right">${totals.beforeTaxUSD.toFixed(2)}</TableCell>
-                    <TableCell align="right">${totals.estimatedTaxUSD.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.beforeTax.toFixed(2)}</TableCell>
+                    <TableCell align="right">${totals.estimatedTax.toFixed(2)}</TableCell>
                     <TableCell align="right">${totals.amazonTotal.toFixed(2)}</TableCell>
                     <TableCell align="right">-</TableCell>
                     <TableCell align="right">₹{totals.amazonTotalINR.toFixed(2)}</TableCell>
@@ -2143,6 +2536,62 @@ export default function AllOrdersSheetPage() {
           />
         </Box>
       )}
+
+      {/* Order Total Confirmation Dialog */}
+      <Dialog
+        open={confirmOrderTotal.open}
+        onClose={() => setConfirmOrderTotal({ open: false, order: null, value: '' })}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit Order Total</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Current value: <strong>{formatCurrency(confirmOrderTotal.order ? (confirmOrderTotal.order.orderTotal ?? ((parseFloat(confirmOrderTotal.order.pricingSummary?.total?.value) || 0) + (parseFloat(confirmOrderTotal.order.salesTax) || 0))) : '')}</strong>
+            </Typography>
+            <TextField
+              label="New Order Total (USD)"
+              type="number"
+              size="small"
+              fullWidth
+              autoFocus
+              value={confirmOrderTotal.value}
+              onChange={(e) => setConfirmOrderTotal(prev => ({ ...prev, value: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (confirmOrderTotal.order) {
+                    handleSaveOrderTotal(confirmOrderTotal.order, confirmOrderTotal.value);
+                    setConfirmOrderTotal({ open: false, order: null, value: '' });
+                  }
+                }
+              }}
+              inputProps={{ min: 0, step: '0.01' }}
+            />
+            <Typography variant="caption" color="text.secondary">
+              Order ID: {confirmOrderTotal.order?.orderId}
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOrderTotal({ open: false, order: null, value: '' })}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (confirmOrderTotal.order) {
+                handleSaveOrderTotal(confirmOrderTotal.order, confirmOrderTotal.value);
+                setConfirmOrderTotal({ open: false, order: null, value: '' });
+              }
+            }}
+            disabled={!confirmOrderTotal.value || isNaN(parseFloat(confirmOrderTotal.value))}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Price Update Modal */}
       <Dialog 
@@ -2308,7 +2757,13 @@ export default function AllOrdersSheetPage() {
                                 </Typography>
                               </Stack>
                               <Stack direction="row" justifyContent="space-between">
-                                <Typography variant="caption">TDS (1%):</Typography>
+                                <Typography variant="caption">Order total (adjusted):</Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                                  ${breakdown.orderTotal.toFixed(2)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption">TDS (1% of pricingSummary.total.value + salesTax):</Typography>
                                 <Typography variant="caption" sx={{ color: 'error.main' }}>
                                   -${breakdown.tds.toFixed(2)}
                                 </Typography>
@@ -2473,7 +2928,7 @@ export default function AllOrdersSheetPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPageShell>
     </Fade>
   );
 }

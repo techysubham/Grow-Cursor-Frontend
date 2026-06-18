@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Box, Paper, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Chip, IconButton, Dialog,
   Stack, TextField, Button, FormControl, InputLabel, Select, MenuItem,
   CircularProgress, Alert, Grid, InputAdornment, Menu, ListSubheader, Tooltip,
   Divider, Link, useMediaQuery, useTheme, List, ListItem, ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction, Pagination, Checkbox, FormControlLabel
 } from '@mui/material';
 import ChatIcon from '@mui/icons-material/Chat';
 import CloseIcon from '@mui/icons-material/Close';
@@ -13,6 +13,7 @@ import SendIcon from '@mui/icons-material/Send';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import DownloadIcon from '@mui/icons-material/Download';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PersonIcon from '@mui/icons-material/Person';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -23,6 +24,18 @@ import PeopleIcon from '@mui/icons-material/People';
 import api from '../../lib/api';
 import { CHAT_TEMPLATES, personalizeTemplate } from '../../constants/chatTemplates';
 import ColumnSelector from '../../components/ColumnSelector';
+import { downloadCSV } from '../../utils/csvExport';
+import {
+  tableHeaderCellSx,
+  tableBodyRowSx,
+  tableBodyCellSx,
+  tableContainerSx,
+  tableIndexBadgeSx,
+  yellowOutlinedButtonSx,
+  yellowFilledButtonSx
+} from '../../theme/tableStyles.js';
+import { BRAND_DARK } from '../../constants/brandTheme.js';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
 
 
 // --- RESOLUTION MODAL COMPONENT (Unchanged logic, kept for completeness) ---
@@ -282,6 +295,28 @@ function ResolutionDialog({ open, onClose, metaItem, onSave, chatAgents = [] }) 
                 <Box key={i} sx={{ alignSelf: msg.sender === 'SELLER' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
                   <Paper sx={{ p: 1.5, bgcolor: msg.sender === 'SELLER' ? '#1976d2' : '#fff', color: msg.sender === 'SELLER' ? '#fff' : '#000' }}>
                     <Typography variant="body2">{msg.body}</Typography>
+
+                    {msg.mediaUrls && msg.mediaUrls.length > 0 && (
+                      <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {msg.mediaUrls.map((url, idx) => (
+                          <Box
+                            key={idx}
+                            component="img"
+                            src={url}
+                            alt="Attachment"
+                            sx={{
+                              width: 100,
+                              height: 100,
+                              objectFit: 'cover',
+                              borderRadius: 1,
+                              cursor: 'pointer',
+                              border: '1px solid #ccc'
+                            }}
+                            onClick={() => window.open(url, '_blank')}
+                          />
+                        ))}
+                      </Box>
+                    )}
                   </Paper>
                   <Typography variant="caption" sx={{ display: 'block', mt: 0.5, textAlign: msg.sender === 'SELLER' ? 'right' : 'left' }}>
                     {new Date(msg.messageDate).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} PT
@@ -465,11 +500,31 @@ const CATEGORY_DISPLAY_MAP = {
 };
 const formatCategory = (cat) => CATEGORY_DISPLAY_MAP[cat ?? ''] ?? cat ?? 'Not a Case Yet';
 
+function formatCreationDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
 export default function ConversationManagementPage() {
   const [items, setItems] = useState([]);
+  const [sellers, setSellers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null);
   const [nowMs, setNowMs] = useState(Date.now());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Chat Agents (Picked Up By)
   const [chatAgents, setChatAgents] = useState([]);
@@ -478,6 +533,7 @@ export default function ConversationManagementPage() {
   const [editingAgent, setEditingAgent] = useState(null); // { _id, name }
   const [editAgentName, setEditAgentName] = useState('');
   const [agentSaving, setAgentSaving] = useState(false);
+  const rowsPerPage = 25;
 
   const ONE_HOUR_MS = 60 * 60 * 1000;
   const ONE_DAY_MS = 24 * ONE_HOUR_MS;
@@ -534,26 +590,36 @@ export default function ConversationManagementPage() {
     { id: 'sl', label: 'SL No' },
     { id: 'seller', label: 'Seller' },
     { id: 'orderId', label: 'Order ID' },
+    { id: 'creationDate', label: 'Creation Date' },
     { id: 'username', label: 'Username' },
     { id: 'buyerName', label: 'Buyer Name' },
     { id: 'buyerSla', label: 'Buyer SLA' },
     { id: 'sellerReply', label: 'Seller Last Reply' },
     { id: 'about', label: 'Conversation About' },
     { id: 'case', label: 'Case' },
+    { id: 'amazonAccount', label: 'Amazon Account' },
+    { id: 'azOrderId', label: 'AZ Order ID' },
     { id: 'pickedUpBy', label: 'Picked Up By' },
     { id: 'action', label: 'Action' },
   ];
   const [visibleColumns, setVisibleColumns] = useState(ALL_COLUMNS.map(c => c.id));
+  const exportableColumns = ALL_COLUMNS.filter(column => column.id !== 'action');
+  const [selectedExportColumns, setSelectedExportColumns] = useState(exportableColumns.map(column => column.id));
 
   // --- FILTERS STATE ---
   const [searchText, setSearchText] = useState('');
   const [filterSeller, setFilterSeller] = useState('All');
   const [filterAbout, setFilterAbout] = useState('All');
   const [filterCase, setFilterCase] = useState('All');
+  const [filterPickedUpBy, setFilterPickedUpBy] = useState('All');
+  const [dateFilterMode, setDateFilterMode] = useState('none');
+  const [singleDate, setSingleDate] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   useEffect(() => {
-    fetchItems();
     fetchAgents();
+    fetchSellers();
   }, []);
 
   useEffect(() => {
@@ -561,15 +627,56 @@ export default function ConversationManagementPage() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    fetchItems();
+  }, [currentPage, searchText, filterSeller, filterAbout, filterCase, filterPickedUpBy, dateFilterMode, singleDate, dateFrom, dateTo]);
+
+  function buildListParams() {
+    const params = {
+      status: 'Case Not Opened,Open,In Progress',
+      page: currentPage,
+      limit: rowsPerPage
+    };
+
+    if (searchText.trim()) params.search = searchText.trim();
+    if (filterSeller !== 'All') params.sellerId = filterSeller;
+    if (filterAbout !== 'All') params.about = filterAbout;
+    if (filterCase !== 'All') params.caseStatus = filterCase;
+    if (filterPickedUpBy !== 'All') params.pickedUpBy = filterPickedUpBy;
+    if (dateFilterMode === 'single' && singleDate) {
+      params.creationDate = singleDate;
+    }
+    if (dateFilterMode === 'range') {
+      if (dateFrom) params.creationDateFrom = dateFrom;
+      if (dateTo) params.creationDateTo = dateTo;
+    }
+
+    return params;
+  }
+
   async function fetchItems() {
     setLoading(true);
     try {
-      const { data } = await api.get('/ebay/conversation-management/list', { params: { status: 'Case Not Opened,Open,In Progress' } });
-      setItems(data || []);
+      const { data } = await api.get('/ebay/conversation-management/list', { params: buildListParams() });
+      setItems(data?.records || []);
+      setTotalItems(data?.total || 0);
+      setTotalPages(data?.pagination?.totalPages || 1);
     } catch (e) {
       console.error(e);
+      setItems([]);
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchSellers() {
+    try {
+      const { data } = await api.get('/sellers/all');
+      setSellers(data || []);
+    } catch (e) {
+      console.error(e);
     }
   }
 
@@ -580,6 +687,112 @@ export default function ConversationManagementPage() {
     } catch (e) {
       console.error(e);
     }
+  }
+
+  async function handleDownloadCsv() {
+    setExportingCsv(true);
+    try {
+      const { data } = await api.get('/ebay/conversation-management/export', {
+        params: {
+          ...buildListParams(),
+          page: undefined,
+          limit: undefined
+        }
+      });
+
+      const csvColumnAccessors = {
+        sl: {
+          label: 'SL No',
+          value: (item, index) => index + 1
+        },
+        seller: {
+          label: 'Seller',
+          value: (item) => item.sellerName || 'Unknown'
+        },
+        orderId: {
+          label: 'Order ID',
+          value: (item) => item.orderId || ''
+        },
+        creationDate: {
+          label: 'Creation Date',
+          value: (item) => formatCreationDate(item.creationDate)
+        },
+        username: {
+          label: 'Username',
+          value: (item) => item.buyerUsername || ''
+        },
+        buyerName: {
+          label: 'Buyer Name',
+          value: (item) => item.buyerName || ''
+        },
+        buyerSla: {
+          label: 'Buyer SLA',
+          value: (item) => getBuyerSlaLabel(item).label
+        },
+        sellerReply: {
+          label: 'Seller Last Reply',
+          value: (item) => getSellerReplyLabel(item).label
+        },
+        about: {
+          label: 'Conversation About',
+          value: (item) => formatCategory(item.category)
+        },
+        case: {
+          label: 'Case',
+          value: (item) => item.caseStatus || ''
+        },
+        amazonAccount: {
+          label: 'Amazon Account',
+          value: (item) => item.amazonAccount || ''
+        },
+        azOrderId: {
+          label: 'AZ Order ID',
+          value: (item) => item.azOrderId || ''
+        },
+        pickedUpBy: {
+          label: 'Picked Up By',
+          value: (item) => item.pickedUpBy || ''
+        }
+      };
+
+      const csvData = (data || []).map((item, index) => {
+        const row = {};
+        selectedExportColumns.forEach((columnId) => {
+          const config = csvColumnAccessors[columnId];
+          if (!config) return;
+          row[config.label] = config.value(item, index);
+        });
+        return row;
+      });
+
+      downloadCSV(csvData, 'Conversation_Management');
+      setExportDialogOpen(false);
+    } catch (e) {
+      alert('Failed to download CSV: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setExportingCsv(false);
+    }
+  }
+
+  function handleOpenExportDialog() {
+    const defaultColumns = visibleColumns.filter(columnId => columnId !== 'action');
+    setSelectedExportColumns(defaultColumns.length ? defaultColumns : exportableColumns.map(column => column.id));
+    setExportDialogOpen(true);
+  }
+
+  function handleToggleExportColumn(columnId) {
+    setSelectedExportColumns((prev) => {
+      if (prev.includes(columnId)) {
+        return prev.filter(id => id !== columnId);
+      }
+
+      const next = [...prev, columnId];
+      next.sort((left, right) => (
+        exportableColumns.findIndex(column => column.id === left) -
+        exportableColumns.findIndex(column => column.id === right)
+      ));
+      return next;
+    });
   }
 
   async function handleAddAgent() {
@@ -630,46 +843,42 @@ export default function ConversationManagementPage() {
     }
   }
 
-  // --- FILTER LOGIC ---
-  // Extract unique sellers for the dropdown
-  const uniqueSellers = useMemo(() => {
-    const sellers = new Set(items.map(i => i.sellerName).filter(Boolean));
-    return Array.from(sellers);
-  }, [items]);
-
-  const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      // 1. Text Search (Matches OrderID, Username, BuyerName)
-      const query = searchText.toLowerCase();
-      const matchesText =
-        (item.orderId && item.orderId.toLowerCase().includes(query)) ||
-        (item.buyerUsername && item.buyerUsername.toLowerCase().includes(query)) ||
-        (item.buyerName && item.buyerName.toLowerCase().includes(query));
-
-      // 2. Dropdown Filters
-      const matchesSeller = filterSeller === 'All' || item.sellerName === filterSeller;
-      const matchesAbout = filterAbout === 'All' || formatCategory(item.category) === filterAbout;
-      const matchesCase = filterCase === 'All' || item.caseStatus === filterCase;
-
-      return matchesText && matchesSeller && matchesAbout && matchesCase;
-    });
-  }, [items, searchText, filterSeller, filterAbout, filterCase]);
-
   return (
     <Box sx={{ p: 2 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Conversation Management</Typography>
         <Stack direction="row" spacing={1} alignItems="center">
           <Button startIcon={<FilterListIcon />} onClick={() => {
-            setSearchText(''); setFilterSeller('All'); setFilterAbout('All'); setFilterCase('All');
-          }}>
+            setSearchText('');
+            setFilterSeller('All');
+            setFilterAbout('All');
+            setFilterCase('All');
+            setFilterPickedUpBy('All');
+            setDateFilterMode('none');
+            setSingleDate('');
+            setDateFrom('');
+            setDateTo('');
+            setCurrentPage(1);
+          }} sx={yellowOutlinedButtonSx}>
             Reset Filters
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            color="success"
+            startIcon={<DownloadIcon />}
+            onClick={handleOpenExportDialog}
+            disabled={exportingCsv || loading || totalItems === 0}
+            sx={yellowOutlinedButtonSx}
+          >
+            Download CSV
           </Button>
           <Button
             variant="outlined"
             size="small"
             startIcon={<PeopleIcon />}
             onClick={() => setManageAgentsOpen(true)}
+            sx={yellowOutlinedButtonSx}
           >
             Manage Agents
           </Button>
@@ -695,7 +904,10 @@ export default function ConversationManagementPage() {
               size="small"
               placeholder="Search Order, User, or Buyer Name..."
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={(e) => {
+                setSearchText(e.target.value);
+                setCurrentPage(1);
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -713,11 +925,14 @@ export default function ConversationManagementPage() {
               <Select
                 value={filterSeller}
                 label="Filter Seller"
-                onChange={(e) => setFilterSeller(e.target.value)}
+                onChange={(e) => {
+                  setFilterSeller(e.target.value);
+                  setCurrentPage(1);
+                }}
               >
                 <MenuItem value="All">All Sellers</MenuItem>
-                {uniqueSellers.map(seller => (
-                  <MenuItem key={seller} value={seller}>{seller}</MenuItem>
+                {sellers.map(seller => (
+                  <MenuItem key={seller._id} value={seller._id}>{seller.user?.username || seller.storeName || seller._id}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -730,14 +945,17 @@ export default function ConversationManagementPage() {
               <Select
                 value={filterAbout}
                 label="Filter About"
-                onChange={(e) => setFilterAbout(e.target.value)}
+                onChange={(e) => {
+                  setFilterAbout(e.target.value);
+                  setCurrentPage(1);
+                }}
               >
                 <MenuItem value="All">All Categories</MenuItem>
                 <MenuItem value="INR">INR</MenuItem>
                 <MenuItem value="Cancellation">Cancellation</MenuItem>
                 <MenuItem value="Return">Return</MenuItem>
-                <MenuItem value="Refund">Refund</MenuItem>
-                <MenuItem value="Replace">Replace</MenuItem>
+                <MenuItem value="Return - Refund">Refund</MenuItem>
+                <MenuItem value="Return - Replace">Replace</MenuItem>
                 <MenuItem value="Out of Stock">Out of Stock</MenuItem>
                 <MenuItem value="Issue with Product">Issue with Product</MenuItem>
                 <MenuItem value="Inquiry">Inquiry</MenuItem>
@@ -752,7 +970,10 @@ export default function ConversationManagementPage() {
               <Select
                 value={filterCase}
                 label="Filter Case"
-                onChange={(e) => setFilterCase(e.target.value)}
+                onChange={(e) => {
+                  setFilterCase(e.target.value);
+                  setCurrentPage(1);
+                }}
               >
                 <MenuItem value="All">All Statuses</MenuItem>
                 <MenuItem value="Case Opened">Case Opened</MenuItem>
@@ -760,119 +981,416 @@ export default function ConversationManagementPage() {
               </Select>
             </FormControl>
           </Grid>
+
+          <Grid item xs={12} md={3}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Picked Up By</InputLabel>
+              <Select
+                value={filterPickedUpBy}
+                label="Picked Up By"
+                onChange={(e) => {
+                  setFilterPickedUpBy(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <MenuItem value="All">All Agents</MenuItem>
+                <MenuItem value="__UNASSIGNED__">Unassigned</MenuItem>
+                {chatAgents.map(agent => (
+                  <MenuItem key={agent._id} value={agent.name}>{agent.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} md={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Date Filter</InputLabel>
+              <Select
+                value={dateFilterMode}
+                label="Date Filter"
+                onChange={(e) => {
+                  const nextMode = e.target.value;
+                  setDateFilterMode(nextMode);
+                  if (nextMode !== 'single') setSingleDate('');
+                  if (nextMode !== 'range') {
+                    setDateFrom('');
+                    setDateTo('');
+                  }
+                  setCurrentPage(1);
+                }}
+              >
+                <MenuItem value="none">No Date Filter</MenuItem>
+                <MenuItem value="single">Single Date</MenuItem>
+                <MenuItem value="range">Date Range</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {dateFilterMode === 'single' && (
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                size="small"
+                type="date"
+                label="Creation Date"
+                value={singleDate}
+                onChange={(e) => {
+                  setSingleDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+          )}
+
+          {dateFilterMode === 'range' && (
+            <>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="date"
+                  label="Creation From"
+                  value={dateFrom}
+                  onChange={(e) => {
+                    setDateFrom(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="date"
+                  label="Creation To"
+                  value={dateTo}
+                  onChange={(e) => {
+                    setDateTo(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+            </>
+          )}
         </Grid>
       </Paper>
 
       {/* --- TABLE --- */}
       {loading ? (
         <Box display="flex" justifyContent="center" p={5}><CircularProgress /></Box>
-      ) : filteredItems.length === 0 ? (
+      ) : items.length === 0 ? (
         <Alert severity="info">No active conversation cases found matching your filters.</Alert>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead sx={{ bgcolor: '#eee' }}>
-              <TableRow>
-                {visibleColumns.includes('sl') && <TableCell sx={{ fontWeight: 'bold' }}>SL No</TableCell>}
-                {visibleColumns.includes('seller') && <TableCell sx={{ fontWeight: 'bold' }}>Seller</TableCell>}
-                {visibleColumns.includes('orderId') && <TableCell sx={{ fontWeight: 'bold' }}>Order ID</TableCell>}
-                {visibleColumns.includes('username') && <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>}
-                {visibleColumns.includes('buyerName') && <TableCell sx={{ fontWeight: 'bold' }}>Buyer Name</TableCell>}
-                {visibleColumns.includes('buyerSla') && <TableCell sx={{ fontWeight: 'bold' }}>Buyer SLA</TableCell>}
-                {visibleColumns.includes('sellerReply') && <TableCell sx={{ fontWeight: 'bold' }}>Seller Last Reply</TableCell>}
-                {visibleColumns.includes('about') && <TableCell sx={{ fontWeight: 'bold' }}>Conversation About</TableCell>}
-                {visibleColumns.includes('case') && <TableCell sx={{ fontWeight: 'bold' }}>Case</TableCell>}
-                {visibleColumns.includes('pickedUpBy') && <TableCell sx={{ fontWeight: 'bold' }}>Picked Up By</TableCell>}
-                {visibleColumns.includes('action') && <TableCell align="center" sx={{ fontWeight: 'bold' }}>Action</TableCell>}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredItems.map((item, index) => {
-                const buyerSla = getBuyerSlaLabel(item);
-                const sellerReply = getSellerReplyLabel(item);
-                return (
-                  <TableRow key={item._id} hover>
-                    {/* SERIAL NUMBER */}
-                    {visibleColumns.includes('sl') && <TableCell>{index + 1}</TableCell>}
+        <>
+          <TableContainer component={Paper} sx={{ ...tableContainerSx, overflowX: 'auto', overflowY: 'hidden' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  {visibleColumns.includes('sl') && <TableCell sx={tableHeaderCellSx}>SL No</TableCell>}
+                  {visibleColumns.includes('seller') && <TableCell sx={tableHeaderCellSx}>Seller</TableCell>}
+                  {visibleColumns.includes('orderId') && <TableCell sx={tableHeaderCellSx}>Order ID</TableCell>}
+                  {visibleColumns.includes('creationDate') && <TableCell sx={tableHeaderCellSx}>Creation Date</TableCell>}
+                  {visibleColumns.includes('username') && <TableCell sx={tableHeaderCellSx}>Username</TableCell>}
+                  {visibleColumns.includes('buyerName') && <TableCell sx={tableHeaderCellSx}>Buyer Name</TableCell>}
+                  {visibleColumns.includes('buyerSla') && <TableCell sx={tableHeaderCellSx}>Buyer SLA</TableCell>}
+                  {visibleColumns.includes('sellerReply') && <TableCell sx={tableHeaderCellSx}>Seller Last Reply</TableCell>}
+                  {visibleColumns.includes('about') && <TableCell sx={tableHeaderCellSx}>Conversation About</TableCell>}
+                  {visibleColumns.includes('case') && <TableCell sx={tableHeaderCellSx}>Case</TableCell>}
+                  {visibleColumns.includes('amazonAccount') && <TableCell sx={tableHeaderCellSx}>Amazon Account</TableCell>}
+                  {visibleColumns.includes('azOrderId') && <TableCell sx={tableHeaderCellSx}>AZ Order ID</TableCell>}
+                  {visibleColumns.includes('pickedUpBy') && <TableCell sx={tableHeaderCellSx}>Picked Up By</TableCell>}
+                  {visibleColumns.includes('action') && <TableCell align="center" sx={tableHeaderCellSx}>Action</TableCell>}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {items.map((item, index) => {
+                  const buyerSla = getBuyerSlaLabel(item);
+                  const sellerReply = getSellerReplyLabel(item);
+                  return (
+                    <TableRow key={item._id} hover sx={tableBodyRowSx}>
+                      {/* SERIAL NUMBER */}
+                      {visibleColumns.includes('sl') && <TableCell sx={tableBodyCellSx}><Box component="span" sx={tableIndexBadgeSx}>{(currentPage - 1) * rowsPerPage + index + 1}</Box></TableCell>}
 
-                    {/* SELLER NAME (Added) */}
-                    {visibleColumns.includes('seller') && <TableCell>
-                      <Chip label={item.sellerName || 'Unknown'} size="small" variant="outlined" />
-                    </TableCell>}
+                      {/* SELLER NAME (Added) */}
+                      {visibleColumns.includes('seller') && <TableCell sx={tableBodyCellSx}>
+                        <Chip label={item.sellerName || 'Unknown'} size="small" variant="outlined" />
+                      </TableCell>}
 
-                    {visibleColumns.includes('orderId') && <TableCell>
-                      {item.orderId ? (
-                        <Chip label={item.orderId} size="small" variant="outlined" sx={{ bgcolor: '#fafafa' }} />
-                      ) : (
-                        <Typography color="text.secondary">-</Typography>
+                      {visibleColumns.includes('orderId') && <TableCell sx={tableBodyCellSx}>
+                        {item.orderId ? (
+                          <Chip label={item.orderId} size="small" variant="outlined" sx={{ bgcolor: '#fafafa' }} />
+                        ) : (
+                          <Typography color="text.secondary">-</Typography>
+                        )}
+                      </TableCell>}
+                      {visibleColumns.includes('creationDate') && <TableCell sx={tableBodyCellSx}>{formatCreationDate(item.creationDate)}</TableCell>}
+                      {visibleColumns.includes('username') && <TableCell sx={tableBodyCellSx}>{item.buyerUsername}</TableCell>}
+                      {visibleColumns.includes('buyerName') && <TableCell sx={{ ...tableBodyCellSx, fontWeight: 'bold' }}>{item.buyerName}</TableCell>}
+                      {visibleColumns.includes('buyerSla') && <TableCell sx={tableBodyCellSx}>
+                        <Chip
+                          label={buyerSla.label}
+                          color={buyerSla.color}
+                          size="small"
+                          variant={buyerSla.color === 'default' ? 'outlined' : 'filled'}
+                        />
+                      </TableCell>}
+                      {visibleColumns.includes('sellerReply') && <TableCell sx={tableBodyCellSx}>
+                        <Chip
+                          label={sellerReply.label}
+                          color={sellerReply.color}
+                          size="small"
+                          variant={sellerReply.color === 'default' ? 'outlined' : 'filled'}
+                        />
+                      </TableCell>}
+                      {visibleColumns.includes('about') && <TableCell sx={tableBodyCellSx}>
+                        <Chip label={formatCategory(item.category)} color="primary" size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 'bold' }} />
+                      </TableCell>}
+                      {visibleColumns.includes('case') && <TableCell sx={tableBodyCellSx}>
+                        <Chip
+                          label={item.caseStatus}
+                          color={item.caseStatus === 'Case Opened' ? 'error' : 'success'}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </TableCell>}
+                      {visibleColumns.includes('amazonAccount') && (
+                        <TableCell sx={tableBodyCellSx}>
+                          {item.amazonAccount ? (
+                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{item.amazonAccount}</Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.disabled">—</Typography>
+                          )}
+                        </TableCell>
                       )}
-                    </TableCell>}
-                    {visibleColumns.includes('username') && <TableCell>{item.buyerUsername}</TableCell>}
-                    {visibleColumns.includes('buyerName') && <TableCell sx={{ fontWeight: 'bold' }}>{item.buyerName}</TableCell>}
-                    {visibleColumns.includes('buyerSla') && <TableCell>
-                      <Chip
-                        label={buyerSla.label}
-                        color={buyerSla.color}
-                        size="small"
-                        variant={buyerSla.color === 'default' ? 'outlined' : 'filled'}
-                      />
-                    </TableCell>}
-                    {visibleColumns.includes('sellerReply') && <TableCell>
-                      <Chip
-                        label={sellerReply.label}
-                        color={sellerReply.color}
-                        size="small"
-                        variant={sellerReply.color === 'default' ? 'outlined' : 'filled'}
-                      />
-                    </TableCell>}
-                    {visibleColumns.includes('about') && <TableCell>
-                      <Chip label={formatCategory(item.category)} color="primary" size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 'bold' }} />
-                    </TableCell>}
-                    {visibleColumns.includes('case') && <TableCell>
-                      <Chip
-                        label={item.caseStatus}
-                        color={item.caseStatus === 'Case Opened' ? 'error' : 'success'}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </TableCell>}
-                    {visibleColumns.includes('pickedUpBy') && (
-                      <TableCell sx={{ minWidth: 150 }}>
-                        <FormControl fullWidth size="small">
-                          <Select
-                            value={item.pickedUpBy || ''}
-                            onChange={(e) => handlePickedUpByChange(item, e.target.value)}
-                            displayEmpty
-                            sx={{ fontSize: '0.8rem' }}
-                            renderValue={(selected) => (selected ? selected : <em style={{ color: '#999' }}>— Unassigned —</em>)}
-                          >
-                            <MenuItem value=""><em>— Unassigned —</em></MenuItem>
-                            {chatAgents.map(agent => (
-                              <MenuItem key={agent._id} value={agent.name}>{agent.name}</MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </TableCell>
-                    )}
-                    {visibleColumns.includes('action') && <TableCell align="center">
-                      <IconButton color="primary" onClick={() => setSelectedItem(item)}>
-                        <ChatIcon />
-                      </IconButton>
-                    </TableCell>}
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                      {visibleColumns.includes('azOrderId') && (
+                        <TableCell sx={tableBodyCellSx}>
+                          {item.azOrderId ? (
+                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{item.azOrderId}</Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.disabled">—</Typography>
+                          )}
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes('pickedUpBy') && (
+                        <TableCell sx={{ ...tableBodyCellSx, minWidth: 150 }}>
+                          <FormControl fullWidth size="small">
+                            <Select
+                              value={item.pickedUpBy || ''}
+                              onChange={(e) => handlePickedUpByChange(item, e.target.value)}
+                              displayEmpty
+                              sx={{ fontSize: '0.8rem' }}
+                              renderValue={(selected) => (selected ? selected : <em style={{ color: '#999' }}>— Unassigned —</em>)}
+                            >
+                              <MenuItem value=""><em>— Unassigned —</em></MenuItem>
+                              {chatAgents.map(agent => (
+                                <MenuItem key={agent._id} value={agent.name}>{agent.name}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes('action') && <TableCell align="center" sx={tableBodyCellSx}>
+                        <IconButton color="primary" onClick={() => setSelectedItem(item)}>
+                          <ChatIcon />
+                        </IconButton>
+                      </TableCell>}
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Paper sx={{ mt: 2, py: 1.5, px: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Typography variant="body2" color="text.secondary">
+              Showing {items.length} of {totalItems} conversations
+            </Typography>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={(event, value) => setCurrentPage(value)}
+              color="primary"
+              showFirstButton
+              showLastButton
+              size="small"
+            />
+          </Paper>
+        </>
       )}
 
-      {/* MANAGE AGENTS DIALOG */}
-      <Dialog open={manageAgentsOpen} onClose={() => { setManageAgentsOpen(false); setEditingAgent(null); setEditAgentName(''); setNewAgentName(''); }} maxWidth="xs" fullWidth>
+      <Dialog
+        open={exportDialogOpen}
+        onClose={() => !exportingCsv && setExportDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: `${dashboardSignatureTokens.radius.card}px`,
+            overflow: 'hidden',
+            boxShadow: dashboardSignatureTokens.shadows.card,
+            background: dashboardSignatureTokens.surfaces.pageCard,
+          }
+        }}
+      >
         <Box sx={{ p: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6">Manage Agents</Typography>
-            <IconButton onClick={() => { setManageAgentsOpen(false); setEditingAgent(null); }}><CloseIcon /></IconButton>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+            sx={{
+              mx: -3,
+              mt: -3,
+              mb: 2.5,
+              px: 3,
+              py: 2,
+              bgcolor: BRAND_DARK,
+              color: '#fff'
+            }}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Export CSV
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)' }}>
+                Download all rows matching the current filters. Hidden rows stay excluded.
+              </Typography>
+            </Box>
+            <IconButton onClick={() => setExportDialogOpen(false)} disabled={exportingCsv} sx={{ color: 'rgba(255,255,255,0.8)' }}>
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+
+          <Stack direction="row" spacing={1} mb={2}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setSelectedExportColumns(exportableColumns.map(column => column.id))}
+              disabled={exportingCsv}
+              sx={yellowOutlinedButtonSx}
+            >
+              Select All
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setSelectedExportColumns([])}
+              disabled={exportingCsv}
+              sx={yellowOutlinedButtonSx}
+            >
+              Clear All
+            </Button>
+          </Stack>
+
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.5,
+              maxHeight: 320,
+              overflowY: 'auto',
+              borderRadius: 2,
+              borderColor: dashboardSignatureTokens.table.rowBorder,
+              background: dashboardSignatureTokens.surfaces.metricCard
+            }}
+          >
+            <Stack>
+              {exportableColumns.map((column) => (
+                <FormControlLabel
+                  key={column.id}
+                  sx={{
+                    mx: 0,
+                    px: 1,
+                    borderRadius: 1.5,
+                    '&:hover': {
+                      backgroundColor: dashboardSignatureTokens.table.rowHover,
+                    }
+                  }}
+                  control={
+                    <Checkbox
+                      checked={selectedExportColumns.includes(column.id)}
+                      onChange={() => handleToggleExportColumn(column.id)}
+                      disabled={exportingCsv}
+                      sx={{
+                        color: BRAND_DARK,
+                        '&.Mui-checked': {
+                          color: BRAND_DARK,
+                        }
+                      }}
+                    />
+                  }
+                  label={column.label}
+                />
+              ))}
+            </Stack>
+          </Paper>
+
+          {selectedExportColumns.length === 0 && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              Select at least one column to export.
+            </Alert>
+          )}
+
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Exporting all filtered conversations, not just this page.
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button onClick={() => setExportDialogOpen(false)} disabled={exportingCsv} sx={yellowOutlinedButtonSx}>Cancel</Button>
+              <Button
+                variant="contained"
+                onClick={handleDownloadCsv}
+                disabled={exportingCsv || selectedExportColumns.length === 0}
+                sx={yellowFilledButtonSx}
+              >
+                {exportingCsv ? 'Exporting...' : 'Download'}
+              </Button>
+            </Stack>
+          </Box>
+        </Box>
+      </Dialog>
+
+      {/* MANAGE AGENTS DIALOG */}
+      <Dialog
+        open={manageAgentsOpen}
+        onClose={() => { setManageAgentsOpen(false); setEditingAgent(null); setEditAgentName(''); setNewAgentName(''); }}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: `${dashboardSignatureTokens.radius.card}px`,
+            overflow: 'hidden',
+            boxShadow: dashboardSignatureTokens.shadows.card,
+            background: dashboardSignatureTokens.surfaces.pageCard,
+          }
+        }}
+      >
+        <Box sx={{ p: 3 }}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+            sx={{
+              mx: -3,
+              mt: -3,
+              mb: 2.5,
+              px: 3,
+              py: 2,
+              bgcolor: BRAND_DARK,
+              color: '#fff'
+            }}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Manage Agents</Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)' }}>
+                Add, rename, or remove assignment owners for conversation handling.
+              </Typography>
+            </Box>
+            <IconButton onClick={() => { setManageAgentsOpen(false); setEditingAgent(null); }} sx={{ color: 'rgba(255,255,255,0.8)' }}>
+              <CloseIcon />
+            </IconButton>
           </Stack>
 
           {/* Add new agent */}
@@ -891,49 +1409,70 @@ export default function ConversationManagementPage() {
               startIcon={<PersonAddIcon />}
               onClick={handleAddAgent}
               disabled={agentSaving || !newAgentName.trim()}
+              sx={yellowFilledButtonSx}
             >
               Add
             </Button>
           </Stack>
 
-          <Divider sx={{ mb: 1 }} />
+          <Divider sx={{ mb: 1.5 }} />
 
           {/* Agent list */}
-          <List dense>
-            {chatAgents.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>No agents yet. Add one above.</Typography>
-            )}
-            {chatAgents.map(agent => (
-              <ListItem key={agent._id} disableGutters>
-                {editingAgent?._id === agent._id ? (
-                  <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={editAgentName}
-                      onChange={(e) => setEditAgentName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateAgent(); }}
-                      autoFocus
-                    />
-                    <Button size="small" variant="contained" onClick={handleUpdateAgent} disabled={agentSaving}>Save</Button>
-                    <Button size="small" onClick={() => { setEditingAgent(null); setEditAgentName(''); }}>Cancel</Button>
-                  </Stack>
-                ) : (
-                  <>
-                    <ListItemText primary={agent.name} />
-                    <ListItemSecondaryAction>
-                      <IconButton size="small" onClick={() => { setEditingAgent(agent); setEditAgentName(agent.name); }}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" color="error" onClick={() => handleDeleteAgent(agent)}>
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </ListItemSecondaryAction>
-                  </>
-                )}
-              </ListItem>
-            ))}
-          </List>
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1,
+              borderRadius: 2,
+              borderColor: dashboardSignatureTokens.table.rowBorder,
+              background: dashboardSignatureTokens.surfaces.metricCard
+            }}
+          >
+            <List dense>
+              {chatAgents.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>No agents yet. Add one above.</Typography>
+              )}
+              {chatAgents.map(agent => (
+                <ListItem
+                  key={agent._id}
+                  disableGutters
+                  sx={{
+                    px: 1,
+                    borderRadius: 1.5,
+                    '&:hover': {
+                      backgroundColor: dashboardSignatureTokens.table.rowHover,
+                    }
+                  }}
+                >
+                  {editingAgent?._id === agent._id ? (
+                    <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={editAgentName}
+                        onChange={(e) => setEditAgentName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateAgent(); }}
+                        autoFocus
+                      />
+                      <Button size="small" variant="contained" onClick={handleUpdateAgent} disabled={agentSaving} sx={yellowFilledButtonSx}>Save</Button>
+                      <Button size="small" onClick={() => { setEditingAgent(null); setEditAgentName(''); }} sx={yellowOutlinedButtonSx}>Cancel</Button>
+                    </Stack>
+                  ) : (
+                    <>
+                      <ListItemText primary={agent.name} />
+                      <ListItemSecondaryAction>
+                        <IconButton size="small" onClick={() => { setEditingAgent(agent); setEditAgentName(agent.name); }} sx={{ color: BRAND_DARK }}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" color="error" onClick={() => handleDeleteAgent(agent)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </>
+                  )}
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
         </Box>
       </Dialog>
 

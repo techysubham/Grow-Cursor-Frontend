@@ -38,10 +38,13 @@ import ClearIcon from '@mui/icons-material/Clear';
 import ChatIcon from '@mui/icons-material/Chat';
 import DownloadIcon from '@mui/icons-material/Download';
 import api from '../../lib/api';
-import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
+import { csvText, downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ChatModal from '../../components/ChatModal';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
 import ColumnSelector from '../../components/ColumnSelector';
+import SectionCard from '../../components/SectionCard.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, tableContainerSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
+import IssuesResolutionTabSkeleton from '../../components/skeletons/IssuesResolutionTabSkeleton.jsx';
 
 // LogsCell component for editable logs field with save functionality
 function LogsCell({ value, onSave, id }) {
@@ -89,6 +92,24 @@ function LogsCell({ value, onSave, id }) {
   );
 }
 
+// Static fallback labels for known eBay reason codes
+const REASON_LABEL_MAP = {
+  'WRONG_SIZE': 'Does not fit',
+  'DOES_NOT_FIT': "Doesn't fit my vehicle",
+  'NOT_AS_DESCRIBED': 'Not As Described',
+  'DEFECTIVE_ITEM': 'Defective Item',
+  'NO_LONGER_NEED_ITEM': 'No Longer Needed',
+  'ORDERED_ACCIDENTALLY': 'Ordered Accidentally',
+  'ARRIVED_DAMAGED': 'Arrived Damaged',
+  'MISSING_PARTS': 'Missing Parts',
+  'OTHER': 'Other',
+};
+
+function getReasonLabel(code) {
+  if (!code) return '-';
+  return REASON_LABEL_MAP[code] || code.replace(/_/g, ' ');
+}
+
 export default function ReturnRequestedPage({
   dateFilter: dateFilterProp,
   hideDateFilter = false,
@@ -111,7 +132,7 @@ export default function ReturnRequestedPage({
 
   const [returns, setReturns] = useState([]);
   const [sellers, setSellers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
   const [selectedReturn, setSelectedReturn] = useState(null);
@@ -154,7 +175,10 @@ export default function ReturnRequestedPage({
   const [statusFilter, setStatusFilter] = useState('');
   const [sellerFilter, setSellerFilter] = useState('');
   const [reasonFilter, setReasonFilter] = useState([]);
+  const [availableReasons, setAvailableReasons] = useState([]);
+  const [availableStatuses, setAvailableStatuses] = useState([]);
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [excludeClient, setExcludeClient] = useState(true);
   const [internalDateFilter, setInternalDateFilter] = useState({
     mode: 'all',
     single: '',
@@ -165,6 +189,12 @@ export default function ReturnRequestedPage({
     () => dateFilterProp ?? internalDateFilter,
     [dateFilterProp, internalDateFilter]
   );
+  const [responseDueDateFilter, setResponseDueDateFilter] = useState({
+    mode: 'all',
+    single: '',
+    from: '',
+    to: ''
+  });
 
   const hasFetchedInitialData = useRef(false);
 
@@ -191,6 +221,32 @@ export default function ReturnRequestedPage({
     fetchSellers();
   }, []);
 
+  // Fetch distinct return reasons from DB (lightweight distinct query)
+  useEffect(() => {
+    async function fetchReasons() {
+      try {
+        const res = await api.get('/ebay/return-reasons');
+        setAvailableReasons(res.data || []);
+      } catch (e) {
+        console.error('Failed to fetch return reasons:', e);
+      }
+    }
+    fetchReasons();
+  }, []);
+
+  // Fetch distinct return statuses from DB (lightweight distinct query)
+  useEffect(() => {
+    async function fetchStatuses() {
+      try {
+        const res = await api.get('/ebay/return-statuses');
+        setAvailableStatuses(res.data || []);
+      } catch (e) {
+        console.error('Failed to fetch return statuses:', e);
+      }
+    }
+    fetchStatuses();
+  }, []);
+
   // Load returns when filters or page changes
   useEffect(() => {
     if (!hasFetchedInitialData.current) {
@@ -199,14 +255,14 @@ export default function ReturnRequestedPage({
       return;
     }
     loadStoredReturns();
-  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, urgentOnly, page]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, responseDueDateFilter, urgentOnly, excludeClient, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     if (hasFetchedInitialData.current) {
       setPage(1);
     }
-  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, urgentOnly]);
+  }, [statusFilter, sellerFilter, reasonFilter, dateFilter, responseDueDateFilter, urgentOnly, excludeClient]);
 
   async function loadStoredReturns() {
     setLoading(true);
@@ -220,12 +276,20 @@ export default function ReturnRequestedPage({
       if (sellerFilter) params.sellerId = sellerFilter;
       if (reasonFilter.length > 0) params.reason = reasonFilter.join(',');
       if (urgentOnly) params.urgentOnly = 'true';
+      params.excludeClient = excludeClient ? 'true' : 'false';
       if (dateFilter.mode === 'single' && dateFilter.single) {
         params.startDate = dateFilter.single;
         params.endDate = dateFilter.single;
       } else if (dateFilter.mode === 'range') {
         if (dateFilter.from) params.startDate = dateFilter.from;
         if (dateFilter.to) params.endDate = dateFilter.to;
+      }
+      if (responseDueDateFilter.mode === 'single' && responseDueDateFilter.single) {
+        params.responseDueStartDate = responseDueDateFilter.single;
+        params.responseDueEndDate = responseDueDateFilter.single;
+      } else if (responseDueDateFilter.mode === 'range') {
+        if (responseDueDateFilter.from) params.responseDueStartDate = responseDueDateFilter.from;
+        if (responseDueDateFilter.to) params.responseDueEndDate = responseDueDateFilter.to;
       }
 
       const res = await api.get('/ebay/stored-returns', { params });
@@ -319,6 +383,7 @@ export default function ReturnRequestedPage({
     setReasonFilter([]);
     setUrgentOnly(false);
     setInternalDateFilter({ mode: 'all', single: '', from: '', to: '' });
+    setResponseDueDateFilter({ mode: 'all', single: '', from: '', to: '' });
   };
 
   const handleWorksheetStatusChange = async (returnId, newStatus) => {
@@ -400,7 +465,8 @@ export default function ReturnRequestedPage({
     reasonFilter.length > 0 ||
     urgentOnly ||
     (!hideDateFilter &&
-      (dateFilter.mode !== 'all' || dateFilter.single || dateFilter.from || dateFilter.to));
+      (dateFilter.mode !== 'all' || dateFilter.single || dateFilter.from || dateFilter.to)) ||
+    responseDueDateFilter.mode !== 'all' || responseDueDateFilter.single || responseDueDateFilter.from || responseDueDateFilter.to;
 
   // Check if response due date is within next 24 hours (urgent for filter)
   const isResponseUrgent24hrs = (responseDate) => {
@@ -490,33 +556,22 @@ export default function ReturnRequestedPage({
       }
 
       const csvData = prepareCSVData(exportData, {
-        'Return ID': 'returnId',
-        'Order ID': 'orderId',
+        'Return ID': (r) => csvText(r.returnId || ''),
+        'Order ID': (r) => csvText(r.orderId || ''),
         'Product Name': 'productName',
-        'Date Sold': (r) => r.dateSold ? new Date(r.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+        'Date Sold': (r) => csvText(r.dateSold ? new Date(r.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : ''),
         'Seller': (r) => r.seller?.user?.username || '',
         'Buyer': 'buyerUsername',
         'Reason': (r) => {
           const reason = r.returnReason?.value || r.returnReason || '';
-          const reasonLabels = {
-            'WRONG_SIZE': 'Does not fit',
-            'DOES_NOT_FIT': "Doesn't fit my vehicle",
-            'NOT_AS_DESCRIBED': 'Not As Described',
-            'DEFECTIVE_ITEM': 'Defective Item',
-            'NO_LONGER_NEED_ITEM': 'No Longer Needed',
-            'ORDERED_ACCIDENTALLY': 'Ordered Accidentally',
-            'ARRIVED_DAMAGED': 'Arrived Damaged',
-            'MISSING_PARTS': 'Missing Parts',
-            'OTHER': 'Other'
-          };
-          return reasonLabels[reason] || reason;
+          return getReasonLabel(reason) === '-' ? '' : getReasonLabel(reason);
         },
         'Status': (r) => r.currentStatus || r.returnRequest?.currentType || '',
         'eBay Status': 'ebayStatus',
         'Amazon Status': 'amazonStatus',
         'RMA Number': 'RMANumber',
-        'Created Date': (r) => r.creationDate ? new Date(r.creationDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
-        'Response Due': (r) => r.responseDate ? new Date(r.responseDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+        'Created Date': (r) => csvText(r.creationDate ? new Date(r.creationDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : ''),
+        'Response Due': (r) => csvText(r.responseDate ? new Date(r.responseDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : ''),
         'Logs': 'logs',
       });
 
@@ -531,6 +586,10 @@ export default function ReturnRequestedPage({
       setExportLoading(false);
     }
   };
+
+  if (loading && returns.length === 0) {
+    return <IssuesResolutionTabSkeleton />;
+  }
 
   return (
     <Box
@@ -586,7 +645,7 @@ export default function ReturnRequestedPage({
         <Stack direction="row" spacing={2} alignItems="center">
           <Button
             variant="contained"
-            color="primary"
+            sx={yellowFilledButtonSx}
             startIcon={fetching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
             onClick={fetchReturnsFromEbay}
             disabled={fetching}
@@ -601,7 +660,7 @@ export default function ReturnRequestedPage({
 
         <Button
           variant="outlined"
-          color="success"
+          sx={yellowOutlinedButtonSx}
           startIcon={<DownloadIcon />}
           onClick={() => setExportDialogOpen(true)}
         >
@@ -617,7 +676,7 @@ export default function ReturnRequestedPage({
       </Stack>
 
       {/* Controls Row 2: Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <SectionCard sx={{ p: 2, mb: 3 }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           {/* Seller Filter */}
           <FormControl size="small" sx={{ minWidth: 150 }}>
@@ -645,9 +704,9 @@ export default function ReturnRequestedPage({
               label="Status"
             >
               <MenuItem value="">All Statuses</MenuItem>
-              <MenuItem value="RETURN_REQUESTED">Return Requested</MenuItem>
-              <MenuItem value="ITEM_READY_TO_SHIP">Item Ready to Ship</MenuItem>
-              <MenuItem value="CLOSED">Closed</MenuItem>
+              {availableStatuses.map((s) => (
+                <MenuItem key={s} value={s}>{s.replace(/_/g, ' ')}</MenuItem>
+              ))}
             </Select>
           </FormControl>
 
@@ -664,43 +723,27 @@ export default function ReturnRequestedPage({
                   {selected.map((value) => (
                     <Chip
                       key={value}
-                      label={{
-                        'WRONG_SIZE': 'Does not fit',
-                        'DOES_NOT_FIT': "Doesn't fit my vehicle",
-                        'NOT_AS_DESCRIBED': 'Not As Described',
-                        'DEFECTIVE_ITEM': 'Defective Item',
-                        'NO_LONGER_NEED_ITEM': 'No Longer Needed',
-                        'ORDERED_ACCIDENTALLY': 'Ordered Accidentally',
-                        'ARRIVED_DAMAGED': 'Arrived Damaged',
-                        'MISSING_PARTS': 'Missing Parts',
-                        'OTHER': 'Other'
-                      }[value] || value}
+                      label={getReasonLabel(value)}
                       size="small"
                     />
                   ))}
                 </Box>
               )}
             >
-              <MenuItem value="WRONG_SIZE">Does not fit</MenuItem>
-              <MenuItem value="DOES_NOT_FIT">Doesn't fit my vehicle</MenuItem>
-              <MenuItem value="NOT_AS_DESCRIBED">Not As Described</MenuItem>
-              <MenuItem value="DEFECTIVE_ITEM">Defective Item</MenuItem>
-              <MenuItem value="NO_LONGER_NEED_ITEM">No Longer Needed</MenuItem>
-              <MenuItem value="ORDERED_ACCIDENTALLY">Ordered Accidentally</MenuItem>
-              <MenuItem value="ARRIVED_DAMAGED">Arrived Damaged</MenuItem>
-              <MenuItem value="MISSING_PARTS">Missing Parts</MenuItem>
-              <MenuItem value="OTHER">Other</MenuItem>
+              {availableReasons.map((code) => (
+                <MenuItem key={code} value={code}>{getReasonLabel(code)}</MenuItem>
+              ))}
             </Select>
           </FormControl>
 
           {!hideDateFilter && (
             <>
-              {/* Date Filter */}
+              {/* Created Date Filter */}
               <FormControl size="small" sx={{ minWidth: 160 }}>
-                <InputLabel>Date</InputLabel>
+                <InputLabel>Created Date</InputLabel>
                 <Select
                   value={dateFilter.mode}
-                  label="Date"
+                  label="Created Date"
                   onChange={(e) => {
                     const mode = e.target.value;
                     if (mode === 'all') {
@@ -732,7 +775,7 @@ export default function ReturnRequestedPage({
                 <TextField
                   size="small"
                   type="date"
-                  label="On"
+                  label="Created On"
                   value={dateFilter.single}
                   onChange={(e) =>
                     setInternalDateFilter((prev) => ({ ...prev, single: e.target.value }))
@@ -746,7 +789,7 @@ export default function ReturnRequestedPage({
                   <TextField
                     size="small"
                     type="date"
-                    label="From"
+                    label="Created From"
                     value={dateFilter.from}
                     onChange={(e) =>
                       setInternalDateFilter((prev) => ({ ...prev, from: e.target.value }))
@@ -756,7 +799,7 @@ export default function ReturnRequestedPage({
                   <TextField
                     size="small"
                     type="date"
-                    label="To"
+                    label="Created To"
                     value={dateFilter.to}
                     onChange={(e) =>
                       setInternalDateFilter((prev) => ({ ...prev, to: e.target.value }))
@@ -765,6 +808,77 @@ export default function ReturnRequestedPage({
                   />
                 </>
               )}
+            </>
+          )}
+
+          {/* Response Due Date Filter */}
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel>Response Due</InputLabel>
+            <Select
+              value={responseDueDateFilter.mode}
+              label="Response Due"
+              onChange={(e) => {
+                const mode = e.target.value;
+                if (mode === 'all') {
+                  setResponseDueDateFilter({ mode: 'all', single: '', from: '', to: '' });
+                } else if (mode === 'single') {
+                  setResponseDueDateFilter((prev) => ({
+                    mode: 'single',
+                    single: prev.single || new Date().toISOString().split('T')[0],
+                    from: '',
+                    to: ''
+                  }));
+                } else {
+                  setResponseDueDateFilter((prev) => ({
+                    mode: 'range',
+                    single: '',
+                    from: prev.from || '',
+                    to: prev.to || ''
+                  }));
+                }
+              }}
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="single">Single date</MenuItem>
+              <MenuItem value="range">Date range</MenuItem>
+            </Select>
+          </FormControl>
+
+          {responseDueDateFilter.mode === 'single' && (
+            <TextField
+              size="small"
+              type="date"
+              label="Due On (PST)"
+              value={responseDueDateFilter.single}
+              onChange={(e) =>
+                setResponseDueDateFilter((prev) => ({ ...prev, single: e.target.value }))
+              }
+              InputLabelProps={{ shrink: true }}
+            />
+          )}
+
+          {responseDueDateFilter.mode === 'range' && (
+            <>
+              <TextField
+                size="small"
+                type="date"
+                label="Due From (PST)"
+                value={responseDueDateFilter.from}
+                onChange={(e) =>
+                  setResponseDueDateFilter((prev) => ({ ...prev, from: e.target.value }))
+                }
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="Due To (PST)"
+                value={responseDueDateFilter.to}
+                onChange={(e) =>
+                  setResponseDueDateFilter((prev) => ({ ...prev, to: e.target.value }))
+                }
+                InputLabelProps={{ shrink: true }}
+              />
             </>
           )}
 
@@ -795,8 +909,20 @@ export default function ReturnRequestedPage({
               </Typography>
             }
           />
+
+          {/* Exclude Client Toggle */}
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={excludeClient}
+                onChange={(e) => setExcludeClient(e.target.checked)}
+              />
+            }
+            label={<Typography variant="body2">Exclude Client</Typography>}
+          />
         </Stack>
-      </Paper>
+      </SectionCard>
 
       {/* Table */}
       {loading ? (
@@ -807,25 +933,14 @@ export default function ReturnRequestedPage({
         <TableContainer
           component={Paper}
           sx={{
+            ...tableContainerSx,
             flexGrow: 1,
             overflow: 'auto',
             ...(embedded ? {} : { maxHeight: 'calc(100% - 50px)' }),
             width: '100%',
-            '&::-webkit-scrollbar': {
-              width: '8px',
-              height: '8px',
-            },
-            '&::-webkit-scrollbar-track': {
-              backgroundColor: '#f1f1f1',
-              borderRadius: '10px',
-            },
-            '&::-webkit-scrollbar-thumb': {
-              backgroundColor: '#888',
-              borderRadius: '10px',
-              '&:hover': {
-                backgroundColor: '#555',
-              },
-            },
+            '&::-webkit-scrollbar': { width: '8px', height: '8px' },
+            '&::-webkit-scrollbar-track': { backgroundColor: '#f1f1f1', borderRadius: '10px' },
+            '&::-webkit-scrollbar-thumb': { backgroundColor: '#888', borderRadius: '10px', '&:hover': { backgroundColor: '#555' } },
           }}
         >
           <Table
@@ -834,24 +949,24 @@ export default function ReturnRequestedPage({
           >
             <TableHead>
               <TableRow>
-                {visibleColumns.includes('returnId') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Return ID</strong></TableCell>}
-                {visibleColumns.includes('createdDate') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Created Date (PST)</strong></TableCell>}
-                {visibleColumns.includes('responseDue') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Response Due (PST)</strong></TableCell>}
-                {visibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Order ID</strong></TableCell>}
-                {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100, minWidth: 300 }}><strong>Product Name</strong></TableCell>}
-                {visibleColumns.includes('dateSold') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Date Sold (PST)</strong></TableCell>}
-                {visibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Seller</strong></TableCell>}
-                {visibleColumns.includes('buyer') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Buyer</strong></TableCell>}
-                {visibleColumns.includes('item') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Item</strong></TableCell>}
-                {visibleColumns.includes('reason') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Reason</strong></TableCell>}
-                {visibleColumns.includes('status') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Status</strong></TableCell>}
-                {visibleColumns.includes('ebayStatus') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>eBay Status</strong></TableCell>}
-                {visibleColumns.includes('amazonStatus') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Amazon Status</strong></TableCell>}
-                {visibleColumns.includes('refundAmount') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Refund Amount</strong></TableCell>}
-                {visibleColumns.includes('worksheetStatus') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Worksheet Status</strong></TableCell>}
-                {visibleColumns.includes('logs') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }}><strong>Logs</strong></TableCell>}
-                {visibleColumns.includes('snad') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }} align="center"><strong>SNAD</strong></TableCell>}
-                {visibleColumns.includes('chat') && <TableCell sx={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0, zIndex: 100 }} align="center"><strong>Chat</strong></TableCell>}
+                {visibleColumns.includes('returnId') && <TableCell sx={tableHeaderCellSx}>Return ID</TableCell>}
+                {visibleColumns.includes('createdDate') && <TableCell sx={tableHeaderCellSx}>Created Date (PST)</TableCell>}
+                {visibleColumns.includes('responseDue') && <TableCell sx={tableHeaderCellSx}>Response Due (PST)</TableCell>}
+                {visibleColumns.includes('orderId') && <TableCell sx={tableHeaderCellSx}>Order ID</TableCell>}
+                {visibleColumns.includes('productName') && <TableCell sx={{ ...tableHeaderCellSx, minWidth: 300 }}>Product Name</TableCell>}
+                {visibleColumns.includes('dateSold') && <TableCell sx={tableHeaderCellSx}>Date Sold (PST)</TableCell>}
+                {visibleColumns.includes('seller') && <TableCell sx={tableHeaderCellSx}>Seller</TableCell>}
+                {visibleColumns.includes('buyer') && <TableCell sx={tableHeaderCellSx}>Buyer</TableCell>}
+                {visibleColumns.includes('item') && <TableCell sx={tableHeaderCellSx}>Item</TableCell>}
+                {visibleColumns.includes('reason') && <TableCell sx={tableHeaderCellSx}>Reason</TableCell>}
+                {visibleColumns.includes('status') && <TableCell sx={tableHeaderCellSx}>Status</TableCell>}
+                {visibleColumns.includes('ebayStatus') && <TableCell sx={tableHeaderCellSx}>eBay Status</TableCell>}
+                {visibleColumns.includes('amazonStatus') && <TableCell sx={tableHeaderCellSx}>Amazon Status</TableCell>}
+                {visibleColumns.includes('refundAmount') && <TableCell sx={tableHeaderCellSx}>Refund Amount</TableCell>}
+                {visibleColumns.includes('worksheetStatus') && <TableCell sx={tableHeaderCellSx}>Worksheet Status</TableCell>}
+                {visibleColumns.includes('logs') && <TableCell sx={tableHeaderCellSx}>Logs</TableCell>}
+                {visibleColumns.includes('snad') && <TableCell sx={tableHeaderCellSx} align="center">SNAD</TableCell>}
+                {visibleColumns.includes('chat') && <TableCell sx={tableHeaderCellSx} align="center">Chat</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -865,7 +980,7 @@ export default function ReturnRequestedPage({
                 </TableRow>
               ) : (
                 returns.map((ret) => (
-                  <TableRow key={ret._id} hover>
+                  <TableRow key={ret._id} hover sx={tableBodyRowSx}>
                     {visibleColumns.includes('returnId') && <TableCell>
                       <Stack direction="row" alignItems="center" spacing={0.5}>
                         <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
@@ -886,12 +1001,12 @@ export default function ReturnRequestedPage({
                         <Typography
                           variant="body2"
                           fontSize="0.75rem"
-                          color={ret.returnStatus !== 'CLOSED' && isResponseOverdue(ret.responseDate) ? 'error' : 'inherit'}
-                          fontWeight={ret.returnStatus !== 'CLOSED' && (isResponseOverdue(ret.responseDate) || isResponseUrgent(ret.responseDate)) ? 'bold' : 'normal'}
+                          color={ret.returnStatus === 'RETURN_REQUESTED' && isResponseOverdue(ret.responseDate) ? 'error' : 'inherit'}
+                          fontWeight={ret.returnStatus === 'RETURN_REQUESTED' && (isResponseOverdue(ret.responseDate) || isResponseUrgent(ret.responseDate)) ? 'bold' : 'normal'}
                         >
                           {formatDate(ret.responseDate)}
                         </Typography>
-                        {ret.returnStatus !== 'CLOSED' && isResponseOverdue(ret.responseDate) && (
+                        {ret.returnStatus === 'RETURN_REQUESTED' && isResponseOverdue(ret.responseDate) && (
                           <Chip
                             label="OVERDUE"
                             size="small"
@@ -904,7 +1019,7 @@ export default function ReturnRequestedPage({
                             }}
                           />
                         )}
-                        {ret.returnStatus !== 'CLOSED' && !isResponseOverdue(ret.responseDate) && isResponseUrgent(ret.responseDate) && (
+                        {ret.returnStatus === 'RETURN_REQUESTED' && !isResponseOverdue(ret.responseDate) && isResponseUrgent(ret.responseDate) && (
                           <Chip
                             label="URGENT"
                             size="small"
@@ -988,17 +1103,7 @@ export default function ReturnRequestedPage({
                     </TableCell>}
                     {visibleColumns.includes('reason') && <TableCell>
                       <Typography variant="body2" fontSize="0.7rem">
-                        {{
-                          'WRONG_SIZE': 'Does not fit',
-                          'DOES_NOT_FIT': "Doesn't fit my vehicle",
-                          'NOT_AS_DESCRIBED': 'Not As Described',
-                          'DEFECTIVE_ITEM': 'Defective Item',
-                          'NO_LONGER_NEED_ITEM': 'No Longer Needed',
-                          'ORDERED_ACCIDENTALLY': 'Ordered Accidentally',
-                          'ARRIVED_DAMAGED': 'Arrived Damaged',
-                          'MISSING_PARTS': 'Missing Parts',
-                          'OTHER': 'Other'
-                        }[ret.returnReason] || ret.returnReason || '-'}
+                        {getReasonLabel(ret.returnReason)}
                       </Typography>
                     </TableCell>}
                     {visibleColumns.includes('status') && <TableCell>
@@ -1280,7 +1385,7 @@ export default function ReturnRequestedPage({
           </Button>
           <Button
             variant="contained"
-            color="success"
+            sx={yellowFilledButtonSx}
             onClick={handleExportCSV}
             disabled={exportLoading}
             startIcon={exportLoading ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}

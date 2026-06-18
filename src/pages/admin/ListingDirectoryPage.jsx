@@ -1,31 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  FormControl,
-  InputAdornment,
-  InputLabel,
-  MenuItem,
-  OutlinedInput,
-  Pagination,
-  Paper,
-  Select,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Toolbar,
-  Tooltip,
-  Typography,
-  Checkbox,
-  Alert,
-  IconButton,
+  Box, Button, Chip, CircularProgress, FormControl, InputAdornment,
+  InputLabel, MenuItem, OutlinedInput, Pagination, Paper, Select, Stack,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  TextField, Toolbar, Tooltip, Typography, Checkbox, Alert, IconButton,
+  Skeleton,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -34,6 +14,7 @@ import {
   RuleOutlined as ProofReadIcon,
   CalendarToday as CalendarIcon,
   PlayArrow as ApplyIcon,
+  FolderSpecial as DirectoryIcon,
 } from '@mui/icons-material';
 import {
   Dialog as MuiDialog,
@@ -45,8 +26,13 @@ import api from '../../lib/api.js';
 import ListDirectlyDialog from '../../components/ListDirectlyDialog.jsx';
 import TemplateCustomizationDialog from '../../components/TemplateCustomizationDialog.jsx';
 import AsinReviewModal from '../../components/AsinReviewModal.jsx';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, yellowFilledButtonSx } from '../../theme/tableStyles.js';
 
-// Core columns to display in the directory table (same as TemplateListingsPage)
+// ── Core columns ──────────────────────────────────────────────────────────────
 const CORE_COLUMNS = [
   { key: 'action',              label: '*Action',            width: 80  },
   { key: 'customLabel',         label: 'Custom Label (SKU)', width: 150 },
@@ -69,25 +55,55 @@ function renderCellValue(col, listing) {
 const SELLER_DISPLAY_NAMES = { growmentality: 'Grow Mentality' };
 
 export default function ListingDirectoryPage() {
-  // ── Seller (fixed: "Testing") ────────────────────────────────────────────
+  const theme = useTheme();
+  const dashboardTheme = theme.customTokens?.dashboardSignature || dashboardSignatureTokens;
+
+  // ── Style tokens ──────────────────────────────────────────────────────────
+  const stickyFirstSx = {
+    position: 'sticky', left: 0, zIndex: 2,
+    backgroundColor: theme.palette.background.paper,
+    '&:after': { content: '""', position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: alpha(BRAND_DARK, 0.08) }
+  };
+  const stickyLastSx = {
+    position: 'sticky', right: 0,
+    backgroundColor: theme.palette.background.paper,
+    '&:before': { content: '""', position: 'absolute', left: 0, top: 0, bottom: 0, width: 1, backgroundColor: alpha(BRAND_DARK, 0.08) }
+  };
+  const inputFocusSx = {
+    '& .MuiOutlinedInput-root': {
+      '& .MuiOutlinedInput-notchedOutline': { transition: 'border-color 0.2s ease' },
+      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(BRAND_DARK, 0.35) },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#b8860b', borderWidth: 2 },
+    },
+  };
+  const selectFocusSx = {
+    '& label.Mui-focused': { color: '#b8860b' },
+    '& .MuiOutlinedInput-root': { '&.Mui-focused fieldset': { borderColor: '#b8860b' } },
+  };
+  const darkButtonSx = {
+    minHeight: 36, px: 2, borderRadius: 1.5,
+    color: '#fff', backgroundColor: BRAND_DARK, fontWeight: 700,
+    '&:hover': { backgroundColor: alpha(BRAND_DARK, 0.82) },
+    '&.Mui-disabled': { color: alpha('#fff', 0.35), backgroundColor: alpha(BRAND_DARK, 0.38) },
+  };
+  const outlinedButtonSx = {
+    minHeight: 36, px: 2, borderRadius: 1.5,
+    color: BRAND_DARK, borderColor: alpha(BRAND_DARK, 0.3), fontWeight: 600,
+    '&:hover': { borderColor: BRAND_YELLOW_DARK, backgroundColor: alpha(BRAND_YELLOW, 0.08) },
+    '&.Mui-disabled': { borderColor: alpha(BRAND_DARK, 0.15), color: alpha(BRAND_DARK, 0.3) },
+  };
+
+  // ── State ─────────────────────────────────────────────────────────────────
   const [seller, setSeller] = useState(null);
   const [sellerLoading, setSellerLoading] = useState(true);
-
-  // ── Template selection ───────────────────────────────────────────────────
   const [templates, setTemplates] = useState([]);
   const [template, setTemplate] = useState(null);
-
-  // ── Listings + pagination ────────────────────────────────────────────────
   const [listings, setListings] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
-  // ── Row selection ────────────────────────────────────────────────────────
   const [selectedListings, setSelectedListings] = useState(new Set());
-
-  // ── Filters ──────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
@@ -95,20 +111,14 @@ export default function ListingDirectoryPage() {
   const [scheduleTimeFrom, setScheduleTimeFrom] = useState('');
   const [scheduleStep, setScheduleStep] = useState(3);
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
-
-  // ── Dialogs ───────────────────────────────────────────────────────────────
   const [customizationDialog, setCustomizationDialog] = useState(false);
   const [listDirectlyDialog, setListDirectlyDialog] = useState(false);
   const [pendingInlineListings, setPendingInlineListings] = useState(null);
   const [reviewModal, setReviewModal] = useState(false);
   const [previewItems, setPreviewItems] = useState([]);
-
-  // Search debounce ref
   const searchTimeout = useRef(null);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Boot: find "Testing" seller + load all templates
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Boot ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const boot = async () => {
       try {
@@ -130,16 +140,11 @@ export default function ListingDirectoryPage() {
       }
     };
     boot();
-  }, [])
+  }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Fetch listings whenever template, seller, page, or price changes
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Fetch listings ────────────────────────────────────────────────────────
   const fetchListings = useCallback(async (pageOverride) => {
-    if (!template?._id || !seller?._id) {
-      setListings([]);
-      return;
-    }
+    if (!template?._id || !seller?._id) { setListings([]); return; }
     setLoading(true);
     try {
       const params = {
@@ -152,7 +157,6 @@ export default function ListingDirectoryPage() {
       if (priceMin) params.minPrice = priceMin;
       if (priceMax) params.maxPrice = priceMax;
       if (searchQuery.trim()) params.search = searchQuery.trim();
-
       const { data } = await api.get('/template-listings', { params });
       setListings(data.listings || []);
       setPagination(p => ({ ...p, ...data.pagination }));
@@ -164,24 +168,17 @@ export default function ListingDirectoryPage() {
     }
   }, [template, seller, pagination.page, pagination.limit, priceMin, priceMax, searchQuery]);
 
-  useEffect(() => {
-    fetchListings(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [template, seller, priceMin, priceMax]);
+  useEffect(() => { fetchListings(1); }, [template, seller, priceMin, priceMax]);
 
-  // Debounced search
   useEffect(() => {
     clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
       if (template && seller) fetchListings(1);
     }, 400);
     return () => clearTimeout(searchTimeout.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Selection helpers
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Selection helpers ─────────────────────────────────────────────────────
   const handleToggleSelect = id => {
     setSelectedListings(prev => {
       const next = new Set(prev);
@@ -194,9 +191,7 @@ export default function ListingDirectoryPage() {
     else setSelectedListings(new Set(listings.map(l => l._id)));
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Schedule Time helpers
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Schedule helpers ──────────────────────────────────────────────────────
   const scheduleReady = !!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1 && template && seller);
 
   const computeSchedulePreview = () => {
@@ -223,17 +218,11 @@ export default function ListingDirectoryPage() {
     try {
       const startDateTime = `${scheduleDate} ${scheduleTimeFrom}:00`;
       const { data } = await api.post('/template-listings/bulk-apply-schedule', {
-        templateId: template._id,
-        sellerId: seller._id,
-        startDateTime,
-        stepMinutes: scheduleStep,
-        batchFilter: 'all',
+        templateId: template._id, sellerId: seller._id,
+        startDateTime, stepMinutes: scheduleStep, batchFilter: 'all',
       });
-      if (data.updated === 0) {
-        setSuccess('No listings found for this template and seller.');
-      } else {
-        setSuccess(`Schedule applied to ${data.updated} listings (${data.firstTime} → ${data.lastTime})`);
-      }
+      if (data.updated === 0) setSuccess('No listings found for this template and seller.');
+      else setSuccess(`Schedule applied to ${data.updated} listings (${data.firstTime} → ${data.lastTime})`);
       fetchListings(1);
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to apply schedule times');
@@ -242,75 +231,37 @@ export default function ListingDirectoryPage() {
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Proof Read – open AsinReviewModal over selected rows
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Proof Read ────────────────────────────────────────────────────────────
   const handleProofRead = async () => {
     const selected = listings.filter(l => selectedListings.has(l._id));
-
-    // Build items immediately with loading state so modal opens right away
     const items = selected.map(l => ({
-      id: l._id,
-      asin: l._asinReference || '',
-      sku: l.customLabel || '',
+      id: l._id, asin: l._asinReference || '', sku: l.customLabel || '',
       status: 'loading',
-      sourceData: null,
+      sourceData: l._amazonSourcePrice ? { price: l._amazonSourcePrice, title: '', brand: '', images: [], description: '', color: '', compatibility: '' } : null,
       generatedListing: {
-        _existingListingId: l._id,
-        action: l.action,
-        customLabel: l.customLabel,
-        title: l.title,
-        startPrice: l.startPrice,
-        categoryId: l.categoryId,
-        categoryName: l.categoryName,
-        relationship: l.relationship,
-        relationshipDetails: l.relationshipDetails,
-        scheduleTime: l.scheduleTime,
-        description: l.description,
-        condition: l.condition,
-        conditionDescription: l.conditionDescription,
-        quantity: l.quantity,
+        _existingListingId: l._id, action: l.action, customLabel: l.customLabel,
+        title: l.title, startPrice: l.startPrice, categoryId: l.categoryId,
+        categoryName: l.categoryName, relationship: l.relationship,
+        relationshipDetails: l.relationshipDetails, scheduleTime: l.scheduleTime,
+        description: l.description, condition: l.condition,
+        conditionDescription: l.conditionDescription, quantity: l.quantity,
         customFields: l.customFields,
       },
-      warnings: [],
-      errors: []
+      warnings: [], errors: []
     }));
     setPreviewItems(items);
     setReviewModal(true);
-
-    // Fetch Amazon source data from the ASIN directory in the background
     const asinList = selected.map(l => l._asinReference).filter(Boolean);
-    if (asinList.length === 0) {
-      // No ASINs — flip all to ready immediately
-      setPreviewItems(items.map(i => ({ ...i, status: 'ready' })));
-      return;
-    }
+    if (asinList.length === 0) { setPreviewItems(items.map(i => ({ ...i, status: 'ready' }))); return; }
     try {
-      const { data } = await api.get('/asin-directory/by-asins', {
-        params: { asins: asinList.join(',') },
-      });
+      const { data } = await api.get('/asin-directory/by-asins', { params: { asins: asinList.join(',') } });
       const byAsin = {};
       (data || []).forEach(d => { byAsin[d.asin] = d; });
       setPreviewItems(prev => prev.map(item => {
         const src = byAsin[item.asin?.toUpperCase()];
-        return {
-          ...item,
-          status: 'ready',
-          sourceData: src
-            ? {
-                title: src.title,
-                brand: src.brand,
-                price: src.price,
-                images: src.images || [],
-                description: src.description,
-                color: src.color,
-                compatibility: src.compatibility,
-              }
-            : null,
-        };
+        return { ...item, status: 'ready', sourceData: src ? { title: src.title, brand: src.brand, price: src.price, images: src.images || [], description: src.description, color: src.color, compatibility: src.compatibility } : null };
       }));
     } catch {
-      // If the fetch fails, still flip to ready so the modal is usable
       setPreviewItems(prev => prev.map(i => ({ ...i, status: 'ready' })));
     }
   };
@@ -318,26 +269,16 @@ export default function ListingDirectoryPage() {
   const handleSaveFromReview = async (listings) => {
     try {
       await api.put('/template-listings/bulk-update', { listings });
-      setReviewModal(false);
-      setPreviewItems([]);
-      setSuccess('Listings updated successfully!');
-      fetchListings(1);
-    } catch (e) {
-      setError('Failed to save changes');
-    }
+      setReviewModal(false); setPreviewItems([]);
+      setSuccess('Listings updated successfully!'); fetchListings(1);
+    } catch (e) { setError('Failed to save changes'); }
   };
 
   const handleListDirectlyFromReview = (listings) => {
-    // Edits are carried into the CSV as-is — do NOT persist to DB here
-    setPendingInlineListings(listings);
-    setReviewModal(false);
-    setPreviewItems([]);
-    setListDirectlyDialog(true);
+    setPendingInlineListings(listings); setReviewModal(false); setPreviewItems([]); setListDirectlyDialog(true);
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CSV Download
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── CSV Download ──────────────────────────────────────────────────────────
   const handleDownloadCsv = async () => {
     if (!template?._id || !seller?._id) return;
     try {
@@ -345,277 +286,262 @@ export default function ListingDirectoryPage() {
       const ids = selectedListings.size > 0 ? [...selectedListings].join(',') : undefined;
       let url = `/template-listings/export-csv/${template._id}?sellerId=${seller._id}`;
       if (ids) url += `&listingIds=${ids}`;
-
       const response = await api.get(url, { responseType: 'blob' });
       const contentDisposition = response.headers['content-disposition'];
       let filename = `listings_${Date.now()}.csv`;
-      if (contentDisposition) {
-        const m = contentDisposition.match(/filename="?(.+)"?/i);
-        if (m?.[1]) filename = m[1].replace(/"/g, '');
-      }
+      if (contentDisposition) { const m = contentDisposition.match(/filename="?(.+)"?/i); if (m?.[1]) filename = m[1].replace(/"/g, ''); }
       const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.setAttribute('download', filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setSuccess('CSV downloaded successfully!');
-      fetchListings(1);
-    } catch (e) {
-      setError('Failed to download CSV');
-    } finally {
-      setLoading(false);
-    }
+      link.href = downloadUrl; link.setAttribute('download', filename);
+      document.body.appendChild(link); link.click(); link.remove();
+      setSuccess('CSV downloaded successfully!'); fetchListings(1);
+    } catch (e) { setError('Failed to download CSV'); } finally { setLoading(false); }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
-  const totalCols = CORE_COLUMNS.length + (template?.customColumns?.length || 0) + 2; // +checkbox +actions
+  // ── Render ────────────────────────────────────────────────────────────────
+  const totalCols = CORE_COLUMNS.length + (template?.customColumns?.length || 0) + 2;
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" fontWeight={700} gutterBottom>
-        Listing Directory
-      </Typography>
+    <AdminPageShell>
 
-      {error && (
-        <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-      {success && (
-        <Alert severity="success" onClose={() => setSuccess('')} sx={{ mb: 2 }}>
-          {success}
-        </Alert>
-      )}
+      <PageHeader title="Listing Directory" />
+
+      {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" onClose={() => setSuccess('')} sx={{ mb: 2 }}>{success}</Alert>}
 
       {/* ── Top filter bar ── */}
-      <Stack spacing={1.5} sx={{ mb: 2 }}>
-        {/* Row 1: Template selector + Search */}
-        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-          {/* Template */}
-          <FormControl size="small" sx={{ minWidth: 220 }}>
-            <InputLabel>Template</InputLabel>
-            <Select
-              label="Template"
-              value={template?._id || ''}
-              onChange={e => setTemplate(templates.find(t => t._id === e.target.value) || null)}
-            >
-              {templates.length === 0 && (
-                <MenuItem value="" disabled><em>No templates found</em></MenuItem>
-              )}
-              {templates.map(t => (
-                <MenuItem key={t._id} value={t._id}>{t.name}</MenuItem>
+      <Paper sx={{
+        p: 2, mb: 2,
+        borderRadius: `${dashboardTheme.radius.card}px`,
+        border: `1px solid ${alpha(BRAND_DARK, 0.08)}`,
+        boxShadow: dashboardTheme.shadows.card
+      }}>
+        <Stack spacing={2}>
+          {/* Row 1: Template selector + Search */}
+          <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap" useFlexGap>
+            <FormControl size="small" sx={{ minWidth: 220, ...selectFocusSx }}>
+              <InputLabel>Template</InputLabel>
+              <Select
+                label="Template"
+                value={template?._id || ''}
+                onChange={e => setTemplate(templates.find(t => t._id === e.target.value) || null)}
+              >
+                {templates.length === 0 && <MenuItem value="" disabled><em>No templates found</em></MenuItem>}
+                {templates.map(t => <MenuItem key={t._id} value={t._id}>{t.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+
+            <Box sx={{ flex: 1, minWidth: 200, maxWidth: 380 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search keywords and ASIN"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                sx={inputFocusSx}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" sx={{ color: alpha(BRAND_DARK, 0.35) }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+          </Stack>
+
+          {/* Row 2: Price range group + Schedule group + Action buttons */}
+          <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap" useFlexGap>
+
+            {/* ── Price Range group ── */}
+            <Paper variant="outlined" sx={{
+              display: 'inline-flex', alignItems: 'center', gap: 0,
+              borderColor: alpha(BRAND_DARK, 0.15), borderRadius: 2, overflow: 'hidden',
+              backgroundColor: theme.palette.background.paper,
+            }}>
+              <Box sx={{
+                px: 1.5, height: 38, display: 'flex', alignItems: 'center',
+                borderRight: `1px solid ${alpha(BRAND_DARK, 0.1)}`,
+                backgroundColor: alpha(BRAND_DARK, 0.03),
+              }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.72rem', color: alpha(BRAND_DARK, 0.5), whiteSpace: 'nowrap', letterSpacing: 0.3 }}>
+                  Price Range
+                </Typography>
+              </Box>
+              <OutlinedInput size="small" value={priceMin} onChange={e => setPriceMin(e.target.value)}
+                onBlur={() => fetchListings(1)} onKeyDown={e => e.key === 'Enter' && fetchListings(1)}
+                placeholder="Min"
+                sx={{
+                  width: 78, borderRadius: 0,
+                  '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                  '&.Mui-focused': { backgroundColor: alpha(BRAND_YELLOW, 0.05) },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                  '& input': { textAlign: 'center' }
+                }} />
+              <Typography variant="body2" sx={{ px: 0.5, color: alpha(BRAND_DARK, 0.25), fontWeight: 600 }}>–</Typography>
+              <OutlinedInput size="small" value={priceMax} onChange={e => setPriceMax(e.target.value)}
+                onBlur={() => fetchListings(1)} onKeyDown={e => e.key === 'Enter' && fetchListings(1)}
+                placeholder="Max"
+                sx={{
+                  width: 78, borderRadius: 0,
+                  borderLeft: `1px solid ${alpha(BRAND_DARK, 0.07)}`,
+                  '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                  '&.Mui-focused': { backgroundColor: alpha(BRAND_YELLOW, 0.05) },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                  '& input': { textAlign: 'center' }
+                }} />
+            </Paper>
+
+            {/* ── Schedule group ── */}
+            <Paper variant="outlined" sx={{
+              display: 'inline-flex', alignItems: 'stretch', gap: 0,
+              borderColor: alpha(BRAND_DARK, 0.15), borderRadius: 2, overflow: 'hidden',
+              borderLeft: `3px solid ${BRAND_YELLOW_DARK}`,
+              backgroundColor: theme.palette.background.paper,
+            }}>
+              <Box sx={{
+                px: 1.5, display: 'flex', alignItems: 'center', gap: 0.5,
+                borderRight: `1px solid ${alpha(BRAND_DARK, 0.1)}`,
+                backgroundColor: alpha(BRAND_DARK, 0.03),
+              }}>
+                <CalendarIcon sx={{ fontSize: 13, color: BRAND_YELLOW_DARK }} />
+                <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.72rem', color: alpha(BRAND_DARK, 0.5), letterSpacing: 0.3 }}>
+                  Schedule
+                </Typography>
+              </Box>
+              {[
+                { label: 'Date', content: (
+                  <OutlinedInput size="small" type="date" value={scheduleDate}
+                    onChange={e => setScheduleDate(e.target.value)}
+                    sx={{ width: 148, borderRadius: 0, '& .MuiOutlinedInput-notchedOutline': { border: 'none' }, '&.Mui-focused': { backgroundColor: alpha(BRAND_YELLOW, 0.05) }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' }, '& input': { fontSize: '0.84rem', py: 0.6 } }} />
+                )},
+                { label: 'Start (24h)', content: (
+                  <OutlinedInput size="small" placeholder="HH:MM" value={scheduleTimeFrom}
+                    onChange={e => { const v = e.target.value.replace(/[^0-9:]/g, ''); if (v.length <= 5) setScheduleTimeFrom(v); }}
+                    sx={{ width: 96, borderRadius: 0, '& .MuiOutlinedInput-notchedOutline': { border: 'none' }, '&.Mui-focused': { backgroundColor: alpha(BRAND_YELLOW, 0.05) }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' }, '& input': { fontSize: '0.84rem', py: 0.6 } }} />
+                )},
+                { label: 'Interval (min)', content: (
+                  <OutlinedInput size="small" type="number" value={scheduleStep}
+                    onChange={e => setScheduleStep(Math.max(1, parseInt(e.target.value) || 1))}
+                    inputProps={{ min: 1 }}
+                    sx={{ width: 84, borderRadius: 0, '& .MuiOutlinedInput-notchedOutline': { border: 'none' }, '&.Mui-focused': { backgroundColor: alpha(BRAND_YELLOW, 0.05) }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' }, '& input': { fontSize: '0.84rem', py: 0.6 } }} />
+                )},
+              ].map(({ label, content }) => (
+                <Box key={label} sx={{ borderRight: `1px solid ${alpha(BRAND_DARK, 0.08)}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="caption" sx={{ display: 'block', px: 1.25, pt: 0.5, fontSize: '0.6rem', fontWeight: 700, letterSpacing: 0.4, color: alpha(BRAND_DARK, 0.35), textTransform: 'uppercase', lineHeight: 1.2 }}>
+                    {label}
+                  </Typography>
+                  {content}
+                </Box>
               ))}
-            </Select>
-          </FormControl>
-
-          <Box sx={{ flex: 1, minWidth: 200, maxWidth: 380 }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Search keywords and ASIN"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Box>
-        </Stack>
-
-        {/* Row 2: Price range + Schedule + Action buttons */}
-        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-          {/* Price Range */}
-          <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-              Price Range
-            </Typography>
-            <OutlinedInput
-              size="small"
-              value={priceMin}
-              onChange={e => setPriceMin(e.target.value)}
-              onBlur={() => fetchListings(1)}
-              onKeyDown={e => e.key === 'Enter' && fetchListings(1)}
-              sx={{ width: 70, '& input': { py: 0.5, px: 1 } }}
-              placeholder="Min"
-            />
-            <Typography variant="caption">–</Typography>
-            <OutlinedInput
-              size="small"
-              value={priceMax}
-              onChange={e => setPriceMax(e.target.value)}
-              onBlur={() => fetchListings(1)}
-              onKeyDown={e => e.key === 'Enter' && fetchListings(1)}
-              sx={{ width: 70, '& input': { py: 0.5, px: 1 } }}
-              placeholder="Max"
-            />
-          </Paper>
-
-          {/* Schedule block */}
-          <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2 }}>
-            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-              <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
-              <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
-                SCHEDULE
-              </Typography>
-              {schedulePreviewLast && (
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11, ml: 1 }}>
-                  — last: {schedulePreviewLast}
-                </Typography>
-              )}
-            </Stack>
-            <Stack direction="row" alignItems="flex-end" spacing={1.5}>
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
-                  Date
-                </Typography>
-                <OutlinedInput
-                  size="small"
-                  type="date"
-                  value={scheduleDate}
-                  onChange={e => setScheduleDate(e.target.value)}
-                  sx={{ width: 148, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
-                />
-              </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
-                  Start time (24h)
-                </Typography>
-                <OutlinedInput
-                  size="small"
-                  placeholder="HH:MM"
-                  value={scheduleTimeFrom}
-                  onChange={e => {
-                    const v = e.target.value.replace(/[^0-9:]/g, '');
-                    if (v.length <= 5) setScheduleTimeFrom(v);
-                  }}
-                  sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
-                />
-              </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
-                  Interval (min)
-                </Typography>
-                <OutlinedInput
-                  size="small"
-                  type="number"
-                  value={scheduleStep}
-                  onChange={e => setScheduleStep(Math.max(1, parseInt(e.target.value) || 1))}
-                  inputProps={{ min: 1 }}
-                  sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
-                />
-              </Box>
-              <Tooltip title={!scheduleReady ? 'Fill in date, start time, and interval first' : `Apply schedule to all ${pagination.total} listings`}>
-                <span>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<ApplyIcon />}
+              {/* Apply — flush inside pill */}
+              <Tooltip title={!scheduleReady ? 'Fill date, start time and interval first' : `Apply to all ${pagination.total} listings`}>
+                <span style={{ display: 'flex' }}>
+                  <Button variant="contained" size="small" startIcon={<ApplyIcon sx={{ fontSize: '1rem !important' }} />}
                     disabled={!scheduleReady || loading}
                     onClick={() => setScheduleConfirmOpen(true)}
-                    sx={{ mb: 0.2, bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}
-                  >
+                    sx={{
+                      height: '100%', borderRadius: 0, fontWeight: 700, px: 2, boxShadow: 'none',
+                      color: '#fff', backgroundColor: '#2e7d32',
+                      '&:hover': { backgroundColor: '#1b5e20', boxShadow: 'none' },
+                      '&.Mui-disabled': { color: alpha('#fff', 0.45), backgroundColor: alpha('#2e7d32', 0.35), boxShadow: 'none' }
+                    }}>
                     Apply
                   </Button>
                 </span>
               </Tooltip>
+            </Paper>
+
+            {schedulePreviewLast && (
+              <Typography variant="caption" sx={{ fontSize: '0.72rem', color: alpha(BRAND_DARK, 0.4), whiteSpace: 'nowrap' }}>
+                Last: {schedulePreviewLast}
+              </Typography>
+            )}
+
+            <Box sx={{ flex: 1 }} />
+
+            {/* ── Action buttons ── */}
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button variant="contained" startIcon={<SettingsIcon />} disabled={!template}
+                onClick={() => setCustomizationDialog(true)} sx={darkButtonSx}>
+                Customize
+              </Button>
+              <Button variant="contained" disabled={!template || !seller || selectedListings.size === 0}
+                onClick={() => setListDirectlyDialog(true)} sx={darkButtonSx}>
+                List Directly
+              </Button>
+              <Button variant="outlined" startIcon={<ProofReadIcon />}
+                disabled={!template || selectedListings.size === 0}
+                onClick={handleProofRead} sx={outlinedButtonSx}>
+                Proof Read
+              </Button>
+              <Button variant="contained" startIcon={<DownloadIcon />}
+                disabled={!template || !seller || loading}
+                onClick={handleDownloadCsv} sx={yellowFilledButtonSx}>
+                Download CSV
+              </Button>
             </Stack>
-          </Paper>
+          </Stack>
 
-          <Box sx={{ flex: 1 }} />
-
-          {/* Customize (view only) */}
-          <Button
-            variant="contained"
-            startIcon={<SettingsIcon />}
-            disabled={!template}
-            onClick={() => setCustomizationDialog(true)}
-            sx={{ bgcolor: '#222', '&:hover': { bgcolor: '#444' } }}
-          >
-            Customize
-          </Button>
-
-          {/* List Directly */}
-          <Button
-            variant="contained"
-            disabled={!template || !seller || selectedListings.size === 0}
-            onClick={() => setListDirectlyDialog(true)}
-            sx={{ bgcolor: '#222', '&:hover': { bgcolor: '#444' } }}
-          >
-            List Directly
-          </Button>
-
-          {/* Proof Read */}
-          <Button
-            variant="outlined"
-            startIcon={<ProofReadIcon />}
-            disabled={!template || selectedListings.size === 0}
-            onClick={handleProofRead}
-          >
-            Proof Read
-          </Button>
-
-          {/* Download CSV */}
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            disabled={!template || !seller || loading}
-            onClick={handleDownloadCsv}
-          >
-            Download CSV
-          </Button>
         </Stack>
-      </Stack>
+      </Paper>
 
       {/* ── Listings panel ── */}
-      <Paper variant="outlined">
-        {/* Template header + batch filter toolbar */}
-        <Toolbar
-          variant="dense"
-          sx={{ borderBottom: 1, borderColor: 'divider', minHeight: 48, gap: 1, flexWrap: 'wrap' }}
-        >
-          <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1 }}>
-            {template ? `${template.name} — Listings` : 'Select a product to load listings'}
+      <Paper sx={{
+        borderRadius: `${dashboardTheme.radius.card}px`,
+        border: `1px solid ${alpha(BRAND_DARK, 0.1)}`,
+        boxShadow: dashboardTheme.shadows.table,
+        overflow: 'hidden'
+      }}>
+        {/* Panel header bar */}
+        <Box sx={{
+          px: 2.5, py: 1.25,
+          backgroundColor: BRAND_DARK,
+          borderBottom: `2px solid ${BRAND_YELLOW}`,
+          display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap'
+        }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.4, color: alpha('#fff', 0.95), flex: 1 }}>
+            {template ? `${template.name} — Listings` : 'Select a template to load listings'}
           </Typography>
 
-          {sellerLoading && <CircularProgress size={16} />}
+          {sellerLoading && <CircularProgress size={14} sx={{ color: alpha('#fff', 0.6) }} />}
           {!sellerLoading && !seller && (
-            <Chip label="Seller 'growmentality' not found" color="error" size="small" />
+            <Chip label="Seller 'growmentality' not found" size="small"
+              sx={{ backgroundColor: 'rgba(220,38,38,0.2)', color: '#fca5a5', border: '1px solid rgba(220,38,38,0.3)', fontWeight: 600 }} />
           )}
           {seller && (
             <Chip
               label={`Seller: ${SELLER_DISPLAY_NAMES[seller.user?.username?.toLowerCase()] || seller.user?.username || 'Grow Mentality'}`}
               size="small"
-              color="default"
-              variant="outlined"
+              sx={{ backgroundColor: alpha('#fff', 0.1), color: alpha('#fff', 0.8), border: `1px solid ${alpha('#fff', 0.2)}`, fontWeight: 600 }}
             />
           )}
-
           {template && selectedListings.size > 0 && (
             <Chip
               label={`${selectedListings.size} selected`}
-              color="primary"
               size="small"
               onDelete={() => setSelectedListings(new Set())}
+              sx={{
+                backgroundColor: BRAND_YELLOW, color: BRAND_DARK, fontWeight: 700,
+                border: `1px solid ${BRAND_YELLOW_DARK}`,
+                '& .MuiChip-deleteIcon': { color: BRAND_DARK, '&:hover': { color: alpha(BRAND_DARK, 0.7) } }
+              }}
             />
           )}
-        </Toolbar>
+        </Box>
 
         {/* Table */}
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-            <CircularProgress />
+          <Box sx={{ py: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+            <CircularProgress size={28} sx={{ color: BRAND_YELLOW_DARK }} />
+            <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.4), fontWeight: 500 }}>
+              Loading listings…
+            </Typography>
           </Box>
         ) : !template ? (
-          <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
-            <Typography variant="body2">
+          <Box sx={{ py: 6, textAlign: 'center' }}>
+            <DirectoryIcon sx={{ fontSize: 48, color: alpha(BRAND_DARK, 0.12), mb: 1 }} />
+            <Typography variant="body2" sx={{ color: alpha(BRAND_DARK, 0.4) }}>
               Select a template above to load listings.
             </Typography>
           </Box>
@@ -624,36 +550,43 @@ export default function ListingDirectoryPage() {
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell
-                    padding="checkbox"
-                    sx={{ fontWeight: 700, position: 'sticky', left: 0, bgcolor: 'background.paper', zIndex: 2 }}
-                  >
+                  {/* Sticky checkbox header */}
+                  <TableCell padding="checkbox" sx={{
+                    ...tableHeaderCellSx,
+                    ...stickyFirstSx,
+                    backgroundColor: BRAND_DARK,
+                    zIndex: 4,
+                    minWidth: 48,
+                  }}>
                     <Checkbox
                       size="small"
                       indeterminate={selectedListings.size > 0 && selectedListings.size < listings.length}
                       checked={listings.length > 0 && selectedListings.size === listings.length}
                       onChange={handleToggleAll}
+                      sx={{
+                        color: alpha('#fff', 0.6),
+                        '&.Mui-checked': { color: BRAND_YELLOW },
+                        '&.MuiCheckbox-indeterminate': { color: BRAND_YELLOW },
+                      }}
                     />
                   </TableCell>
                   {CORE_COLUMNS.map(col => (
-                    <TableCell key={col.key} sx={{ fontWeight: 700, minWidth: col.width, whiteSpace: 'nowrap' }}>
+                    <TableCell key={col.key} sx={{ ...tableHeaderCellSx, minWidth: col.width }}>
                       {col.label}
                     </TableCell>
                   ))}
                   {template.customColumns?.map(col => (
-                    <TableCell key={col.name} sx={{ fontWeight: 700, minWidth: 150, whiteSpace: 'nowrap' }}>
-                      {col.displayName}
+                    <TableCell key={col.name} sx={{ ...tableHeaderCellSx, minWidth: 150 }}>
+                      C:{col.displayName}
                     </TableCell>
                   ))}
-                  <TableCell
-                    sx={{ fontWeight: 700, position: 'sticky', right: 0, bgcolor: 'background.paper', zIndex: 1 }}
-                  />
+                  <TableCell sx={{ ...tableHeaderCellSx, ...stickyLastSx, zIndex: 3, backgroundColor: BRAND_DARK }} />
                 </TableRow>
               </TableHead>
               <TableBody>
                 {listings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={totalCols} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                    <TableCell colSpan={totalCols} align="center" sx={{ py: 5, color: alpha(BRAND_DARK, 0.4), backgroundColor: alpha(BRAND_DARK, 0.02) }}>
                       No listings found
                     </TableCell>
                   </TableRow>
@@ -663,30 +596,27 @@ export default function ListingDirectoryPage() {
                       key={listing._id}
                       hover
                       selected={selectedListings.has(listing._id)}
+                      sx={tableBodyRowSx}
                     >
-                      <TableCell
-                        padding="checkbox"
-                        sx={{ position: 'sticky', left: 0, bgcolor: 'background.paper' }}
-                      >
+                      <TableCell padding="checkbox" sx={{ ...stickyFirstSx }}>
                         <Checkbox
                           size="small"
                           checked={selectedListings.has(listing._id)}
                           onChange={() => handleToggleSelect(listing._id)}
+                          sx={{ '&.Mui-checked': { color: BRAND_YELLOW_DARK } }}
                         />
                       </TableCell>
                       {CORE_COLUMNS.map(col => (
-                        <TableCell key={col.key} sx={{ whiteSpace: 'nowrap' }}>
+                        <TableCell key={col.key} sx={{ whiteSpace: 'nowrap', fontSize: '0.82rem', color: BRAND_DARK }}>
                           {renderCellValue(col, listing)}
                         </TableCell>
                       ))}
                       {template.customColumns?.map(col => (
-                        <TableCell key={col.name}>
+                        <TableCell key={col.name} sx={{ fontSize: '0.82rem', color: BRAND_DARK }}>
                           {listing.customFields?.[col.name] || '-'}
                         </TableCell>
                       ))}
-                      <TableCell
-                        sx={{ position: 'sticky', right: 0, bgcolor: 'background.paper' }}
-                      />
+                      <TableCell sx={{ ...stickyLastSx }} />
                     </TableRow>
                   ))
                 )}
@@ -696,21 +626,23 @@ export default function ListingDirectoryPage() {
         )}
 
         {pagination.pages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2, borderTop: `1px solid ${alpha(BRAND_DARK, 0.07)}` }}>
             <Pagination
               count={pagination.pages}
               page={pagination.page}
-              onChange={(_, page) => {
-                setPagination(p => ({ ...p, page }));
-                fetchListings(page);
+              onChange={(_, page) => { setPagination(p => ({ ...p, page })); fetchListings(page); }}
+              sx={{
+                '& .MuiPaginationItem-root.Mui-selected': {
+                  backgroundColor: BRAND_YELLOW, color: BRAND_DARK, fontWeight: 700,
+                  '&:hover': { backgroundColor: BRAND_YELLOW_DARK }
+                }
               }}
-              color="primary"
             />
           </Box>
         )}
       </Paper>
 
-      {/* ── Dialogs ── */}
+      {/* ── Dialogs (logic unchanged) ── */}
       <TemplateCustomizationDialog
         open={customizationDialog}
         onClose={() => setCustomizationDialog(false)}
@@ -731,6 +663,7 @@ export default function ListingDirectoryPage() {
 
       <AsinReviewModal
         open={reviewModal}
+        templateName={template?.name}
         onClose={() => { setReviewModal(false); setPreviewItems([]); }}
         previewItems={previewItems}
         onSave={handleSaveFromReview}
@@ -744,35 +677,32 @@ export default function ListingDirectoryPage() {
         ]}
       />
 
-      {/* Schedule confirmation dialog */}
+      {/* Schedule confirm dialog */}
       <MuiDialog open={scheduleConfirmOpen} onClose={() => setScheduleConfirmOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Apply Schedule Times</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ pb: 1, borderBottom: `2px solid ${BRAND_YELLOW}`, backgroundColor: BRAND_DARK }}>
+          <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700 }}>Apply Schedule Times</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5 }}>
           <Typography variant="body2" gutterBottom>
             Schedule times will be assigned to <strong>{pagination.total} listings</strong> in <strong>{template?.name}</strong>:
           </Typography>
-          <Typography variant="body2" gutterBottom>
-            • Starting: <strong>{scheduleDate} {scheduleTimeFrom}:00</strong>
-          </Typography>
-          <Typography variant="body2" gutterBottom>
-            • Interval: <strong>{scheduleStep} minute{scheduleStep !== 1 ? 's' : ''}</strong> between each listing
-          </Typography>
+          <Typography variant="body2" gutterBottom>• Starting: <strong>{scheduleDate} {scheduleTimeFrom}:00</strong></Typography>
+          <Typography variant="body2" gutterBottom>• Interval: <strong>{scheduleStep} minute{scheduleStep !== 1 ? 's' : ''}</strong> between each listing</Typography>
           {schedulePreviewLast && (
-            <Typography variant="body2" gutterBottom>
-              • Last listing: <strong>{schedulePreviewLast}</strong>
-            </Typography>
+            <Typography variant="body2" gutterBottom>• Last listing: <strong>{schedulePreviewLast}</strong></Typography>
           )}
-          <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
-            Existing Schedule Time values will be overwritten.
+          <Typography variant="body2" sx={{ mt: 1.5, color: '#b45309', fontWeight: 500, backgroundColor: 'rgba(251,191,36,0.12)', p: 1, borderRadius: 1.5, border: '1px solid rgba(251,191,36,0.3)' }}>
+            ⚠ Existing Schedule Time values will be overwritten.
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setScheduleConfirmOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleApplySchedule} sx={{ bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setScheduleConfirmOpen(false)} sx={{ color: alpha(BRAND_DARK, 0.6) }}>Cancel</Button>
+          <Button variant="contained" onClick={handleApplySchedule}
+            sx={{ borderRadius: 1.5, fontWeight: 700, color: '#fff', backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}>
             Confirm
           </Button>
         </DialogActions>
       </MuiDialog>
-    </Box>
+    </AdminPageShell>
   );
 }
