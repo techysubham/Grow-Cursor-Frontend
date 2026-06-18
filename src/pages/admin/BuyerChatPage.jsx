@@ -65,18 +65,20 @@ export default function BuyerChatPage() {
   const [filterType, setFilterType] = useState(() => getInitialState('filterType', 'ALL'));
   const [filterMarketplace, setFilterMarketplace] = useState(() => getInitialState('filterMarketplace', ''));
   const [showUnreadOnly, setShowUnreadOnly] = useState(() => getInitialState('showUnreadOnly', false));
+  const [buyerUnrepliedOnly, setBuyerUnrepliedOnly] = useState(() => getInitialState('buyerUnrepliedOnly', false));
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingThreads, setLoadingThreads] = useState(false);
 
   // Pending filter state — only applied when user clicks "Apply Filters"
-  const initialFilters = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '', excludeClient: true };
+  const initialFilters = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, buyerUnrepliedOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '', excludeClient: true };
   const [pendingFilters, setPendingFilters] = useState({
     ...initialFilters,
     seller: getInitialState('selectedSeller', ''),
     filterType: getInitialState('filterType', 'ALL'),
     filterMarketplace: getInitialState('filterMarketplace', ''),
     showUnreadOnly: getInitialState('showUnreadOnly', false),
+    buyerUnrepliedOnly: getInitialState('buyerUnrepliedOnly', false),
     searchQuery: getInitialState('searchQuery', ''),
     excludeClient: getInitialState('excludeClient', true),
   });
@@ -165,6 +167,7 @@ export default function BuyerChatPage() {
       filterType,
       filterMarketplace,
       showUnreadOnly,
+      buyerUnrepliedOnly,
       excludeClient: pendingFilters.excludeClient
     };
     try {
@@ -172,7 +175,7 @@ export default function BuyerChatPage() {
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedThread, searchQuery, selectedSeller, pendingFilters.excludeClient]);
+  }, [selectedThread, searchQuery, selectedSeller, filterType, filterMarketplace, showUnreadOnly, buyerUnrepliedOnly, pendingFilters.excludeClient]);
 
 
 
@@ -435,34 +438,36 @@ export default function BuyerChatPage() {
   }
 
   function handleClearFilters() {
-    const reset = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '', excludeClient: pendingFilters.excludeClient };
+    const reset = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, buyerUnrepliedOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '', excludeClient: pendingFilters.excludeClient };
     setPendingFilters(reset);
     setSelectedSeller('');
     setFilterType('ALL');
     setFilterMarketplace('');
     setShowUnreadOnly(false);
+    setBuyerUnrepliedOnly(false);
     setSearchQuery('');
     setAppliedDateMode('none');
     setDateFrom('');
     setDateTo('');
     setPage(1);
-    loadThreads(true, { sellerId: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, searchQuery: '', dateFrom: '', dateTo: '', excludeClient: pendingFilters.excludeClient });
+    loadThreads(true, { sellerId: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, buyerUnrepliedOnly: false, searchQuery: '', dateFrom: '', dateTo: '', excludeClient: pendingFilters.excludeClient });
   }
 
   function handleApplyFilters() {
-    const { seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, searchQuery: sq, dateMode, dateSingle, dateFrom: df, dateTo: dt, excludeClient: ec } = pendingFilters;
+    const { seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, buyerUnrepliedOnly: bu, searchQuery: sq, dateMode, dateSingle, dateFrom: df, dateTo: dt, excludeClient: ec } = pendingFilters;
     const effectiveDateFrom = dateMode === 'single' ? dateSingle : dateMode === 'range' ? df : '';
     const effectiveDateTo = dateMode === 'single' ? dateSingle : dateMode === 'range' ? dt : '';
     setSelectedSeller(seller);
     setFilterType(ft);
     setFilterMarketplace(fm);
     setShowUnreadOnly(su);
+    setBuyerUnrepliedOnly(bu);
     setSearchQuery(sq);
     setAppliedDateMode(dateMode);
     setDateFrom(effectiveDateFrom);
     setDateTo(effectiveDateTo);
     setPage(1);
-    loadThreads(true, { sellerId: seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, searchQuery: sq, dateFrom: effectiveDateFrom, dateTo: effectiveDateTo, excludeClient: ec });
+    loadThreads(true, { sellerId: seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, buyerUnrepliedOnly: bu, searchQuery: sq, dateFrom: effectiveDateFrom, dateTo: effectiveDateTo, excludeClient: ec });
   }
 
   async function loadThreads(reset = false, overrides = {}) {
@@ -476,6 +481,7 @@ export default function BuyerChatPage() {
       const effectiveFilterType = 'filterType' in overrides ? overrides.filterType : filterType;
       const effectiveFilterMarketplace = 'filterMarketplace' in overrides ? overrides.filterMarketplace : filterMarketplace;
       const effectiveShowUnreadOnly = 'showUnreadOnly' in overrides ? overrides.showUnreadOnly : showUnreadOnly;
+      const effectiveBuyerUnrepliedOnly = 'buyerUnrepliedOnly' in overrides ? overrides.buyerUnrepliedOnly : buyerUnrepliedOnly;
       const effectiveSearch = 'searchQuery' in overrides ? overrides.searchQuery : searchQuery;
       const effectiveDateFrom = 'dateFrom' in overrides ? overrides.dateFrom : dateFrom;
       const effectiveDateTo = 'dateTo' in overrides ? overrides.dateTo : dateTo;
@@ -488,6 +494,7 @@ export default function BuyerChatPage() {
         filterType: effectiveFilterType,
         filterMarketplace: effectiveFilterMarketplace,
         showUnreadOnly: effectiveShowUnreadOnly,
+        buyerUnrepliedOnly: effectiveBuyerUnrepliedOnly,
         excludeClient: effectiveExcludeClient
       };
 
@@ -907,6 +914,16 @@ export default function BuyerChatPage() {
             </FormControl>
 
             {/* DATE FILTER — mode selector + conditional inputs */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5, py: 0.25, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>Needs Reply</Typography>
+              <Switch
+                size="small"
+                checked={!!pendingFilters.buyerUnrepliedOnly}
+                onChange={(e) => setPendingFilters(p => ({ ...p, buyerUnrepliedOnly: e.target.checked }))}
+                sx={{ '& .MuiSwitch-thumb': { bgcolor: pendingFilters.buyerUnrepliedOnly ? BRAND_YELLOW : undefined }, '& .MuiSwitch-track': { bgcolor: pendingFilters.buyerUnrepliedOnly ? `${BRAND_YELLOW} !important` : undefined } }}
+              />
+            </Box>
+
             <FormControl fullWidth size="small">
               <InputLabel>Date Filter</InputLabel>
               <Select
