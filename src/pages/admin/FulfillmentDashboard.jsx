@@ -1517,6 +1517,7 @@ function FulfillmentDashboard() {
   const [error, setError] = useState('');
   const [pollResults, setPollResults] = useState(null);
   const [pollRunStatus, setPollRunStatus] = useState({});
+  const [pollRunDetail, setPollRunDetail] = useState(null);
   const [copied, setCopied] = useState(false);
   const [copiedText, setCopiedText] = useState('');
 
@@ -2360,6 +2361,38 @@ function FulfillmentDashboard() {
     if (run.status && run.status !== 'completed') pieces.push(run.status);
     return `${formatPollRunTime(run.completedAt || run.startedAt)}${pieces.length ? ` (${pieces.join(', ')})` : ''}`;
   }, [formatPollRunTime]);
+
+  const getPollRunRows = useCallback((run) => {
+    if (!run?.results || !Array.isArray(run.results)) return [];
+
+    return run.results.flatMap((result) => {
+      const sellerName = result.sellerName || result.username || result.sellerId || 'Unknown seller';
+
+      if (Array.isArray(result.newOrders) && result.newOrders.length > 0) {
+        return result.newOrders.map((orderId) => ({
+          sellerName,
+          orderId,
+          detail: 'New order'
+        }));
+      }
+
+      if (Array.isArray(result.updatedOrders) && result.updatedOrders.length > 0) {
+        return result.updatedOrders.map((order) => ({
+          sellerName,
+          orderId: order.orderId,
+          detail: Array.isArray(order.changedFields) && order.changedFields.length > 0
+            ? order.changedFields.join(', ')
+            : 'Updated'
+        }));
+      }
+
+      if (result.error) {
+        return [{ sellerName, orderId: '-', detail: result.error }];
+      }
+
+      return [];
+    });
+  }, []);
 
   async function fetchPollRunStatus() {
     try {
@@ -3280,6 +3313,10 @@ function FulfillmentDashboard() {
   const PollRunStatusStrip = () => {
     const newOrders = pollRunStatus['poll-new-orders'] || {};
     const updates = pollRunStatus['poll-order-updates'] || {};
+    const openRunDetail = (title, run) => {
+      if (!run) return;
+      setPollRunDetail({ title, run });
+    };
 
     return (
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} sx={{ mt: 1 }} flexWrap="wrap">
@@ -3287,25 +3324,29 @@ function FulfillmentDashboard() {
           size="small"
           variant="outlined"
           label={`Cron new orders: ${formatPollRunSummary(newOrders.cron)}`}
-          sx={{ maxWidth: '100%', justifyContent: 'flex-start' }}
+          onClick={() => openRunDetail('Cron New Orders', newOrders.cron)}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start', cursor: newOrders.cron ? 'pointer' : 'default' }}
         />
         <Chip
           size="small"
           variant="outlined"
           label={`Cron updates: ${formatPollRunSummary(updates.cron)}`}
-          sx={{ maxWidth: '100%', justifyContent: 'flex-start' }}
+          onClick={() => openRunDetail('Cron Order Updates', updates.cron)}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start', cursor: updates.cron ? 'pointer' : 'default' }}
         />
         <Chip
           size="small"
           variant="outlined"
           label={`Manual new orders: ${formatPollRunSummary(newOrders.manual)}`}
-          sx={{ maxWidth: '100%', justifyContent: 'flex-start' }}
+          onClick={() => openRunDetail('Manual New Orders', newOrders.manual)}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start', cursor: newOrders.manual ? 'pointer' : 'default' }}
         />
         <Chip
           size="small"
           variant="outlined"
           label={`Manual updates: ${formatPollRunSummary(updates.manual)}`}
-          sx={{ maxWidth: '100%', justifyContent: 'flex-start' }}
+          onClick={() => openRunDetail('Manual Order Updates', updates.manual)}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start', cursor: updates.manual ? 'pointer' : 'default' }}
         />
       </Stack>
     );
@@ -3518,7 +3559,7 @@ function FulfillmentDashboard() {
                 )}
               </Stack>
 
-              {isSuperAdmin && <PollRunStatusStrip />}
+              <PollRunStatusStrip />
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
                 <FormControl size="small" sx={{ flex: '1 1 120px' }}>
@@ -3842,7 +3883,7 @@ function FulfillmentDashboard() {
                 )}
               </Stack>
 
-              {isSuperAdmin && <PollRunStatusStrip />}
+              <PollRunStatusStrip />
 
               <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: 'wrap', width: '100%' }}>
                 <FormControl size="small" sx={{ minWidth: 135 }}>
@@ -5439,6 +5480,71 @@ function FulfillmentDashboard() {
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
             <Button onClick={() => setHistoryDialogOpen(false)} color="inherit">
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={!!pollRunDetail}
+          onClose={() => setPollRunDetail(null)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h6" fontWeight="bold">
+                {pollRunDetail?.title || 'Poll Run Details'}
+              </Typography>
+              {pollRunDetail?.run && (
+                <Typography variant="body2" color="text.secondary">
+                  {formatPollRunTime(pollRunDetail.run.completedAt || pollRunDetail.run.startedAt)}
+                </Typography>
+              )}
+            </Box>
+            <IconButton onClick={() => setPollRunDetail(null)} size="small">
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            {pollRunDetail?.run?.error && (
+              <Alert severity={pollRunDetail.run.status === 'skipped' ? 'warning' : 'error'} sx={{ mb: 2 }}>
+                {pollRunDetail.run.error}
+              </Alert>
+            )}
+            {pollRunDetail?.run && getPollRunRows(pollRunDetail.run).length > 0 ? (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: 'action.hover' }}>
+                      <TableCell>Seller</TableCell>
+                      <TableCell>Order ID</TableCell>
+                      <TableCell>Details</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {getPollRunRows(pollRunDetail.run).map((row, index) => (
+                      <TableRow key={`${row.sellerName}-${row.orderId}-${index}`}>
+                        <TableCell>{row.sellerName}</TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontFamily="monospace">
+                            {row.orderId || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{row.detail}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>
+                No order-level details were recorded for this run.
+              </Typography>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setPollRunDetail(null)} color="inherit">
               Close
             </Button>
           </DialogActions>
