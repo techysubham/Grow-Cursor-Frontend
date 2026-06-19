@@ -2386,6 +2386,14 @@ function FulfillmentDashboard() {
         }));
       }
 
+      if (Number(result.newMessages || 0) > 0) {
+        return [{
+          sellerName,
+          orderId: '-',
+          detail: `${result.newMessages} new message${result.newMessages > 1 ? 's' : ''}${result.fetched !== undefined ? ` (${result.fetched} fetched)` : ''}`
+        }];
+      }
+
       if (result.error) {
         return [{ sellerName, orderId: '-', detail: result.error }];
       }
@@ -3313,6 +3321,7 @@ function FulfillmentDashboard() {
   const PollRunStatusStrip = () => {
     const newOrders = pollRunStatus['poll-new-orders'] || {};
     const updates = pollRunStatus['poll-order-updates'] || {};
+    const messages = pollRunStatus['buyer-chat-check-new'] || {};
     const openRunDetail = (title, run) => {
       if (!run) return;
       setPollRunDetail({ title, run });
@@ -3347,6 +3356,20 @@ function FulfillmentDashboard() {
           label={`Manual updates: ${formatPollRunSummary(updates.manual)}`}
           onClick={() => openRunDetail('Manual Order Updates', updates.manual)}
           sx={{ maxWidth: '100%', justifyContent: 'flex-start', cursor: updates.manual ? 'pointer' : 'default' }}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={`Cron messages: ${formatPollRunSummary(messages.cron)}`}
+          onClick={() => openRunDetail('Cron Buyer Messages', messages.cron)}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start', cursor: messages.cron ? 'pointer' : 'default' }}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={`Manual messages: ${formatPollRunSummary(messages.manual)}`}
+          onClick={() => openRunDetail('Manual Buyer Messages', messages.manual)}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start', cursor: messages.manual ? 'pointer' : 'default' }}
         />
       </Stack>
     );
