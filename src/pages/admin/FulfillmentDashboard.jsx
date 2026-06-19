@@ -1516,6 +1516,7 @@ function FulfillmentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pollResults, setPollResults] = useState(null);
+  const [pollRunStatus, setPollRunStatus] = useState({});
   const [copied, setCopied] = useState(false);
   const [copiedText, setCopiedText] = useState('');
 
@@ -2044,6 +2045,7 @@ function FulfillmentDashboard() {
       hasFetchedInitialData.current = true;
       fetchSellers();
       loadStoredOrders();
+      fetchPollRunStatus();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2333,6 +2335,41 @@ function FulfillmentDashboard() {
     setSnackbarOpen(true);
   }, []);
 
+  const formatPollRunTime = useCallback((value) => {
+    if (!value) return 'Never';
+    try {
+      return new Date(value).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return 'Unknown';
+    }
+  }, []);
+
+  const formatPollRunSummary = useCallback((run) => {
+    if (!run) return 'Never';
+    const pieces = [];
+    if (run.totalNewOrders) pieces.push(`${run.totalNewOrders} new`);
+    if (run.totalUpdatedOrders) pieces.push(`${run.totalUpdatedOrders} updated`);
+    if (run.totalNewMessages) pieces.push(`${run.totalNewMessages} messages`);
+    if (run.status && run.status !== 'completed') pieces.push(run.status);
+    return `${formatPollRunTime(run.completedAt || run.startedAt)}${pieces.length ? ` (${pieces.join(', ')})` : ''}`;
+  }, [formatPollRunTime]);
+
+  async function fetchPollRunStatus() {
+    try {
+      const { data } = await api.get('/ebay/poll-runs/latest');
+      setPollRunStatus(data?.latest || {});
+    } catch (e) {
+      console.debug('Failed to load poll run status', e);
+    }
+  }
+
   // Poll for NEW orders only
   async function pollNewOrders() {
     setLoading(true);
@@ -2343,6 +2380,7 @@ function FulfillmentDashboard() {
     try {
       const { data } = await api.post('/ebay/poll-new-orders');
       setPollResults(data || null);
+      await fetchPollRunStatus();
 
       // Reset filters to show all sellers and go to page 1
       setSelectedSeller('');
@@ -2367,7 +2405,12 @@ function FulfillmentDashboard() {
         setSnackbarOpen(true);
       }
     } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to poll new orders');
+      const message = e?.response?.data?.error || 'Failed to poll new orders';
+      setError(message);
+      setSnackbarMsg(message);
+      setSnackbarSeverity(e?.response?.status === 409 ? 'warning' : 'error');
+      setSnackbarOpen(true);
+      await fetchPollRunStatus();
     } finally {
       setLoading(false);
     }
@@ -2383,6 +2426,7 @@ function FulfillmentDashboard() {
     try {
       const { data } = await api.post('/ebay/poll-order-updates');
       setPollResults(data || null);
+      await fetchPollRunStatus();
 
       // Reset filters to show all sellers and go to page 1
       setSelectedSeller('');
@@ -2413,7 +2457,12 @@ function FulfillmentDashboard() {
         setSnackbarOpen(true);
       }
     } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to poll order updates');
+      const message = e?.response?.data?.error || 'Failed to poll order updates';
+      setError(message);
+      setSnackbarMsg(message);
+      setSnackbarSeverity(e?.response?.status === 409 ? 'warning' : 'error');
+      setSnackbarOpen(true);
+      await fetchPollRunStatus();
     } finally {
       setLoading(false);
     }
@@ -3228,6 +3277,40 @@ function FulfillmentDashboard() {
     }
   }, []);
 
+  const PollRunStatusStrip = () => {
+    const newOrders = pollRunStatus['poll-new-orders'] || {};
+    const updates = pollRunStatus['poll-order-updates'] || {};
+
+    return (
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} sx={{ mt: 1 }} flexWrap="wrap">
+        <Chip
+          size="small"
+          variant="outlined"
+          label={`Cron new orders: ${formatPollRunSummary(newOrders.cron)}`}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start' }}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={`Cron updates: ${formatPollRunSummary(updates.cron)}`}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start' }}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={`Manual new orders: ${formatPollRunSummary(newOrders.manual)}`}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start' }}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={`Manual updates: ${formatPollRunSummary(updates.manual)}`}
+          sx={{ maxWidth: '100%', justifyContent: 'flex-start' }}
+        />
+      </Stack>
+    );
+  };
+
   if (loading && orders.length === 0) return <FulfillmentSkeleton />;
 
   return (
@@ -3362,37 +3445,41 @@ function FulfillmentDashboard() {
 
               {/* Row 2: Poll Buttons (side by side) */}
               <Stack direction="row" spacing={1}>
-                <Button
-                  variant="contained"
-                  startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />)}
-                  onClick={pollNewOrders}
-                  disabled={loading}
-                  size="small"
-                  fullWidth
-                  sx={{
-                    ...yellowFilledButtonSx,
-                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                    px: { xs: 0.5, sm: 1 }
-                  }}
-                >
-                  {loading ? 'Polling...' : isSmallMobile ? 'Poll New' : 'Poll New Orders'}
-                </Button>
+                {isSuperAdmin && (
+                  <>
+                    <Button
+                      variant="contained"
+                      startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />)}
+                      onClick={pollNewOrders}
+                      disabled={loading}
+                      size="small"
+                      fullWidth
+                      sx={{
+                        ...yellowFilledButtonSx,
+                        fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                        px: { xs: 0.5, sm: 1 }
+                      }}
+                    >
+                      {loading ? 'Polling...' : isSmallMobile ? 'Poll New' : 'Poll New Orders'}
+                    </Button>
 
-                <Button
-                  variant="contained"
-                  startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />)}
-                  onClick={pollOrderUpdates}
-                  disabled={loading}
-                  size="small"
-                  fullWidth
-                  sx={{
-                    ...yellowFilledButtonSx,
-                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                    px: { xs: 0.5, sm: 1 }
-                  }}
-                >
-                  {loading ? 'Updating...' : isSmallMobile ? 'Poll Updates' : 'Poll Order Updates'}
-                </Button>
+                    <Button
+                      variant="contained"
+                      startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />)}
+                      onClick={pollOrderUpdates}
+                      disabled={loading}
+                      size="small"
+                      fullWidth
+                      sx={{
+                        ...yellowFilledButtonSx,
+                        fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                        px: { xs: 0.5, sm: 1 }
+                      }}
+                    >
+                      {loading ? 'Updating...' : isSmallMobile ? 'Poll Updates' : 'Poll Order Updates'}
+                    </Button>
+                  </>
+                )}
 
                 <Select
                   value={resyncDays}
@@ -3430,6 +3517,8 @@ function FulfillmentDashboard() {
                   </Button>
                 )}
               </Stack>
+
+              {isSuperAdmin && <PollRunStatusStrip />}
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
                 <FormControl size="small" sx={{ flex: '1 1 120px' }}>
@@ -3664,27 +3753,31 @@ function FulfillmentDashboard() {
                   ))}
                 </Select>
 
-                <Button
-                  variant="contained"
-                  size="small"
-                  startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
-                  onClick={pollNewOrders}
-                  disabled={loading}
-                  sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
-                >
-                  {loading ? 'Polling...' : 'Poll New Orders'}
-                </Button>
+                {isSuperAdmin && (
+                  <>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
+                      onClick={pollNewOrders}
+                      disabled={loading}
+                      sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
+                    >
+                      {loading ? 'Polling...' : 'Poll New Orders'}
+                    </Button>
 
-                <Button
-                  variant="contained"
-                  size="small"
-                  startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-                  onClick={pollOrderUpdates}
-                  disabled={loading}
-                  sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
-                >
-                  {loading ? 'Updating...' : 'Poll Order Updates'}
-                </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+                      onClick={pollOrderUpdates}
+                      disabled={loading}
+                      sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
+                    >
+                      {loading ? 'Updating...' : 'Poll Order Updates'}
+                    </Button>
+                  </>
+                )}
 
                 {isSuperAdmin && (
                   <>
@@ -3748,6 +3841,8 @@ function FulfillmentDashboard() {
                   </>
                 )}
               </Stack>
+
+              {isSuperAdmin && <PollRunStatusStrip />}
 
               <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: 'wrap', width: '100%' }}>
                 <FormControl size="small" sx={{ minWidth: 135 }}>
