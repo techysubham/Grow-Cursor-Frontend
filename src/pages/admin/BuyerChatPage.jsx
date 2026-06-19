@@ -51,6 +51,9 @@ const getInitialState = (key, defaultValue) => {
 };
 
 export default function BuyerChatPage() {
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isPrasanna = currentUser.username === 'prasanna';
+
   const [threads, setThreads] = useState([]);
   const [selectedThread, setSelectedThread] = useState(() => getInitialState('selectedThread', null));
   const [messages, setMessages] = useState([]);
@@ -1008,22 +1011,23 @@ export default function BuyerChatPage() {
             </Button>
           </Stack>
 
-          {/* Check New row */}
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.68rem' }}>
-              Inbox
-            </Typography>
-            <Button
-              size="small"
-              startIcon={syncingInbox ? <CircularProgress size={14} /> : <RefreshIcon fontSize="small" />}
-              onClick={handleManualSync}
-              disabled={syncingInbox || loadingThreads}
-              variant="outlined"
-              sx={{ ...yellowOutlinedButtonSx, height: 30, fontSize: '0.75rem' }}
-            >
-              {syncingInbox ? 'Syncing...' : 'Check New'}
-            </Button>
-          </Stack>
+          {isPrasanna && (
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.68rem' }}>
+                Inbox
+              </Typography>
+              <Button
+                size="small"
+                startIcon={syncingInbox ? <CircularProgress size={14} /> : <RefreshIcon fontSize="small" />}
+                onClick={handleManualSync}
+                disabled={syncingInbox || loadingThreads}
+                variant="outlined"
+                sx={{ ...yellowOutlinedButtonSx, height: 30, fontSize: '0.75rem' }}
+              >
+                {syncingInbox ? 'Syncing...' : 'Check New'}
+              </Button>
+            </Stack>
+          )}
         </Box>
 
         {/* THREAD LIST — wrapped in relative container for overlay */}

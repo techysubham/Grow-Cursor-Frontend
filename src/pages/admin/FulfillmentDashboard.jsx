@@ -3445,37 +3445,41 @@ function FulfillmentDashboard() {
 
               {/* Row 2: Poll Buttons (side by side) */}
               <Stack direction="row" spacing={1}>
-                <Button
-                  variant="contained"
-                  startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />)}
-                  onClick={pollNewOrders}
-                  disabled={loading}
-                  size="small"
-                  fullWidth
-                  sx={{
-                    ...yellowFilledButtonSx,
-                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                    px: { xs: 0.5, sm: 1 }
-                  }}
-                >
-                  {loading ? 'Polling...' : isSmallMobile ? 'Poll New' : 'Poll New Orders'}
-                </Button>
+                {isSuperAdmin && (
+                  <>
+                    <Button
+                      variant="contained"
+                      startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />)}
+                      onClick={pollNewOrders}
+                      disabled={loading}
+                      size="small"
+                      fullWidth
+                      sx={{
+                        ...yellowFilledButtonSx,
+                        fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                        px: { xs: 0.5, sm: 1 }
+                      }}
+                    >
+                      {loading ? 'Polling...' : isSmallMobile ? 'Poll New' : 'Poll New Orders'}
+                    </Button>
 
-                <Button
-                  variant="contained"
-                  startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />)}
-                  onClick={pollOrderUpdates}
-                  disabled={loading}
-                  size="small"
-                  fullWidth
-                  sx={{
-                    ...yellowFilledButtonSx,
-                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                    px: { xs: 0.5, sm: 1 }
-                  }}
-                >
-                  {loading ? 'Updating...' : isSmallMobile ? 'Poll Updates' : 'Poll Order Updates'}
-                </Button>
+                    <Button
+                      variant="contained"
+                      startIcon={!isSmallMobile && (loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />)}
+                      onClick={pollOrderUpdates}
+                      disabled={loading}
+                      size="small"
+                      fullWidth
+                      sx={{
+                        ...yellowFilledButtonSx,
+                        fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                        px: { xs: 0.5, sm: 1 }
+                      }}
+                    >
+                      {loading ? 'Updating...' : isSmallMobile ? 'Poll Updates' : 'Poll Order Updates'}
+                    </Button>
+                  </>
+                )}
 
                 <Select
                   value={resyncDays}
@@ -3514,7 +3518,7 @@ function FulfillmentDashboard() {
                 )}
               </Stack>
 
-              <PollRunStatusStrip />
+              {isSuperAdmin && <PollRunStatusStrip />}
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
                 <FormControl size="small" sx={{ flex: '1 1 120px' }}>
@@ -3749,27 +3753,31 @@ function FulfillmentDashboard() {
                   ))}
                 </Select>
 
-                <Button
-                  variant="contained"
-                  size="small"
-                  startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
-                  onClick={pollNewOrders}
-                  disabled={loading}
-                  sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
-                >
-                  {loading ? 'Polling...' : 'Poll New Orders'}
-                </Button>
+                {isSuperAdmin && (
+                  <>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
+                      onClick={pollNewOrders}
+                      disabled={loading}
+                      sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
+                    >
+                      {loading ? 'Polling...' : 'Poll New Orders'}
+                    </Button>
 
-                <Button
-                  variant="contained"
-                  size="small"
-                  startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-                  onClick={pollOrderUpdates}
-                  disabled={loading}
-                  sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
-                >
-                  {loading ? 'Updating...' : 'Poll Order Updates'}
-                </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+                      onClick={pollOrderUpdates}
+                      disabled={loading}
+                      sx={{ ...yellowFilledButtonSx, minWidth: 120 }}
+                    >
+                      {loading ? 'Updating...' : 'Poll Order Updates'}
+                    </Button>
+                  </>
+                )}
 
                 {isSuperAdmin && (
                   <>
@@ -3834,7 +3842,7 @@ function FulfillmentDashboard() {
                 )}
               </Stack>
 
-              <PollRunStatusStrip />
+              {isSuperAdmin && <PollRunStatusStrip />}
 
               <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: 'wrap', width: '100%' }}>
                 <FormControl size="small" sx={{ minWidth: 135 }}>
