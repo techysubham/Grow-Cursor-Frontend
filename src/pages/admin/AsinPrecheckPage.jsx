@@ -15,12 +15,14 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   InputLabel,
   LinearProgress,
   MenuItem,
   Paper,
   Select,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -54,6 +56,8 @@ const MARKETPLACE_OPTIONS = [
 const getSellerDisplayName = (seller) =>
   seller?.user?.username || seller?.user?.email || seller?.name || 'Unknown Seller';
 
+const isRowComplete = (row) => row.status !== 'loading' && row.status !== 'error';
+
 export default function AsinPrecheckPage() {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -75,6 +79,15 @@ export default function AsinPrecheckPage() {
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [imagePreview, setImagePreview] = useState(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    priceFrom: '',
+    priceTo: '',
+    minRating: '',
+    keyword: '',
+    stock: 'all',
+    active: 'all',
+    hideExcluded: false
+  });
 
   const surfaceSx = {
     borderRadius: `${dashboardTheme.radius.card}px`,
@@ -121,6 +134,39 @@ export default function AsinPrecheckPage() {
     };
   }, []);
 
+  const getFilteredRows = (sourceRows, options = {}) => {
+    const keyword = (options.keyword ?? filters.keyword).trim().toLowerCase();
+    const priceFrom = Number(options.priceFrom ?? filters.priceFrom);
+    const priceTo = Number(options.priceTo ?? filters.priceTo);
+    const minRating = Number(options.minRating ?? filters.minRating);
+    const stock = options.stock ?? filters.stock;
+    const active = options.active ?? filters.active;
+    const hideExcluded = options.hideExcluded ?? filters.hideExcluded;
+
+    return sourceRows.filter(row => {
+      if (hideExcluded && row.intent === 'excluded') return false;
+      if (keyword && !String(row.title || '').toLowerCase().includes(keyword)) return false;
+      if (Number.isFinite(priceFrom) && String(options.priceFrom ?? filters.priceFrom) !== '' && !(Number(row.priceNumber) >= priceFrom)) return false;
+      if (Number.isFinite(priceTo) && String(options.priceTo ?? filters.priceTo) !== '' && !(Number(row.priceNumber) <= priceTo)) return false;
+      if (Number.isFinite(minRating) && String(options.minRating ?? filters.minRating) !== '' && !(Number(row.rating) >= minRating)) return false;
+      if (stock === 'in_stock' && row.inStock !== true) return false;
+      if (stock === 'out_of_stock' && row.inStock !== false) return false;
+      if (active === 'active' && row.active !== true) return false;
+      if (active === 'inactive' && row.active !== false) return false;
+      return true;
+    });
+  };
+
+  const visibleRows = useMemo(
+    () => getFilteredRows(rows),
+    [rows, filters]
+  );
+
+  const keywordMatchedRows = useMemo(
+    () => visibleRows.filter(row => filters.keyword.trim() && isRowComplete(row)),
+    [visibleRows, filters.keyword]
+  );
+
   const selectedRows = useMemo(
     () => rows.filter(row => selectedIds.has(row.id)),
     [rows, selectedIds]
@@ -140,6 +186,29 @@ export default function AsinPrecheckPage() {
     () => rows.filter(row => row.status !== 'loading' && row.active).length,
     [rows]
   );
+
+  const includedCount = useMemo(
+    () => rows.filter(row => row.intent === 'included').length,
+    [rows]
+  );
+
+  const excludedCount = useMemo(
+    () => rows.filter(row => row.intent === 'excluded').length,
+    [rows]
+  );
+
+  const finalRows = useMemo(
+    () => rows.filter(row => (
+      isRowComplete(row)
+      && row.intent !== 'excluded'
+      && (row.intent === 'included' || selectedIds.has(row.id))
+    )),
+    [rows, selectedIds]
+  );
+
+  const updateFilter = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
 
   const parseSetupAsins = () => parseAsins(asinInput);
 
@@ -202,6 +271,13 @@ export default function AsinPrecheckPage() {
       active: false,
       title: '',
       image: '',
+      price: '',
+      priceNumber: null,
+      rating: null,
+      reviewCount: null,
+      availabilityStatus: '',
+      inStock: null,
+      intent: 'neutral',
       status: 'loading',
       progressStage: 'queued',
       errors: []
@@ -290,6 +366,30 @@ export default function AsinPrecheckPage() {
     setSelectedIds(new Set(nextRows.map(row => row.id)));
   };
 
+  const setRowIntent = (rowIds, intent) => {
+    const idSet = new Set(rowIds);
+    setRows(prev => prev.map(row => (
+      idSet.has(row.id) ? { ...row, intent } : row
+    )));
+  };
+
+  const setKeywordIntent = (intent) => {
+    if (keywordMatchedRows.length === 0) return;
+    setRowIntent(keywordMatchedRows.map(row => row.id), intent);
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      priceFrom: '',
+      priceTo: '',
+      minRating: '',
+      keyword: '',
+      stock: 'all',
+      active: 'all',
+      hideExcluded: false
+    });
+  };
+
   const discardSelected = () => {
     if (selectedIds.size === 0) return;
     setRows(prev => prev.filter(row => !selectedIds.has(row.id)));
@@ -310,9 +410,9 @@ export default function AsinPrecheckPage() {
   };
 
   const continueToAddListings = () => {
-    const asins = selectedRows.map(row => row.asin);
+    const asins = finalRows.map(row => row.asin);
     if (asins.length === 0) {
-      setError('Select at least one ASIN to continue');
+      setError('Select or include at least one non-excluded ASIN to continue');
       return;
     }
 
@@ -333,7 +433,8 @@ export default function AsinPrecheckPage() {
     navigate(`/admin/template-listings?templateId=${templateId}&sellerId=${sellerId}&fromAsinPrecheck=${nonce}`);
   };
 
-  const allCompletedSelected = completedRows.length > 0 && completedRows.every(row => selectedIds.has(row.id));
+  const visibleCompletedRows = visibleRows.filter(isRowComplete);
+  const allVisibleSelected = visibleCompletedRows.length > 0 && visibleCompletedRows.every(row => selectedIds.has(row.id));
 
   return (
     <AdminPageShell
@@ -362,10 +463,10 @@ export default function AsinPrecheckPage() {
               </Button>
               <Button
                 variant="outlined"
-                onClick={() => selectRows(completedRows)}
-                disabled={completedRows.length === 0 || allCompletedSelected}
+                onClick={() => selectRows(visibleRows.filter(isRowComplete))}
+                disabled={visibleRows.filter(isRowComplete).length === 0}
               >
-                Select All
+                Select Visible
               </Button>
               <Button
                 variant="outlined"
@@ -388,7 +489,10 @@ export default function AsinPrecheckPage() {
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end" flexWrap="wrap">
               <Chip label={`Active: ${activeCount}`} color="success" variant="outlined" />
               <Chip label={`Inactive: ${inactiveRows.length}`} color="error" variant="outlined" />
+              <Chip label={`Included: ${includedCount}`} color="primary" variant="outlined" />
+              <Chip label={`Excluded: ${excludedCount}`} color="warning" variant="outlined" />
               <Chip label={`Selected: ${selectedIds.size}`} sx={{ bgcolor: alpha(BRAND_YELLOW, 0.24), fontWeight: 700 }} />
+              <Chip label={`Final: ${finalRows.length}`} sx={{ bgcolor: alpha(BRAND_DARK, 0.08), fontWeight: 700 }} />
               <Button
                 variant="outlined"
                 onClick={copySelectedAsins}
@@ -400,11 +504,110 @@ export default function AsinPrecheckPage() {
               <Button
                 variant="contained"
                 onClick={continueToAddListings}
-                disabled={selectedIds.size === 0}
+                disabled={finalRows.length === 0}
                 startIcon={<PlayIcon />}
                 sx={yellowFilledButtonSx}
               >
-                Continue
+                Continue ({finalRows.length})
+              </Button>
+            </Stack>
+          </Stack>
+
+          <Stack spacing={1.5} sx={{ mt: 2 }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
+              <TextField
+                size="small"
+                label="Price From"
+                type="number"
+                value={filters.priceFrom}
+                onChange={(event) => updateFilter('priceFrom', event.target.value)}
+                sx={{ width: { xs: '100%', md: 130 } }}
+              />
+              <TextField
+                size="small"
+                label="Price To"
+                type="number"
+                value={filters.priceTo}
+                onChange={(event) => updateFilter('priceTo', event.target.value)}
+                sx={{ width: { xs: '100%', md: 130 } }}
+              />
+              <TextField
+                size="small"
+                label="Min Rating"
+                type="number"
+                value={filters.minRating}
+                onChange={(event) => updateFilter('minRating', event.target.value)}
+                sx={{ width: { xs: '100%', md: 130 } }}
+              />
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Stock</InputLabel>
+                <Select
+                  value={filters.stock}
+                  label="Stock"
+                  onChange={(event) => updateFilter('stock', event.target.value)}
+                >
+                  <MenuItem value="all">All Stock</MenuItem>
+                  <MenuItem value="in_stock">In Stock</MenuItem>
+                  <MenuItem value="out_of_stock">Out of Stock</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Active</InputLabel>
+                <Select
+                  value={filters.active}
+                  label="Active"
+                  onChange={(event) => updateFilter('active', event.target.value)}
+                >
+                  <MenuItem value="all">All Active</MenuItem>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                </Select>
+              </FormControl>
+              <Button variant="text" onClick={clearAllFilters}>
+                Clear Filters
+              </Button>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={filters.hideExcluded}
+                    onChange={(event) => updateFilter('hideExcluded', event.target.checked)}
+                  />
+                }
+                label="Hide excluded"
+              />
+            </Stack>
+
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
+              <TextField
+                size="small"
+                label="Keyword in Title"
+                value={filters.keyword}
+                onChange={(event) => updateFilter('keyword', event.target.value)}
+                placeholder="e.g. mud flaps"
+                sx={{ flex: 1 }}
+              />
+              <Chip label={`Keyword matches: ${keywordMatchedRows.length}`} variant="outlined" />
+              <Button
+                variant="outlined"
+                onClick={() => setKeywordIntent('included')}
+                disabled={keywordMatchedRows.length === 0}
+              >
+                Include Matches
+              </Button>
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={() => setKeywordIntent('excluded')}
+                disabled={keywordMatchedRows.length === 0}
+              >
+                Exclude Matches
+              </Button>
+              <Button
+                variant="text"
+                onClick={() => setRowIntent(rows.map(row => row.id), 'neutral')}
+                disabled={includedCount + excludedCount === 0}
+              >
+                Clear Include/Exclude
               </Button>
             </Stack>
           </Stack>
@@ -429,34 +632,51 @@ export default function AsinPrecheckPage() {
               <TableRow>
                 <TableCell padding="checkbox" sx={tableHeaderCellSx}>
                   <Checkbox
-                    checked={allCompletedSelected}
-                    indeterminate={selectedIds.size > 0 && !allCompletedSelected}
-                    onChange={(event) => selectRows(event.target.checked ? completedRows : [])}
-                    disabled={completedRows.length === 0}
+                    checked={allVisibleSelected}
+                    indeterminate={visibleCompletedRows.some(row => selectedIds.has(row.id)) && !allVisibleSelected}
+                    onChange={(event) => selectRows(event.target.checked ? visibleCompletedRows : [])}
+                    disabled={visibleCompletedRows.length === 0}
                   />
                 </TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 130 }}>ASIN</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 132 }}>Amazon Image</TableCell>
-                <TableCell sx={{ ...tableHeaderCellSx, width: '48%' }}>Title</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: '38%' }}>Title</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 90 }}>Price</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 90 }}>Rating</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 120 }}>Stock</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 130 }}>SKU</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 110 }}>Active</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 150 }}>Include/Exclude</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
                     <Typography color="text.secondary">Start a precheck to review ASINs.</Typography>
                   </TableCell>
                 </TableRow>
               )}
 
-              {rows.map(row => (
+              {rows.length > 0 && visibleRows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
+                    <Typography color="text.secondary">No ASINs match the current filters.</Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {visibleRows.map(row => (
                 <TableRow
                   key={row.id}
                   hover
                   selected={selectedIds.has(row.id)}
                   sx={{
+                    ...(row.intent === 'excluded' ? {
+                      '& td': {
+                        backgroundColor: `${alpha(theme.palette.warning.main, 0.08)} !important`
+                      }
+                    } : {}),
                     '&.Mui-selected td': {
                       backgroundColor: `${alpha(BRAND_YELLOW, 0.16)} !important`
                     }
@@ -504,7 +724,7 @@ export default function AsinPrecheckPage() {
                       <Typography variant="caption" color="text.secondary">No image</Typography>
                     )}
                   </TableCell>
-                  <TableCell sx={{ width: '48%', minWidth: 260, maxWidth: 620 }}>
+                  <TableCell sx={{ width: '38%', minWidth: 240, maxWidth: 520 }}>
                     {row.status === 'loading' ? (
                       <Typography variant="body2" color="text.secondary">Fetching...</Typography>
                     ) : row.title ? (
@@ -515,6 +735,32 @@ export default function AsinPrecheckPage() {
                       <Typography variant="body2" color="error">
                         {row.errors?.[0] || 'No title'}
                       </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {row.price ? `$${row.price}` : '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {row.rating ? Number(row.rating).toFixed(1) : '-'}
+                    </Typography>
+                    {row.reviewCount && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        {Number(row.reviewCount).toLocaleString()}
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {row.status === 'loading' ? (
+                      <Chip label="Checking" size="small" />
+                    ) : row.inStock === true ? (
+                      <Chip label="In Stock" size="small" color="success" />
+                    ) : row.inStock === false ? (
+                      <Chip label="Out of Stock" size="small" color="error" variant="outlined" />
+                    ) : (
+                      <Chip label="Unknown" size="small" variant="outlined" />
                     )}
                   </TableCell>
                   <TableCell>
@@ -530,6 +776,35 @@ export default function AsinPrecheckPage() {
                     ) : (
                       <Chip label="Inactive" size="small" color="error" variant="outlined" />
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Stack spacing={0.75}>
+                      <Chip
+                        label={row.intent === 'included' ? 'Included' : row.intent === 'excluded' ? 'Excluded' : 'Neutral'}
+                        size="small"
+                        color={row.intent === 'included' ? 'primary' : row.intent === 'excluded' ? 'warning' : 'default'}
+                        variant={row.intent === 'neutral' ? 'outlined' : 'filled'}
+                      />
+                      <Stack direction="row" spacing={0.5}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setRowIntent([row.id], row.intent === 'included' ? 'neutral' : 'included')}
+                          disabled={!isRowComplete(row)}
+                        >
+                          Include
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="warning"
+                          onClick={() => setRowIntent([row.id], row.intent === 'excluded' ? 'neutral' : 'excluded')}
+                          disabled={!isRowComplete(row)}
+                        >
+                          Exclude
+                        </Button>
+                      </Stack>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
