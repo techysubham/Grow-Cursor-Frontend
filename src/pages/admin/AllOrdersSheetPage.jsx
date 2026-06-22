@@ -75,6 +75,50 @@ const EXCHANGE_RATE_DEFAULTS = {
   AMAZON_CA: 87
 };
 
+const AllOrdersUsdRemarkCell = React.memo(function AllOrdersUsdRemarkCell({ order, saving, onSave }) {
+  const savedValue = order.allOrdersUsdRemark || '';
+  const [draft, setDraft] = useState(savedValue);
+
+  useEffect(() => {
+    setDraft(savedValue);
+  }, [order._id, savedValue]);
+
+  const hasChanges = draft !== savedValue;
+
+  return (
+    <Stack direction="row" spacing={0.75} alignItems="center">
+      <Tooltip title={draft || savedValue || ''} arrow placement="top">
+        <TextField
+          size="small"
+          multiline
+          maxRows={2}
+          placeholder="Add remark"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          disabled={saving}
+          sx={{
+            minWidth: 190,
+            '& .MuiInputBase-input': {
+              fontSize: '0.78rem',
+              lineHeight: 1.3
+            }
+          }}
+        />
+      </Tooltip>
+      <Button
+        size="small"
+        variant="outlined"
+        onClick={() => onSave(order, draft)}
+        disabled={saving || !hasChanges}
+        sx={{ fontSize: '0.72rem', whiteSpace: 'nowrap', minWidth: 58 }}
+      >
+        Save
+      </Button>
+      {saving && <CircularProgress size={16} />}
+    </Stack>
+  );
+});
+
 export default function AllOrdersSheetPage() {
   const [sellers, setSellers] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -116,6 +160,7 @@ export default function AllOrdersSheetPage() {
   const [updatedOrderIds, setUpdatedOrderIds] = useState(new Set()); // Track orders with price updates
   const [orderTotalUpdates, setOrderTotalUpdates] = useState({}); // { orderId: value }
   const [updatingOrderTotals, setUpdatingOrderTotals] = useState({}); // { orderId: boolean }
+  const [savingAllOrdersUsdRemarks, setSavingAllOrdersUsdRemarks] = useState({}); // { order._id: boolean }
   const [confirmOrderTotal, setConfirmOrderTotal] = useState({ open: false, order: null, value: '' });
 
   // Search filters
@@ -383,6 +428,7 @@ export default function AllOrdersSheetPage() {
         'PROFIT (INR)',
         'Amazon Acc',
         'Order ID',
+        'All Orders USD Remark',
         'Buyer Name',
         'Arriving'
       ];
@@ -456,6 +502,7 @@ export default function AllOrdersSheetPage() {
           profit.toFixed(2),
           order.amazonAccount || '-',
           order.orderId || '-',
+          order.allOrdersUsdRemark || '-',
           order.buyer?.buyerRegistrationAddress?.fullName || '-',
           (() => {
             const d = order.arrivingDate;
@@ -475,8 +522,8 @@ export default function AllOrdersSheetPage() {
       });
 
       // Combine headers and rows
-      // Date column indices (0-based): 1=Date Sold, 29=Arriving
-      const DATE_COL_INDICES = new Set([1, 29]);
+      // Date column indices (0-based): 1=Date Sold, 30=Arriving
+      const DATE_COL_INDICES = new Set([1, 30]);
       const csvContent = [
         headers.join(','),
         ...rows.map(row =>
@@ -656,6 +703,32 @@ export default function AllOrdersSheetPage() {
       alert('Failed to update order total: ' + (err?.response?.data?.error || err.message));
     } finally {
       setUpdatingOrderTotals(prev => ({ ...prev, [order._id]: false }));
+    }
+  }
+
+  async function handleSaveAllOrdersUsdRemark(order, overrideValue) {
+    const nextValue = overrideValue !== undefined ? overrideValue : order.allOrdersUsdRemark;
+    const normalizedValue = nextValue == null ? '' : String(nextValue);
+    const currentValue = order.allOrdersUsdRemark || '';
+
+    if (normalizedValue === currentValue) return;
+
+    setSavingAllOrdersUsdRemarks(prev => ({ ...prev, [order._id]: true }));
+
+    try {
+      const { data } = await api.patch(`/ebay/orders/${order._id}/all-orders-usd-remark`, {
+        allOrdersUsdRemark: normalizedValue
+      });
+
+      setOrders(prev => prev.map(existingOrder => (
+        existingOrder._id === order._id
+          ? { ...existingOrder, allOrdersUsdRemark: data.order?.allOrdersUsdRemark || '' }
+          : existingOrder
+      )));
+    } catch (err) {
+      alert('Failed to update All Orders USD remark: ' + (err?.response?.data?.error || err.message));
+    } finally {
+      setSavingAllOrdersUsdRemarks(prev => ({ ...prev, [order._id]: false }));
     }
   }
 
@@ -1953,6 +2026,7 @@ export default function AllOrdersSheetPage() {
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderBottom: `3px solid ${BRAND_YELLOW}`, borderRight: `2px solid ${BRAND_DARK}` }} align="right">PROFIT<br />(INR)</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Amazon<br />Acc</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Order ID</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 220 }}>All Orders USD<br />Remark</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Buyer<br />Name</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Arriving</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 180 }}>Actions</TableCell>
@@ -2368,6 +2442,13 @@ export default function AllOrdersSheetPage() {
                       )}
                     </Stack>
                   </TableCell>
+                  <TableCell sx={{ minWidth: 220 }}>
+                    <AllOrdersUsdRemarkCell
+                      order={order}
+                      saving={Boolean(savingAllOrdersUsdRemarks[order._id])}
+                      onSave={handleSaveAllOrdersUsdRemark}
+                    />
+                  </TableCell>
                   <TableCell>{order.buyer?.buyerRegistrationAddress?.fullName || '-'}</TableCell>
                   <TableCell>{order.arrivingDate || '-'}</TableCell>
                   {/* Update Price Column */}
@@ -2482,6 +2563,7 @@ export default function AllOrdersSheetPage() {
                     <TableCell align="right" sx={{ color: totals.profit < 0 ? 'error.main' : 'success.main' }}>
                       ₹{totals.profit.toFixed(2)}
                     </TableCell>
+                    <TableCell></TableCell>
                     <TableCell></TableCell>
                     <TableCell></TableCell>
                     <TableCell></TableCell>
