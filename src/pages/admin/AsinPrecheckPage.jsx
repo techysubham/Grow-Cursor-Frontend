@@ -30,6 +30,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
 import {
@@ -58,6 +59,22 @@ const getSellerDisplayName = (seller) =>
 
 const isRowComplete = (row) => row.status !== 'loading' && row.status !== 'error';
 
+const formatDeliveryLabel = (row) => {
+  if (row.status === 'loading') return 'Checking';
+  if (row.deliveryDays == null) return 'Unknown';
+  if (row.deliveryDays === 0) return 'Today';
+  if (row.deliveryDays === 1) return '1 day';
+  return `${row.deliveryDays} days`;
+};
+
+const getDeliveryTooltip = (row) => {
+  if (row.status === 'loading') return 'Checking delivery date';
+  if (row.deliveryDate) {
+    return row.shippingTime ? `${row.deliveryDate} (${row.shippingTime})` : row.deliveryDate;
+  }
+  return row.shippingTime || row.shippingCondition || 'Delivery date unavailable';
+};
+
 export default function AsinPrecheckPage() {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -83,6 +100,7 @@ export default function AsinPrecheckPage() {
     priceFrom: '',
     priceTo: '',
     minRating: '',
+    deliveryWithinDays: '',
     keyword: '',
     stock: 'all',
     active: 'all',
@@ -139,6 +157,7 @@ export default function AsinPrecheckPage() {
     const priceFrom = Number(options.priceFrom ?? filters.priceFrom);
     const priceTo = Number(options.priceTo ?? filters.priceTo);
     const minRating = Number(options.minRating ?? filters.minRating);
+    const deliveryWithinDays = Number(options.deliveryWithinDays ?? filters.deliveryWithinDays);
     const stock = options.stock ?? filters.stock;
     const active = options.active ?? filters.active;
     const hideExcluded = options.hideExcluded ?? filters.hideExcluded;
@@ -149,6 +168,7 @@ export default function AsinPrecheckPage() {
       if (Number.isFinite(priceFrom) && String(options.priceFrom ?? filters.priceFrom) !== '' && !(Number(row.priceNumber) >= priceFrom)) return false;
       if (Number.isFinite(priceTo) && String(options.priceTo ?? filters.priceTo) !== '' && !(Number(row.priceNumber) <= priceTo)) return false;
       if (Number.isFinite(minRating) && String(options.minRating ?? filters.minRating) !== '' && !(Number(row.rating) >= minRating)) return false;
+      if (Number.isFinite(deliveryWithinDays) && String(options.deliveryWithinDays ?? filters.deliveryWithinDays) !== '' && !(Number(row.deliveryDays) <= deliveryWithinDays)) return false;
       if (stock === 'in_stock' && row.inStock !== true) return false;
       if (stock === 'out_of_stock' && row.inStock !== false) return false;
       if (active === 'active' && row.active !== true) return false;
@@ -275,6 +295,12 @@ export default function AsinPrecheckPage() {
       priceNumber: null,
       rating: null,
       reviewCount: null,
+      shippingTime: '',
+      shippingCondition: '',
+      marketplaceTimezone: '',
+      scrapedAt: null,
+      deliveryDate: null,
+      deliveryDays: null,
       availabilityStatus: '',
       inStock: null,
       intent: 'neutral',
@@ -383,6 +409,7 @@ export default function AsinPrecheckPage() {
       priceFrom: '',
       priceTo: '',
       minRating: '',
+      deliveryWithinDays: '',
       keyword: '',
       stock: 'all',
       active: 'all',
@@ -445,75 +472,90 @@ export default function AsinPrecheckPage() {
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
         {success && <Alert severity="success" onClose={() => setSuccess('')}>{success}</Alert>}
 
-        <Paper sx={{ ...surfaceSx, p: 2 }}>
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={1.5}
-            alignItems={{ xs: 'stretch', md: 'center' }}
-            justifyContent="space-between"
-          >
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Button
-                variant="outlined"
-                onClick={() => setSetupOpen(true)}
-                startIcon={<SearchIcon />}
-                sx={yellowOutlinedButtonSx}
-              >
-                New Precheck
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => selectRows(visibleRows.filter(isRowComplete))}
-                disabled={visibleRows.filter(isRowComplete).length === 0}
-              >
-                Select Visible
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => selectRows(inactiveRows)}
-                disabled={inactiveRows.length === 0}
-              >
-                Select All Inactive
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={() => setDiscardConfirmOpen(true)}
-                disabled={selectedIds.size === 0}
-                startIcon={<DeleteIcon />}
-              >
-                Discard
-              </Button>
+        <Paper sx={{ ...surfaceSx, p: { xs: 1.5, md: 2 } }}>
+          <Stack spacing={1.5}>
+            <Stack
+              direction={{ xs: 'column', lg: 'row' }}
+              spacing={1.5}
+              alignItems={{ xs: 'stretch', lg: 'center' }}
+              justifyContent="space-between"
+            >
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Button
+                  variant="outlined"
+                  onClick={() => setSetupOpen(true)}
+                  startIcon={<SearchIcon />}
+                  sx={yellowOutlinedButtonSx}
+                >
+                  New Precheck
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => selectRows(visibleRows.filter(isRowComplete))}
+                  disabled={visibleRows.filter(isRowComplete).length === 0}
+                >
+                  Select Visible
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => selectRows(inactiveRows)}
+                  disabled={inactiveRows.length === 0}
+                >
+                  Select All Inactive
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => setDiscardConfirmOpen(true)}
+                  disabled={selectedIds.size === 0}
+                  startIcon={<DeleteIcon />}
+                >
+                  Discard
+                </Button>
+              </Stack>
+
+              <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: 'flex-start', lg: 'flex-end' }} flexWrap="wrap" useFlexGap>
+                <Button
+                  variant="outlined"
+                  onClick={copySelectedAsins}
+                  disabled={selectedIds.size === 0}
+                  startIcon={<CopyIcon />}
+                >
+                  Copy ASINs
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={continueToAddListings}
+                  disabled={finalRows.length === 0}
+                  startIcon={<PlayIcon />}
+                  sx={yellowFilledButtonSx}
+                >
+                  Continue ({finalRows.length})
+                </Button>
+              </Stack>
             </Stack>
 
-            <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end" flexWrap="wrap">
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              flexWrap="wrap"
+              useFlexGap
+              sx={{
+                px: 1.25,
+                py: 1,
+                borderRadius: 1.5,
+                bgcolor: alpha(BRAND_DARK, 0.035)
+              }}
+            >
               <Chip label={`Active: ${activeCount}`} color="success" variant="outlined" />
               <Chip label={`Inactive: ${inactiveRows.length}`} color="error" variant="outlined" />
               <Chip label={`Included: ${includedCount}`} color="primary" variant="outlined" />
               <Chip label={`Excluded: ${excludedCount}`} color="warning" variant="outlined" />
               <Chip label={`Selected: ${selectedIds.size}`} sx={{ bgcolor: alpha(BRAND_YELLOW, 0.24), fontWeight: 700 }} />
               <Chip label={`Final: ${finalRows.length}`} sx={{ bgcolor: alpha(BRAND_DARK, 0.08), fontWeight: 700 }} />
-              <Button
-                variant="outlined"
-                onClick={copySelectedAsins}
-                disabled={selectedIds.size === 0}
-                startIcon={<CopyIcon />}
-              >
-                Copy ASINs
-              </Button>
-              <Button
-                variant="contained"
-                onClick={continueToAddListings}
-                disabled={finalRows.length === 0}
-                startIcon={<PlayIcon />}
-                sx={yellowFilledButtonSx}
-              >
-                Continue ({finalRows.length})
-              </Button>
             </Stack>
-          </Stack>
 
-          <Stack spacing={1.5} sx={{ mt: 2 }}>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
               <TextField
                 size="small"
@@ -521,7 +563,7 @@ export default function AsinPrecheckPage() {
                 type="number"
                 value={filters.priceFrom}
                 onChange={(event) => updateFilter('priceFrom', event.target.value)}
-                sx={{ width: { xs: '100%', md: 130 } }}
+                sx={{ width: { xs: '100%', md: 150 } }}
               />
               <TextField
                 size="small"
@@ -529,7 +571,7 @@ export default function AsinPrecheckPage() {
                 type="number"
                 value={filters.priceTo}
                 onChange={(event) => updateFilter('priceTo', event.target.value)}
-                sx={{ width: { xs: '100%', md: 130 } }}
+                sx={{ width: { xs: '100%', md: 150 } }}
               />
               <TextField
                 size="small"
@@ -537,9 +579,21 @@ export default function AsinPrecheckPage() {
                 type="number"
                 value={filters.minRating}
                 onChange={(event) => updateFilter('minRating', event.target.value)}
-                sx={{ width: { xs: '100%', md: 130 } }}
+                sx={{ width: { xs: '100%', md: 150 } }}
               />
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+              <TextField
+                size="small"
+                label="Delivery Within"
+                type="number"
+                value={filters.deliveryWithinDays}
+                onChange={(event) => updateFilter('deliveryWithinDays', event.target.value)}
+                sx={{ width: { xs: '100%', md: 170 } }}
+                InputProps={{ endAdornment: <Typography variant="caption" color="text.secondary">days</Typography> }}
+              />
+            </Stack>
+
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
+              <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 170 } }}>
                 <InputLabel>Stock</InputLabel>
                 <Select
                   value={filters.stock}
@@ -551,7 +605,7 @@ export default function AsinPrecheckPage() {
                   <MenuItem value="out_of_stock">Out of Stock</MenuItem>
                 </Select>
               </FormControl>
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+              <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 170 } }}>
                 <InputLabel>Active</InputLabel>
                 <Select
                   value={filters.active}
@@ -563,9 +617,6 @@ export default function AsinPrecheckPage() {
                   <MenuItem value="inactive">Inactive</MenuItem>
                 </Select>
               </FormControl>
-              <Button variant="text" onClick={clearAllFilters}>
-                Clear Filters
-              </Button>
               <FormControlLabel
                 control={
                   <Switch
@@ -574,41 +625,55 @@ export default function AsinPrecheckPage() {
                   />
                 }
                 label="Hide excluded"
+                sx={{ ml: { md: 0.5 } }}
               />
+              <Button variant="text" onClick={clearAllFilters}>
+                Clear Filters
+              </Button>
             </Stack>
 
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
+            <Stack
+              direction={{ xs: 'column', lg: 'row' }}
+              spacing={1.5}
+              alignItems={{ xs: 'stretch', lg: 'center' }}
+              sx={{
+                pt: 1.5,
+                borderTop: `1px solid ${alpha(BRAND_DARK, 0.08)}`
+              }}
+            >
               <TextField
                 size="small"
                 label="Keyword in Title"
                 value={filters.keyword}
                 onChange={(event) => updateFilter('keyword', event.target.value)}
                 placeholder="e.g. mud flaps"
-                sx={{ flex: 1 }}
+                sx={{ flex: 1, minWidth: { lg: 360 } }}
               />
-              <Chip label={`Keyword matches: ${keywordMatchedRows.length}`} variant="outlined" />
-              <Button
-                variant="outlined"
-                onClick={() => setKeywordIntent('included')}
-                disabled={keywordMatchedRows.length === 0}
-              >
-                Include Matches
-              </Button>
-              <Button
-                variant="outlined"
-                color="warning"
-                onClick={() => setKeywordIntent('excluded')}
-                disabled={keywordMatchedRows.length === 0}
-              >
-                Exclude Matches
-              </Button>
-              <Button
-                variant="text"
-                onClick={() => setRowIntent(rows.map(row => row.id), 'neutral')}
-                disabled={includedCount + excludedCount === 0}
-              >
-                Clear Include/Exclude
-              </Button>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Chip label={`Keyword matches: ${keywordMatchedRows.length}`} variant="outlined" />
+                <Button
+                  variant="outlined"
+                  onClick={() => setKeywordIntent('included')}
+                  disabled={keywordMatchedRows.length === 0}
+                >
+                  Include Matches
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => setKeywordIntent('excluded')}
+                  disabled={keywordMatchedRows.length === 0}
+                >
+                  Exclude Matches
+                </Button>
+                <Button
+                  variant="text"
+                  onClick={() => setRowIntent(rows.map(row => row.id), 'neutral')}
+                  disabled={includedCount + excludedCount === 0}
+                >
+                  Clear Include/Exclude
+                </Button>
+              </Stack>
             </Stack>
           </Stack>
 
@@ -644,6 +709,7 @@ export default function AsinPrecheckPage() {
                 <TableCell sx={{ ...tableHeaderCellSx, width: 90 }}>Price</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 90 }}>Rating</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 120 }}>Stock</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 130 }}>Delivery</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 130 }}>SKU</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 110 }}>Active</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 150 }}>Include/Exclude</TableCell>
@@ -652,7 +718,7 @@ export default function AsinPrecheckPage() {
             <TableBody>
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
                     <Typography color="text.secondary">Start a precheck to review ASINs.</Typography>
                   </TableCell>
                 </TableRow>
@@ -660,7 +726,7 @@ export default function AsinPrecheckPage() {
 
               {rows.length > 0 && visibleRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
                     <Typography color="text.secondary">No ASINs match the current filters.</Typography>
                   </TableCell>
                 </TableRow>
@@ -761,6 +827,26 @@ export default function AsinPrecheckPage() {
                       <Chip label="Out of Stock" size="small" color="error" variant="outlined" />
                     ) : (
                       <Chip label="Unknown" size="small" variant="outlined" />
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {row.status === 'loading' ? (
+                      <Tooltip title={getDeliveryTooltip(row)} arrow>
+                        <Chip label="Checking" size="small" />
+                      </Tooltip>
+                    ) : row.deliveryDays != null ? (
+                      <Tooltip title={getDeliveryTooltip(row)} arrow>
+                        <Chip
+                          label={formatDeliveryLabel(row)}
+                          size="small"
+                          color={row.deliveryDays <= 8 ? 'success' : 'warning'}
+                          variant={row.deliveryDays <= 8 ? 'filled' : 'outlined'}
+                        />
+                      </Tooltip>
+                    ) : (
+                      <Tooltip title={getDeliveryTooltip(row)} arrow>
+                        <Chip label="Unknown" size="small" variant="outlined" />
+                      </Tooltip>
                     )}
                   </TableCell>
                   <TableCell>
