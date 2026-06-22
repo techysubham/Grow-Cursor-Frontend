@@ -37,6 +37,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../lib/api';
 import AllOrdersSheetSkeleton from '../../components/skeletons/AllOrdersSheetSkeleton';
 import AdminPageShell from '../../components/AdminPageShell.jsx';
@@ -701,6 +702,10 @@ export default function AllOrdersSheetPage() {
     } finally {
       setUpdatingItemPrices(prev => ({ ...prev, [legacyItemId]: false }));
     }
+  }
+
+  function getPriceChangeHistoryUrl(orderId) {
+    return `/admin/price-change-history?orderId=${encodeURIComponent(orderId || '')}`;
   }
 
   // Calculate expected profit based on try pricing
@@ -1950,7 +1955,7 @@ export default function AllOrdersSheetPage() {
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Order ID</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Buyer<br />Name</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Arriving</TableCell>
-                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 180 }}>Update Price</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 180 }}>Actions</TableCell>
               </TableRow>
               {/* Second row: eBay Side and Amazon Side column headers */}
               <TableRow>
@@ -2367,14 +2372,33 @@ export default function AllOrdersSheetPage() {
                   <TableCell>{order.arrivingDate || '-'}</TableCell>
                   {/* Update Price Column */}
                   <TableCell>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={() => openPriceUpdateModal(order)}
-                      sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                    >
-                      Change Price
-                    </Button>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => openPriceUpdateModal(order)}
+                        sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                      >
+                        Change Price
+                      </Button>
+                      <Tooltip title="Open price change history for this order" arrow placement="top">
+                        <span>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            component="a"
+                            href={getPriceChangeHistoryUrl(order.orderId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            disabled={!order.orderId}
+                            endIcon={<OpenInNewIcon sx={{ fontSize: '0.875rem' }} />}
+                            sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                          >
+                            History
+                          </Button>
+                        </span>
+                      </Tooltip>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
