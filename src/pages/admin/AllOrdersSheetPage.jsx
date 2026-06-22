@@ -781,6 +781,14 @@ export default function AllOrdersSheetPage() {
     return `/admin/price-change-history?orderId=${encodeURIComponent(orderId || '')}`;
   }
 
+  function getFirstLegacyItemId(order) {
+    return order.lineItems?.find(item => item?.legacyItemId)?.legacyItemId || '';
+  }
+
+  function getPriceChangeHistoryItemUrl(itemId) {
+    return `/admin/price-change-history?legacyItemId=${encodeURIComponent(itemId || '')}`;
+  }
+
   // Calculate expected profit based on try pricing
   function calculateExpectedProfit(tryPricingValue, order) {
     if (!tryPricingValue || isNaN(parseFloat(tryPricingValue))) return null;
@@ -2453,33 +2461,56 @@ export default function AllOrdersSheetPage() {
                   <TableCell>{order.arrivingDate || '-'}</TableCell>
                   {/* Update Price Column */}
                   <TableCell>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Button
-                        size="small"
-                        variant="contained"
-                        onClick={() => openPriceUpdateModal(order)}
-                        sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                      >
-                        Change Price
-                      </Button>
-                      <Tooltip title="Open price change history for this order" arrow placement="top">
-                        <span>
+                    {(() => {
+                      const legacyItemId = getFirstLegacyItemId(order);
+
+                      return (
+                        <Stack direction="row" spacing={1} alignItems="center">
                           <Button
                             size="small"
-                            variant="outlined"
-                            component="a"
-                            href={getPriceChangeHistoryUrl(order.orderId)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            disabled={!order.orderId}
-                            endIcon={<OpenInNewIcon sx={{ fontSize: '0.875rem' }} />}
+                            variant="contained"
+                            onClick={() => openPriceUpdateModal(order)}
                             sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                           >
-                            History
+                            Change Price
                           </Button>
-                        </span>
-                      </Tooltip>
-                    </Stack>
+                          <Tooltip title="Open price change history for this order" arrow placement="top">
+                            <span>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                component="a"
+                                href={getPriceChangeHistoryUrl(order.orderId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                disabled={!order.orderId}
+                                endIcon={<OpenInNewIcon sx={{ fontSize: '0.875rem' }} />}
+                                sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                              >
+                                History
+                              </Button>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={legacyItemId ? `Open price change history for item ${legacyItemId}` : 'No item ID found for this order'} arrow placement="top">
+                            <span>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                component="a"
+                                href={getPriceChangeHistoryItemUrl(legacyItemId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                disabled={!legacyItemId}
+                                endIcon={<OpenInNewIcon sx={{ fontSize: '0.875rem' }} />}
+                                sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                              >
+                                Open Item
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        </Stack>
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               ))}
