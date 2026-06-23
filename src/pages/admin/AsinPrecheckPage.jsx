@@ -54,6 +54,43 @@ const MARKETPLACE_OPTIONS = [
   { value: 'AU', label: 'Amazon.com.au (Australia)' }
 ];
 
+const ASIN_PRECHECK_PREFERENCES_KEY = 'asinPrecheckPreferences';
+
+const DEFAULT_FILTERS = {
+  priceFrom: '',
+  priceTo: '',
+  minRating: '',
+  deliveryWithinDays: '',
+  keyword: '',
+  stock: 'all',
+  active: 'all',
+  hideExcluded: false
+};
+
+const DEFAULT_PREFERENCES = {
+  region: 'US',
+  ebayMotorsMode: false,
+  filters: DEFAULT_FILTERS
+};
+
+const getSavedPrecheckPreferences = () => {
+  if (typeof window === 'undefined') return DEFAULT_PREFERENCES;
+
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(ASIN_PRECHECK_PREFERENCES_KEY) || '{}');
+    return {
+      region: saved.region || DEFAULT_PREFERENCES.region,
+      ebayMotorsMode: Boolean(saved.ebayMotorsMode),
+      filters: {
+        ...DEFAULT_FILTERS,
+        ...(saved.filters || {})
+      }
+    };
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+};
+
 const getSellerDisplayName = (seller) =>
   seller?.user?.username || seller?.user?.email || seller?.name || 'Unknown Seller';
 
@@ -105,8 +142,8 @@ export default function AsinPrecheckPage() {
   const [sellerId, setSellerId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [asinInput, setAsinInput] = useState('');
-  const [region, setRegion] = useState('US');
-  const [ebayMotorsMode, setEbayMotorsMode] = useState(false);
+  const [region, setRegion] = useState(() => getSavedPrecheckPreferences().region);
+  const [ebayMotorsMode, setEbayMotorsMode] = useState(() => getSavedPrecheckPreferences().ebayMotorsMode);
   const [loadingSetup, setLoadingSetup] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
@@ -116,16 +153,7 @@ export default function AsinPrecheckPage() {
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [imagePreview, setImagePreview] = useState(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    priceFrom: '',
-    priceTo: '',
-    minRating: '',
-    deliveryWithinDays: '',
-    keyword: '',
-    stock: 'all',
-    active: 'all',
-    hideExcluded: false
-  });
+  const [filters, setFilters] = useState(() => getSavedPrecheckPreferences().filters);
 
   const surfaceSx = {
     borderRadius: `${dashboardTheme.radius.card}px`,
@@ -171,6 +199,18 @@ export default function AsinPrecheckPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ASIN_PRECHECK_PREFERENCES_KEY, JSON.stringify({
+        region,
+        ebayMotorsMode,
+        filters
+      }));
+    } catch {
+      // Local storage is a convenience only; the precheck flow can continue without it.
+    }
+  }, [region, ebayMotorsMode, filters]);
 
   const getFilteredRows = (sourceRows, options = {}) => {
     const keyword = (options.keyword ?? filters.keyword).trim().toLowerCase();
@@ -438,16 +478,7 @@ export default function AsinPrecheckPage() {
   };
 
   const clearAllFilters = () => {
-    setFilters({
-      priceFrom: '',
-      priceTo: '',
-      minRating: '',
-      deliveryWithinDays: '',
-      keyword: '',
-      stock: 'all',
-      active: 'all',
-      hideExcluded: false
-    });
+    setFilters(DEFAULT_FILTERS);
   };
 
   const discardSelected = () => {
