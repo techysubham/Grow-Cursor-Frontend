@@ -79,6 +79,7 @@ export default function SkuIndexSyncPage() {
                     status: mapStatus(data),
                     dbCount: data.dbCount,
                     syncedAt: data.syncedAt || null,
+                    completedAt: data.completedAt || null,
                     progress: data.progress || (prev[sellerId]?.status === 'running' ? prev[sellerId]?.progress || null : null),
                     errorMsg: data.error || null,
                     source: data.source || null,
@@ -93,7 +94,13 @@ export default function SkuIndexSyncPage() {
     const handleSync = async (sellerId) => {
         setSellerState(prev => ({
             ...prev,
-            [sellerId]: { status: 'running', dbCount: prev[sellerId]?.dbCount ?? 0, syncedAt: prev[sellerId]?.syncedAt ?? null, progress: null },
+            [sellerId]: {
+                status: 'running',
+                dbCount: prev[sellerId]?.dbCount ?? 0,
+                syncedAt: prev[sellerId]?.syncedAt ?? null,
+                completedAt: prev[sellerId]?.completedAt ?? null,
+                progress: null,
+            },
         }));
 
         try {
@@ -139,6 +146,7 @@ export default function SkuIndexSyncPage() {
                                 status: 'completed',
                                 dbCount: evt.totalCount,
                                 syncedAt: evt.syncedAt,
+                                completedAt: new Date().toISOString(),
                                 progress: null,
                             },
                         }));
@@ -252,6 +260,7 @@ export default function SkuIndexSyncPage() {
                                 <TableCell sx={{ fontWeight: 700 }}>Seller</TableCell>
                                 <TableCell align="right" sx={{ fontWeight: 700 }}>Indexed Listings</TableCell>
                                 <TableCell align="center" sx={{ fontWeight: 700 }}>Last Synced</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 700 }}>Completed At</TableCell>
                                 <TableCell align="center" sx={{ fontWeight: 700 }}>Status</TableCell>
                                 <TableCell align="center" sx={{ fontWeight: 700 }}>Action</TableCell>
                             </TableRow>
@@ -259,19 +268,19 @@ export default function SkuIndexSyncPage() {
                         <TableBody>
                             {loadingInitial ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
+                                    <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
                                         <CircularProgress size={28} />
                                         <Typography variant="body2" sx={{ mt: 1 }}>Loading sellers…</Typography>
                                     </TableCell>
                                 </TableRow>
                             ) : sellers.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} align="center" sx={{ py: 5 }}>No sellers found</TableCell>
+                                    <TableCell colSpan={6} align="center" sx={{ py: 5 }}>No sellers found</TableCell>
                                 </TableRow>
                             ) : (
                                 sellers.map(seller => {
                                     const sid = seller._id;
-                                    const s = sellerState[sid] || { status: 'idle', dbCount: 0, syncedAt: null };
+                                    const s = sellerState[sid] || { status: 'idle', dbCount: 0, syncedAt: null, completedAt: null };
                                     const isRunning = s.status === 'running';
                                     const isQueued = s.status === 'queued';
                                     const prog = s.progress;
@@ -296,6 +305,12 @@ export default function SkuIndexSyncPage() {
                                             <TableCell align="center">
                                                 <Typography variant="body2" color={s.syncedAt ? 'text.primary' : 'text.disabled'}>
                                                     {formatDate(s.syncedAt)}
+                                                </Typography>
+                                            </TableCell>
+
+                                            <TableCell align="center">
+                                                <Typography variant="body2" color={s.completedAt ? 'text.primary' : 'text.disabled'}>
+                                                    {formatDate(s.completedAt)}
                                                 </Typography>
                                             </TableCell>
 
