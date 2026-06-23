@@ -558,7 +558,11 @@ export default function AsinPrecheckPage() {
                     ml: { md: 0.5 },
                     px: 1,
                     borderRadius: 1.5,
-                    bgcolor: ebayMotorsMode ? alpha(BRAND_YELLOW, 0.2) : alpha(BRAND_DARK, 0.035)
+                    bgcolor: ebayMotorsMode ? alpha(BRAND_YELLOW, 0.2) : alpha(BRAND_DARK, 0.035),
+                    '& .MuiFormControlLabel-label': {
+                      ml: 0.75,
+                      fontWeight: 700
+                    }
                   }}
                 />
               </Stack>
@@ -636,7 +640,7 @@ export default function AsinPrecheckPage() {
                 type="number"
                 value={filters.deliveryWithinDays}
                 onChange={(event) => updateFilter('deliveryWithinDays', event.target.value)}
-                sx={{ width: { xs: '100%', md: 170 } }}
+                sx={{ width: { xs: '100%', md: 220 } }}
                 InputProps={{ endAdornment: <Typography variant="caption" color="text.secondary">days</Typography> }}
               />
             </Stack>
@@ -674,7 +678,13 @@ export default function AsinPrecheckPage() {
                   />
                 }
                 label="Hide excluded"
-                sx={{ ml: { md: 0.5 } }}
+                sx={{
+                  ml: { md: 0.5 },
+                  '& .MuiFormControlLabel-label': {
+                    ml: 0.75,
+                    fontWeight: 600
+                  }
+                }}
               />
               <Button variant="text" onClick={clearAllFilters}>
                 Clear Filters
@@ -1034,7 +1044,11 @@ export default function AsinPrecheckPage() {
                     px: 1.25,
                     py: 0.5,
                     borderRadius: 1.5,
-                    bgcolor: ebayMotorsMode ? alpha(BRAND_YELLOW, 0.2) : alpha(BRAND_DARK, 0.035)
+                    bgcolor: ebayMotorsMode ? alpha(BRAND_YELLOW, 0.2) : alpha(BRAND_DARK, 0.035),
+                    '& .MuiFormControlLabel-label': {
+                      ml: 0.75,
+                      fontWeight: 700
+                    }
                   }}
                 />
 
