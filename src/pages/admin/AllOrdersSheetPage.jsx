@@ -37,6 +37,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../lib/api';
 import AllOrdersSheetSkeleton from '../../components/skeletons/AllOrdersSheetSkeleton';
 import AdminPageShell from '../../components/AdminPageShell.jsx';
@@ -73,6 +74,50 @@ const EXCHANGE_RATE_DEFAULTS = {
   AMAZON_GB: 87,
   AMAZON_CA: 87
 };
+
+const AllOrdersUsdRemarkCell = React.memo(function AllOrdersUsdRemarkCell({ order, saving, onSave }) {
+  const savedValue = order.allOrdersUsdRemark || '';
+  const [draft, setDraft] = useState(savedValue);
+
+  useEffect(() => {
+    setDraft(savedValue);
+  }, [order._id, savedValue]);
+
+  const hasChanges = draft !== savedValue;
+
+  return (
+    <Stack direction="row" spacing={0.75} alignItems="center">
+      <Tooltip title={draft || savedValue || ''} arrow placement="top">
+        <TextField
+          size="small"
+          multiline
+          maxRows={2}
+          placeholder="Add remark"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          disabled={saving}
+          sx={{
+            minWidth: 190,
+            '& .MuiInputBase-input': {
+              fontSize: '0.78rem',
+              lineHeight: 1.3
+            }
+          }}
+        />
+      </Tooltip>
+      <Button
+        size="small"
+        variant="outlined"
+        onClick={() => onSave(order, draft)}
+        disabled={saving || !hasChanges}
+        sx={{ fontSize: '0.72rem', whiteSpace: 'nowrap', minWidth: 58 }}
+      >
+        Save
+      </Button>
+      {saving && <CircularProgress size={16} />}
+    </Stack>
+  );
+});
 
 export default function AllOrdersSheetPage() {
   const [sellers, setSellers] = useState([]);
@@ -115,6 +160,7 @@ export default function AllOrdersSheetPage() {
   const [updatedOrderIds, setUpdatedOrderIds] = useState(new Set()); // Track orders with price updates
   const [orderTotalUpdates, setOrderTotalUpdates] = useState({}); // { orderId: value }
   const [updatingOrderTotals, setUpdatingOrderTotals] = useState({}); // { orderId: boolean }
+  const [savingAllOrdersUsdRemarks, setSavingAllOrdersUsdRemarks] = useState({}); // { order._id: boolean }
   const [confirmOrderTotal, setConfirmOrderTotal] = useState({ open: false, order: null, value: '' });
 
   // Search filters
@@ -382,6 +428,7 @@ export default function AllOrdersSheetPage() {
         'PROFIT (INR)',
         'Amazon Acc',
         'Order ID',
+        'All Orders USD Remark',
         'Buyer Name',
         'Arriving'
       ];
@@ -455,6 +502,7 @@ export default function AllOrdersSheetPage() {
           profit.toFixed(2),
           order.amazonAccount || '-',
           order.orderId || '-',
+          order.allOrdersUsdRemark || '-',
           order.buyer?.buyerRegistrationAddress?.fullName || '-',
           (() => {
             const d = order.arrivingDate;
@@ -474,8 +522,8 @@ export default function AllOrdersSheetPage() {
       });
 
       // Combine headers and rows
-      // Date column indices (0-based): 1=Date Sold, 29=Arriving
-      const DATE_COL_INDICES = new Set([1, 29]);
+      // Date column indices (0-based): 1=Date Sold, 30=Arriving
+      const DATE_COL_INDICES = new Set([1, 30]);
       const csvContent = [
         headers.join(','),
         ...rows.map(row =>
@@ -658,6 +706,32 @@ export default function AllOrdersSheetPage() {
     }
   }
 
+  async function handleSaveAllOrdersUsdRemark(order, overrideValue) {
+    const nextValue = overrideValue !== undefined ? overrideValue : order.allOrdersUsdRemark;
+    const normalizedValue = nextValue == null ? '' : String(nextValue);
+    const currentValue = order.allOrdersUsdRemark || '';
+
+    if (normalizedValue === currentValue) return;
+
+    setSavingAllOrdersUsdRemarks(prev => ({ ...prev, [order._id]: true }));
+
+    try {
+      const { data } = await api.patch(`/ebay/orders/${order._id}/all-orders-usd-remark`, {
+        allOrdersUsdRemark: normalizedValue
+      });
+
+      setOrders(prev => prev.map(existingOrder => (
+        existingOrder._id === order._id
+          ? { ...existingOrder, allOrdersUsdRemark: data.order?.allOrdersUsdRemark || '' }
+          : existingOrder
+      )));
+    } catch (err) {
+      alert('Failed to update All Orders USD remark: ' + (err?.response?.data?.error || err.message));
+    } finally {
+      setSavingAllOrdersUsdRemarks(prev => ({ ...prev, [order._id]: false }));
+    }
+  }
+
   // Handler for updating individual item price
   async function handleUpdateItemPrice(legacyItemId, order) {
     const newPrice = itemPriceUpdates[legacyItemId];
@@ -701,6 +775,18 @@ export default function AllOrdersSheetPage() {
     } finally {
       setUpdatingItemPrices(prev => ({ ...prev, [legacyItemId]: false }));
     }
+  }
+
+  function getPriceChangeHistoryUrl(orderId) {
+    return `/admin/price-change-history?orderId=${encodeURIComponent(orderId || '')}`;
+  }
+
+  function getFirstLegacyItemId(order) {
+    return order.lineItems?.find(item => item?.legacyItemId)?.legacyItemId || '';
+  }
+
+  function getPriceChangeHistoryItemUrl(itemId) {
+    return `/admin/price-change-history?legacyItemId=${encodeURIComponent(itemId || '')}`;
   }
 
   // Calculate expected profit based on try pricing
@@ -1948,9 +2034,10 @@ export default function AllOrdersSheetPage() {
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderBottom: `3px solid ${BRAND_YELLOW}`, borderRight: `2px solid ${BRAND_DARK}` }} align="right">PROFIT<br />(INR)</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Amazon<br />Acc</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Order ID</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 220 }}>All Orders USD<br />Remark</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Buyer<br />Name</TableCell>
                 <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}` }}>Arriving</TableCell>
-                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 180 }}>Update Price</TableCell>
+                <TableCell rowSpan={2} sx={{ ...tableHeaderCellSx, borderRight: `2px solid ${BRAND_DARK}`, minWidth: 180 }}>Actions</TableCell>
               </TableRow>
               {/* Second row: eBay Side and Amazon Side column headers */}
               <TableRow>
@@ -2363,18 +2450,67 @@ export default function AllOrdersSheetPage() {
                       )}
                     </Stack>
                   </TableCell>
+                  <TableCell sx={{ minWidth: 220 }}>
+                    <AllOrdersUsdRemarkCell
+                      order={order}
+                      saving={Boolean(savingAllOrdersUsdRemarks[order._id])}
+                      onSave={handleSaveAllOrdersUsdRemark}
+                    />
+                  </TableCell>
                   <TableCell>{order.buyer?.buyerRegistrationAddress?.fullName || '-'}</TableCell>
                   <TableCell>{order.arrivingDate || '-'}</TableCell>
                   {/* Update Price Column */}
                   <TableCell>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={() => openPriceUpdateModal(order)}
-                      sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                    >
-                      Change Price
-                    </Button>
+                    {(() => {
+                      const legacyItemId = getFirstLegacyItemId(order);
+
+                      return (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => openPriceUpdateModal(order)}
+                            sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                          >
+                            Change Price
+                          </Button>
+                          <Tooltip title="Open price change history for this order" arrow placement="top">
+                            <span>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                component="a"
+                                href={getPriceChangeHistoryUrl(order.orderId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                disabled={!order.orderId}
+                                endIcon={<OpenInNewIcon sx={{ fontSize: '0.875rem' }} />}
+                                sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                              >
+                                History
+                              </Button>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={legacyItemId ? `Open price change history for item ${legacyItemId}` : 'No item ID found for this order'} arrow placement="top">
+                            <span>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                component="a"
+                                href={getPriceChangeHistoryItemUrl(legacyItemId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                disabled={!legacyItemId}
+                                endIcon={<OpenInNewIcon sx={{ fontSize: '0.875rem' }} />}
+                                sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                              >
+                                Open Item
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        </Stack>
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               ))}
@@ -2458,6 +2594,7 @@ export default function AllOrdersSheetPage() {
                     <TableCell align="right" sx={{ color: totals.profit < 0 ? 'error.main' : 'success.main' }}>
                       ₹{totals.profit.toFixed(2)}
                     </TableCell>
+                    <TableCell></TableCell>
                     <TableCell></TableCell>
                     <TableCell></TableCell>
                     <TableCell></TableCell>
