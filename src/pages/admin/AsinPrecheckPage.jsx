@@ -75,6 +75,25 @@ const getDeliveryTooltip = (row) => {
   return row.shippingTime || row.shippingCondition || 'Delivery date unavailable';
 };
 
+const formatEbayMotorsTooltip = (row) => {
+  const detected = row.ebayMotorsDetected || {};
+  const signals = row.ebayMotorsSignals || {};
+  const modelNames = Array.isArray(detected.modelNames) && detected.modelNames.length > 0
+    ? detected.modelNames.join(', ')
+    : 'None';
+  const years = Array.isArray(detected.years) && detected.years.length > 0
+    ? detected.years.join(', ')
+    : 'None';
+  const universalPhrase = detected.universalPhrase || 'None';
+
+  return [
+    row.ebayMotorsReason || 'eBay Motors title eligibility',
+    `Model detected: ${signals.hasModel ? 'Yes' : 'No'} (${modelNames})`,
+    `Year detected: ${signals.hasYear ? 'Yes' : 'No'} (${years})`,
+    `Universal detected: ${signals.isUniversal ? 'Yes' : 'No'} (${universalPhrase})`
+  ].join('\n');
+};
+
 export default function AsinPrecheckPage() {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -87,6 +106,7 @@ export default function AsinPrecheckPage() {
   const [templateId, setTemplateId] = useState('');
   const [asinInput, setAsinInput] = useState('');
   const [region, setRegion] = useState('US');
+  const [ebayMotorsMode, setEbayMotorsMode] = useState(false);
   const [loadingSetup, setLoadingSetup] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
@@ -221,6 +241,7 @@ export default function AsinPrecheckPage() {
     () => rows.filter(row => (
       isRowComplete(row)
       && row.intent !== 'excluded'
+      && !(row.ebayMotorsMode && row.ebayMotorsEligible === false)
       && (row.intent === 'included' || selectedIds.has(row.id))
     )),
     [rows, selectedIds]
@@ -303,6 +324,11 @@ export default function AsinPrecheckPage() {
       deliveryDays: null,
       availabilityStatus: '',
       inStock: null,
+      ebayMotorsMode,
+      ebayMotorsEligible: null,
+      ebayMotorsReason: '',
+      ebayMotorsSignals: null,
+      ebayMotorsDetected: null,
       intent: 'neutral',
       status: 'loading',
       progressStage: 'queued',
@@ -320,7 +346,7 @@ export default function AsinPrecheckPage() {
 
     const authToken = getAuthToken();
     const asinParam = asinsToCheck.join(',');
-    const sseUrl = `/template-listings/asin-precheck-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(region)}&token=${encodeURIComponent(authToken)}`;
+    const sseUrl = `/template-listings/asin-precheck-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(region)}&ebayMotorsMode=${ebayMotorsMode ? 'true' : 'false'}&token=${encodeURIComponent(authToken)}`;
     const eventSource = new EventSource(api.defaults.baseURL + sseUrl);
 
     eventSource.onmessage = (event) => {
@@ -395,7 +421,14 @@ export default function AsinPrecheckPage() {
   const setRowIntent = (rowIds, intent) => {
     const idSet = new Set(rowIds);
     setRows(prev => prev.map(row => (
-      idSet.has(row.id) ? { ...row, intent } : row
+      idSet.has(row.id)
+        ? {
+            ...row,
+            intent: row.ebayMotorsMode && row.ebayMotorsEligible === false && intent === 'included'
+              ? 'excluded'
+              : intent
+          }
+        : row
     )));
   };
 
@@ -512,6 +545,22 @@ export default function AsinPrecheckPage() {
                 >
                   Discard
                 </Button>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={ebayMotorsMode}
+                      onChange={(event) => setEbayMotorsMode(event.target.checked)}
+                      disabled={rows.length > 0 || running}
+                    />
+                  }
+                  label="eBay Motors"
+                  sx={{
+                    ml: { md: 0.5 },
+                    px: 1,
+                    borderRadius: 1.5,
+                    bgcolor: ebayMotorsMode ? alpha(BRAND_YELLOW, 0.2) : alpha(BRAND_DARK, 0.035)
+                  }}
+                />
               </Stack>
 
               <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: 'flex-start', lg: 'flex-end' }} flexWrap="wrap" useFlexGap>
@@ -794,9 +843,29 @@ export default function AsinPrecheckPage() {
                     {row.status === 'loading' ? (
                       <Typography variant="body2" color="text.secondary">Fetching...</Typography>
                     ) : row.title ? (
-                      <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.35 }}>
-                        {row.title}
-                      </Typography>
+                      <Stack spacing={0.75} alignItems="flex-start">
+                        <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.35 }}>
+                          {row.title}
+                        </Typography>
+                        {row.ebayMotorsMode && (
+                          <Tooltip
+                            title={
+                              <Box sx={{ whiteSpace: 'pre-line' }}>
+                                {formatEbayMotorsTooltip(row)}
+                              </Box>
+                            }
+                            arrow
+                          >
+                            <Chip
+                              size="small"
+                              label={row.ebayMotorsEligible ? 'eBay Motors Eligible' : 'Excluded: Missing Fitment'}
+                              color={row.ebayMotorsEligible ? 'success' : 'warning'}
+                              variant={row.ebayMotorsEligible ? 'filled' : 'outlined'}
+                              sx={{ fontWeight: 700 }}
+                            />
+                          </Tooltip>
+                        )}
+                      </Stack>
                     ) : (
                       <Typography variant="body2" color="error">
                         {row.errors?.[0] || 'No title'}
@@ -876,7 +945,7 @@ export default function AsinPrecheckPage() {
                           size="small"
                           variant="outlined"
                           onClick={() => setRowIntent([row.id], row.intent === 'included' ? 'neutral' : 'included')}
-                          disabled={!isRowComplete(row)}
+                          disabled={!isRowComplete(row) || (row.ebayMotorsMode && row.ebayMotorsEligible === false)}
                         >
                           Include
                         </Button>
@@ -950,6 +1019,24 @@ export default function AsinPrecheckPage() {
                     </Select>
                   </FormControl>
                 </Stack>
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={ebayMotorsMode}
+                      onChange={(event) => setEbayMotorsMode(event.target.checked)}
+                      disabled={rows.length > 0 || running}
+                    />
+                  }
+                  label="eBay Motors mode"
+                  sx={{
+                    alignSelf: 'flex-start',
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: 1.5,
+                    bgcolor: ebayMotorsMode ? alpha(BRAND_YELLOW, 0.2) : alpha(BRAND_DARK, 0.035)
+                  }}
+                />
 
                 <TextField
                   label="ASINs"
