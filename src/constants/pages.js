@@ -85,6 +85,8 @@ export const PAGE_REGISTRY = [
   { id: 'SellerUploadLimits', name: 'Seller Upload Limits', path: '/seller-upload-limits', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'CsvStorage', name: 'CSV Storage', path: '/csv-storage', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin', 'lister'] },
   { id: 'ProductResearch', name: 'Product Research', path: '/research', category: 'listingResearch', defaultRoles: ['superadmin', 'productadmin'] },
+  { id: 'UserCategoryTargets', name: 'User Category Targets', path: '/user-category-targets', category: 'listingResearch', defaultRoles: ['superadmin', 'hradmin', 'hr'] },
+  { id: 'UserListingPerformance', name: 'Listing Performance', path: '/user-listing-performance', category: 'listingResearch', defaultRoles: ['superadmin', 'hradmin', 'hr'] },
 
   // ====== FINANCE & CASH FLOW ======
   { id: 'MicroOrders', name: 'Micro Orders', path: '/micro-orders', category: 'finance', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
@@ -97,6 +99,7 @@ export const PAGE_REGISTRY = [
   { id: 'AllOrdersSheet', name: 'All Orders USD', path: '/all-orders-sheet', category: 'finance', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
   { id: 'PriceChangeHistory', name: 'Price Change History', path: '/price-change-history', category: 'finance', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
   { id: 'SellerAnalytics', name: 'Seller Analytics', path: '/seller-analytics', category: 'finance', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
+  { id: 'SellerFunds', name: 'Seller Funds', path: '/seller-funds', category: 'finance', defaultRoles: ['superadmin', 'listingadmin'] },
 
   // ====== COMPLIANCE & SUPPORT ======
   { id: 'Disputes', name: 'Issues and Resolutions', path: '/disputes', category: 'compliance', defaultRoles: ['superadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
@@ -110,7 +113,6 @@ export const PAGE_REGISTRY = [
   // ====== EBAY PARAMETERS ======
   { id: 'SellingPrivileges', name: 'Seller Privileges', path: '/selling-privileges', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'EbayApiUsage', name: 'eBay API Usage', path: '/ebay-api-usage', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
-  { id: 'SellerFunds', name: 'Seller Funds', path: '/seller-funds', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'ActiveListingTiers', name: 'Active Listing Tiers', path: '/active-listing-tiers', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'ExpiringListings', name: 'Expiring Listings', path: '/expiring-listings', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'SkuIndexSync', name: 'SKU Index Sync', path: '/sku-index-sync', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
@@ -125,8 +127,6 @@ export const PAGE_REGISTRY = [
   { id: 'EmployeeManagement', name: 'Employee Management', path: '/employee-management', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin'] },
   { id: 'AddUser', name: 'Add User', path: '/add-user', category: 'hrManagement', defaultRoles: ['superadmin', 'listingadmin', 'hradmin', 'operationhead'] },
   { id: 'UserSellerAssignments', name: 'User-Seller Assignments', path: '/user-seller-assignments', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin', 'hr'] },
-  { id: 'UserCategoryTargets', name: 'User Category Targets', path: '/user-category-targets', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin', 'hr'] },
-  { id: 'UserListingPerformance', name: 'Listing Performance', path: '/user-listing-performance', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin', 'hr'] },
   { id: 'Meetings', name: 'Meetings', path: '/meetings', category: 'hrManagement', defaultRoles: ['superadmin', 'productadmin', 'listingadmin', 'lister', 'advancelister', 'compatibilityadmin', 'compatibilityeditor', 'fulfillmentadmin', 'hradmin', 'hr', 'operationhead', 'trainee', 'hoc', 'compliancemanager'] },
   { id: 'ViewAllMessages', name: 'View All Messages', path: '/internal-messages-admin', category: 'hrManagement', defaultRoles: ['superadmin'] },
   { id: 'Attendance', name: 'Working Hours Tracking', path: '/attendance', category: 'hrManagement', defaultRoles: ['superadmin'] },
