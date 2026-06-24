@@ -176,6 +176,39 @@ function getItemAiRunId(item = {}) {
   return listing._aiRunId || listing.aiRunId || item._aiRunId || item.aiRunId || null;
 }
 
+function normalizeComparableTitle(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function getComparablePrice(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(String(value).replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : null;
+}
+
+function getCrossSellerMatchSummary(skuState, itemData = {}) {
+  const records = Array.isArray(skuState?.otherSellerMatches) ? skuState.otherSellerMatches : [];
+  const currentTitle = normalizeComparableTitle(itemData.title);
+  const currentPrice = getComparablePrice(itemData.startPrice);
+
+  const titleMatches = records.filter(record => currentTitle && normalizeComparableTitle(record.title) === currentTitle);
+  const priceMatches = records.filter(record => {
+    const otherPrice = getComparablePrice(record.price);
+    return currentPrice !== null && otherPrice !== null && otherPrice === currentPrice;
+  });
+
+  const sellerNames = [...new Set([...titleMatches, ...priceMatches].map(record => record.sellerName).filter(Boolean))];
+
+  return {
+    records,
+    titleMatches,
+    priceMatches,
+    sellerNames,
+    hasTitleMatch: titleMatches.length > 0,
+    hasPriceMatch: priceMatches.length > 0
+  };
+}
+
 function buildDismissedReviewStats(previewItems = [], dismissedItems = new Set()) {
   const byRunId = new Map();
   const eligibleStatuses = new Set(['success', 'warning', 'duplicate_updateable', 'ready']);
@@ -268,6 +301,8 @@ export default function AsinReviewModal({
   );
   const canShuffleDescriptionImages = currentItem?.status === 'duplicate_updateable'
     && matchedDescriptionImageUrls.length >= 2;
+  const currentSkuStatus = currentItem?.id ? skuStatus[currentItem.id] : null;
+  const crossSellerSummary = getCrossSellerMatchSummary(currentSkuStatus, itemData);
 
   // Reset modal-local session state only when the modal opens.
   useEffect(() => {
@@ -304,7 +339,15 @@ export default function AsinReviewModal({
       setSkuStatus(prev => ({ ...prev, [item.id]: { status: 'loading', count: 0 } }));
       api.get(`/ebay/check-sku-active?sku=${encodeURIComponent(baseSku)}&sellerId=${encodeURIComponent(sellerId)}`)
         .then(({ data }) => {
-          setSkuStatus(prev => ({ ...prev, [item.id]: { status: data.active ? 'active' : 'inactive', count: data._debug?.count ?? data._debug?.itemCount ?? 0 } }));
+          setSkuStatus(prev => ({
+            ...prev,
+            [item.id]: {
+              status: data.active ? 'active' : 'inactive',
+              count: data._debug?.count ?? data._debug?.itemCount ?? 0,
+              otherSellerMatches: data.otherSellerMatches || [],
+              otherSellerCount: data.otherSellerCount || 0
+            }
+          }));
         })
         .catch(() => {
           setSkuStatus(prev => ({ ...prev, [item.id]: { status: null, count: 0 } }));
@@ -1312,7 +1355,33 @@ export default function AsinReviewModal({
                       if (s.status === 'inactive') return <Chip label="Not Active" color="success" size="small" sx={{ flexShrink: 0 }} />;
                       return null;
                     })()}
+                    {crossSellerSummary.records.length > 0 && (
+                      <Chip
+                        label={`Other sellers: ${crossSellerSummary.records.length}`}
+                        color={crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? 'warning' : 'info'}
+                        variant="outlined"
+                        size="small"
+                        sx={{ flexShrink: 0 }}
+                      />
+                    )}
                   </Stack>
+                  {currentSkuStatus?.otherSellerCount > 0 && (
+                    <Alert
+                      severity={crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? 'warning' : 'success'}
+                      sx={{ mt: 1 }}
+                    >
+                      {crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? (
+                        <>
+                          Same SKU exists in other seller
+                          {crossSellerSummary.sellerNames.length > 0 ? `: ${crossSellerSummary.sellerNames.slice(0, 3).join(', ')}` : ''}.
+                          {crossSellerSummary.hasTitleMatch ? ` Title matches ${crossSellerSummary.titleMatches.length} listing${crossSellerSummary.titleMatches.length === 1 ? '' : 's'}.` : ' Title does not match now.'}
+                          {crossSellerSummary.hasPriceMatch ? ` Price matches ${crossSellerSummary.priceMatches.length} listing${crossSellerSummary.priceMatches.length === 1 ? '' : 's'}.` : ' Price does not match now.'}
+                        </>
+                      ) : (
+                        <>Same SKU exists in another seller, but the current title and price do not match.</>
+                      )}
+                    </Alert>
+                  )}
                 </Box>
 
                 {/* Core Fields */}
@@ -1526,7 +1595,15 @@ export default function AsinReviewModal({
                             size="small"
                             fullWidth
                             required
-                            helperText={`${(itemData.title || '').length}/80`}
+                            helperText={
+                              crossSellerSummary.records.length > 0
+                                ? `${(itemData.title || '').length}/80 • ${
+                                    crossSellerSummary.hasTitleMatch
+                                      ? `Title matches ${crossSellerSummary.titleMatches.length} other seller listing${crossSellerSummary.titleMatches.length === 1 ? '' : 's'}`
+                                      : 'Title no longer matches other sellers with this SKU'
+                                  }`
+                                : `${(itemData.title || '').length}/80`
+                            }
                             sx={{ flex: 1 }}
                           />
                           <Tooltip title="Rephrase title">
