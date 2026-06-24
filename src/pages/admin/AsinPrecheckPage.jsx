@@ -64,7 +64,7 @@ const DEFAULT_FILTERS = {
   keyword: '',
   stock: 'all',
   active: 'all',
-  hideExcluded: false
+  hideExcluded: true
 };
 
 const DEFAULT_PREFERENCES = {
@@ -154,6 +154,8 @@ export default function AsinPrecheckPage() {
   const [imagePreview, setImagePreview] = useState(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [filters, setFilters] = useState(() => getSavedPrecheckPreferences().filters);
+  const [keywordDraft, setKeywordDraft] = useState(() => getSavedPrecheckPreferences().filters.keyword || '');
+  const [keywordIntent, setKeywordIntent] = useState('included');
 
   const surfaceSx = {
     borderRadius: `${dashboardTheme.radius.card}px`,
@@ -221,9 +223,12 @@ export default function AsinPrecheckPage() {
     const stock = options.stock ?? filters.stock;
     const active = options.active ?? filters.active;
     const hideExcluded = options.hideExcluded ?? filters.hideExcluded;
+    const focusIncluded = options.focusIncluded ?? true;
+    const hasIncludedRows = focusIncluded && sourceRows.some(row => row.intent === 'included');
 
     return sourceRows.filter(row => {
       if (hideExcluded && row.intent === 'excluded') return false;
+      if (hasIncludedRows && row.intent !== 'included') return false;
       if (keyword && !String(row.title || '').toLowerCase().includes(keyword)) return false;
       if (Number.isFinite(priceFrom) && String(options.priceFrom ?? filters.priceFrom) !== '' && !(Number(row.priceNumber) >= priceFrom)) return false;
       if (Number.isFinite(priceTo) && String(options.priceTo ?? filters.priceTo) !== '' && !(Number(row.priceNumber) <= priceTo)) return false;
@@ -242,10 +247,11 @@ export default function AsinPrecheckPage() {
     [rows, filters]
   );
 
-  const keywordMatchedRows = useMemo(
-    () => visibleRows.filter(row => filters.keyword.trim() && isRowComplete(row)),
-    [visibleRows, filters.keyword]
-  );
+  const keywordDraftMatchedRows = useMemo(() => {
+    const keyword = keywordDraft.trim();
+    if (!keyword) return [];
+    return getFilteredRows(rows, { ...filters, keyword, focusIncluded: false }).filter(isRowComplete);
+  }, [rows, filters, keywordDraft]);
 
   const selectedRows = useMemo(
     () => rows.filter(row => selectedIds.has(row.id)),
@@ -257,14 +263,14 @@ export default function AsinPrecheckPage() {
     [rows]
   );
 
-  const inactiveRows = useMemo(
-    () => rows.filter(row => row.status !== 'loading' && !row.active),
-    [rows]
+  const visibleInactiveRows = useMemo(
+    () => visibleRows.filter(row => row.status !== 'loading' && !row.active),
+    [visibleRows]
   );
 
-  const activeCount = useMemo(
-    () => rows.filter(row => row.status !== 'loading' && row.active).length,
-    [rows]
+  const visibleActiveCount = useMemo(
+    () => visibleRows.filter(row => row.status !== 'loading' && row.active).length,
+    [visibleRows]
   );
 
   const includedCount = useMemo(
@@ -472,13 +478,22 @@ export default function AsinPrecheckPage() {
     )));
   };
 
-  const setKeywordIntent = (intent) => {
-    if (keywordMatchedRows.length === 0) return;
-    setRowIntent(keywordMatchedRows.map(row => row.id), intent);
+  const applyKeywordIntent = (event) => {
+    event.preventDefault();
+    const keyword = keywordDraft.trim();
+    if (!keyword) return;
+
+    const matchedRowIds = keywordDraftMatchedRows.map(row => row.id);
+    updateFilter('keyword', keyword);
+    if (matchedRowIds.length > 0) {
+      setRowIntent(matchedRowIds, keywordIntent);
+    }
   };
 
   const clearAllFilters = () => {
     setFilters(DEFAULT_FILTERS);
+    setKeywordDraft('');
+    setKeywordIntent('included');
   };
 
   const discardSelected = () => {
@@ -562,8 +577,8 @@ export default function AsinPrecheckPage() {
                 </Button>
                 <Button
                   variant="outlined"
-                  onClick={() => selectRows(inactiveRows)}
-                  disabled={inactiveRows.length === 0}
+                  onClick={() => selectRows(visibleInactiveRows)}
+                  disabled={visibleInactiveRows.length === 0}
                 >
                   Select All Inactive
                 </Button>
@@ -632,8 +647,15 @@ export default function AsinPrecheckPage() {
                 bgcolor: alpha(BRAND_DARK, 0.035)
               }}
             >
-              <Chip label={`Active: ${activeCount}`} color="success" variant="outlined" />
-              <Chip label={`Inactive: ${inactiveRows.length}`} color="error" variant="outlined" />
+              <Chip
+                label={`Showing ASINs: ${visibleRows.length}/${rows.length}`}
+                sx={{
+                  bgcolor: alpha(BRAND_DARK, 0.08),
+                  fontWeight: 800
+                }}
+              />
+              <Chip label={`Active: ${visibleActiveCount}`} color="success" variant="outlined" />
+              <Chip label={`Inactive: ${visibleInactiveRows.length}`} color="error" variant="outlined" />
               <Chip label={`Included: ${includedCount}`} color="primary" variant="outlined" />
               <Chip label={`Excluded: ${excludedCount}`} color="warning" variant="outlined" />
               <Chip label={`Selected: ${selectedIds.size}`} sx={{ bgcolor: alpha(BRAND_YELLOW, 0.24), fontWeight: 700 }} />
@@ -696,7 +718,7 @@ export default function AsinPrecheckPage() {
                   label="Active"
                   onChange={(event) => updateFilter('active', event.target.value)}
                 >
-                  <MenuItem value="all">All Active</MenuItem>
+                  <MenuItem value="all">All</MenuItem>
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="inactive">Inactive</MenuItem>
                 </Select>
@@ -723,6 +745,8 @@ export default function AsinPrecheckPage() {
             </Stack>
 
             <Stack
+              component="form"
+              onSubmit={applyKeywordIntent}
               direction={{ xs: 'column', lg: 'row' }}
               spacing={1.5}
               alignItems={{ xs: 'stretch', lg: 'center' }}
@@ -731,35 +755,46 @@ export default function AsinPrecheckPage() {
                 borderTop: `1px solid ${alpha(BRAND_DARK, 0.08)}`
               }}
             >
+              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}>
+                <InputLabel>Action</InputLabel>
+                <Select
+                  value={keywordIntent}
+                  label="Action"
+                  onChange={(event) => setKeywordIntent(event.target.value)}
+                >
+                  <MenuItem value="included">Include</MenuItem>
+                  <MenuItem value="excluded">Exclude</MenuItem>
+                </Select>
+              </FormControl>
               <TextField
                 size="small"
                 label="Keyword in Title"
-                value={filters.keyword}
-                onChange={(event) => updateFilter('keyword', event.target.value)}
+                value={keywordDraft}
+                onChange={(event) => {
+                  setKeywordDraft(event.target.value);
+                  updateFilter('keyword', event.target.value);
+                }}
                 placeholder="e.g. mud flaps"
                 sx={{ flex: 1, minWidth: { lg: 360 } }}
               />
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                <Chip label={`Keyword matches: ${keywordMatchedRows.length}`} variant="outlined" />
+                <Chip label={`Keyword matches: ${keywordDraftMatchedRows.length}`} variant="outlined" />
                 <Button
-                  variant="outlined"
-                  onClick={() => setKeywordIntent('included')}
-                  disabled={keywordMatchedRows.length === 0}
+                  type="submit"
+                  variant="contained"
+                  disabled={!keywordDraft.trim()}
+                  sx={yellowFilledButtonSx}
                 >
-                  Include Matches
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  onClick={() => setKeywordIntent('excluded')}
-                  disabled={keywordMatchedRows.length === 0}
-                >
-                  Exclude Matches
+                  Apply
                 </Button>
                 <Button
                   variant="text"
-                  onClick={() => setRowIntent(rows.map(row => row.id), 'neutral')}
-                  disabled={includedCount + excludedCount === 0}
+                  onClick={() => {
+                    setRowIntent(rows.map(row => row.id), 'neutral');
+                    setKeywordDraft('');
+                    updateFilter('keyword', '');
+                  }}
+                  disabled={includedCount + excludedCount === 0 && !keywordDraft.trim() && !filters.keyword}
                 >
                   Clear Include/Exclude
                 </Button>
