@@ -76,40 +76,6 @@ function HeaderTooltip({ label, title, align = 'left' }) {
     );
 }
 
-function CountryBreakdownTooltip({ row }) {
-    const sellers = row.sellerBreakdown || [];
-    return (
-        <Box sx={{ minWidth: 320, maxWidth: 460, p: 0.5 }}>
-            <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.5 }}>
-                {row.country} seller breakdown
-            </Typography>
-            <Typography variant="caption" sx={{ display: 'block', mb: 1, opacity: 0.8 }}>
-                Showing up to 12 sellers sorted by extra duplicate count.
-            </Typography>
-            <Stack spacing={0.7}>
-                {sellers.length ? sellers.map((seller) => (
-                    <Box
-                        key={seller.sellerId || seller.sellerName}
-                        sx={{
-                            display: 'grid',
-                            gridTemplateColumns: 'minmax(100px, 1fr) 70px 70px 70px',
-                            gap: 1,
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Typography variant="caption" fontWeight={800} noWrap>{seller.sellerName}</Typography>
-                        <Typography variant="caption" textAlign="right">{Number(seller.uniqueSkuCount || 0).toLocaleString()} SKU</Typography>
-                        <Typography variant="caption" textAlign="right">{Number(seller.listingCount || 0).toLocaleString()} list</Typography>
-                        <Typography variant="caption" textAlign="right" fontWeight={800}>+{Number(seller.extraCount || 0).toLocaleString()}</Typography>
-                    </Box>
-                )) : (
-                    <Typography variant="caption">No seller breakdown available.</Typography>
-                )}
-            </Stack>
-        </Box>
-    );
-}
-
 export default function SkuIndexDashboardPage() {
     const [countrySummary, setCountrySummary] = useState(null);
     const [multiCurrencySkus, setMultiCurrencySkus] = useState(null);
@@ -219,7 +185,7 @@ export default function SkuIndexDashboardPage() {
                                                 <HeaderTooltip label="#" title="Rank by highest extra duplicate count." />
                                             </TableCell>
                                             <TableCell sx={tableHeaderCellSx}>
-                                                <HeaderTooltip label="Country" title="Country is derived from the SKU index currency. Hover a country to see seller-wise breakdown." />
+                                                <HeaderTooltip label="Country" title="Country is derived from the SKU index currency." />
                                             </TableCell>
                                             <TableCell align="right" sx={tableHeaderCellSx}>
                                                 <HeaderTooltip label="SKU Count" align="right" title="Unique SKU names in this country. A SKU appearing once or many times still counts as 1." />
@@ -245,20 +211,9 @@ export default function SkuIndexDashboardPage() {
                                                     <Box sx={{ ...tableIndexBadgeSx, width: 28, height: 28, fontSize: '0.78rem' }}>{index + 1}</Box>
                                                 </TableCell>
                                                 <TableCell sx={tableBodyCellSx}>
-                                                    <Tooltip title={<CountryBreakdownTooltip row={row} />} arrow placement="right">
-                                                        <Typography
-                                                            fontWeight={800}
-                                                            sx={{
-                                                                color: BRAND_DARK,
-                                                                display: 'inline-flex',
-                                                                cursor: 'help',
-                                                                textDecoration: 'underline dotted',
-                                                                textUnderlineOffset: 3,
-                                                            }}
-                                                        >
-                                                            {row.country}
-                                                        </Typography>
-                                                    </Tooltip>
+                                                    <Typography fontWeight={800} sx={{ color: BRAND_DARK }}>
+                                                        {row.country}
+                                                    </Typography>
                                                     <Typography variant="caption" color="text.secondary">
                                                         {(row.currencies || []).join(', ')}
                                                     </Typography>
