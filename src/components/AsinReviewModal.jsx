@@ -176,6 +176,45 @@ function getItemAiRunId(item = {}) {
   return listing._aiRunId || listing.aiRunId || item._aiRunId || item.aiRunId || null;
 }
 
+function normalizeComparableTitle(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function getComparablePrice(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(String(value).replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : null;
+}
+
+function getCrossSellerMatchSummary(skuState, itemData = {}) {
+  const records = Array.isArray(skuState?.otherSellerMatches) ? skuState.otherSellerMatches : [];
+  const currentTitle = normalizeComparableTitle(itemData.title);
+  const currentPrice = getComparablePrice(itemData.startPrice);
+
+  const titleMatches = records.filter(record => currentTitle && normalizeComparableTitle(record.title) === currentTitle);
+  const priceMatches = records.filter(record => {
+    const otherPrice = getComparablePrice(record.price);
+    return currentPrice !== null && otherPrice !== null && otherPrice === currentPrice;
+  });
+
+  const sellerNames = [...new Set([...titleMatches, ...priceMatches].map(record => record.sellerName).filter(Boolean))];
+
+  return {
+    records,
+    titleMatches,
+    priceMatches,
+    sellerNames,
+    hasTitleMatch: titleMatches.length > 0,
+    hasPriceMatch: priceMatches.length > 0
+  };
+}
+
+function formatSellerSkuPrice(record = {}) {
+  if (record.price === null || record.price === undefined || record.price === '') return 'Price unavailable';
+  const prefix = record.currency ? `${record.currency} ` : '';
+  return `${prefix}${Number(record.price).toFixed(2)}`;
+}
+
 function buildDismissedReviewStats(previewItems = [], dismissedItems = new Set()) {
   const byRunId = new Map();
   const eligibleStatuses = new Set(['success', 'warning', 'duplicate_updateable', 'ready']);
@@ -268,6 +307,8 @@ export default function AsinReviewModal({
   );
   const canShuffleDescriptionImages = currentItem?.status === 'duplicate_updateable'
     && matchedDescriptionImageUrls.length >= 2;
+  const currentSkuStatus = currentItem?.id ? skuStatus[currentItem.id] : null;
+  const crossSellerSummary = getCrossSellerMatchSummary(currentSkuStatus, itemData);
 
   // Reset modal-local session state only when the modal opens.
   useEffect(() => {
@@ -304,7 +345,15 @@ export default function AsinReviewModal({
       setSkuStatus(prev => ({ ...prev, [item.id]: { status: 'loading', count: 0 } }));
       api.get(`/ebay/check-sku-active?sku=${encodeURIComponent(baseSku)}&sellerId=${encodeURIComponent(sellerId)}`)
         .then(({ data }) => {
-          setSkuStatus(prev => ({ ...prev, [item.id]: { status: data.active ? 'active' : 'inactive', count: data._debug?.count ?? data._debug?.itemCount ?? 0 } }));
+          setSkuStatus(prev => ({
+            ...prev,
+            [item.id]: {
+              status: data.active ? 'active' : 'inactive',
+              count: data._debug?.count ?? data._debug?.itemCount ?? 0,
+              otherSellerMatches: data.otherSellerMatches || [],
+              otherSellerCount: data.otherSellerCount || 0
+            }
+          }));
         })
         .catch(() => {
           setSkuStatus(prev => ({ ...prev, [item.id]: { status: null, count: 0 } }));
@@ -1312,7 +1361,131 @@ export default function AsinReviewModal({
                       if (s.status === 'inactive') return <Chip label="Not Active" color="success" size="small" sx={{ flexShrink: 0 }} />;
                       return null;
                     })()}
+                    {currentSkuStatus?.status !== 'loading' && itemData.customLabel && crossSellerSummary.records.length === 0 && (
+                      <Chip
+                        label="No other seller SKU match"
+                        color="success"
+                        size="small"
+                        sx={{ flexShrink: 0, fontWeight: 800 }}
+                      />
+                    )}
+                    {crossSellerSummary.records.length > 0 && (
+                      <Tooltip
+                        arrow
+                        placement="bottom-end"
+                        title={
+                          <Stack spacing={1} sx={{ maxWidth: 560 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                              Same SKU found in other sellers
+                            </Typography>
+                            {crossSellerSummary.records.slice(0, 10).map((record, index) => (
+                              <Box
+                                key={`${record.sellerId || 'seller'}-${record.itemId || index}`}
+                                sx={{
+                                  pb: 0.75,
+                                  borderBottom: index < Math.min(crossSellerSummary.records.length, 10) - 1 ? '1px solid rgba(255,255,255,0.18)' : 'none'
+                                }}
+                              >
+                                <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: '#fff' }}>
+                                  {record.sellerName || 'Unknown Seller'} {record.itemId ? `• ${record.itemId}` : ''}
+                                </Typography>
+                                <Typography variant="caption" sx={{ display: 'block', color: '#ffd166' }}>
+                                  Price: {formatSellerSkuPrice(record)}
+                                </Typography>
+                                <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.86)' }}>
+                                  {record.title || 'Title unavailable'}
+                                </Typography>
+                              </Box>
+                            ))}
+                            {crossSellerSummary.records.length > 10 && (
+                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.75)' }}>
+                                +{crossSellerSummary.records.length - 10} more
+                              </Typography>
+                            )}
+                          </Stack>
+                        }
+                      >
+                        <Chip
+                          label={`Other sellers: ${crossSellerSummary.records.length}`}
+                          color={crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? 'warning' : 'info'}
+                          variant="outlined"
+                          size="small"
+                          sx={{
+                            flexShrink: 0,
+                            fontWeight: 800,
+                            borderWidth: 2,
+                            bgcolor: crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? '#fff4de' : '#e8f4fd',
+                            '&:hover': {
+                              bgcolor: crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? '#ffe6b8' : '#d8ecfb'
+                            }
+                          }}
+                        />
+                      </Tooltip>
+                    )}
                   </Stack>
+                  {currentSkuStatus?.otherSellerCount > 0 && (
+                    <Alert
+                      severity={crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? 'warning' : 'info'}
+                      icon={<WarningIcon fontSize="small" />}
+                      sx={{
+                        mt: 1,
+                        alignItems: 'center',
+                        border: '1px solid',
+                        borderColor: crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? 'warning.main' : 'info.main',
+                        bgcolor: crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? '#fff4de' : '#e8f4fd',
+                        '& .MuiAlert-message': { width: '100%' }
+                      }}
+                    >
+                      <Stack spacing={0.75}>
+                        <Typography variant="body2" sx={{ fontWeight: 900, color: crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? 'warning.dark' : 'info.dark' }}>
+                          Same SKU exists in {crossSellerSummary.records.length} other seller listing{crossSellerSummary.records.length === 1 ? '' : 's'}
+                        </Typography>
+                        {crossSellerSummary.sellerNames.length > 0 && (
+                          <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                            <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary' }}>
+                              Sellers:
+                            </Typography>
+                            {crossSellerSummary.sellerNames.slice(0, 5).map(name => (
+                              <Chip
+                                key={name}
+                                label={name}
+                                size="small"
+                                sx={{ height: 22, fontWeight: 800, bgcolor: '#fff3cd', color: '#7a4b00', border: '1px solid #f0b429' }}
+                              />
+                            ))}
+                          </Stack>
+                        )}
+                        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                          <Chip
+                            label={crossSellerSummary.hasTitleMatch
+                              ? `Title matches: ${crossSellerSummary.titleMatches.length}`
+                              : 'Title different'}
+                            size="small"
+                            sx={{
+                              fontWeight: 900,
+                              bgcolor: crossSellerSummary.hasTitleMatch ? '#ffecb3' : '#e8f4fd',
+                              color: crossSellerSummary.hasTitleMatch ? '#8a5300' : '#0b5f8f',
+                              border: '1px solid',
+                              borderColor: crossSellerSummary.hasTitleMatch ? '#f0a500' : '#64b5f6'
+                            }}
+                          />
+                          <Chip
+                            label={crossSellerSummary.hasPriceMatch
+                              ? `Price matches: ${crossSellerSummary.priceMatches.length}`
+                              : 'Price different'}
+                            size="small"
+                            sx={{
+                              fontWeight: 900,
+                              bgcolor: crossSellerSummary.hasPriceMatch ? '#ffe0e0' : '#e8f4fd',
+                              color: crossSellerSummary.hasPriceMatch ? '#a11111' : '#0b5f8f',
+                              border: '1px solid',
+                              borderColor: crossSellerSummary.hasPriceMatch ? '#e57373' : '#64b5f6'
+                            }}
+                          />
+                        </Stack>
+                      </Stack>
+                    </Alert>
+                  )}
                 </Box>
 
                 {/* Core Fields */}
@@ -1526,7 +1699,15 @@ export default function AsinReviewModal({
                             size="small"
                             fullWidth
                             required
-                            helperText={`${(itemData.title || '').length}/80`}
+                            helperText={
+                              crossSellerSummary.records.length > 0
+                                ? `${(itemData.title || '').length}/80 • ${
+                                    crossSellerSummary.hasTitleMatch
+                                      ? `Title matches ${crossSellerSummary.titleMatches.length} other seller listing${crossSellerSummary.titleMatches.length === 1 ? '' : 's'}`
+                                      : 'Title no longer matches other sellers with this SKU'
+                                  }`
+                                : `${(itemData.title || '').length}/80`
+                            }
                             sx={{ flex: 1 }}
                           />
                           <Tooltip title="Rephrase title">
