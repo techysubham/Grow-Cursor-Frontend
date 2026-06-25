@@ -78,6 +78,60 @@ function ToneChip({ label, tone = 'neutral', size = 'small', sx = {} }) {
     );
 }
 
+function HeaderTooltip({ label, title, align = 'left' }) {
+    return (
+        <Tooltip title={title} arrow placement="top">
+            <Box
+                component="span"
+                sx={{
+                    display: 'inline-flex',
+                    justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+                    width: '100%',
+                    cursor: 'help',
+                    textDecoration: 'underline dotted',
+                    textUnderlineOffset: 3,
+                }}
+            >
+                {label}
+            </Box>
+        </Tooltip>
+    );
+}
+
+function CountryBreakdownTooltip({ row }) {
+    const sellers = row.sellerBreakdown || [];
+    return (
+        <Box sx={{ minWidth: 320, maxWidth: 460, p: 0.5 }}>
+            <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.5 }}>
+                {row.country} seller breakdown
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', mb: 1, opacity: 0.8 }}>
+                Showing up to 12 sellers sorted by extra duplicate count.
+            </Typography>
+            <Stack spacing={0.7}>
+                {sellers.length ? sellers.map((seller) => (
+                    <Box
+                        key={seller.sellerId || seller.sellerName}
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(100px, 1fr) 70px 70px 70px',
+                            gap: 1,
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Typography variant="caption" fontWeight={800} noWrap>{seller.sellerName}</Typography>
+                        <Typography variant="caption" textAlign="right">{Number(seller.uniqueSkuCount || 0).toLocaleString()} SKU</Typography>
+                        <Typography variant="caption" textAlign="right">{Number(seller.listingCount || 0).toLocaleString()} list</Typography>
+                        <Typography variant="caption" textAlign="right" fontWeight={800}>+{Number(seller.extraCount || 0).toLocaleString()}</Typography>
+                    </Box>
+                )) : (
+                    <Typography variant="caption">No seller breakdown available.</Typography>
+                )}
+            </Stack>
+        </Box>
+    );
+}
+
 // ─── ItemRow ─────────────────────────────────────────────────────────────────
 function ItemRow({ itemId, title, orderCount, endTime, loadingEndTimes, endTimesFetched, selected, onToggle }) {
     const [copied, setCopied] = useState(false);
@@ -319,7 +373,11 @@ export default function DuplicateSkusPage() {
     const [sellers, setSellers] = useState([]);
     const [sellerId, setSellerId] = useState('');
     const [result, setResult] = useState(null);
+    const [countrySummary, setCountrySummary] = useState(null);
+    const [multiCurrencySkus, setMultiCurrencySkus] = useState(null);
     const [loadingSellers, setLoadingSellers] = useState(true);
+    const [loadingCountrySummary, setLoadingCountrySummary] = useState(true);
+    const [loadingMultiCurrencySkus, setLoadingMultiCurrencySkus] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -345,6 +403,20 @@ export default function DuplicateSkusPage() {
             .then(({ data }) => setSellers(data))
             .catch(() => setError('Failed to load sellers.'))
             .finally(() => setLoadingSellers(false));
+    }, []);
+
+    useEffect(() => {
+        api.get('/sellers/sku-duplicates-by-country')
+            .then(({ data }) => setCountrySummary(data))
+            .catch(() => setError('Failed to load SKU country summary.'))
+            .finally(() => setLoadingCountrySummary(false));
+    }, []);
+
+    useEffect(() => {
+        api.get('/sellers/skus-in-multiple-currencies')
+            .then(({ data }) => setMultiCurrencySkus(data))
+            .catch(() => setError('Failed to load multi-currency SKUs.'))
+            .finally(() => setLoadingMultiCurrencySkus(false));
     }, []);
 
     // Fetch live end times from eBay for the current page's item IDs.
@@ -573,6 +645,198 @@ export default function DuplicateSkusPage() {
                             />
                         </Box>
                     )}
+                </SectionCard>
+
+                <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3, background: T.surfaces.pageCard }}>
+                    <Stack spacing={2.5}>
+                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1.5}>
+                            <Box>
+                                <Typography variant="h6" fontWeight={800} sx={{ color: BRAND_DARK }}>
+                                    SKU Index by Country
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Each SKU is counted once per currency country; repeated listings are shown as extra duplicate count.
+                                </Typography>
+                            </Box>
+                            {loadingCountrySummary && (
+                                <Box display="flex" alignItems="center" gap={1}>
+                                    <CircularProgress size={16} thickness={5} sx={{ color: BRAND_YELLOW_DARK }} />
+                                    <Typography variant="caption" color="text.secondary">Loading country summary</Typography>
+                                </Box>
+                            )}
+                        </Stack>
+
+                        {countrySummary && (
+                            <>
+                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                                    <Box sx={{ flex: 1, p: 1.6, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.08)}`, bgcolor: T.surfaces.metricCard }}>
+                                        <Typography variant="caption" color="text.secondary" fontWeight={700}>Unique SKUs</Typography>
+                                        <Typography variant="h5" fontWeight={900} sx={{ color: BRAND_DARK }}>
+                                            {Number(countrySummary.totals?.uniqueSkuCount || 0).toLocaleString()}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1, p: 1.6, borderRadius: 2, border: `1px solid ${alpha(BRAND_DARK, 0.08)}`, bgcolor: T.surfaces.metricCard }}>
+                                        <Typography variant="caption" color="text.secondary" fontWeight={700}>Total Listings</Typography>
+                                        <Typography variant="h5" fontWeight={900} sx={{ color: BRAND_DARK }}>
+                                            {Number(countrySummary.totals?.listingCount || 0).toLocaleString()}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1, p: 1.6, borderRadius: 2, border: `1px solid ${T.tones.warning.border}`, bgcolor: T.tones.warning.background }}>
+                                        <Typography variant="caption" sx={{ color: T.tones.warning.color }} fontWeight={700}>Duplicate SKU Names</Typography>
+                                        <Typography variant="h5" fontWeight={900} sx={{ color: T.tones.warning.color }}>
+                                            {Number(countrySummary.totals?.duplicateSkuCount || 0).toLocaleString()}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1, p: 1.6, borderRadius: 2, border: `1px solid ${T.tones.danger.border}`, bgcolor: T.tones.danger.background }}>
+                                        <Typography variant="caption" sx={{ color: T.tones.danger.color }} fontWeight={700}>Extra Count</Typography>
+                                        <Typography variant="h5" fontWeight={900} sx={{ color: T.tones.danger.color }}>
+                                            {Number(countrySummary.totals?.extraCount || 0).toLocaleString()}
+                                        </Typography>
+                                    </Box>
+                                </Stack>
+
+                                <TableContainer sx={{ ...tableContainerSx, maxHeight: 430, overflow: 'auto' }}>
+                                    <Table size="small" stickyHeader>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ ...tableHeaderCellSx, width: 58 }}>
+                                                    <HeaderTooltip label="#" title="Rank by highest extra duplicate count." />
+                                                </TableCell>
+                                                <TableCell sx={tableHeaderCellSx}>
+                                                    <HeaderTooltip label="Country" title="Country is derived from the SKU index currency. Hover a country to see seller-wise breakdown." />
+                                                </TableCell>
+                                                <TableCell align="right" sx={tableHeaderCellSx}>
+                                                    <HeaderTooltip label="SKU Count" align="right" title="Unique SKU names in this country. A SKU appearing once or many times still counts as 1." />
+                                                </TableCell>
+                                                <TableCell align="right" sx={tableHeaderCellSx}>
+                                                    <HeaderTooltip label="Listings" align="right" title="Total SKU index listing rows in this country." />
+                                                </TableCell>
+                                                <TableCell align="right" sx={tableHeaderCellSx}>
+                                                    <HeaderTooltip label="Duplicate SKUs" align="right" title="Number of SKU names that appear on more than one listing." />
+                                                </TableCell>
+                                                <TableCell align="right" sx={tableHeaderCellSx}>
+                                                    <HeaderTooltip label="Extra Count" align="right" title="Extra duplicate listings after the first valid listing for each SKU. Example: 3 listings for ABC means extra count is 2." />
+                                                </TableCell>
+                                                <TableCell sx={tableHeaderCellSx}>
+                                                    <HeaderTooltip label="Top Extra SKUs" title="Highest duplicate SKUs in this country, shown as SKU plus extra duplicate count." />
+                                                </TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {(countrySummary.countries || []).map((row, index) => (
+                                                <TableRow key={row.country} sx={tableBodyRowSx}>
+                                                    <TableCell sx={{ ...tableBodyCellSx, width: 58 }}>
+                                                        <Box sx={{ ...tableIndexBadgeSx, width: 28, height: 28, fontSize: '0.78rem' }}>{index + 1}</Box>
+                                                    </TableCell>
+                                                    <TableCell sx={tableBodyCellSx}>
+                                                        <Tooltip title={<CountryBreakdownTooltip row={row} />} arrow placement="right">
+                                                            <Typography
+                                                                fontWeight={800}
+                                                                sx={{
+                                                                    color: BRAND_DARK,
+                                                                    display: 'inline-flex',
+                                                                    cursor: 'help',
+                                                                    textDecoration: 'underline dotted',
+                                                                    textUnderlineOffset: 3,
+                                                                }}
+                                                            >
+                                                                {row.country}
+                                                            </Typography>
+                                                        </Tooltip>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {(row.currencies || []).join(', ')}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={tableBodyCellSx}>{Number(row.uniqueSkuCount || 0).toLocaleString()}</TableCell>
+                                                    <TableCell align="right" sx={tableBodyCellSx}>{Number(row.listingCount || 0).toLocaleString()}</TableCell>
+                                                    <TableCell align="right" sx={tableBodyCellSx}>
+                                                        <ToneChip label={Number(row.duplicateSkuCount || 0).toLocaleString()} tone={row.duplicateSkuCount > 0 ? 'warning' : 'success'} />
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={tableBodyCellSx}>
+                                                        <ToneChip label={Number(row.extraCount || 0).toLocaleString()} tone={row.extraCount > 0 ? 'danger' : 'success'} />
+                                                    </TableCell>
+                                                    <TableCell sx={tableBodyCellSx}>
+                                                        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                                                            {(row.topDuplicates || []).slice(0, 5).map(item => (
+                                                                <Tooltip key={item.sku} title={`${item.listingCount} listings, ${item.extraCount} extra`}>
+                                                                    <Chip
+                                                                        size="small"
+                                                                        label={`${item.sku}: +${item.extraCount}`}
+                                                                        sx={{
+                                                                            maxWidth: 180,
+                                                                            fontFamily: "'JetBrains Mono', 'Fira Mono', monospace",
+                                                                            fontWeight: 800,
+                                                                            bgcolor: alpha(BRAND_DARK, 0.05),
+                                                                            border: `1px solid ${alpha(BRAND_DARK, 0.1)}`,
+                                                                            '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
+                                                                        }}
+                                                                    />
+                                                                </Tooltip>
+                                                            ))}
+                                                            {!row.topDuplicates?.length && (
+                                                                <Typography variant="caption" color="text.secondary">No extras</Typography>
+                                                            )}
+                                                        </Stack>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </>
+                        )}
+                    </Stack>
+                </SectionCard>
+
+                <SectionCard sx={{ p: { xs: 2, md: 3 }, mb: 3, background: T.surfaces.pageCard }}>
+                    <Stack spacing={2.5}>
+                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1.5}>
+                            <Box>
+                                <Typography variant="h6" fontWeight={800} sx={{ color: BRAND_DARK }}>
+                                    SKUs in Multiple Currencies
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    SKU names that appear in more than one currency group, such as USD and AUD.
+                                </Typography>
+                            </Box>
+                            {loadingMultiCurrencySkus ? (
+                                <Box display="flex" alignItems="center" gap={1}>
+                                    <CircularProgress size={16} thickness={5} sx={{ color: BRAND_YELLOW_DARK }} />
+                                    <Typography variant="caption" color="text.secondary">Loading multi-currency SKUs</Typography>
+                                </Box>
+                            ) : null}
+                        </Stack>
+
+                        {multiCurrencySkus && (
+                            multiCurrencySkus.skus?.length ? (
+                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                                    <Box sx={{ flex: 1, p: 1.8, borderRadius: 2, border: `1px solid ${T.tones.warning.border}`, bgcolor: T.tones.warning.background }}>
+                                        <Typography variant="caption" sx={{ color: T.tones.warning.color }} fontWeight={800}>
+                                            SKU Count
+                                        </Typography>
+                                        <Typography variant="h4" fontWeight={900} sx={{ color: T.tones.warning.color }}>
+                                            {Number(multiCurrencySkus.total || 0).toLocaleString()}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1, p: 1.8, borderRadius: 2, border: `1px solid ${T.tones.danger.border}`, bgcolor: T.tones.danger.background }}>
+                                        <Typography variant="caption" sx={{ color: T.tones.danger.color }} fontWeight={800}>
+                                            Extra Count
+                                        </Typography>
+                                        <Typography variant="h4" fontWeight={900} sx={{ color: T.tones.danger.color }}>
+                                            {Number(multiCurrencySkus.extraCount || 0).toLocaleString()}
+                                        </Typography>
+                                    </Box>
+                                </Stack>
+                            ) : (
+                                <Box py={5} textAlign="center">
+                                    <CheckCircleOutlineIcon sx={{ fontSize: 40, color: T.tones.success.color, mb: 1 }} />
+                                    <Typography fontWeight={800} sx={{ color: T.tones.success.color }}>
+                                        No SKUs found in multiple currencies.
+                                    </Typography>
+                                </Box>
+                            )
+                        )}
+                    </Stack>
                 </SectionCard>
 
                 {loading && (
