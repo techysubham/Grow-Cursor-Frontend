@@ -68,6 +68,8 @@ const DEFAULT_FILTERS = {
 };
 
 const DEFAULT_PREFERENCES = {
+  sellerId: '',
+  templateId: '',
   region: 'US',
   ebayMotorsMode: false,
   filters: DEFAULT_FILTERS
@@ -79,6 +81,8 @@ const getSavedPrecheckPreferences = () => {
   try {
     const saved = JSON.parse(window.localStorage.getItem(ASIN_PRECHECK_PREFERENCES_KEY) || '{}');
     return {
+      sellerId: saved.sellerId || DEFAULT_PREFERENCES.sellerId,
+      templateId: saved.templateId || DEFAULT_PREFERENCES.templateId,
       region: saved.region || DEFAULT_PREFERENCES.region,
       ebayMotorsMode: Boolean(saved.ebayMotorsMode),
       filters: {
@@ -135,6 +139,7 @@ export default function AsinPrecheckPage() {
   const navigate = useNavigate();
   const theme = useTheme();
   const dashboardTheme = theme.customTokens?.dashboardSignature || dashboardSignatureTokens;
+  const savedPreferences = useMemo(() => getSavedPrecheckPreferences(), []);
 
   const [setupOpen, setSetupOpen] = useState(true);
   const [sellers, setSellers] = useState([]);
@@ -142,8 +147,8 @@ export default function AsinPrecheckPage() {
   const [sellerId, setSellerId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [asinInput, setAsinInput] = useState('');
-  const [region, setRegion] = useState(() => getSavedPrecheckPreferences().region);
-  const [ebayMotorsMode, setEbayMotorsMode] = useState(() => getSavedPrecheckPreferences().ebayMotorsMode);
+  const [region, setRegion] = useState(savedPreferences.region);
+  const [ebayMotorsMode, setEbayMotorsMode] = useState(savedPreferences.ebayMotorsMode);
   const [loadingSetup, setLoadingSetup] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
@@ -153,8 +158,8 @@ export default function AsinPrecheckPage() {
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [imagePreview, setImagePreview] = useState(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
-  const [filters, setFilters] = useState(() => getSavedPrecheckPreferences().filters);
-  const [keywordDraft, setKeywordDraft] = useState(() => getSavedPrecheckPreferences().filters.keyword || '');
+  const [filters, setFilters] = useState(savedPreferences.filters);
+  const [keywordDraft, setKeywordDraft] = useState(savedPreferences.filters.keyword || '');
   const [keywordIntent, setKeywordIntent] = useState('included');
 
   const surfaceSx = {
@@ -181,8 +186,10 @@ export default function AsinPrecheckPage() {
         const templateList = templateRes.data || [];
         setSellers(sellerList);
         setTemplates(templateList);
-        if (sellerList.length > 0) setSellerId(sellerList[0]._id);
-        if (templateList.length > 0) setTemplateId(templateList[0]._id);
+        const savedSellerExists = sellerList.some(seller => seller._id === savedPreferences.sellerId);
+        const savedTemplateExists = templateList.some(template => template._id === savedPreferences.templateId);
+        setSellerId(savedSellerExists ? savedPreferences.sellerId : sellerList[0]?._id || '');
+        setTemplateId(savedTemplateExists ? savedPreferences.templateId : templateList[0]?._id || '');
       } catch (err) {
         console.error('Failed to load ASIN precheck setup data:', err);
         if (mounted) setError('Failed to load sellers or templates');
@@ -200,11 +207,15 @@ export default function AsinPrecheckPage() {
         window._asinPrecheckEventSource = null;
       }
     };
-  }, []);
+  }, [savedPreferences.sellerId, savedPreferences.templateId]);
 
   useEffect(() => {
+    if (loadingSetup) return;
+
     try {
       window.localStorage.setItem(ASIN_PRECHECK_PREFERENCES_KEY, JSON.stringify({
+        sellerId,
+        templateId,
         region,
         ebayMotorsMode,
         filters
@@ -212,7 +223,7 @@ export default function AsinPrecheckPage() {
     } catch {
       // Local storage is a convenience only; the precheck flow can continue without it.
     }
-  }, [region, ebayMotorsMode, filters]);
+  }, [sellerId, templateId, region, ebayMotorsMode, filters, loadingSetup]);
 
   const getFilteredRows = (sourceRows, options = {}) => {
     const keyword = (options.keyword ?? filters.keyword).trim().toLowerCase();
@@ -1044,7 +1055,7 @@ export default function AsinPrecheckPage() {
         </TableContainer>
       </Stack>
 
-      <Dialog open={setupOpen} onClose={() => rows.length > 0 && !running && setSetupOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={setupOpen} onClose={() => !running && setSetupOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>ASIN Precheck</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
@@ -1132,8 +1143,8 @@ export default function AsinPrecheckPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSetupOpen(false)} disabled={rows.length === 0 || running}>
-            Cancel
+          <Button onClick={() => setSetupOpen(false)} disabled={running}>
+            Close
           </Button>
           <Button
             onClick={runPrecheck}
