@@ -215,7 +215,9 @@ function getNextNonMatchingPrice(value, records = [], stepCents = 2) {
 }
 
 function getCrossSellerMatchSummary(skuState, itemData = {}) {
-  const records = Array.isArray(skuState?.otherSellerMatches) ? skuState.otherSellerMatches : [];
+  const currentSellerRecords = Array.isArray(skuState?.currentSellerMatches) ? skuState.currentSellerMatches : [];
+  const otherSellerRecords = Array.isArray(skuState?.otherSellerMatches) ? skuState.otherSellerMatches : [];
+  const records = [...currentSellerRecords, ...otherSellerRecords];
   const currentTitle = normalizeComparableTitle(itemData.title);
   const currentPrice = getComparablePrice(itemData.startPrice);
 
@@ -229,6 +231,8 @@ function getCrossSellerMatchSummary(skuState, itemData = {}) {
 
   return {
     records,
+    currentSellerRecords,
+    otherSellerRecords,
     titleMatches,
     priceMatches,
     sellerNames,
@@ -381,6 +385,8 @@ export default function AsinReviewModal({
             [item.id]: {
               status: data.active ? 'active' : 'inactive',
               count: data._debug?.count ?? data._debug?.itemCount ?? 0,
+              currentSellerMatches: data.currentSellerMatches || [],
+              currentSellerCount: data.currentSellerCount || 0,
               otherSellerMatches: data.otherSellerMatches || [],
               otherSellerCount: data.otherSellerCount || 0
             }
@@ -404,7 +410,10 @@ export default function AsinReviewModal({
       const next = { ...prev };
 
       previewItems.forEach(item => {
-        const records = skuStatus[item.id]?.otherSellerMatches || [];
+        const records = [
+          ...(skuStatus[item.id]?.currentSellerMatches || []),
+          ...(skuStatus[item.id]?.otherSellerMatches || [])
+        ];
         if (records.length === 0) return;
 
         const listingData = next[item.id] || item.generatedListing;
@@ -1447,7 +1456,7 @@ export default function AsinReviewModal({
                     })()}
                     {currentSkuStatus?.status !== 'loading' && itemData.customLabel && crossSellerSummary.records.length === 0 && (
                       <Chip
-                        label="No other seller SKU match"
+                        label="No SKU match"
                         color="success"
                         size="small"
                         sx={{ flexShrink: 0, fontWeight: 800 }}
@@ -1460,7 +1469,7 @@ export default function AsinReviewModal({
                         title={
                           <Stack spacing={1} sx={{ maxWidth: 560 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                              Same SKU found in other sellers
+                              Same SKU found in synced listings
                             </Typography>
                             {crossSellerSummary.records.slice(0, 10).map((record, index) => (
                               <Box
@@ -1490,24 +1499,24 @@ export default function AsinReviewModal({
                         }
                       >
                         <Chip
-                          label={`Other sellers: ${crossSellerSummary.records.length}`}
-                          color={crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? 'warning' : 'info'}
+                          label={`SKU matches: ${crossSellerSummary.records.length}`}
+                          color="info"
                           variant="outlined"
                           size="small"
                           sx={{
                             flexShrink: 0,
                             fontWeight: 800,
                             borderWidth: 2,
-                            bgcolor: crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? '#fff4de' : '#e8f4fd',
+                            bgcolor: '#e8f4fd',
                             '&:hover': {
-                              bgcolor: crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? '#ffe6b8' : '#d8ecfb'
+                              bgcolor: '#d8ecfb'
                             }
                           }}
                         />
                       </Tooltip>
                     )}
                   </Stack>
-                  {currentSkuStatus?.otherSellerCount > 0 && (
+                  {crossSellerSummary.records.length > 0 && (
                     <Alert
                       severity={crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? 'warning' : 'info'}
                       icon={<WarningIcon fontSize="small" />}
@@ -1522,8 +1531,20 @@ export default function AsinReviewModal({
                     >
                       <Stack spacing={0.75}>
                         <Typography variant="body2" sx={{ fontWeight: 900, color: crossSellerSummary.hasTitleMatch || crossSellerSummary.hasPriceMatch ? 'warning.dark' : 'info.dark' }}>
-                          Same SKU exists in {crossSellerSummary.records.length} other seller listing{crossSellerSummary.records.length === 1 ? '' : 's'}
+                          Same SKU exists in {crossSellerSummary.records.length} synced listing{crossSellerSummary.records.length === 1 ? '' : 's'}
                         </Typography>
+                        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                          <Chip
+                            label={`Current seller: ${crossSellerSummary.currentSellerRecords.length}`}
+                            size="small"
+                            sx={{ fontWeight: 800, bgcolor: '#e8f4fd', color: '#0b5f8f', border: '1px solid #64b5f6' }}
+                          />
+                          <Chip
+                            label={`Other sellers: ${crossSellerSummary.otherSellerRecords.length}`}
+                            size="small"
+                            sx={{ fontWeight: 800, bgcolor: '#f5f7fa', color: '#455a64', border: '1px solid #b0bec5' }}
+                          />
+                        </Stack>
                         {crossSellerSummary.sellerNames.length > 0 && (
                           <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
                             <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary' }}>
@@ -1534,7 +1555,7 @@ export default function AsinReviewModal({
                                 key={name}
                                 label={name}
                                 size="small"
-                                sx={{ height: 22, fontWeight: 800, bgcolor: '#fff3cd', color: '#7a4b00', border: '1px solid #f0b429' }}
+                                sx={{ height: 22, fontWeight: 800, bgcolor: '#f5f7fa', color: '#455a64', border: '1px solid #b0bec5' }}
                               />
                             ))}
                           </Stack>
@@ -1807,8 +1828,8 @@ export default function AsinReviewModal({
                               crossSellerSummary.records.length > 0
                                 ? `${(itemData.title || '').length}/80 • ${
                                     crossSellerSummary.hasTitleMatch
-                                      ? `Title matches ${crossSellerSummary.titleMatches.length} other seller listing${crossSellerSummary.titleMatches.length === 1 ? '' : 's'}`
-                                      : 'Title no longer matches other sellers with this SKU'
+                                      ? `Title matches ${crossSellerSummary.titleMatches.length} synced same-SKU listing${crossSellerSummary.titleMatches.length === 1 ? '' : 's'}`
+                                      : 'Title does not match synced listings with this SKU'
                                   }`
                                 : `${(itemData.title || '').length}/80`
                             }
