@@ -186,6 +186,34 @@ function getComparablePrice(value) {
   return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : null;
 }
 
+function getComparablePriceCents(value) {
+  const price = getComparablePrice(value);
+  return price === null ? null : Math.round(price * 100);
+}
+
+function getNextNonMatchingPrice(value, records = [], stepCents = 2) {
+  const startCents = getComparablePriceCents(value);
+  if (startCents === null) return null;
+
+  const matchedPriceCents = new Set(
+    records
+      .map(record => getComparablePriceCents(record.price))
+      .filter(price => price !== null)
+  );
+
+  if (!matchedPriceCents.has(startCents)) return null;
+
+  let nextCents = startCents;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    nextCents += stepCents;
+    if (!matchedPriceCents.has(nextCents)) {
+      return (nextCents / 100).toFixed(2);
+    }
+  }
+
+  return null;
+}
+
 function getCrossSellerMatchSummary(skuState, itemData = {}) {
   const records = Array.isArray(skuState?.otherSellerMatches) ? skuState.otherSellerMatches : [];
   const currentTitle = normalizeComparableTitle(itemData.title);
@@ -274,6 +302,7 @@ export default function AsinReviewModal({
   const [rephrasing, setRephrasing] = useState({}); // { [itemId]: true|false }
   const [startPriceEditMode, setStartPriceEditMode] = useState({}); // { [itemId]: true|false }
   const [skuStatus, setSkuStatus] = useState({}); // { [itemId]: { status: 'loading'|'active'|'inactive'|null, count: number } }
+  const [autoPriceAdjustments, setAutoPriceAdjustments] = useState({}); // { [itemId]: { from, to } }
   const [vehicleInputs, setVehicleInputs] = useState({}); // { [itemId]: string } — Steering Wheel Cover only
   const isSteeringWheelCover = templateName?.toLowerCase() === 'steering wheel cover';
 
@@ -309,6 +338,7 @@ export default function AsinReviewModal({
     && matchedDescriptionImageUrls.length >= 2;
   const currentSkuStatus = currentItem?.id ? skuStatus[currentItem.id] : null;
   const crossSellerSummary = getCrossSellerMatchSummary(currentSkuStatus, itemData);
+  const currentAutoPriceAdjustment = currentItem?.id ? autoPriceAdjustments[currentItem.id] : null;
 
   // Reset modal-local session state only when the modal opens.
   useEffect(() => {
@@ -326,6 +356,7 @@ export default function AsinReviewModal({
       setRephrasing({});
       setStartPriceEditMode({});
       setSkuStatus({});
+      setAutoPriceAdjustments({});
       checkedSkuIdsRef.current = new Set();
     }
 
@@ -361,6 +392,50 @@ export default function AsinReviewModal({
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, sellerId, editedItems]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const adjustments = {};
+    let hasAdjustments = false;
+
+    setEditedItems(prev => {
+      let changed = false;
+      const next = { ...prev };
+
+      previewItems.forEach(item => {
+        const records = skuStatus[item.id]?.otherSellerMatches || [];
+        if (records.length === 0) return;
+
+        const listingData = next[item.id] || item.generatedListing;
+        if (!listingData?.startPrice) return;
+
+        const adjustedPrice = getNextNonMatchingPrice(listingData.startPrice, records, 20);
+        if (!adjustedPrice) return;
+
+        next[item.id] = {
+          ...listingData,
+          startPrice: adjustedPrice
+        };
+        adjustments[item.id] = {
+          from: getComparablePrice(listingData.startPrice).toFixed(2),
+          to: adjustedPrice
+        };
+        changed = true;
+        hasAdjustments = true;
+      });
+
+      return changed ? next : prev;
+    });
+
+    if (hasAdjustments) {
+      setAutoPriceAdjustments(prev => ({
+        ...prev,
+        ...adjustments
+      }));
+      setHasUnsavedChanges(true);
+    }
+  }, [open, previewItems, skuStatus, editedItems]);
 
   // Merge streamed/generated listings into the editable map without overwriting user edits.
   useEffect(() => {
@@ -485,6 +560,15 @@ export default function AsinReviewModal({
       ...prev,
       [currentItem.id]: updatedItem
     }));
+
+    if (field === 'startPrice' && !isCustomField) {
+      setAutoPriceAdjustments(prev => {
+        if (!prev[currentItem.id]) return prev;
+        const next = { ...prev };
+        delete next[currentItem.id];
+        return next;
+      });
+    }
     
     setHasUnsavedChanges(true);
   };
@@ -1587,6 +1671,26 @@ export default function AsinReviewModal({
                             >
                               {isStartPriceEditing ? 'Save' : 'Edit'}
                             </Button>
+                            {currentAutoPriceAdjustment && (
+                              <Tooltip
+                                title={`Start price auto-increased from ${currentAutoPriceAdjustment.from} to ${currentAutoPriceAdjustment.to} because the original price matched another seller with this SKU.`}
+                                placement="bottom"
+                                arrow
+                              >
+                                <Chip
+                                  label={`Auto +${(Number(currentAutoPriceAdjustment.to) - Number(currentAutoPriceAdjustment.from)).toFixed(2)}`}
+                                  size="small"
+                                  sx={{
+                                    height: 26,
+                                    fontWeight: 900,
+                                    bgcolor: '#e8f4fd',
+                                    color: '#0b5f8f',
+                                    border: '1px solid #64b5f6',
+                                    flexShrink: 0
+                                  }}
+                                />
+                              </Tooltip>
+                            )}
                             {startPriceTooltipContent && (
                               <Tooltip
                                 title={startPriceTooltipContent}
