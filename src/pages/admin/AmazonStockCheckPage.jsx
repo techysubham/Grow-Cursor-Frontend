@@ -95,6 +95,10 @@ function statusColor(status) {
   return 'default';
 }
 
+function getOrderCount(item) {
+  return (item.sellerItems || []).reduce((sum, row) => sum + (row.orderCount || 0), 0);
+}
+
 export default function AmazonStockCheckPage() {
   const [mode, setMode] = useState('pilot_option_b');
   const [currencies, setCurrencies] = useState(['USD']);
@@ -271,6 +275,7 @@ export default function AmazonStockCheckPage() {
     if (activeFilter === 'restocked') return restockedItems;
     if (activeFilter === 'qty_zero_success') return qtyZeroItems;
     if (activeFilter === 'qty_zero_failed') return qtyZeroFailedItems;
+    if (activeFilter === 'has_orders') return items.filter((item) => getOrderCount(item) > 0);
     if (activeFilter === 'checked') return items.filter((item) => !['queued', 'no_asin'].includes(item.status));
     if (activeFilter === 'all') return items;
     return issueItems;
@@ -390,6 +395,7 @@ export default function AmazonStockCheckPage() {
           <Grid item xs={6} md={2}><KpiCard label="No ASIN" value={activeRun.noAsinCount} active={activeFilter === 'no_asin'} onClick={() => setActiveFilter('no_asin')} /></Grid>
           <Grid item xs={6} md={2}><KpiCard label="Became Available" value={activeRun.becameAvailableCount} tone="good" active={activeFilter === 'restocked'} onClick={() => setActiveFilter('restocked')} /></Grid>
           <Grid item xs={6} md={2}><KpiCard label="Errors" value={activeRun.errorCount} tone="bad" active={activeFilter === 'errors'} onClick={() => setActiveFilter('errors')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Has Orders" value={items.filter((item) => getOrderCount(item) > 0).length} active={activeFilter === 'has_orders'} onClick={() => setActiveFilter('has_orders')} /></Grid>
         </Grid>
       )}
 
@@ -411,16 +417,23 @@ export default function AmazonStockCheckPage() {
               </TableHead>
               <TableBody>
                 {displayItems.map((item) => {
-                  const orderCount = (item.sellerItems || []).reduce((sum, row) => sum + (row.orderCount || 0), 0);
+                  const orderCount = getOrderCount(item);
                   const expanded = expandedRows.has(item._id);
                   const qtySummary = getQtyZeroSummary(item.sellerItems || []);
+                  const groupBg = expanded ? '#f8fbff' : 'inherit';
+                  const groupBorder = expanded ? '3px solid #2563eb' : '3px solid transparent';
                   return (
                     <Fragment key={item._id}>
                       <TableRow
                         key={item._id}
                         hover
                         onClick={() => toggleExpanded(item._id)}
-                        sx={{ cursor: 'pointer' }}
+                        sx={{
+                          cursor: 'pointer',
+                          backgroundColor: groupBg,
+                          '& > td:first-of-type': { borderLeft: groupBorder },
+                          '& > td': { borderTop: expanded ? '1px solid #bfdbfe' : undefined }
+                        }}
                       >
                         <TableCell sx={{ fontWeight: 900 }}>{item.sku}</TableCell>
                         <TableCell>{item.asin || '-'}</TableCell>
@@ -442,10 +455,22 @@ export default function AmazonStockCheckPage() {
                         <TableCell>{formatNumber(orderCount)}</TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell colSpan={8} sx={{ p: 0, border: 0 }}>
+                        <TableCell
+                          colSpan={8}
+                          sx={{
+                            p: 0,
+                            border: 0,
+                            borderLeft: expanded ? '3px solid #2563eb' : '3px solid transparent',
+                            backgroundColor: expanded ? '#eff6ff' : 'transparent'
+                          }}
+                        >
                           <Collapse in={expanded} timeout="auto" unmountOnExit>
-                            <Box sx={{ p: 2, background: '#f8fafc' }}>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>Seller item breakdown</Typography>
+                            <Box sx={{ p: 2, background: '#eff6ff' }}>
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>Seller item breakdown</Typography>
+                                <Chip size="small" label={item.sku} sx={{ fontWeight: 900 }} />
+                                <Chip size="small" label={`${item.sellerItems?.length || 0} item IDs`} />
+                              </Stack>
                               <Table size="small">
                                 <TableHead>
                                   <TableRow>
