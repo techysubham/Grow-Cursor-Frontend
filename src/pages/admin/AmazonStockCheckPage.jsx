@@ -33,6 +33,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import EditIcon from '@mui/icons-material/Edit';
 import StopCircleIcon from '@mui/icons-material/StopCircle';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import api from '../../lib/api';
 import PageHeader from '../../components/PageHeader';
 import { BRAND_DARK } from '../../constants/brandTheme';
@@ -57,7 +58,7 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString();
 }
 
-function KpiCard({ label, value, tone = 'default' }) {
+function KpiCard({ label, value, tone = 'default', active = false, onClick }) {
   const colors = {
     default: { bg: '#fff', border: '#e5e7eb', color: BRAND_DARK },
     good: { bg: '#ecfdf5', border: '#a7f3d0', color: '#047857' },
@@ -66,7 +67,17 @@ function KpiCard({ label, value, tone = 'default' }) {
   };
   const palette = colors[tone] || colors.default;
   return (
-    <Card variant="outlined" sx={{ borderColor: palette.border, background: palette.bg, borderRadius: 2 }}>
+    <Card
+      variant="outlined"
+      onClick={onClick}
+      sx={{
+        borderColor: active ? BRAND_DARK : palette.border,
+        background: palette.bg,
+        borderRadius: 2,
+        cursor: onClick ? 'pointer' : 'default',
+        boxShadow: active ? `0 0 0 2px ${BRAND_DARK}` : 'none'
+      }}
+    >
       <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
         <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800 }}>{label}</Typography>
         <Typography variant="h5" sx={{ color: palette.color, fontWeight: 900 }}>
@@ -97,7 +108,9 @@ export default function AmazonStockCheckPage() {
   const [starting, setStarting] = useState(false);
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [error, setError] = useState('');
-  const [expandedSku, setExpandedSku] = useState('');
+  const [success, setSuccess] = useState('');
+  const [expandedRows, setExpandedRows] = useState(() => new Set());
+  const [activeFilter, setActiveFilter] = useState('actionable');
   const [reviseTarget, setReviseTarget] = useState(null);
   const [reviseForm, setReviseForm] = useState({ title: '', price: '' });
 
@@ -148,6 +161,7 @@ export default function AmazonStockCheckPage() {
 
   const handleEstimate = async () => {
     setError('');
+    setSuccess('');
     setLoadingEstimate(true);
     try {
       const params = mode === 'pilot_option_b'
@@ -164,6 +178,7 @@ export default function AmazonStockCheckPage() {
 
   const handleStart = async () => {
     setError('');
+    setSuccess('');
     setStarting(true);
     try {
       const payload = {
@@ -175,6 +190,8 @@ export default function AmazonStockCheckPage() {
       const { data } = await api.post('/amazon-stock-checks/runs', payload);
       setActiveRun(data.run);
       setItems([]);
+      setExpandedRows(new Set());
+      setActiveFilter('actionable');
       await fetchRuns();
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to start run');
@@ -185,10 +202,12 @@ export default function AmazonStockCheckPage() {
 
   const handleManualZero = async (item, sellerItem) => {
     setError('');
+    setSuccess('');
     try {
-      await api.post(`/amazon-stock-checks/items/${item._id}/set-quantity-zero`, {
+      const { data } = await api.post(`/amazon-stock-checks/items/${item._id}/set-quantity-zero`, {
         itemId: sellerItem.itemId
       });
+      setSuccess(data.message || `Quantity set to zero for item ${sellerItem.itemId}`);
       await fetchRun(activeRun._id);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to set quantity to zero');
@@ -197,12 +216,14 @@ export default function AmazonStockCheckPage() {
 
   const handleEndItem = async (sellerItem) => {
     setError('');
+    setSuccess('');
     try {
       await api.post('/ebay/end-item', {
         sellerId: sellerItem.sellerId,
         itemId: sellerItem.itemId,
         source: 'amazon_stock_check'
       });
+      setSuccess(`Ended item ${sellerItem.itemId}`);
       await fetchRun(activeRun._id);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to end item');
@@ -220,6 +241,7 @@ export default function AmazonStockCheckPage() {
   const handleReviseListing = async () => {
     if (!reviseTarget) return;
     setError('');
+    setSuccess('');
     try {
       await api.post('/ebay/update-listing', {
         sellerId: reviseTarget.sellerItem.sellerId,
@@ -228,6 +250,7 @@ export default function AmazonStockCheckPage() {
         price: reviseForm.price
       });
       setReviseTarget(null);
+      setSuccess(`Revised item ${reviseTarget.sellerItem.itemId}`);
       await fetchRun(activeRun._id);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to revise listing');
@@ -237,6 +260,37 @@ export default function AmazonStockCheckPage() {
   const actionableItems = items.filter((item) => ['low_stock', 'out_of_stock'].includes(item.status));
   const restockedItems = items.filter((item) => item.becameAvailable);
   const issueItems = [...actionableItems, ...restockedItems.filter((item) => !actionableItems.some((x) => x._id === item._id))];
+  const qtyZeroItems = items.filter((item) => (item.sellerItems || []).some((row) => row.quantityZeroStatus === 'success'));
+  const qtyZeroFailedItems = items.filter((item) => (item.sellerItems || []).some((row) => row.quantityZeroStatus === 'failed'));
+
+  const displayItems = useMemo(() => {
+    if (activeFilter === 'low_stock') return items.filter((item) => item.status === 'low_stock');
+    if (activeFilter === 'out_of_stock') return items.filter((item) => item.status === 'out_of_stock');
+    if (activeFilter === 'errors') return items.filter((item) => item.status === 'error');
+    if (activeFilter === 'no_asin') return items.filter((item) => item.status === 'no_asin');
+    if (activeFilter === 'restocked') return restockedItems;
+    if (activeFilter === 'qty_zero_success') return qtyZeroItems;
+    if (activeFilter === 'qty_zero_failed') return qtyZeroFailedItems;
+    if (activeFilter === 'checked') return items.filter((item) => !['queued', 'no_asin'].includes(item.status));
+    if (activeFilter === 'all') return items;
+    return issueItems;
+  }, [activeFilter, items, issueItems, qtyZeroFailedItems, qtyZeroItems, restockedItems]);
+
+  const toggleExpanded = (itemId) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const getQtyZeroSummary = (sellerItems = []) => {
+    const successCount = sellerItems.filter((row) => row.quantityZeroStatus === 'success').length;
+    const failedCount = sellerItems.filter((row) => row.quantityZeroStatus === 'failed').length;
+    const pendingCount = sellerItems.filter((row) => row.quantityZeroStatus === 'pending').length;
+    return { successCount, failedCount, pendingCount };
+  };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -246,6 +300,7 @@ export default function AmazonStockCheckPage() {
       />
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
         <Grid container spacing={2} alignItems="center">
@@ -326,15 +381,15 @@ export default function AmazonStockCheckPage() {
       {activeRun && (
         <Grid container spacing={1.5} sx={{ mb: 2 }}>
           <Grid item xs={6} md={2}><KpiCard label="Status" value={activeRun.status} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Total SKUs" value={activeRun.totalSkus} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Checked" value={activeRun.checkedCount} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Low Stock" value={activeRun.lowStockCount} tone="warn" /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Out of Stock" value={activeRun.outOfStockCount} tone="bad" /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Qty Zero Success" value={activeRun.quantityZeroSuccessCount} tone="good" /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Total SKUs" value={activeRun.totalSkus} active={activeFilter === 'all'} onClick={() => setActiveFilter('all')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Checked" value={activeRun.checkedCount} active={activeFilter === 'checked'} onClick={() => setActiveFilter('checked')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Low Stock" value={activeRun.lowStockCount} tone="warn" active={activeFilter === 'low_stock'} onClick={() => setActiveFilter('low_stock')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Out of Stock" value={activeRun.outOfStockCount} tone="bad" active={activeFilter === 'out_of_stock'} onClick={() => setActiveFilter('out_of_stock')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Qty Zero Success" value={activeRun.quantityZeroSuccessCount} tone="good" active={activeFilter === 'qty_zero_success'} onClick={() => setActiveFilter('qty_zero_success')} /></Grid>
           <Grid item xs={6} md={2}><KpiCard label="Credits Used" value={activeRun.creditsUsed} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="No ASIN" value={activeRun.noAsinCount} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Became Available" value={activeRun.becameAvailableCount} tone="good" /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Errors" value={activeRun.errorCount} tone="bad" /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="No ASIN" value={activeRun.noAsinCount} active={activeFilter === 'no_asin'} onClick={() => setActiveFilter('no_asin')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Became Available" value={activeRun.becameAvailableCount} tone="good" active={activeFilter === 'restocked'} onClick={() => setActiveFilter('restocked')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Errors" value={activeRun.errorCount} tone="bad" active={activeFilter === 'errors'} onClick={() => setActiveFilter('errors')} /></Grid>
         </Grid>
       )}
 
@@ -349,20 +404,22 @@ export default function AmazonStockCheckPage() {
                   <TableCell sx={{ color: '#fff', fontWeight: 900 }}>Country</TableCell>
                   <TableCell sx={{ color: '#fff', fontWeight: 900 }}>Amazon Status</TableCell>
                   <TableCell sx={{ color: '#fff', fontWeight: 900 }}>Stock</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 900 }}>Qty Zero</TableCell>
                   <TableCell sx={{ color: '#fff', fontWeight: 900 }}>Seller Items</TableCell>
                   <TableCell sx={{ color: '#fff', fontWeight: 900 }}>Orders</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {issueItems.map((item) => {
+                {displayItems.map((item) => {
                   const orderCount = (item.sellerItems || []).reduce((sum, row) => sum + (row.orderCount || 0), 0);
-                  const expanded = expandedSku === item._id;
+                  const expanded = expandedRows.has(item._id);
+                  const qtySummary = getQtyZeroSummary(item.sellerItems || []);
                   return (
                     <Fragment key={item._id}>
                       <TableRow
                         key={item._id}
                         hover
-                        onClick={() => setExpandedSku(expanded ? '' : item._id)}
+                        onClick={() => toggleExpanded(item._id)}
                         sx={{ cursor: 'pointer' }}
                       >
                         <TableCell sx={{ fontWeight: 900 }}>{item.sku}</TableCell>
@@ -373,11 +430,19 @@ export default function AmazonStockCheckPage() {
                           {item.becameAvailable && <Chip size="small" color="success" label="Became available" sx={{ ml: 1 }} />}
                         </TableCell>
                         <TableCell>{item.stockQuantity ?? (item.availabilityText || '-')}</TableCell>
+                        <TableCell>
+                          <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                            {qtySummary.successCount > 0 && <Chip size="small" color="success" label={`${qtySummary.successCount} success`} />}
+                            {qtySummary.failedCount > 0 && <Chip size="small" color="error" label={`${qtySummary.failedCount} failed`} />}
+                            {qtySummary.pendingCount > 0 && <Chip size="small" label={`${qtySummary.pendingCount} pending`} />}
+                            {!qtySummary.successCount && !qtySummary.failedCount && !qtySummary.pendingCount && <Typography variant="body2" color="text.secondary">-</Typography>}
+                          </Stack>
+                        </TableCell>
                         <TableCell>{formatNumber(item.sellerItems?.length || 0)}</TableCell>
                         <TableCell>{formatNumber(orderCount)}</TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+                        <TableCell colSpan={8} sx={{ p: 0, border: 0 }}>
                           <Collapse in={expanded} timeout="auto" unmountOnExit>
                             <Box sx={{ p: 2, background: '#f8fafc' }}>
                               <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>Seller item breakdown</Typography>
@@ -397,7 +462,19 @@ export default function AmazonStockCheckPage() {
                                   {(item.sellerItems || []).map((sellerItem) => (
                                     <TableRow key={`${sellerItem.sellerId}-${sellerItem.itemId}`}>
                                       <TableCell>{sellerItem.sellerName}</TableCell>
-                                      <TableCell>{sellerItem.itemId}</TableCell>
+                                      <TableCell>
+                                        <Button
+                                          size="small"
+                                          variant="text"
+                                          endIcon={<OpenInNewIcon fontSize="inherit" />}
+                                          href={`https://www.ebay.com/itm/${sellerItem.itemId}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(event) => event.stopPropagation()}
+                                        >
+                                          {sellerItem.itemId}
+                                        </Button>
+                                      </TableCell>
                                       <TableCell sx={{ maxWidth: 360 }}>
                                         <Typography variant="body2" noWrap title={sellerItem.title}>{sellerItem.title || '-'}</Typography>
                                       </TableCell>
@@ -459,10 +536,10 @@ export default function AmazonStockCheckPage() {
                     </Fragment>
                   );
                 })}
-                {!issueItems.length && (
+                {!displayItems.length && (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 5, color: 'text.secondary' }}>
-                      {activeRun ? 'No low-stock, out-of-stock, or restocked results to show yet.' : 'Start a run to see results.'}
+                    <TableCell colSpan={8} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                      {activeRun ? 'No rows match the selected card/filter yet.' : 'Start a run to see results.'}
                     </TableCell>
                   </TableRow>
                 )}
