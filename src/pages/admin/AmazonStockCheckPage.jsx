@@ -218,6 +218,20 @@ export default function AmazonStockCheckPage() {
     }
   };
 
+  const handleManualOne = async (item, sellerItem) => {
+    setError('');
+    setSuccess('');
+    try {
+      const { data } = await api.post(`/amazon-stock-checks/items/${item._id}/set-quantity-one`, {
+        itemId: sellerItem.itemId
+      });
+      setSuccess(data.message || `Quantity set to one for item ${sellerItem.itemId}`);
+      await fetchRun(activeRun._id);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to set quantity to one');
+    }
+  };
+
   const handleEndItem = async (sellerItem) => {
     setError('');
     setSuccess('');
@@ -524,6 +538,18 @@ export default function AmazonStockCheckPage() {
                                             }}
                                           >
                                             Qty 0
+                                          </Button>
+                                          <Button
+                                            size="small"
+                                            variant="outlined"
+                                            color="success"
+                                            startIcon={<InventoryIcon />}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              handleManualOne(item, sellerItem);
+                                            }}
+                                          >
+                                            Qty 1
                                           </Button>
                                           <Button
                                             size="small"
