@@ -19,6 +19,7 @@ import {
   Paper,
   Select,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -52,7 +53,21 @@ const STATUS_LABELS = {
   out_of_stock: 'Out of stock',
   no_asin: 'No ASIN',
   error: 'Error',
+  processing: 'Processing',
   queued: 'Queued'
+};
+
+const FILTER_LABELS = {
+  all: 'All',
+  actionable: 'Actionable',
+  checked: 'Checked',
+  low_stock: 'Low Stock',
+  out_of_stock: 'Out of Stock',
+  qty_zero_success: 'Qty Zero Success',
+  no_asin: 'No ASIN',
+  restocked: 'Became Available',
+  errors: 'Errors',
+  has_orders: 'Has Orders'
 };
 
 function formatNumber(value) {
@@ -100,6 +115,19 @@ function getOrderCount(item) {
   return (item.sellerItems || []).reduce((sum, row) => sum + (row.orderCount || 0), 0);
 }
 
+function formatDateTime(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleString();
+}
+
+function getRunUser(run) {
+  return run?.requestedBy?.username || run?.requestedBy?.name || run?.requestedBy?.email || '-';
+}
+
+function getRunScope(run) {
+  return `${run.mode} | ${(run.currencies || []).join(', ') || '-'}`;
+}
+
 export default function AmazonStockCheckPage() {
   const [mode, setMode] = useState('pilot_option_b');
   const [currencies, setCurrencies] = useState(['USD']);
@@ -107,6 +135,7 @@ export default function AmazonStockCheckPage() {
   const [autoZeroQuantity, setAutoZeroQuantity] = useState(true);
   const [estimate, setEstimate] = useState(null);
   const [runs, setRuns] = useState([]);
+  const [runPagination, setRunPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [activeRun, setActiveRun] = useState(null);
   const [items, setItems] = useState([]);
   const [itemCounts, setItemCounts] = useState({});
@@ -117,21 +146,30 @@ export default function AmazonStockCheckPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [expandedRows, setExpandedRows] = useState(() => new Set());
-  const [activeFilter, setActiveFilter] = useState('actionable');
+  const [activeFilters, setActiveFilters] = useState(['actionable']);
+  const [multiFilterEnabled, setMultiFilterEnabled] = useState(false);
   const [reviseTarget, setReviseTarget] = useState(null);
   const [reviseForm, setReviseForm] = useState({ title: '', price: '' });
 
   const isRunning = activeRun && ['queued', 'running'].includes(activeRun.status);
 
   const selectedCurrencyList = useMemo(() => (
-    mode === 'pilot_option_b' ? ['USD', 'AUD', 'CAD', 'GBP'] : currencies
+    mode === 'custom' ? currencies : ['USD', 'AUD', 'CAD', 'GBP']
   ), [mode, currencies]);
+
+  const selectedCountryValue = mode === 'custom' ? (currencies[0] || 'USD') : 'ALL';
 
   const fetchRuns = async () => {
     setLoadingRuns(true);
     try {
-      const { data } = await api.get('/amazon-stock-checks/runs');
+      const { data } = await api.get('/amazon-stock-checks/runs', {
+        params: {
+          page: runPagination.page,
+          limit: runPagination.limit
+        }
+      });
       setRuns(data.runs || []);
+      setRunPagination((prev) => ({ ...prev, ...(data.pagination || {}) }));
       if (!activeRun && data.runs?.[0]) setActiveRun(data.runs[0]);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to load runs');
@@ -147,7 +185,7 @@ export default function AmazonStockCheckPage() {
         api.get(`/amazon-stock-checks/runs/${runId}`),
         api.get(`/amazon-stock-checks/runs/${runId}/items`, {
           params: {
-            filter: activeFilter,
+            filter: activeFilters.join(','),
             page: pagination.page,
             limit: pagination.limit
           }
@@ -164,7 +202,7 @@ export default function AmazonStockCheckPage() {
 
   useEffect(() => {
     fetchRuns();
-  }, []);
+  }, [runPagination.page, runPagination.limit]);
 
   useEffect(() => {
     if (!activeRun?._id) return undefined;
@@ -172,7 +210,7 @@ export default function AmazonStockCheckPage() {
     if (!['queued', 'running'].includes(activeRun.status)) return undefined;
     const timer = setInterval(() => fetchRun(activeRun._id), 5000);
     return () => clearInterval(timer);
-  }, [activeRun?._id, activeRun?.status, activeFilter, pagination.page, pagination.limit]);
+  }, [activeRun?._id, activeRun?.status, activeFilters.join(','), pagination.page, pagination.limit]);
 
   const handleEstimate = async () => {
     setError('');
@@ -181,7 +219,7 @@ export default function AmazonStockCheckPage() {
     try {
       const params = mode === 'pilot_option_b'
         ? { mode }
-        : { mode, currencies: currencies.join(',') };
+        : { mode, currencies: selectedCurrencyList.join(',') };
       const { data } = await api.get('/amazon-stock-checks/estimate', { params });
       setEstimate(data);
     } catch (err) {
@@ -208,7 +246,7 @@ export default function AmazonStockCheckPage() {
       setItemCounts({});
       setPagination((prev) => ({ ...prev, page: 1, total: 0, totalPages: 1 }));
       setExpandedRows(new Set());
-      setActiveFilter('actionable');
+      setActiveFilters(['actionable']);
       await fetchRuns();
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to start run');
@@ -291,7 +329,27 @@ export default function AmazonStockCheckPage() {
   const displayItems = items;
 
   const applyFilter = (filter) => {
-    setActiveFilter(filter);
+    setActiveFilters((prev) => {
+      if (filter === 'all') return ['all'];
+      if (!multiFilterEnabled) return [filter];
+      const current = prev.includes('all') ? [] : prev;
+      const next = current.includes(filter)
+        ? current.filter((value) => value !== filter)
+        : [...current, filter];
+      return next.length ? next : ['all'];
+    });
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    setExpandedRows(new Set());
+  };
+
+  const isFilterActive = (filter) => activeFilters.includes(filter);
+
+  const handleMultiFilterToggle = (event) => {
+    const enabled = event.target.checked;
+    setMultiFilterEnabled(enabled);
+    if (!enabled) {
+      setActiveFilters((prev) => [prev.find((filter) => filter !== 'all') || 'actionable']);
+    }
     setPagination((prev) => ({ ...prev, page: 1 }));
     setExpandedRows(new Set());
   };
@@ -336,12 +394,14 @@ export default function AmazonStockCheckPage() {
             <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary' }}>Countries</Typography>
             <Select
               fullWidth
-              multiple
               size="small"
-              value={selectedCurrencyList}
-              disabled={mode === 'pilot_option_b'}
-              onChange={(event) => setCurrencies(event.target.value)}
+              value={selectedCountryValue}
+              disabled={mode !== 'custom'}
+              onChange={(event) => setCurrencies([event.target.value])}
             >
+              {mode !== 'custom' && (
+                <MenuItem value="ALL">All supported countries (USD, AUD, CAD, GBP)</MenuItem>
+              )}
               {CURRENCY_OPTIONS.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
                   {option.label} ({option.value}, {option.credits} credit{option.credits > 1 ? 's' : ''})
@@ -401,22 +461,94 @@ export default function AmazonStockCheckPage() {
       {activeRun && (
         <Grid container spacing={1.5} sx={{ mb: 2 }}>
           <Grid item xs={6} md={2}><KpiCard label="Status" value={activeRun.status} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Total SKUs" value={activeRun.totalSkus} active={activeFilter === 'all'} onClick={() => applyFilter('all')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Checked" value={activeRun.checkedCount} active={activeFilter === 'checked'} onClick={() => applyFilter('checked')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Low Stock" value={activeRun.lowStockCount} tone="warn" active={activeFilter === 'low_stock'} onClick={() => applyFilter('low_stock')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Out of Stock" value={activeRun.outOfStockCount} tone="bad" active={activeFilter === 'out_of_stock'} onClick={() => applyFilter('out_of_stock')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Qty Zero Success" value={activeRun.quantityZeroSuccessCount} tone="good" active={activeFilter === 'qty_zero_success'} onClick={() => applyFilter('qty_zero_success')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Total SKUs" value={activeRun.totalSkus} active={isFilterActive('all')} onClick={() => applyFilter('all')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Checked" value={activeRun.checkedCount} active={isFilterActive('checked')} onClick={() => applyFilter('checked')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Low Stock" value={activeRun.lowStockCount} tone="warn" active={isFilterActive('low_stock')} onClick={() => applyFilter('low_stock')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Out of Stock" value={activeRun.outOfStockCount} tone="bad" active={isFilterActive('out_of_stock')} onClick={() => applyFilter('out_of_stock')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Qty Zero Success" value={activeRun.quantityZeroSuccessCount} tone="good" active={isFilterActive('qty_zero_success')} onClick={() => applyFilter('qty_zero_success')} /></Grid>
           <Grid item xs={6} md={2}><KpiCard label="Credits Used" value={activeRun.creditsUsed} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="No ASIN" value={activeRun.noAsinCount} active={activeFilter === 'no_asin'} onClick={() => applyFilter('no_asin')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Became Available" value={activeRun.becameAvailableCount} tone="good" active={activeFilter === 'restocked'} onClick={() => applyFilter('restocked')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Errors" value={activeRun.errorCount} tone="bad" active={activeFilter === 'errors'} onClick={() => applyFilter('errors')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Has Orders" value={itemCounts.has_orders || 0} active={activeFilter === 'has_orders'} onClick={() => applyFilter('has_orders')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="No ASIN" value={activeRun.noAsinCount} active={isFilterActive('no_asin')} onClick={() => applyFilter('no_asin')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Became Available" value={activeRun.becameAvailableCount} tone="good" active={isFilterActive('restocked')} onClick={() => applyFilter('restocked')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Errors" value={activeRun.errorCount} tone="bad" active={isFilterActive('errors')} onClick={() => applyFilter('errors')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Has Orders" value={itemCounts.has_orders || 0} active={isFilterActive('has_orders')} onClick={() => applyFilter('has_orders')} /></Grid>
         </Grid>
       )}
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} lg={9}>
-          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+      <Paper variant="outlined" sx={{ borderRadius: 2, p: 2, mb: 2 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Recent Runs</Typography>
+          {loadingRuns && <CircularProgress size={16} />}
+        </Stack>
+        <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 0.5 }}>
+          {runs.map((run) => (
+            <Button
+              key={run._id}
+              variant={activeRun?._id === run._id ? 'contained' : 'outlined'}
+              onClick={() => {
+                setActiveRun(run);
+                setActiveFilters(['actionable']);
+                setPagination((prev) => ({ ...prev, page: 1, total: 0, totalPages: 1 }));
+                setExpandedRows(new Set());
+              }}
+              sx={{
+                alignItems: 'flex-start',
+                flex: '0 0 280px',
+                justifyContent: 'flex-start',
+                textAlign: 'left',
+                textTransform: 'none',
+                backgroundColor: activeRun?._id === run._id ? BRAND_DARK : undefined
+              }}
+            >
+              <Stack spacing={0.25} sx={{ width: '100%' }}>
+                <Typography variant="body2" sx={{ fontWeight: 900 }}>{getRunScope(run)}</Typography>
+                <Typography variant="caption">{formatDateTime(run.createdAt)}</Typography>
+                <Typography variant="caption">By {getRunUser(run)}</Typography>
+                <Typography variant="caption" sx={{ fontWeight: 900 }}>
+                  {run.status} | {formatNumber(run.checkedCount)}/{formatNumber(run.totalSkus)}
+                </Typography>
+              </Stack>
+            </Button>
+          ))}
+          {!runs.length && <Typography variant="body2" color="text.secondary">No runs yet.</Typography>}
+        </Stack>
+        <TablePagination
+          component="div"
+          count={runPagination.total || 0}
+          page={Math.max(0, (runPagination.page || 1) - 1)}
+          onPageChange={(_event, nextPage) => {
+            setRunPagination((prev) => ({ ...prev, page: nextPage + 1 }));
+          }}
+          rowsPerPage={runPagination.limit || 20}
+          onRowsPerPageChange={(event) => {
+            setRunPagination((prev) => ({
+              ...prev,
+              page: 1,
+              limit: Number.parseInt(event.target.value, 10)
+            }));
+          }}
+          rowsPerPageOptions={[10, 20, 50]}
+        />
+      </Paper>
+
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 1 }}>
+        <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary' }}>Active filters</Typography>
+        <FormControlLabel
+          control={<Switch size="small" checked={multiFilterEnabled} onChange={handleMultiFilterToggle} />}
+          label="Multi-filter AND"
+          sx={{ '& .MuiFormControlLabel-label': { fontSize: 12, fontWeight: 800 } }}
+        />
+        {activeFilters.map((filter) => (
+          <Chip
+            key={filter}
+            size="small"
+            label={FILTER_LABELS[filter] || filter}
+            onDelete={filter === 'all' ? undefined : () => applyFilter(filter)}
+            sx={{ fontWeight: 800 }}
+          />
+        ))}
+      </Stack>
+
+      <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
             <Table size="small">
               <TableHead sx={{ background: BRAND_DARK }}>
                 <TableRow>
@@ -617,36 +749,6 @@ export default function AmazonStockCheckPage() {
               rowsPerPageOptions={[25, 50, 100, 250, 500]}
             />
           </TableContainer>
-        </Grid>
-
-        <Grid item xs={12} lg={3}>
-          <Paper variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Recent Runs</Typography>
-              {loadingRuns && <CircularProgress size={16} />}
-            </Stack>
-            <Stack spacing={1}>
-              {runs.map((run) => (
-                <Button
-                  key={run._id}
-                  variant={activeRun?._id === run._id ? 'contained' : 'outlined'}
-                  onClick={() => {
-                    setActiveRun(run);
-                    setActiveFilter('actionable');
-                    setPagination((prev) => ({ ...prev, page: 1, total: 0, totalPages: 1 }));
-                    setExpandedRows(new Set());
-                  }}
-                  sx={{ justifyContent: 'space-between', textTransform: 'none', backgroundColor: activeRun?._id === run._id ? BRAND_DARK : undefined }}
-                >
-                  <span>{run.mode} - {run.status}</span>
-                  <span>{formatNumber(run.checkedCount)}/{formatNumber(run.totalSkus)}</span>
-                </Button>
-              ))}
-              {!runs.length && <Typography variant="body2" color="text.secondary">No runs yet.</Typography>}
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
 
       <Dialog open={!!reviseTarget} onClose={() => setReviseTarget(null)} fullWidth maxWidth="sm">
         <DialogTitle>Revise Listing</DialogTitle>
