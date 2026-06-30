@@ -18,6 +18,7 @@ import {
   MenuItem,
   Paper,
   Select,
+  Snackbar,
   Stack,
   Switch,
   Table,
@@ -377,8 +378,34 @@ export default function AmazonStockCheckPage() {
         subtitle="Run SKU-to-ASIN stock checks on demand and zero eBay quantity when Amazon stock is low or unavailable."
       />
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+      <Snackbar
+        open={Boolean(success)}
+        autoHideDuration={3000}
+        onClose={() => setSuccess('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{
+          top: '50% !important',
+          transform: 'translateY(-50%)'
+        }}
+      >
+        <Alert severity="success" variant="filled" onClose={() => setSuccess('')} sx={{ minWidth: 320 }}>
+          {success}
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={Boolean(error)}
+        autoHideDuration={3000}
+        onClose={() => setError('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{
+          top: '50% !important',
+          transform: 'translateY(-50%)'
+        }}
+      >
+        <Alert severity="error" variant="filled" onClose={() => setError('')} sx={{ minWidth: 320 }}>
+          {error}
+        </Alert>
+      </Snackbar>
 
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
         <Grid container spacing={2} alignItems="center">
@@ -549,7 +576,14 @@ export default function AmazonStockCheckPage() {
       </Stack>
 
       <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
-            <Table size="small">
+            <Table
+              size="small"
+              sx={{
+                borderCollapse: 'separate',
+                borderSpacing: '0 4px',
+                backgroundColor: '#f8fafc'
+              }}
+            >
               <TableHead sx={{ background: BRAND_DARK }}>
                 <TableRow>
                   <TableCell sx={{ color: '#fff', fontWeight: 900 }}>SKU</TableCell>
@@ -563,11 +597,14 @@ export default function AmazonStockCheckPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {displayItems.map((item) => {
+                {displayItems.map((item, index) => {
                   const orderCount = getOrderCount(item);
                   const expanded = expandedRows.has(item._id);
                   const qtySummary = getQtyZeroSummary(item.sellerItems || []);
-                  const groupBg = expanded ? '#f8fbff' : 'inherit';
+                  const expandedPalette = index % 2 === 0
+                    ? { row: '#f8fbff', detail: '#eff6ff', rail: '#2563eb', line: '#bfdbfe' }
+                    : { row: '#fffaf0', detail: '#fff7ed', rail: '#f97316', line: '#fed7aa' };
+                  const groupBg = expanded ? expandedPalette.row : '#fff';
                   const groupBorder = expanded ? '3px solid #2563eb' : '3px solid transparent';
                   return (
                     <Fragment key={item._id}>
@@ -578,8 +615,20 @@ export default function AmazonStockCheckPage() {
                         sx={{
                           cursor: 'pointer',
                           backgroundColor: groupBg,
-                          '& > td:first-of-type': { borderLeft: groupBorder },
-                          '& > td': { borderTop: expanded ? '1px solid #bfdbfe' : undefined }
+                          boxShadow: expanded ? '0 1px 0 rgba(15, 23, 42, 0.06)' : 'none',
+                          '& > td': {
+                            borderTop: expanded ? `1px solid ${expandedPalette.line}` : '1px solid #e5e7eb',
+                            borderBottom: expanded ? `1px solid ${expandedPalette.line}` : '1px solid #eef2f7'
+                          },
+                          '& > td:first-of-type': {
+                            borderLeft: expanded ? `4px solid ${expandedPalette.rail}` : groupBorder,
+                            borderTopLeftRadius: 6,
+                            borderBottomLeftRadius: expanded ? 0 : 6
+                          },
+                          '& > td:last-of-type': {
+                            borderTopRightRadius: 6,
+                            borderBottomRightRadius: expanded ? 0 : 6
+                          }
                         }}
                       >
                         <TableCell sx={{ fontWeight: 900 }}>{item.sku}</TableCell>
@@ -607,12 +656,22 @@ export default function AmazonStockCheckPage() {
                           sx={{
                             p: 0,
                             border: 0,
-                            borderLeft: expanded ? '3px solid #2563eb' : '3px solid transparent',
-                            backgroundColor: expanded ? '#eff6ff' : 'transparent'
+                            borderLeft: expanded ? `4px solid ${expandedPalette.rail}` : '4px solid transparent',
+                            backgroundColor: expanded ? expandedPalette.detail : 'transparent',
+                            borderBottom: expanded ? `1px solid ${expandedPalette.line}` : 0,
+                            borderBottomLeftRadius: 6,
+                            borderBottomRightRadius: 6
                           }}
                         >
                           <Collapse in={expanded} timeout="auto" unmountOnExit>
-                            <Box sx={{ p: 2, background: '#eff6ff' }}>
+                            <Box
+                              sx={{
+                                p: 2,
+                                background: expandedPalette.detail,
+                                borderBottomLeftRadius: 1,
+                                borderBottomRightRadius: 1
+                              }}
+                            >
                               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>Seller item breakdown</Typography>
                                 <Chip size="small" label={item.sku} sx={{ fontWeight: 900 }} />
