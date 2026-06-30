@@ -24,6 +24,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography
@@ -108,6 +109,8 @@ export default function AmazonStockCheckPage() {
   const [runs, setRuns] = useState([]);
   const [activeRun, setActiveRun] = useState(null);
   const [items, setItems] = useState([]);
+  const [itemCounts, setItemCounts] = useState({});
+  const [pagination, setPagination] = useState({ page: 1, limit: 100, total: 0, totalPages: 1 });
   const [loadingEstimate, setLoadingEstimate] = useState(false);
   const [starting, setStarting] = useState(false);
   const [loadingRuns, setLoadingRuns] = useState(false);
@@ -142,10 +145,18 @@ export default function AmazonStockCheckPage() {
     try {
       const [{ data: runData }, { data: itemsData }] = await Promise.all([
         api.get(`/amazon-stock-checks/runs/${runId}`),
-        api.get(`/amazon-stock-checks/runs/${runId}/items`)
+        api.get(`/amazon-stock-checks/runs/${runId}/items`, {
+          params: {
+            filter: activeFilter,
+            page: pagination.page,
+            limit: pagination.limit
+          }
+        })
       ]);
       setActiveRun(runData.run);
+      setItemCounts(runData.itemCounts || {});
       setItems(itemsData.items || []);
+      setPagination((prev) => ({ ...prev, ...(itemsData.pagination || {}) }));
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to load run details');
     }
@@ -161,7 +172,7 @@ export default function AmazonStockCheckPage() {
     if (!['queued', 'running'].includes(activeRun.status)) return undefined;
     const timer = setInterval(() => fetchRun(activeRun._id), 5000);
     return () => clearInterval(timer);
-  }, [activeRun?._id, activeRun?.status]);
+  }, [activeRun?._id, activeRun?.status, activeFilter, pagination.page, pagination.limit]);
 
   const handleEstimate = async () => {
     setError('');
@@ -194,6 +205,8 @@ export default function AmazonStockCheckPage() {
       const { data } = await api.post('/amazon-stock-checks/runs', payload);
       setActiveRun(data.run);
       setItems([]);
+      setItemCounts({});
+      setPagination((prev) => ({ ...prev, page: 1, total: 0, totalPages: 1 }));
       setExpandedRows(new Set());
       setActiveFilter('actionable');
       await fetchRuns();
@@ -275,25 +288,13 @@ export default function AmazonStockCheckPage() {
     }
   };
 
-  const actionableItems = items.filter((item) => ['low_stock', 'out_of_stock'].includes(item.status));
-  const restockedItems = items.filter((item) => item.becameAvailable);
-  const issueItems = [...actionableItems, ...restockedItems.filter((item) => !actionableItems.some((x) => x._id === item._id))];
-  const qtyZeroItems = items.filter((item) => (item.sellerItems || []).some((row) => row.quantityZeroStatus === 'success'));
-  const qtyZeroFailedItems = items.filter((item) => (item.sellerItems || []).some((row) => row.quantityZeroStatus === 'failed'));
+  const displayItems = items;
 
-  const displayItems = useMemo(() => {
-    if (activeFilter === 'low_stock') return items.filter((item) => item.status === 'low_stock');
-    if (activeFilter === 'out_of_stock') return items.filter((item) => item.status === 'out_of_stock');
-    if (activeFilter === 'errors') return items.filter((item) => item.status === 'error');
-    if (activeFilter === 'no_asin') return items.filter((item) => item.status === 'no_asin');
-    if (activeFilter === 'restocked') return restockedItems;
-    if (activeFilter === 'qty_zero_success') return qtyZeroItems;
-    if (activeFilter === 'qty_zero_failed') return qtyZeroFailedItems;
-    if (activeFilter === 'has_orders') return items.filter((item) => getOrderCount(item) > 0);
-    if (activeFilter === 'checked') return items.filter((item) => !['queued', 'no_asin'].includes(item.status));
-    if (activeFilter === 'all') return items;
-    return issueItems;
-  }, [activeFilter, items, issueItems, qtyZeroFailedItems, qtyZeroItems, restockedItems]);
+  const applyFilter = (filter) => {
+    setActiveFilter(filter);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    setExpandedRows(new Set());
+  };
 
   const toggleExpanded = (itemId) => {
     setExpandedRows((prev) => {
@@ -400,16 +401,16 @@ export default function AmazonStockCheckPage() {
       {activeRun && (
         <Grid container spacing={1.5} sx={{ mb: 2 }}>
           <Grid item xs={6} md={2}><KpiCard label="Status" value={activeRun.status} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Total SKUs" value={activeRun.totalSkus} active={activeFilter === 'all'} onClick={() => setActiveFilter('all')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Checked" value={activeRun.checkedCount} active={activeFilter === 'checked'} onClick={() => setActiveFilter('checked')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Low Stock" value={activeRun.lowStockCount} tone="warn" active={activeFilter === 'low_stock'} onClick={() => setActiveFilter('low_stock')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Out of Stock" value={activeRun.outOfStockCount} tone="bad" active={activeFilter === 'out_of_stock'} onClick={() => setActiveFilter('out_of_stock')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Qty Zero Success" value={activeRun.quantityZeroSuccessCount} tone="good" active={activeFilter === 'qty_zero_success'} onClick={() => setActiveFilter('qty_zero_success')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Total SKUs" value={activeRun.totalSkus} active={activeFilter === 'all'} onClick={() => applyFilter('all')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Checked" value={activeRun.checkedCount} active={activeFilter === 'checked'} onClick={() => applyFilter('checked')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Low Stock" value={activeRun.lowStockCount} tone="warn" active={activeFilter === 'low_stock'} onClick={() => applyFilter('low_stock')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Out of Stock" value={activeRun.outOfStockCount} tone="bad" active={activeFilter === 'out_of_stock'} onClick={() => applyFilter('out_of_stock')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Qty Zero Success" value={activeRun.quantityZeroSuccessCount} tone="good" active={activeFilter === 'qty_zero_success'} onClick={() => applyFilter('qty_zero_success')} /></Grid>
           <Grid item xs={6} md={2}><KpiCard label="Credits Used" value={activeRun.creditsUsed} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="No ASIN" value={activeRun.noAsinCount} active={activeFilter === 'no_asin'} onClick={() => setActiveFilter('no_asin')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Became Available" value={activeRun.becameAvailableCount} tone="good" active={activeFilter === 'restocked'} onClick={() => setActiveFilter('restocked')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Errors" value={activeRun.errorCount} tone="bad" active={activeFilter === 'errors'} onClick={() => setActiveFilter('errors')} /></Grid>
-          <Grid item xs={6} md={2}><KpiCard label="Has Orders" value={items.filter((item) => getOrderCount(item) > 0).length} active={activeFilter === 'has_orders'} onClick={() => setActiveFilter('has_orders')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="No ASIN" value={activeRun.noAsinCount} active={activeFilter === 'no_asin'} onClick={() => applyFilter('no_asin')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Became Available" value={activeRun.becameAvailableCount} tone="good" active={activeFilter === 'restocked'} onClick={() => applyFilter('restocked')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Errors" value={activeRun.errorCount} tone="bad" active={activeFilter === 'errors'} onClick={() => applyFilter('errors')} /></Grid>
+          <Grid item xs={6} md={2}><KpiCard label="Has Orders" value={itemCounts.has_orders || 0} active={activeFilter === 'has_orders'} onClick={() => applyFilter('has_orders')} /></Grid>
         </Grid>
       )}
 
@@ -596,6 +597,25 @@ export default function AmazonStockCheckPage() {
                 )}
               </TableBody>
             </Table>
+            <TablePagination
+              component="div"
+              count={pagination.total || 0}
+              page={Math.max(0, (pagination.page || 1) - 1)}
+              onPageChange={(_event, nextPage) => {
+                setPagination((prev) => ({ ...prev, page: nextPage + 1 }));
+                setExpandedRows(new Set());
+              }}
+              rowsPerPage={pagination.limit || 100}
+              onRowsPerPageChange={(event) => {
+                setPagination((prev) => ({
+                  ...prev,
+                  page: 1,
+                  limit: Number.parseInt(event.target.value, 10)
+                }));
+                setExpandedRows(new Set());
+              }}
+              rowsPerPageOptions={[25, 50, 100, 250, 500]}
+            />
           </TableContainer>
         </Grid>
 
@@ -610,7 +630,12 @@ export default function AmazonStockCheckPage() {
                 <Button
                   key={run._id}
                   variant={activeRun?._id === run._id ? 'contained' : 'outlined'}
-                  onClick={() => setActiveRun(run)}
+                  onClick={() => {
+                    setActiveRun(run);
+                    setActiveFilter('actionable');
+                    setPagination((prev) => ({ ...prev, page: 1, total: 0, totalPages: 1 }));
+                    setExpandedRows(new Set());
+                  }}
                   sx={{ justifyContent: 'space-between', textTransform: 'none', backgroundColor: activeRun?._id === run._id ? BRAND_DARK : undefined }}
                 >
                   <span>{run.mode} - {run.status}</span>
