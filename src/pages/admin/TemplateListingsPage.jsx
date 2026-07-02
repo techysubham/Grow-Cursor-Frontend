@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { alpha, useTheme } from '@mui/material/styles';
 import { 
   Box, Button, Paper, Stack, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Typography, IconButton, Dialog, DialogTitle, 
   DialogContent, DialogActions, Alert, Pagination, TextField, Tabs, Tab, MenuItem,
-  Chip, CircularProgress, Switch, FormControlLabel, LinearProgress, FormControl,
+  Chip, CircularProgress, Switch, FormControlLabel, LinearProgress, FormControl, Divider,
   InputLabel, Select, Breadcrumbs, Link, Checkbox, OutlinedInput, Tooltip
 } from '@mui/material';
 import { 
@@ -34,12 +35,30 @@ import ActionFieldEditor from '../../components/ActionFieldEditor.jsx';
 import TemplateCustomizationDialog from '../../components/TemplateCustomizationDialog.jsx';
 import AsinReviewModal from '../../components/AsinReviewModal.jsx';
 import ListDirectlyDialog from '../../components/ListDirectlyDialog.jsx';
+import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
+import { dashboardSignatureTokens } from '../../theme/appTheme.js';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import { tableHeaderCellSx, tableContainerSx } from '../../theme/tableStyles.js';
 import { parseAsins, getParsingStats, getValidationError } from '../../utils/asinParser.js';
 import { generateSKUFromASIN } from '../../utils/skuGenerator.js';
+
+// Derive marketplace key from customActionField (mirrors ManageTemplatesPage)
+function extractMarketplace(customActionField) {
+  if (!customActionField) return 'US';
+  if (customActionField.includes('SiteID=eBayMotors')) return 'Motors';
+  if (customActionField.includes('SiteID=Australia'))  return 'Australia';
+  if (customActionField.includes('SiteID=Canada'))     return 'Canada';
+  if (customActionField.includes('SiteID=UK'))         return 'UK';
+  return 'US';
+}
+const MARKETPLACE_TO_COUNTRY = { Australia: 'AU', US: 'US', UK: 'UK', Canada: 'Canada', Motors: 'US' };
 
 export default function TemplateListingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const theme = useTheme();
+  const dashboardTheme = theme.customTokens?.dashboardSignature || dashboardSignatureTokens;
   const templateId = searchParams.get('templateId');
   const sellerId = searchParams.get('sellerId');
   const fromAsinList = searchParams.get('fromAsinList') === 'true';
@@ -101,6 +120,14 @@ export default function TemplateListingsPage() {
     { value: 'AU', label: '🇦🇺 Amazon.com.au (Australia)' },
   ];
 
+  // Upload limit statuses for this seller (all countries)
+  const [sellerLimitBlocks, setSellerLimitBlocks] = useState([]); // array of blocked country strings
+
+  // Derived: is THIS specific template's country blocked?
+  // Computed inline from sellerLimitBlocks + template state
+  const thisTemplateCountry = MARKETPLACE_TO_COUNTRY[extractMarketplace(template?.customActionField)];
+  const isThisTemplateBlocked = !!(thisTemplateCountry && sellerLimitBlocks.includes(thisTemplateCountry));
+
   // Core field defaults dialog state
   const [defaultsDialog, setDefaultsDialog] = useState(false);
   
@@ -118,6 +145,156 @@ export default function TemplateListingsPage() {
   const [scheduleFromRow, setScheduleFromRow] = useState('');
   const [scheduleToRow, setScheduleToRow] = useState('');
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
+
+  const surfaceCardSx = {
+    borderRadius: `${dashboardTheme.radius.card}px`,
+    border: '1px solid',
+    borderColor: alpha(BRAND_DARK, 0.08),
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: dashboardTheme.shadows.card
+  };
+  const emphasizedSurfaceCardSx = {
+    ...surfaceCardSx,
+    backgroundColor: theme.palette.background.paper
+  };
+  const tableBodyRowSx = {
+    '& td': {
+      borderBottomColor: dashboardTheme.table.rowBorder
+    },
+    '&:nth-of-type(even) td': {
+      backgroundColor: dashboardTheme.table.rowStripe
+    },
+    '&:hover td': {
+      backgroundColor: `${dashboardTheme.table.rowHover} !important`
+    },
+    // Sticky cells must always have a fully-opaque background otherwise the
+    // semi-transparent rowHover / rowStripe colours let scrolled content bleed through.
+    // We override first/last td in every row state with the pre-blended solid equivalent.
+    '&:hover td:first-of-type, &:hover td:last-of-type': {
+      backgroundColor: '#f5f6ff !important'   // white + rgba(37,99,235,0.04) blended
+    },
+    '&:nth-of-type(even) td:first-of-type, &:nth-of-type(even) td:last-of-type': {
+      backgroundColor: `${dashboardTheme.table.rowStripe} !important`
+    },
+    '&.Mui-selected td': {
+      backgroundColor: `${alpha(BRAND_YELLOW, 0.16)} !important`
+    },
+    '&.Mui-selected td:first-of-type, &.Mui-selected td:last-of-type': {
+      backgroundColor: `${alpha(BRAND_YELLOW, 0.16)} !important`
+    }
+  };
+
+  const headerActionButtonSx = {
+    minHeight: 40,
+    px: 1.5,
+    borderRadius: 1.5,
+    boxSizing: 'border-box',
+    whiteSpace: 'nowrap'
+  };
+  const actionToolbarPaperSx = {
+    ...emphasizedSurfaceCardSx,
+    p: { xs: 2, md: 2.25 },
+    mb: 2.25
+  };
+  const actionSectionSx = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+    minWidth: { xs: '100%', md: 260 },
+    flex: '1 1 260px'
+  };
+  const actionSectionTitleSx = {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.8,
+    color: BRAND_DARK,
+    textTransform: 'uppercase'
+  };
+  const actionButtonSx = {
+    minHeight: 40,
+    px: 1.5,
+    borderRadius: 1.5,
+    boxSizing: 'border-box',
+    whiteSpace: 'nowrap'
+  };
+  const yellowOutlinedButtonSx = {
+    ...actionButtonSx,
+    color: BRAND_DARK,
+    borderColor: BRAND_YELLOW_DARK,
+    backgroundColor: alpha(BRAND_YELLOW, 0.08),
+    '&:hover': {
+      borderColor: BRAND_YELLOW_DARK,
+      backgroundColor: alpha(BRAND_YELLOW, 0.18),
+      boxShadow: `0 8px 18px ${alpha(BRAND_YELLOW_DARK, 0.18)}`
+    },
+    '&.Mui-disabled': {
+      borderColor: alpha(BRAND_DARK, 0.16),
+      color: alpha(BRAND_DARK, 0.35),
+      backgroundColor: alpha(BRAND_DARK, 0.03)
+    }
+  };
+  const yellowFilledButtonSx = {
+    ...actionButtonSx,
+    color: BRAND_DARK,
+    backgroundColor: BRAND_YELLOW,
+    boxShadow: `0 10px 20px ${alpha(BRAND_YELLOW_DARK, 0.2)}`,
+    '&:hover': {
+      backgroundColor: BRAND_YELLOW_DARK,
+      boxShadow: `0 12px 22px ${alpha(BRAND_YELLOW_DARK, 0.26)}`
+    },
+    '&.Mui-disabled': {
+      color: alpha(BRAND_DARK, 0.35),
+      backgroundColor: alpha(BRAND_YELLOW, 0.38),
+      boxShadow: 'none'
+    }
+  };
+  const breadcrumbLinkSx = {
+    cursor: 'pointer',
+    textDecoration: 'none',
+    color: BRAND_DARK,
+    fontWeight: 600,
+    '&:hover': {
+      textDecoration: 'none',
+      color: BRAND_YELLOW_DARK
+    }
+  };
+  const breadcrumbCurrentSx = {
+    color: BRAND_DARK,
+    fontWeight: 600,
+    transition: 'color 0.18s ease',
+    '&:hover': {
+      color: BRAND_YELLOW_DARK
+    }
+  };
+  const sellerContextChipSx = {
+    borderColor: BRAND_YELLOW_DARK,
+    backgroundColor: alpha(BRAND_YELLOW, 0.12),
+    color: BRAND_DARK,
+    fontWeight: 600,
+    alignSelf: { xs: 'flex-start', lg: 'flex-end' }
+  };
+
+  const scheduleControlWidth = 148;
+  const scheduleColumnSx = {
+    width: { xs: '100%', sm: scheduleControlWidth },
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column'
+  };
+  const scheduleLabelSx = {
+    display: 'block',
+    mb: 0.4,
+    fontSize: 11,
+    lineHeight: 1.4
+  };
+  const scheduleInputSx = {
+    height: 40,
+    '& input': { py: 0.6, px: 1, fontSize: 13 }
+  };
+  const scheduleButtonSx = {
+    height: 40,
+    whiteSpace: 'nowrap'
+  };
 
   // List Directly dialog state
   const [listDirectlyDialog, setListDirectlyDialog] = useState(false);
@@ -263,6 +440,22 @@ export default function TemplateListingsPage() {
     
     fetchPricingConfig();
   }, [sellerId, templateId]);
+
+  // Fetch upload limit statuses for this seller (all countries)
+  useEffect(() => {
+    if (!sellerId) return;
+    let cancelled = false;
+    api.get('/seller-upload-limits')
+      .then(({ data }) => {
+        if (cancelled) return;
+        const blocked = (data || [])
+          .filter(item => (item.seller?._id || item.seller) === sellerId && item.isBlocked)
+          .map(item => item.country);
+        setSellerLimitBlocks(blocked);
+      })
+      .catch(() => { /* non-critical */ });
+    return () => { cancelled = true; };
+  }, [sellerId]);
 
   useEffect(() => {
     if (templateId && sellerId) {
@@ -600,8 +793,12 @@ export default function TemplateListingsPage() {
     }
   };
 
-  const handleBulkAutofill = async () => {
-    if (!asinInput.trim()) {
+  const handleBulkAutofill = async (asinsOverride = null, regionOverride = null, preferCachedAmazonData = false) => {
+    const hasAsinOverride = Array.isArray(asinsOverride);
+    const sourceInput = hasAsinOverride ? asinsOverride.join('\n') : asinInput;
+    const effectiveRegion = regionOverride || region;
+
+    if (!sourceInput.trim()) {
       setAsinError('Please enter at least one ASIN');
       return;
     }
@@ -619,8 +816,8 @@ export default function TemplateListingsPage() {
 
     try {
       // Parse ASINs using flexible parser (supports commas, newlines, spaces, tabs, etc.)
-      const asins = parseAsins(asinInput);
-      const stats = getParsingStats(asinInput);
+      const asins = hasAsinOverride ? parseAsins(sourceInput) : parseAsins(asinInput);
+      const stats = hasAsinOverride ? { invalid: 0 } : getParsingStats(asinInput);
 
       if (asins.length === 0) {
         setAsinError('Please enter valid ASINs');
@@ -644,10 +841,11 @@ export default function TemplateListingsPage() {
 
       // Open modal immediately with loading state for all ASINs
       const loadingItems = asins.map(asin => ({
-        id: `loading-${asin}`,
+        id: `preview-${asin}`,
         asin,
         sku: `${sellerId}-${asin}`,
         status: 'loading',
+        progressStage: 'queued',
         sourceData: null,
         generatedListing: null,
         pricingCalculation: null,
@@ -669,14 +867,23 @@ export default function TemplateListingsPage() {
       // Build SSE URL with auth token
       const asinParam = asins.join(',');
       const authToken = getAuthToken();
-      const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(region)}&token=${encodeURIComponent(authToken)}`;
+      const cacheParam = preferCachedAmazonData ? '&preferCachedAmazonData=true' : '';
+      const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(effectiveRegion)}&token=${encodeURIComponent(authToken)}${cacheParam}`;
       
+      if (window._currentEventSource) {
+        window._currentEventSource.close();
+        window._currentEventSource = null;
+      }
+
       // Create EventSource for SSE
       const eventSource = new EventSource(api.defaults.baseURL + sseUrl);
       
       eventSource.onmessage = (event) => {
         if (event.data === '[DONE]') {
           eventSource.close();
+          if (window._currentEventSource === eventSource) {
+            window._currentEventSource = null;
+          }
           const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
           setProcessingLog(prev => [
             ...prev,
@@ -693,8 +900,38 @@ export default function TemplateListingsPage() {
             case 'started':
               setProcessingLog(prev => [
                 ...prev,
-                `🚀 Processing ${message.total} ASINs in parallel...`
+                `🚀 Processing ${message.total} ASINs with up to ${message.concurrency || 'several'} active at once...`
               ]);
+              break;
+
+            case 'ping':
+              break;
+
+            case 'item_started':
+              setPreviewItems(prev => prev.map(item => (
+                item.asin === message.asin
+                  ? {
+                      ...item,
+                      id: message.id || item.id,
+                      status: 'loading',
+                      progressStage: message.progressStage || 'fetching'
+                    }
+                  : item
+              )));
+              break;
+
+            case 'amazon_loaded':
+              setPreviewItems(prev => prev.map(item => (
+                item.asin === message.asin
+                  ? {
+                      ...item,
+                      id: message.id || item.id,
+                      status: 'loading',
+                      progressStage: message.progressStage || 'generating',
+                      sourceData: message.sourceData || item.sourceData
+                    }
+                  : item
+              )));
               break;
               
             case 'item':
@@ -703,7 +940,10 @@ export default function TemplateListingsPage() {
                 const updated = [...prev];
                 const index = updated.findIndex(i => i.asin === message.item.asin);
                 if (index !== -1) {
-                  updated[index] = message.item;
+                  updated[index] = {
+                    ...message.item,
+                    progressStage: message.item.progressStage || 'complete'
+                  };
                 }
                 return updated;
               });
@@ -765,6 +1005,34 @@ export default function TemplateListingsPage() {
     }
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const handoffNonce = params.get('fromAsinPrecheck');
+    if (!handoffNonce || !sellerId || !templateId) return;
+
+    const rawHandoff = sessionStorage.getItem('asinPrecheckHandoff');
+    if (!rawHandoff) return;
+
+    try {
+      const handoff = JSON.parse(rawHandoff);
+      const handoffAsins = Array.isArray(handoff.asins) ? handoff.asins : [];
+      const isCurrentHandoff = handoff.nonce === handoffNonce
+        && handoff.sellerId === sellerId
+        && handoff.templateId === templateId;
+
+      if (!isCurrentHandoff || handoffAsins.length === 0) return;
+
+      sessionStorage.removeItem('asinPrecheckHandoff');
+      setAsinInput(handoffAsins.join('\n'));
+      if (handoff.region) setRegion(handoff.region);
+      handleBulkAutofill(handoffAsins, handoff.region, true);
+    } catch (handoffError) {
+      console.error('Failed to read ASIN precheck handoff:', handoffError);
+      sessionStorage.removeItem('asinPrecheckHandoff');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, sellerId, templateId]);
+
   const handleRemoveBulkResult = (asin) => {
     setBulkResults(bulkResults.filter(r => r.asin !== asin));
   };
@@ -796,7 +1064,7 @@ export default function TemplateListingsPage() {
   };
 
   // Save listings from review modal
-  const handleSaveFromReview = async (listings) => {
+  const handleSaveFromReview = async (listings, reviewStats = {}) => {
     setLoading(true);
     setError('');
     setSuccess('');
@@ -806,6 +1074,7 @@ export default function TemplateListingsPage() {
         templateId,
         sellerId,
         listings,
+        reviewStats,
         options: {
           skipDuplicates: true
         }
@@ -1125,14 +1394,14 @@ export default function TemplateListingsPage() {
   }
 
   return (
-    <Box>
+    <AdminPageShell>
       {/* Breadcrumb Navigation */}
-      <Breadcrumbs sx={{ mb: 2 }}>
+      <Breadcrumbs sx={{ mb: 2.5, '& .MuiBreadcrumbs-separator': { color: alpha(BRAND_DARK, 0.55) } }}>
         <Link 
           component="button"
           variant="body2" 
           onClick={() => navigate('/admin/select-seller')}
-          sx={{ cursor: 'pointer', textDecoration: 'none' }}
+          sx={breadcrumbLinkSx}
         >
           Select Seller
         </Link>
@@ -1140,14 +1409,66 @@ export default function TemplateListingsPage() {
           component="button"
           variant="body2" 
           onClick={() => navigate(`/admin/seller-templates?sellerId=${sellerId}`)}
-          sx={{ cursor: 'pointer', textDecoration: 'none' }}
+          sx={breadcrumbLinkSx}
         >
           {seller?.user?.username || seller?.user?.email || 'Seller'}
         </Link>
-        <Typography color="text.primary" variant="body2">
+        <Typography variant="body2" sx={breadcrumbCurrentSx}>
           {template?.name || 'Template Listings'}
         </Typography>
       </Breadcrumbs>
+
+      <Paper sx={{ ...surfaceCardSx, p: { xs: 2, md: 2.5 }, mb: 2.25 }}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', lg: 'center' }} spacing={2}>
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={1.25} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                {template ? `${template.name} - Listings` : 'Template Listings'}
+              </Typography>
+              {template?._isOverridden && (
+                <Chip label="Customized" color="primary" size="small" />
+              )}
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+              Manage listing creation, imports, exports, scheduling, and template-level tools for this seller-template workspace.
+            </Typography>
+          </Box>
+          {(seller || fromAsinList) && (
+            <Stack spacing={1} alignItems={{ xs: 'flex-start', lg: 'flex-end' }} sx={{ width: { xs: '100%', lg: 'auto' } }}>
+              {seller && (
+                <Chip
+                  label={seller?.user?.username || seller?.user?.email || 'Seller'}
+                  size="small"
+                  variant="outlined"
+                  sx={sellerContextChipSx}
+                />
+              )}
+              {fromAsinList && (
+                <Stack direction="row" spacing={1} alignItems="center" useFlexGap sx={{ flexWrap: 'wrap' }}>
+                  <Button variant="outlined" size="small" onClick={() => {}} sx={headerActionButtonSx}>
+                    Save As
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="primary"
+                    onClick={() => {
+                      if (selectedListings.size === 0) {
+                        setError('Please select at least one listing to proceed.');
+                        return;
+                      }
+                      setListDirectlyDialog(true);
+                    }}
+                    sx={headerActionButtonSx}
+                  >
+                    List Directly ({selectedListings.size})
+                  </Button>
+                </Stack>
+              )}
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
 
       {/* Statistics Card */}
       {templateId && sellerId && (
@@ -1158,140 +1479,189 @@ export default function TemplateListingsPage() {
         />
       )}
 
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Stack direction="row" alignItems="center" spacing={2}>
-          <Typography variant="h6">
-            {template ? `${template.name} - Listings` : 'Template Listings'}
-          </Typography>
-          {template?._isOverridden && (
-            <Chip label="Customized" color="primary" size="small" />
-          )}
-        </Stack>
-        <Stack direction="row" spacing={1} alignItems="center">
-          {fromAsinList && (
-            <>
-              <Button variant="outlined" size="small" onClick={() => {}}>
-                Save As
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                color="primary"
-                onClick={() => {
-                  if (selectedListings.size === 0) {
-                    setError('Please select at least one listing to proceed.');
-                    return;
-                  }
-                  setListDirectlyDialog(true);
-                }}
-              >
-                List Directly ({selectedListings.size})
-              </Button>
-            </>
-          )}
-          {sellerId && templateId && (
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<SettingsIcon />}
-              onClick={fromAsinList ? undefined : () => setCustomizationDialog(true)}
-              disabled={fromAsinList}
-            >
-              Customize Template
-            </Button>
-          )}
-        </Stack>
-      </Stack>
-
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
-      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />} 
-          onClick={handleAddListing}
-          disabled={!sellerId || batchFilter !== 'active' || fromAsinList}
+      {/* Upload limit block banner */}
+      {isThisTemplateBlocked && (
+        <Alert severity="error" sx={{ mb: 2, fontWeight: 500 }}>
+          <strong>Daily upload limit reached</strong> for <strong>{thisTemplateCountry}</strong>.
+          CSV download and eBay upload are blocked for this template. Resets at 12:00 AM IST.
+        </Alert>
+      )}
+
+      <Paper variant="outlined" sx={actionToolbarPaperSx}>
+        <Stack
+          direction={{ xs: 'column', xl: 'row' }}
+          spacing={2.5}
+          useFlexGap
+          divider={<Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', xl: 'block' }, borderColor: alpha(theme.palette.primary.main, 0.12) }} />}
         >
-          Add Listing
-        </Button>
-        <Button 
-          variant="outlined" 
-          startIcon={<UploadIcon />} 
-          onClick={() => setBulkImportDialog(true)}
-          disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
-        >
-          Bulk Import ASINs
-        </Button>
-        <Button 
-          variant="outlined" 
-          startIcon={<UploadIcon />} 
-          onClick={() => setBulkImportSKUsDialog(true)}
-          disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
-        >
-          Bulk Import SKUs
-        </Button>
-        <Button 
-          variant="outlined" 
-          color="success"
-          onClick={() => setReactivateDialog(true)}
-          disabled={!sellerId || !templateId || fromAsinList}
-        >
-          Relist by SKU
-        </Button>
-        <Button 
-          variant="outlined" 
-          color="error"
-          onClick={() => setDeactivateDialog(true)}
-          disabled={!sellerId || !templateId || fromAsinList}
-        >
-          Deactivate by SKU
-        </Button>
-        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-          <ActionFieldEditor templateId={templateId} sellerId={sellerId} />
-          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} disabled={loading || listings.length === 0}>
-            Download CSV
-          </Button>
-        </Box>
-        <Button
-          variant="outlined"
-          onClick={() => setHistoryDialog(true)}
-          disabled={downloadHistory.length === 0 || fromAsinList}
-        >
-          Download History ({downloadHistory.length})
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<CalculatorIcon />}
-          onClick={fromAsinList ? undefined : () => setCalculatorDialog(true)}
-          disabled={!pricingConfig || fromAsinList}
-        >
-          Pricing Calculator {isCustomPricing && '(Custom)'}
-        </Button>
-        <Button 
-          variant="outlined" 
-          startIcon={<SettingsIcon />} 
-          onClick={() => setDefaultsDialog(true)}
-          color="primary"
-          disabled={fromAsinList}
-        >
-          Set Defaults
-          {template?.coreFieldDefaults && Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length > 0 && (
-            <Chip 
-              label={Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length} 
-              size="small" 
-              color="primary"
-              sx={{ ml: 1, height: 20 }}
-            />
-          )}
-        </Button>
-      </Stack>
+          <Box sx={actionSectionSx}>
+            <Typography variant="caption" sx={actionSectionTitleSx}>
+              Create & Import
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              <Button 
+                variant="contained" 
+                startIcon={<AddIcon />} 
+                onClick={handleAddListing}
+                disabled={!sellerId || batchFilter !== 'active' || fromAsinList}
+                size="small"
+                sx={yellowFilledButtonSx}
+              >
+                Add Listing
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<UploadIcon />} 
+                onClick={() => setBulkImportDialog(true)}
+                disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
+                size="small"
+                sx={yellowOutlinedButtonSx}
+              >
+                Bulk Import ASINs
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<UploadIcon />} 
+                onClick={() => setBulkImportSKUsDialog(true)}
+                disabled={!sellerId || !templateId || batchFilter !== 'active' || fromAsinList}
+                size="small"
+                sx={yellowOutlinedButtonSx}
+              >
+                Bulk Import SKUs
+              </Button>
+            </Stack>
+          </Box>
+
+          <Box sx={actionSectionSx}>
+            <Typography variant="caption" sx={actionSectionTitleSx}>
+              Listing Status
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              <Button 
+                variant="outlined" 
+                color="success"
+                onClick={() => setReactivateDialog(true)}
+                disabled={!sellerId || !templateId || fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Relist by SKU
+              </Button>
+              <Button 
+                variant="outlined" 
+                color="error"
+                onClick={() => setDeactivateDialog(true)}
+                disabled={!sellerId || !templateId || fromAsinList}
+                size="small"
+                sx={actionButtonSx}
+              >
+                Deactivate by SKU
+              </Button>
+            </Stack>
+          </Box>
+
+          <Box sx={actionSectionSx}>
+            <Typography variant="caption" sx={actionSectionTitleSx}>
+              Export & Review
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              <ActionFieldEditor
+                templateId={templateId}
+                sellerId={sellerId}
+                buttonProps={{ size: 'small', sx: yellowOutlinedButtonSx }}
+              />
+              <Button
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportCSV}
+                disabled={loading || listings.length === 0 || isThisTemplateBlocked}
+                size="small"
+                sx={yellowOutlinedButtonSx}
+                title={isThisTemplateBlocked ? `Upload limit reached for ${thisTemplateCountry}` : undefined}
+              >
+                Download CSV
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setHistoryDialog(true)}
+                disabled={downloadHistory.length === 0 || fromAsinList}
+                size="small"
+                sx={yellowOutlinedButtonSx}
+              >
+                Download History ({downloadHistory.length})
+              </Button>
+            </Stack>
+          </Box>
+
+          <Box sx={actionSectionSx}>
+            <Typography variant="caption" sx={actionSectionTitleSx}>
+              Template Tools
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+              {sellerId && templateId && (
+                <Button
+                  variant="outlined"
+                  startIcon={<SettingsIcon />}
+                  onClick={fromAsinList ? undefined : () => setCustomizationDialog(true)}
+                  disabled={fromAsinList}
+                  size="small"
+                  sx={yellowOutlinedButtonSx}
+                >
+                  Customize Template
+                </Button>
+              )}
+              <Button
+                variant="outlined"
+                startIcon={<CalculatorIcon />}
+                onClick={fromAsinList ? undefined : () => setCalculatorDialog(true)}
+                disabled={!pricingConfig || fromAsinList}
+                size="small"
+                sx={yellowOutlinedButtonSx}
+              >
+                Pricing Calculator {isCustomPricing && '(Custom)'}
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<SettingsIcon />} 
+                onClick={() => setDefaultsDialog(true)}
+                color="primary"
+                disabled={fromAsinList}
+                size="small"
+                sx={yellowOutlinedButtonSx}
+              >
+                Set Defaults
+                {template?.coreFieldDefaults && Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length > 0 && (
+                  <Chip 
+                    label={Object.keys(template.coreFieldDefaults).filter(k => template.coreFieldDefaults[k]).length} 
+                    size="small" 
+                    sx={{
+                      ml: 1,
+                      height: 20,
+                      fontWeight: 700,
+                      color: BRAND_DARK,
+                      backgroundColor: alpha(BRAND_YELLOW, 0.95),
+                      border: '1px solid',
+                      borderColor: BRAND_YELLOW_DARK,
+                      '& .MuiChip-label': {
+                        px: 0.9
+                      }
+                    }}
+                  />
+                )}
+              </Button>
+            </Stack>
+          </Box>
+        </Stack>
+      </Paper>
 
       {/* Schedule block */}
-      <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2, mb: 2, display: 'inline-flex', flexDirection: 'column' }}>
+      <Paper variant="outlined" sx={{ ...emphasizedSurfaceCardSx, px: 2, py: 1.2, mb: 2, display: 'inline-flex', flexDirection: 'column', maxWidth: '100%' }}>
           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-            <CalendarIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
-            <Typography variant="caption" fontWeight={700} letterSpacing={0.8} color="text.secondary">
+            <CalendarIcon sx={{ fontSize: 15, color: BRAND_DARK }} />
+            <Typography variant="caption" fontWeight={700} letterSpacing={0.8} sx={{ color: BRAND_DARK }}>
               SCHEDULE
             </Typography>
             {scheduleDate && scheduleTimeFrom && scheduleStep >= 1 && pagination.total > 0 && (() => {
@@ -1316,9 +1686,9 @@ export default function TemplateListingsPage() {
               );
             })()}
           </Stack>
-          <Stack direction="row" alignItems="flex-end" spacing={1.5}>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+          <Stack direction="row" alignItems="stretch" spacing={1.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 Date
               </Typography>
               <OutlinedInput
@@ -1326,11 +1696,12 @@ export default function TemplateListingsPage() {
                 type="date"
                 value={scheduleDate}
                 onChange={e => setScheduleDate(e.target.value)}
-                sx={{ width: 148, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 Start time (24h)
               </Typography>
               <OutlinedInput
@@ -1341,11 +1712,12 @@ export default function TemplateListingsPage() {
                   const v = e.target.value.replace(/[^0-9:]/g, '');
                   if (v.length <= 5) setScheduleTimeFrom(v);
                 }}
-                sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 Interval (min)
               </Typography>
               <OutlinedInput
@@ -1354,11 +1726,12 @@ export default function TemplateListingsPage() {
                 value={scheduleStep}
                 onChange={e => setScheduleStep(Math.max(1, parseInt(e.target.value) || 1))}
                 inputProps={{ min: 1 }}
-                sx={{ width: 90, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 From row
               </Typography>
               <OutlinedInput
@@ -1368,11 +1741,12 @@ export default function TemplateListingsPage() {
                 value={scheduleFromRow}
                 onChange={e => setScheduleFromRow(e.target.value)}
                 inputProps={{ min: 1 }}
-                sx={{ width: 80, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4, fontSize: 11 }}>
+            <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={scheduleLabelSx}>
                 To row
               </Typography>
               <OutlinedInput
@@ -1382,30 +1756,42 @@ export default function TemplateListingsPage() {
                 value={scheduleToRow}
                 onChange={e => setScheduleToRow(e.target.value)}
                 inputProps={{ min: 1 }}
-                sx={{ width: 80, '& input': { py: 0.6, px: 1, fontSize: 13 } }}
+                fullWidth
+                sx={scheduleInputSx}
               />
             </Box>
             <Tooltip title={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) ? 'Fill in date, start time, and interval first' : (scheduleFromRow || scheduleToRow ? `Apply to rows ${scheduleFromRow || 1}–${scheduleToRow || pagination.total}` : `Apply schedule to all ${pagination.total} listings`)}>
-              <span>
+              <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={{ ...scheduleLabelSx, visibility: 'hidden' }} aria-hidden="true">
+                Action
+              </Typography>
+              <span style={{ display: 'block', width: '100%' }}>
                 <Button
                   variant="contained"
                   size="small"
                   startIcon={<ApplyIcon />}
                   disabled={!(scheduleDate && scheduleTimeFrom && scheduleStep >= 1) || loading}
                   onClick={() => setScheduleConfirmOpen(true)}
-                  sx={{ mb: 0.2, bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}
+                  fullWidth
+                  sx={{ ...scheduleButtonSx, bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}
                 >
                   Apply
                 </Button>
               </span>
+              </Box>
             </Tooltip>
             <Tooltip title="Clear schedule time for all listings in the current view">
+              <Box sx={scheduleColumnSx}>
+              <Typography variant="caption" color="text.secondary" sx={{ ...scheduleLabelSx, visibility: 'hidden' }} aria-hidden="true">
+                Action
+              </Typography>
               <Button
                 variant="outlined"
                 size="small"
                 color="warning"
                 startIcon={<ClearAllIcon />}
                 disabled={loading}
+                fullWidth
                 onClick={async () => {
                   if (!window.confirm('Clear schedule time for all listings in this view?')) return;
                   try {
@@ -1421,19 +1807,20 @@ export default function TemplateListingsPage() {
                     setError(e.response?.data?.error || 'Failed to clear schedule times');
                   }
                 }}
-                sx={{ mb: 0.2 }}
+                sx={scheduleButtonSx}
               >
                 Clear Schedule
               </Button>
+              </Box>
             </Tooltip>
           </Stack>
         </Paper>
 
       {/* Batch Filter */}
       {!fromAsinList && (
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Typography variant="subtitle2">View:</Typography>
+      <Paper sx={{ ...surfaceCardSx, p: 2, mb: 2 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+          <Typography variant="subtitle2" sx={{ color: BRAND_DARK, fontWeight: 700 }}>View:</Typography>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <Select
               value={batchFilter}
@@ -1461,14 +1848,15 @@ export default function TemplateListingsPage() {
       </Paper>
       )}
 
-      <TableContainer component={Paper} sx={{ maxHeight: 600, maxWidth: '100%', overflowX: 'auto' }}>
+      <TableContainer component={Paper} sx={{ ...tableContainerSx, maxHeight: 'calc(100vh - 280px)', maxWidth: '100%', overflowX: 'auto', overflowY: 'auto' }}>
         <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
               {/* Checkbox column */}
-              <TableCell padding="checkbox" sx={{ fontWeight: 'bold', position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 2 }}>
+              <TableCell padding="checkbox" sx={{ ...tableHeaderCellSx, position: 'sticky', left: 0, zIndex: 3 }}>
                 <Checkbox
                   size="small"
+                  sx={{ color: alpha(theme.palette.common.white, 0.75), '&.Mui-checked, &.MuiCheckbox-indeterminate': { color: theme.palette.common.white } }}
                   indeterminate={selectedListings.size > 0 && selectedListings.size < listings.length}
                   checked={listings.length > 0 && selectedListings.size === listings.length}
                   onChange={handleToggleAll}
@@ -1476,19 +1864,19 @@ export default function TemplateListingsPage() {
               </TableCell>
               {/* All 38 core columns */}
               {coreColumns.map(col => (
-                <TableCell key={col.key} sx={{ fontWeight: 'bold', minWidth: col.width }}>
+                <TableCell key={col.key} sx={{ ...tableHeaderCellSx, minWidth: col.width }}>
                   {col.label}
                 </TableCell>
               ))}
               
               {/* Custom columns from template */}
               {template?.customColumns?.map(col => (
-                <TableCell key={col.name} sx={{ fontWeight: 'bold', minWidth: 150 }}>
+                <TableCell key={col.name} sx={{ ...tableHeaderCellSx, minWidth: 150 }}>
                   {col.displayName}
                 </TableCell>
               ))}
               
-              <TableCell align="right" sx={{ fontWeight: 'bold', minWidth: 150, position: 'sticky', right: 0, backgroundColor: 'background.paper', zIndex: 1 }}>
+              <TableCell align="right" sx={{ ...tableHeaderCellSx, minWidth: 150, position: 'sticky', right: 0, zIndex: 3 }}>
                 Actions
               </TableCell>
             </TableRow>
@@ -1496,15 +1884,15 @@ export default function TemplateListingsPage() {
           <TableBody>
             {listings.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={coreColumns.length + (template?.customColumns?.length || 0) + 2} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                <TableCell colSpan={coreColumns.length + (template?.customColumns?.length || 0) + 2} align="center" sx={{ py: 4, color: 'text.secondary', background: dashboardTheme.surfaces.emptyState }}>
                   No listings found. Add one above!
                 </TableCell>
               </TableRow>
             ) : (
               listings.map((listing) => (
-                <TableRow key={listing._id} hover selected={selectedListings.has(listing._id)}>
+                <TableRow key={listing._id} hover selected={selectedListings.has(listing._id)} sx={tableBodyRowSx}>
                   {/* Checkbox cell */}
-                  <TableCell padding="checkbox" sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper' }}>
+                  <TableCell padding="checkbox" sx={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'background.paper' }}>
                     <Checkbox
                       size="small"
                       checked={selectedListings.has(listing._id)}
@@ -1543,7 +1931,7 @@ export default function TemplateListingsPage() {
                     </TableCell>
                   ))}
                   
-                  <TableCell align="right" sx={{ position: 'sticky', right: 0, backgroundColor: 'background.paper' }}>
+                  <TableCell align="right" sx={{ position: 'sticky', right: 0, zIndex: 2, backgroundColor: 'background.paper' }}>
                     <IconButton size="small" onClick={() => handleDuplicateListing(listing)} title="Duplicate">
                       <CopyIcon fontSize="small" />
                     </IconButton>
@@ -2438,6 +2826,8 @@ export default function TemplateListingsPage() {
       <AsinReviewModal
         open={reviewModal}
         marketplace={region}
+        sellerId={sellerId}
+        templateName={template?.name}
         onClose={() => {
           // Clean up EventSource if still active
           if (window._currentEventSource) {
@@ -2518,6 +2908,6 @@ export default function TemplateListingsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPageShell>
   );
 }

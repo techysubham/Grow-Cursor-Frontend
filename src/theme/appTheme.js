@@ -1,4 +1,5 @@
 import { createTheme, alpha } from '@mui/material/styles';
+import { BRAND_DARK, BRAND_YELLOW_DARK } from '../constants/brandTheme.js';
 
 function getButtonPalette(theme, color) {
     if (color && color !== 'inherit' && theme.palette[color]) {
@@ -24,13 +25,13 @@ export const dashboardSignatureTokens = {
         table: '0 18px 40px rgba(15, 23, 42, 0.06)'
     },
     table: {
-        headerBackground: '#123b63',
+        headerBackground: BRAND_DARK,
         headerForeground: '#ffffff',
         rowStripe: 'rgba(248, 250, 252, 0.7)',
         rowHover: 'rgba(37, 99, 235, 0.04)',
         rowBorder: 'rgba(15, 23, 42, 0.08)',
-        indexBadgeBackground: 'rgba(18, 59, 99, 0.08)',
-        indexBadgeForeground: '#123b63'
+        indexBadgeBackground: alpha(BRAND_DARK, 0.08),
+        indexBadgeForeground: BRAND_DARK
     },
     tones: {
         neutral: { background: 'rgba(15, 23, 42, 0.05)', border: 'rgba(15, 23, 42, 0.08)', color: '#0f172a' },
@@ -195,6 +196,13 @@ export function createAppTheme() {
                         borderRadius: 14,
                         backgroundColor: '#c0c0c8',
                         opacity: 1,
+                    },
+                },
+            },
+            MuiCssBaseline: {
+                styleOverrides: {
+                    'input[type="date"], input[type="datetime-local"], input[type="time"]': {
+                        accentColor: BRAND_YELLOW_DARK,
                     },
                 },
             },

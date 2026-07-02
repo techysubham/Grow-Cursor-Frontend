@@ -9,6 +9,7 @@ import {
   TableHead,
   TableRow,
   Typography,
+  Button,
   Stack,
   Alert,
   CircularProgress,
@@ -27,18 +28,21 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ChatIcon from '@mui/icons-material/Chat';
 import DownloadIcon from '@mui/icons-material/Download';
-import { Button } from '@mui/material';
+import ClearIcon from '@mui/icons-material/Clear';
 import api from '../../lib/api';
-import { downloadCSV, prepareCSVData } from '../../utils/csvExport';
+import { csvText, downloadCSV, prepareCSVData } from '../../utils/csvExport';
 import ChatModal from '../../components/ChatModal';
 import ColumnSelector from '../../components/ColumnSelector';
+import SectionCard from '../../components/SectionCard.jsx';
+import { tableHeaderCellSx, tableBodyRowSx, tableContainerSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
+import IssuesResolutionTabSkeleton from '../../components/skeletons/IssuesResolutionTabSkeleton.jsx';
 
 export default function CancelledStatusPage({
   dateFilter: dateFilterProp,
   hideDateFilter = false
 }) {
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -196,6 +200,14 @@ export default function CancelledStatusPage({
     return `$${num.toFixed(2)}`;
   };
 
+  const hasActiveFilters = sellerFilter || marketplaceFilter || dateFilter.mode !== 'all';
+
+  const handleClearFilters = () => {
+    setSellerFilter('');
+    setMarketplaceFilter('');
+    setInternalDateFilter({ mode: 'all', single: '', from: '', to: '' });
+  };
+
   // Handler for saving order logs
   const handleSaveOrderLogs = async (orderId, logs) => {
     try {
@@ -258,38 +270,50 @@ export default function CancelledStatusPage({
     );
   };
 
+  if (loading && orders.length === 0) {
+    return <IssuesResolutionTabSkeleton />;
+  }
+
   return (
     <Box>
-      {/* HEADER SECTION */}
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <CancelIcon color="error" />
-            <Typography variant="h5" fontWeight="bold">
-              Cancelled Status
-            </Typography>
-          </Stack>
-          {orders.length > 0 && (
-            <Chip
-              icon={<CancelIcon />}
-              label={`${orders.length} order(s) with cancellation`}
-              color="error"
-              variant="outlined"
-            />
-          )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
 
+      <Stack direction="row" spacing={2} mb={2} alignItems="center" justifyContent="space-between">
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Button
+            variant="contained"
+            sx={yellowFilledButtonSx}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+            onClick={fetchCancelledOrders}
+            disabled={loading}
+          >
+            {loading ? 'Refreshing...' : 'Refresh Cancelled Orders'}
+          </Button>
+
+          <Typography variant="caption" color="text.secondary">
+            {totalOrders > 0
+              ? `Showing ${totalOrders} cancelled order${totalOrders === 1 ? '' : 's'} across the selected filters.`
+              : 'Track cancelled orders, refunds, and worksheet status across sellers.'}
+          </Typography>
+        </Stack>
+
+        <Stack direction="row" spacing={2} alignItems="center">
           <Button
             variant="outlined"
-            color="success"
+            sx={yellowOutlinedButtonSx}
             startIcon={<DownloadIcon />}
             onClick={() => {
               const csvData = prepareCSVData(orders, {
-                'Order ID': 'orderId',
+                'Order ID': (o) => csvText(o.orderId || ''),
                 'Seller': (o) => o.seller?.user?.username || '',
                 'Buyer Name': 'shippingFullName',
                 'Product': 'productName',
                 'Cancel State': 'cancelState',
-                'Date Sold': (o) => o.dateSold ? new Date(o.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : '',
+                'Date Sold': (o) => csvText(o.dateSold ? new Date(o.dateSold).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : ''),
                 'Marketplace': 'purchaseMarketplaceId',
                 'Total': (o) => o.pricingSummary?.total?.value || '',
                 'Worksheet Status': 'worksheetStatus',
@@ -309,9 +333,10 @@ export default function CancelledStatusPage({
             page="cancelled-status"
           />
         </Stack>
+      </Stack>
 
-        {/* Filters Row */}
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 2 }} flexWrap="wrap" useFlexGap>
+      <SectionCard sx={{ p: 2, mb: 3 }}>
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Seller</InputLabel>
             <Select
@@ -344,21 +369,8 @@ export default function CancelledStatusPage({
             </Select>
           </FormControl>
 
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={fetchCancelledOrders}
-            disabled={loading}
-            size="small"
-          >
-            Refresh
-          </Button>
-        </Stack>
-
-        {!hideDateFilter && (
-          <>
-            {/* Date Filter */}
-            <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
+          {!hideDateFilter && (
+            <>
               <FormControl size="small" sx={{ minWidth: 140 }}>
                 <InputLabel>Date</InputLabel>
                 <Select
@@ -403,36 +415,50 @@ export default function CancelledStatusPage({
                   />
                 </>
               )}
-            </Stack>
-          </>
-        )}
 
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
-          </Alert>
-        )}
-      </Paper>
+            </>
+          )}
+
+          {hasActiveFilters && (
+            <Button
+              size="small"
+              startIcon={<ClearIcon />}
+              onClick={handleClearFilters}
+              color="inherit"
+            >
+              Clear Filters
+            </Button>
+          )}
+
+          <Chip
+            icon={<CancelIcon />}
+            label={`${totalOrders} total cancelled order${totalOrders === 1 ? '' : 's'}`}
+            color="error"
+            variant="outlined"
+          />
+        </Stack>
+      </SectionCard>
 
       {/* TABLE SECTION */}
       {loading ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <SectionCard sx={{ p: 4, textAlign: 'center' }}>
           <CircularProgress />
           <Typography variant="body2" sx={{ mt: 2 }}>
             Loading cancelled orders...
           </Typography>
-        </Paper>
+        </SectionCard>
       ) : orders.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <SectionCard sx={{ p: 4, textAlign: 'center' }}>
           <CancelIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
           <Typography variant="body1" color="text.secondary">
             No cancelled orders found.
           </Typography>
-        </Paper>
+        </SectionCard>
       ) : (
         <TableContainer
           component={Paper}
           sx={{
+            ...tableContainerSx,
             maxHeight: 'calc(100vh - 300px)',
             overflow: 'auto',
             '&::-webkit-scrollbar': {
@@ -455,31 +481,29 @@ export default function CancelledStatusPage({
           <Table size="small" stickyHeader sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}>
             <TableHead>
               <TableRow>
-                {visibleColumns.includes('sl') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>SL No</TableCell>}
-                {visibleColumns.includes('seller') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Seller</TableCell>}
-                {visibleColumns.includes('orderId') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Order ID</TableCell>}
-                {visibleColumns.includes('dateSold') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Date Sold</TableCell>}
-                {visibleColumns.includes('productName') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Product Name</TableCell>}
-                {visibleColumns.includes('buyerName') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Buyer Name</TableCell>}
-                {visibleColumns.includes('marketplace') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Marketplace</TableCell>}
-                {visibleColumns.includes('total') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }} align="right">
+                {visibleColumns.includes('sl') && <TableCell sx={tableHeaderCellSx}>SL No</TableCell>}
+                {visibleColumns.includes('seller') && <TableCell sx={tableHeaderCellSx}>Seller</TableCell>}
+                {visibleColumns.includes('orderId') && <TableCell sx={tableHeaderCellSx}>Order ID</TableCell>}
+                {visibleColumns.includes('dateSold') && <TableCell sx={tableHeaderCellSx}>Date Sold</TableCell>}
+                {visibleColumns.includes('productName') && <TableCell sx={tableHeaderCellSx}>Product Name</TableCell>}
+                {visibleColumns.includes('buyerName') && <TableCell sx={tableHeaderCellSx}>Buyer Name</TableCell>}
+                {visibleColumns.includes('marketplace') && <TableCell sx={tableHeaderCellSx}>Marketplace</TableCell>}
+                {visibleColumns.includes('total') && <TableCell sx={tableHeaderCellSx} align="right">
                   Total
                 </TableCell>}
-                {visibleColumns.includes('cancelStatus') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Cancel Status</TableCell>}
-                {visibleColumns.includes('refunds') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Refunds</TableCell>}
-                {visibleColumns.includes('worksheetStatus') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Worksheet Status</TableCell>}
-                {visibleColumns.includes('logs') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }}>Logs</TableCell>}
-                {visibleColumns.includes('chat') && <TableCell sx={{ backgroundColor: 'error.main', color: 'white', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 1 }} align="center">Chat</TableCell>}
+                {visibleColumns.includes('cancelStatus') && <TableCell sx={tableHeaderCellSx}>Cancel Status</TableCell>}
+                {visibleColumns.includes('refunds') && <TableCell sx={tableHeaderCellSx}>Refunds</TableCell>}
+                {visibleColumns.includes('worksheetStatus') && <TableCell sx={tableHeaderCellSx}>Worksheet Status</TableCell>}
+                {visibleColumns.includes('logs') && <TableCell sx={tableHeaderCellSx}>Logs</TableCell>}
+                {visibleColumns.includes('chat') && <TableCell sx={tableHeaderCellSx} align="center">Chat</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
               {orders.map((order, idx) => (
                 <TableRow
                   key={order._id || idx}
-                  sx={{
-                    '&:nth-of-type(odd)': { backgroundColor: 'action.hover' },
-                    '&:hover': { backgroundColor: 'action.selected' },
-                  }}
+                  hover
+                  sx={tableBodyRowSx}
                 >
                   {visibleColumns.includes('sl') && <TableCell>{idx + 1}</TableCell>}
                   {visibleColumns.includes('seller') && <TableCell>

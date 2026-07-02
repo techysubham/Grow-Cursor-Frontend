@@ -39,6 +39,9 @@ const PriceChangeHistoryPage = () => {
   const userStr = localStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
   const { hasAccess } = usePageAccess(user);
+  const initialSearchParams = new URLSearchParams(window.location.search);
+  const initialOrderId = initialSearchParams.get('orderId') || '';
+  const initialLegacyItemId = initialSearchParams.get('legacyItemId') || initialSearchParams.get('itemId') || '';
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -60,8 +63,8 @@ const PriceChangeHistoryPage = () => {
 
   // Filters
   const [filters, setFilters] = useState({
-    legacyItemId: '',
-    orderId: '',
+    legacyItemId: initialLegacyItemId,
+    orderId: initialOrderId,
     userId: '',
     sellerId: '',
     startDate: null,

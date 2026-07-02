@@ -514,7 +514,7 @@ export default function AsinAutomationEditor({
                   value={fieldForm.promptTemplate}
                   onChange={(e) => setFieldForm({ ...fieldForm, promptTemplate: e.target.value })}
                   placeholder="Enter prompt template with placeholders"
-                  helperText="Use placeholders: {title}, {brand}, {description}, {price}, {asin}"
+                  helperText="Use placeholders: {title}, {brand}, {description}, {price}, {asin}, {product_information}"
                 />
                 
                 <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
@@ -522,7 +522,7 @@ export default function AsinAutomationEditor({
                     Quick Insert Placeholders:
                   </Typography>
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {['{title}', '{brand}', '{description}', '{price}', '{asin}'].map(ph => (
+                    {['{title}', '{brand}', '{description}', '{price}', '{asin}', '{product_information}'].map(ph => (
                       <Chip
                         key={ph}
                         label={ph}

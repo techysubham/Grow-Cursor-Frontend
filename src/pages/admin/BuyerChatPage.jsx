@@ -1,14 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  Avatar, TextField, Button, Divider, Badge, Stack, CircularProgress,
+  Avatar, TextField, Button, Divider, Badge, Stack, CircularProgress, Fade,
   IconButton, Chip, Alert, FormControl, Select, MenuItem, InputLabel, Link,
   Snackbar, ListItemButton, Box, Paper, Typography, List, ListItem, ListItemText, ListItemAvatar,
-  useTheme, useMediaQuery, Menu, ListSubheader, Tooltip
+  useTheme, useMediaQuery, Menu, ListSubheader, Tooltip, Switch, FormControlLabel
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import PersonIcon from '@mui/icons-material/Person';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
+import FilterListOffIcon from '@mui/icons-material/FilterListOff';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import EmailIcon from '@mui/icons-material/Email';
@@ -19,12 +20,16 @@ import SaveIcon from '@mui/icons-material/Save';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import MarkAsUnreadIcon from '@mui/icons-material/MarkAsUnread';
+import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import MenuIcon from '@mui/icons-material/Menu';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SettingsIcon from '@mui/icons-material/Settings';
 import api from '../../lib/api';
 import TemplateManagementModal from '../../components/TemplateManagementModal';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
+import { dashboardSignatureTokens } from '../../theme/appTheme';
+import { yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles';
+import { BRAND_YELLOW, BRAND_DARK, BRAND_YELLOW_DARK } from '../../constants/brandTheme';
 
 // Session storage key for persisting state
 const CHAT_STORAGE_KEY = 'buyer_chat_page_state';
@@ -46,6 +51,9 @@ const getInitialState = (key, defaultValue) => {
 };
 
 export default function BuyerChatPage() {
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isPrasanna = currentUser.username === 'prasanna';
+
   const [threads, setThreads] = useState([]);
   const [selectedThread, setSelectedThread] = useState(() => getInitialState('selectedThread', null));
   const [messages, setMessages] = useState([]);
@@ -60,9 +68,26 @@ export default function BuyerChatPage() {
   const [filterType, setFilterType] = useState(() => getInitialState('filterType', 'ALL'));
   const [filterMarketplace, setFilterMarketplace] = useState(() => getInitialState('filterMarketplace', ''));
   const [showUnreadOnly, setShowUnreadOnly] = useState(() => getInitialState('showUnreadOnly', false));
+  const [buyerUnrepliedOnly, setBuyerUnrepliedOnly] = useState(() => getInitialState('buyerUnrepliedOnly', false));
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingThreads, setLoadingThreads] = useState(false);
+
+  // Pending filter state — only applied when user clicks "Apply Filters"
+  const initialFilters = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, buyerUnrepliedOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '', excludeClient: true };
+  const [pendingFilters, setPendingFilters] = useState({
+    ...initialFilters,
+    seller: getInitialState('selectedSeller', ''),
+    filterType: getInitialState('filterType', 'ALL'),
+    filterMarketplace: getInitialState('filterMarketplace', ''),
+    showUnreadOnly: getInitialState('showUnreadOnly', false),
+    buyerUnrepliedOnly: getInitialState('buyerUnrepliedOnly', false),
+    searchQuery: getInitialState('searchQuery', ''),
+    excludeClient: getInitialState('excludeClient', true),
+  });
+  const [appliedDateMode, setAppliedDateMode] = useState('none');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const [metaCategory, setMetaCategory] = useState('');
   const [metaCaseStatus, setMetaCaseStatus] = useState('');
@@ -89,7 +114,6 @@ export default function BuyerChatPage() {
 
 
   const messagesEndRef = useRef(null);
-  const pollingIntervalRef = useRef(null);
   const hasFetchedInitialData = useRef(false);
   const fileInputRef = useRef(null);
 
@@ -106,6 +130,7 @@ export default function BuyerChatPage() {
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [markingUnread, setMarkingUnread] = useState(false);
+  const [markingRead, setMarkingRead] = useState(false);
   const [copiedText, setCopiedText] = useState('');
   const [templateAnchorEl, setTemplateAnchorEl] = useState(null);
   const [chatTemplates, setChatTemplates] = useState([]);
@@ -144,14 +169,16 @@ export default function BuyerChatPage() {
       selectedSeller,
       filterType,
       filterMarketplace,
-      showUnreadOnly
+      showUnreadOnly,
+      buyerUnrepliedOnly,
+      excludeClient: pendingFilters.excludeClient
     };
     try {
       sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Error saving to sessionStorage:', e);
     }
-  }, [selectedThread, searchQuery, selectedSeller]);
+  }, [selectedThread, searchQuery, selectedSeller, filterType, filterMarketplace, showUnreadOnly, buyerUnrepliedOnly, pendingFilters.excludeClient]);
 
 
 
@@ -303,59 +330,14 @@ export default function BuyerChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Track previous values to detect actual changes
-  const prevSearchQuery = useRef(searchQuery);
-  const prevSelectedSeller = useRef(selectedSeller);
-  const prevFilterType = useRef(filterType);
-  const prevFilterMarketplace = useRef(filterMarketplace);
-  const prevShowUnreadOnly = useRef(showUnreadOnly);
-  const isFirstRender = useRef(true);
 
-  useEffect(() => {
-    // Skip on first render (initial data already loaded above)
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-
-    // Only reload if values actually changed
-    if (prevSearchQuery.current !== searchQuery || prevSelectedSeller.current !== selectedSeller || prevFilterType.current !== filterType || prevFilterMarketplace.current !== filterMarketplace || prevShowUnreadOnly.current !== showUnreadOnly) {
-      prevSearchQuery.current = searchQuery;
-      prevSelectedSeller.current = selectedSeller;
-      prevFilterType.current = filterType;
-      prevFilterMarketplace.current = filterMarketplace;
-      prevShowUnreadOnly.current = showUnreadOnly;
-
-      const delayDebounceFn = setTimeout(() => {
-        setPage(1);
-        loadThreads(true);
-      }, 500);
-
-      return () => clearTimeout(delayDebounceFn);
-    }
-  }, [searchQuery, selectedSeller, filterType, filterMarketplace, showUnreadOnly]);
 
   // 2. Scroll Effect
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // 3. ACTIVE POLLING
-  useEffect(() => {
-    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-
-    if (selectedThread && !selectedThread.isNew) {
-      pollingIntervalRef.current = setInterval(() => {
-        pollActiveThread();
-      }, 10000);
-    }
-
-    return () => {
-      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-    };
-  }, [selectedThread]);
-
-  // 4. FETCH MISSING PRODUCT IMAGES (from eBay API)
+  // 3. FETCH MISSING PRODUCT IMAGES (from eBay API)
   useEffect(() => {
     const fetchMissingImages = async () => {
       // Find threads that need images (ORDER type without productImageUrl)
@@ -458,48 +440,70 @@ export default function BuyerChatPage() {
     }
   }
 
-  async function pollActiveThread() {
-    // SAFETY CHECK: Don't poll if we don't have the required IDs
-    if (!selectedThread || !selectedThread.sellerId || !selectedThread.buyerUsername) {
-      return;
-    }
-
-    try {
-      const res = await api.post('/ebay/sync-thread', {
-        sellerId: selectedThread.sellerId,
-        buyerUsername: selectedThread.buyerUsername,
-        itemId: selectedThread.itemId
-      });
-
-      if (res.data.newMessagesFound) {
-        loadMessages(selectedThread, false);
-      }
-    } catch (e) {
-      // Don't log 401 errors - they're handled by the interceptor
-      // Use silent error logging to avoid spamming console if it's just a timeout or 400
-      if (e.response && e.response.status !== 400 && e.response.status !== 401) {
-        console.error("Thread Poll failed", e);
-      }
-    }
+  function handleClearFilters() {
+    const reset = { seller: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, buyerUnrepliedOnly: false, searchQuery: '', dateMode: 'none', dateSingle: '', dateFrom: '', dateTo: '', excludeClient: pendingFilters.excludeClient };
+    setPendingFilters(reset);
+    setSelectedSeller('');
+    setFilterType('ALL');
+    setFilterMarketplace('');
+    setShowUnreadOnly(false);
+    setBuyerUnrepliedOnly(false);
+    setSearchQuery('');
+    setAppliedDateMode('none');
+    setDateFrom('');
+    setDateTo('');
+    setPage(1);
+    loadThreads(true, { sellerId: '', filterType: 'ALL', filterMarketplace: '', showUnreadOnly: false, buyerUnrepliedOnly: false, searchQuery: '', dateFrom: '', dateTo: '', excludeClient: pendingFilters.excludeClient });
   }
 
-  async function loadThreads(reset = false) {
+  function handleApplyFilters() {
+    const { seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, buyerUnrepliedOnly: bu, searchQuery: sq, dateMode, dateSingle, dateFrom: df, dateTo: dt, excludeClient: ec } = pendingFilters;
+    const effectiveDateFrom = dateMode === 'single' ? dateSingle : dateMode === 'range' ? df : '';
+    const effectiveDateTo = dateMode === 'single' ? dateSingle : dateMode === 'range' ? dt : '';
+    setSelectedSeller(seller);
+    setFilterType(ft);
+    setFilterMarketplace(fm);
+    setShowUnreadOnly(su);
+    setBuyerUnrepliedOnly(bu);
+    setSearchQuery(sq);
+    setAppliedDateMode(dateMode);
+    setDateFrom(effectiveDateFrom);
+    setDateTo(effectiveDateTo);
+    setPage(1);
+    loadThreads(true, { sellerId: seller, filterType: ft, filterMarketplace: fm, showUnreadOnly: su, buyerUnrepliedOnly: bu, searchQuery: sq, dateFrom: effectiveDateFrom, dateTo: effectiveDateTo, excludeClient: ec });
+  }
+
+  async function loadThreads(reset = false, overrides = {}) {
     if (loadingThreads) return;
     setLoadingThreads(true);
     if (reset) setThreads([]); // Clear immediately so stale results don't show during load
 
     try {
       const currentPage = reset ? 1 : page;
+      const effectiveSeller = 'sellerId' in overrides ? overrides.sellerId : selectedSeller;
+      const effectiveFilterType = 'filterType' in overrides ? overrides.filterType : filterType;
+      const effectiveFilterMarketplace = 'filterMarketplace' in overrides ? overrides.filterMarketplace : filterMarketplace;
+      const effectiveShowUnreadOnly = 'showUnreadOnly' in overrides ? overrides.showUnreadOnly : showUnreadOnly;
+      const effectiveBuyerUnrepliedOnly = 'buyerUnrepliedOnly' in overrides ? overrides.buyerUnrepliedOnly : buyerUnrepliedOnly;
+      const effectiveSearch = 'searchQuery' in overrides ? overrides.searchQuery : searchQuery;
+      const effectiveDateFrom = 'dateFrom' in overrides ? overrides.dateFrom : dateFrom;
+      const effectiveDateTo = 'dateTo' in overrides ? overrides.dateTo : dateTo;
+      const effectiveExcludeClient = 'excludeClient' in overrides ? overrides.excludeClient : pendingFilters.excludeClient;
+
       const params = {
         page: currentPage,
         limit: 50,
-        search: searchQuery,
-        filterType: filterType,
-        filterMarketplace: filterMarketplace,
-        showUnreadOnly: showUnreadOnly
+        search: effectiveSearch,
+        filterType: effectiveFilterType,
+        filterMarketplace: effectiveFilterMarketplace,
+        showUnreadOnly: effectiveShowUnreadOnly,
+        buyerUnrepliedOnly: effectiveBuyerUnrepliedOnly,
+        excludeClient: effectiveExcludeClient
       };
 
-      if (selectedSeller) params.sellerId = selectedSeller;
+      if (effectiveSeller) params.sellerId = effectiveSeller;
+      if (effectiveDateFrom) params.dateFrom = effectiveDateFrom;
+      if (effectiveDateTo) params.dateTo = effectiveDateTo;
 
       const res = await api.get('/ebay/chat/threads', { params });
       const newThreads = res.data.threads;
@@ -536,28 +540,28 @@ export default function BuyerChatPage() {
       setSidebarOpen(false);
     }
 
-    // 1. OPTIMISTIC UPDATE: Remove Red Dot Immediately
-    if (thread.unreadCount > 0) {
-      setThreads(prevThreads =>
-        prevThreads.map(t => {
-          // Match by OrderId OR (Buyer + Item)
-          const isMatch = t.orderId
-            ? t.orderId === thread.orderId
-            : (t.buyerUsername === thread.buyerUsername && t.itemId === thread.itemId);
-
-          if (isMatch) {
-            return { ...t, unreadCount: 0 }; // Zero out unread count
-          }
-          return t;
-        })
-      );
-    }
-
-    // 2. Load Messages (Backend will mark as read in DB)
+    // Load messages without changing read state. Read/unread is now explicit.
     if (!thread.isNew) {
+      await syncThreadMessages(thread);
       await loadMessages(thread, true);
     } else {
       setMessages([]);
+    }
+  }
+
+  async function syncThreadMessages(thread) {
+    if (!thread?.sellerId || !thread?.buyerUsername) return;
+
+    try {
+      await api.post('/ebay/sync-thread', {
+        sellerId: thread.sellerId,
+        buyerUsername: thread.buyerUsername,
+        itemId: thread.itemId
+      });
+    } catch (e) {
+      if (e.response?.status !== 401) {
+        console.error('Failed to sync thread messages', e);
+      }
     }
   }
 
@@ -650,6 +654,13 @@ export default function BuyerChatPage() {
     return seller?.user?.username || 'Unknown Seller';
   };
 
+  const isSameThread = (thread, target) => {
+    if (!thread || !target) return false;
+    return thread.orderId
+      ? thread.orderId === target.orderId
+      : (thread.buyerUsername === target.buyerUsername && thread.itemId === target.itemId);
+  };
+
   async function handleFileSelect(e) {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -725,11 +736,7 @@ export default function BuyerChatPage() {
       // Update local thread state to show unread badge
       setThreads(prevThreads =>
         prevThreads.map(t => {
-          const isMatch = t.orderId
-            ? t.orderId === selectedThread.orderId
-            : (t.buyerUsername === selectedThread.buyerUsername && t.itemId === selectedThread.itemId);
-
-          if (isMatch) {
+          if (isSameThread(t, selectedThread)) {
             // Count buyer messages to set unread count
             const buyerMessageCount = messages.filter(m => m.sender === 'BUYER').length;
             return { ...t, unreadCount: buyerMessageCount };
@@ -753,6 +760,38 @@ export default function BuyerChatPage() {
       setSnackbarOpen(true);
     } finally {
       setMarkingUnread(false);
+    }
+  }
+
+  async function handleMarkAsRead() {
+    if (!selectedThread) return;
+
+    setMarkingRead(true);
+    try {
+      const payload = {
+        orderId: selectedThread.orderId,
+        buyerUsername: selectedThread.buyerUsername,
+        itemId: selectedThread.itemId
+      };
+
+      await api.post('/ebay/chat/mark-read', payload);
+
+      setThreads(prevThreads =>
+        prevThreads.map(t => isSameThread(t, selectedThread) ? { ...t, unreadCount: 0 } : t)
+      );
+      setSelectedThread(prev => prev ? { ...prev, unreadCount: 0 } : prev);
+      setMessages(prev => prev.map(m => m.sender === 'BUYER' ? { ...m, read: true } : m));
+
+      setSnackbarMsg('Conversation marked as read');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+
+    } catch (err) {
+      setSnackbarMsg('Failed to mark as read: ' + (err.response?.data?.error || err.message));
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setMarkingRead(false);
     }
   }
 
@@ -792,69 +831,56 @@ export default function BuyerChatPage() {
         left: { xs: 0, sm: 0, md: 'auto' },
         zIndex: { xs: 1600, sm: 1600, md: 1 },
         overflow: 'hidden',
-        boxShadow: { xs: 3, sm: 3, md: 1 }
+        boxShadow: { xs: 3, sm: 3, md: 1 },
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: `${dashboardSignatureTokens.radius.card}px`,
       }}>
         <Box sx={{
           p: { xs: 1.5, md: 2 },
-          bgcolor: '#f5f5f5',
-          borderBottom: 1,
-          borderColor: 'divider'
+          background: dashboardSignatureTokens.surfaces.pageCard,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          overflowY: 'auto',
         }}>
-          {/* Mobile & Tablet: Close button */}
-          {(isMobile || isTablet) && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-              <Typography variant="h6" sx={{ fontSize: '1rem' }}>Conversations</Typography>
-              <IconButton
-                onClick={() => setSidebarOpen(false)}
-                size="small"
-              >
-                <CloseIcon />
-              </IconButton>
-            </Box>
-          )}
+          {/* Header row */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary', letterSpacing: 0.2 }}>
+              Inbox Filters
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              {(isMobile || isTablet) && (
+                <IconButton onClick={() => setSidebarOpen(false)} size="small"><CloseIcon fontSize="small" /></IconButton>
+              )}
+            </Stack>
+          </Stack>
 
           {/* Filters - Vertically stacked, full width */}
           <Stack
             direction="column"
             spacing={1.5}
-            sx={{ mb: 2 }}
+            sx={{ mb: 2, pointerEvents: loadingThreads ? 'none' : 'auto', opacity: loadingThreads ? 0.5 : 1, transition: 'opacity 0.2s' }}
           >
-            <FormControl
-              fullWidth
-              size="small"
-              sx={{
-                bgcolor: 'white'
-              }}
-            >
-              <InputLabel>Filter by Seller</InputLabel>
+            <FormControl fullWidth size="small">
+              <InputLabel>Seller</InputLabel>
               <Select
-                value={selectedSeller}
-                label="Filter by Seller"
-                onChange={(e) => setSelectedSeller(e.target.value)}
+                value={pendingFilters.seller}
+                label="Seller"
+                onChange={(e) => setPendingFilters(p => ({ ...p, seller: e.target.value }))}
               >
-                <MenuItem value="">
-                  <em>All Sellers</em>
-                </MenuItem>
+                <MenuItem value=""><em>All Sellers</em></MenuItem>
                 {sellers.map((s) => (
-                  <MenuItem key={s._id} value={s._id}>
-                    {s.user?.username || s.user?.email}
-                  </MenuItem>
+                  <MenuItem key={s._id} value={s._id}>{s.user?.username || s.user?.email}</MenuItem>
                 ))}
               </Select>
             </FormControl>
 
-            <FormControl
-              fullWidth
-              size="small"
-              sx={{
-                bgcolor: 'white'
-              }}
-            >
-              <InputLabel>Filter by Type</InputLabel>
+            <FormControl fullWidth size="small">
+              <InputLabel>Message Type</InputLabel>
               <Select
-                value={filterType}
-                label="Filter by Type"
-                onChange={(e) => setFilterType(e.target.value)}
+                value={pendingFilters.filterType}
+                label="Message Type"
+                onChange={(e) => setPendingFilters(p => ({ ...p, filterType: e.target.value }))}
               >
                 <MenuItem value="ALL">All Messages</MenuItem>
                 <MenuItem value="ORDER">Order Related</MenuItem>
@@ -862,18 +888,12 @@ export default function BuyerChatPage() {
               </Select>
             </FormControl>
 
-            <FormControl
-              fullWidth
-              size="small"
-              sx={{
-                bgcolor: 'white'
-              }}
-            >
-              <InputLabel>Filter by Marketplace</InputLabel>
+            <FormControl fullWidth size="small">
+              <InputLabel>Marketplace</InputLabel>
               <Select
-                value={filterMarketplace}
-                label="Filter by Marketplace"
-                onChange={(e) => setFilterMarketplace(e.target.value)}
+                value={pendingFilters.filterMarketplace}
+                label="Marketplace"
+                onChange={(e) => setPendingFilters(p => ({ ...p, filterMarketplace: e.target.value }))}
               >
                 <MenuItem value="">All Marketplaces</MenuItem>
                 <MenuItem value="EBAY_US">United States (US)</MenuItem>
@@ -883,57 +903,153 @@ export default function BuyerChatPage() {
               </Select>
             </FormControl>
 
-            <FormControl
-              fullWidth
-              size="small"
-              sx={{
-                bgcolor: 'white'
-              }}
-            >
-              <InputLabel>Show Only</InputLabel>
+            <FormControl fullWidth size="small">
+              <InputLabel>Read Status</InputLabel>
               <Select
-                value={showUnreadOnly}
-                label="Show Only"
-                onChange={(e) => setShowUnreadOnly(e.target.value)}
+                value={pendingFilters.showUnreadOnly}
+                label="Read Status"
+                onChange={(e) => setPendingFilters(p => ({ ...p, showUnreadOnly: e.target.value }))}
               >
                 <MenuItem value={false}>All Conversations</MenuItem>
-                <MenuItem value={true}>Unread Messages Only</MenuItem>
+                <MenuItem value={true}>Unread Only</MenuItem>
+                <MenuItem value="readOnly">Read Only</MenuItem>
               </Select>
             </FormControl>
+
+            {/* DATE FILTER — mode selector + conditional inputs */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5, py: 0.25, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>Needs Reply</Typography>
+              <Switch
+                size="small"
+                checked={!!pendingFilters.buyerUnrepliedOnly}
+                onChange={(e) => setPendingFilters(p => ({ ...p, buyerUnrepliedOnly: e.target.checked }))}
+                sx={{ '& .MuiSwitch-thumb': { bgcolor: pendingFilters.buyerUnrepliedOnly ? BRAND_YELLOW : undefined }, '& .MuiSwitch-track': { bgcolor: pendingFilters.buyerUnrepliedOnly ? `${BRAND_YELLOW} !important` : undefined } }}
+              />
+            </Box>
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Date Filter</InputLabel>
+              <Select
+                value={pendingFilters.dateMode}
+                label="Date Filter"
+                onChange={(e) => setPendingFilters(p => ({ ...p, dateMode: e.target.value, dateSingle: '', dateFrom: '', dateTo: '' }))}
+              >
+                <MenuItem value="none">No Date Filter</MenuItem>
+                <MenuItem value="single">Single Day (PT)</MenuItem>
+                <MenuItem value="range">Date Range (PT)</MenuItem>
+              </Select>
+            </FormControl>
+
+            {pendingFilters.dateMode === 'single' && (
+              <TextField
+                fullWidth size="small" label="Date (PT)" type="date"
+                value={pendingFilters.dateSingle}
+                onChange={(e) => setPendingFilters(p => ({ ...p, dateSingle: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+              />
+            )}
+            {pendingFilters.dateMode === 'range' && (
+              <>
+                <TextField
+                  fullWidth size="small" label="From (PT)" type="date"
+                  value={pendingFilters.dateFrom}
+                  onChange={(e) => setPendingFilters(p => ({ ...p, dateFrom: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  fullWidth size="small" label="To (PT)" type="date"
+                  value={pendingFilters.dateTo}
+                  onChange={(e) => setPendingFilters(p => ({ ...p, dateTo: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </>
+            )}
+
+            {/* Exclude Client Toggle */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5, py: 0.25, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>Exclude Client</Typography>
+              <Switch
+                size="small"
+                checked={!!pendingFilters.excludeClient}
+                onChange={(e) => setPendingFilters(p => ({ ...p, excludeClient: e.target.checked }))}
+                sx={{ '& .MuiSwitch-thumb': { bgcolor: pendingFilters.excludeClient ? BRAND_YELLOW : undefined }, '& .MuiSwitch-track': { bgcolor: pendingFilters.excludeClient ? `${BRAND_YELLOW} !important` : undefined } }}
+              />
+            </Box>
+
+            {/* Search */}
+            <TextField
+              size="small" fullWidth
+              placeholder="Search User, Order, or Item..."
+              value={pendingFilters.searchQuery}
+              onChange={(e) => setPendingFilters(p => ({ ...p, searchQuery: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+            />
           </Stack>
 
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            justifyContent="space-between"
-            alignItems={{ xs: 'stretch', sm: 'center' }}
-            spacing={1}
-            mb={2}
-          >
-            {!isMobile && <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Inbox</Typography>}
+          {/* Action buttons row */}
+          <Stack direction="row" spacing={1} mb={1.5}>
             <Button
+              variant="contained"
+              fullWidth
               size="small"
-              startIcon={syncingInbox ? <CircularProgress size={16} /> : <RefreshIcon />}
-              onClick={handleManualSync}
-              disabled={syncingInbox}
-              variant="outlined"
-              fullWidth={isMobile}
-              sx={{ minWidth: { sm: 'auto', md: 'auto' } }}
+              disabled={loadingThreads}
+              onClick={handleApplyFilters}
+              startIcon={loadingThreads ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
+              sx={{ ...yellowFilledButtonSx, height: 36 }}
             >
-              {syncingInbox ? 'Syncing...' : 'Check New'}
+              {loadingThreads ? 'Loading...' : 'Apply Filters'}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={loadingThreads}
+              onClick={handleClearFilters}
+              startIcon={<FilterListOffIcon />}
+              sx={{ ...yellowOutlinedButtonSx, height: 36, minWidth: 'auto', px: 1.5 }}
+            >
+              Clear
             </Button>
           </Stack>
 
-          {/* SEARCH INPUT (Automatic Debounce) */}
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search User, Order, or Item..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          {isPrasanna && (
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.68rem' }}>
+                Inbox
+              </Typography>
+              <Button
+                size="small"
+                startIcon={syncingInbox ? <CircularProgress size={14} /> : <RefreshIcon fontSize="small" />}
+                onClick={handleManualSync}
+                disabled={syncingInbox || loadingThreads}
+                variant="outlined"
+                sx={{ ...yellowOutlinedButtonSx, height: 30, fontSize: '0.75rem' }}
+              >
+                {syncingInbox ? 'Syncing...' : 'Check New'}
+              </Button>
+            </Stack>
+          )}
         </Box>
 
-        {/* THREAD LIST */}
+        {/* THREAD LIST — wrapped in relative container for overlay */}
+        <Box sx={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Loading overlay: blocks all interaction while threads are fetching */}
+          {loadingThreads && (
+            <Box sx={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 10,
+              bgcolor: 'rgba(255,255,255,0.75)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              backdropFilter: 'blur(2px)'
+            }}>
+              <CircularProgress />
+              <Typography variant="caption" color="text.secondary">Loading conversations…</Typography>
+            </Box>
+          )}
         <List sx={{ overflow: 'auto', flex: 1 }}>
           {threads.map((thread, index) => {
             // Unique Key: OrderID + ItemID (handles multi-item orders correctly)
@@ -952,6 +1068,7 @@ export default function BuyerChatPage() {
                     selected={isSelected}
                     onClick={() => handleThreadSelect(thread)}
                     alignItems="flex-start"
+                    sx={isSelected ? { borderLeft: `3px solid ${BRAND_YELLOW}`, bgcolor: BRAND_YELLOW + '1a' } : { borderLeft: '3px solid transparent' }}
                   >
                     <ListItemAvatar>
                       <Badge color="error" badgeContent={thread.unreadCount}>
@@ -975,7 +1092,7 @@ export default function BuyerChatPage() {
                                   width: 48,
                                   height: 48,
                                   border: '2px solid',
-                                  borderColor: 'primary.main'
+                                  borderColor: BRAND_YELLOW
                                 }}
                               />
                             );
@@ -990,8 +1107,8 @@ export default function BuyerChatPage() {
                                   width: 48,
                                   height: 48,
                                   border: '2px solid',
-                                  borderColor: 'primary.main',
-                                  bgcolor: 'primary.lighter'
+                                  borderColor: BRAND_YELLOW,
+                                  bgcolor: BRAND_YELLOW + '33'
                                 }}
                               >
                                 <CircularProgress size={20} />
@@ -1003,10 +1120,13 @@ export default function BuyerChatPage() {
                           return (
                             <Avatar sx={{
                               bgcolor: isOrder
-                                ? 'primary.main'
+                                ? BRAND_YELLOW
                                 : isDirect
-                                  ? 'warning.main'
-                                  : 'secondary.main'
+                                  ? BRAND_DARK
+                                  : BRAND_YELLOW_DARK,
+                              color: isOrder
+                                ? BRAND_DARK
+                                : '#fff'
                             }}>
                               {isOrder
                                 ? <ShoppingBagIcon fontSize="small" />
@@ -1046,8 +1166,8 @@ export default function BuyerChatPage() {
                                   minWidth: 24,
                                   px: 0,
                                   '& .MuiChip-label': { px: 0.5 },
-                                  bgcolor: thread.marketplaceId === 'EBAY_US' ? '#e3f2fd' : '#fff3e0',
-                                  color: thread.marketplaceId === 'EBAY_US' ? '#1565c0' : '#e65100',
+                                  bgcolor: BRAND_YELLOW + '22',
+                                  color: BRAND_DARK,
                                   fontWeight: 'bold'
                                 }}
                               />
@@ -1087,6 +1207,7 @@ export default function BuyerChatPage() {
                 size="small"
                 onClick={() => loadThreads(false)}
                 disabled={loadingThreads}
+                sx={yellowOutlinedButtonSx}
               >
                 {loadingThreads ? <CircularProgress size={20} /> : 'Load More'}
               </Button>
@@ -1100,6 +1221,7 @@ export default function BuyerChatPage() {
             </Typography>
           )}
         </List>
+        </Box>
       </Paper>
 
       {/* Button to open sidebar when closed */}
@@ -1110,6 +1232,7 @@ export default function BuyerChatPage() {
             variant="contained"
             startIcon={<QuestionAnswerIcon />}
             onClick={() => setSidebarOpen(true)}
+            sx={yellowFilledButtonSx}
           >
             View Conversations
           </Button>
@@ -1123,7 +1246,12 @@ export default function BuyerChatPage() {
         flexDirection: 'column',
         width: { xs: '100%', md: 'auto' },
         height: { xs: '100vh', md: '100%' },
-        minWidth: 0
+        minWidth: 0,
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: `${dashboardSignatureTokens.radius.card}px`,
+        boxShadow: dashboardSignatureTokens.shadows.card,
+        overflow: 'hidden',
       }}>
         {/* ... existing chat area code ... */}
         {
@@ -1131,9 +1259,9 @@ export default function BuyerChatPage() {
             <>
               <Box sx={{
                 p: { xs: 1.5, md: 2 },
-                borderBottom: 1,
+                borderBottom: '1px solid',
                 borderColor: 'divider',
-                bgcolor: '#fff',
+                background: dashboardSignatureTokens.surfaces.pageCard,
                 position: 'relative'
               }}>
                 {/* Mobile & Tablet: Back button */}
@@ -1149,204 +1277,175 @@ export default function BuyerChatPage() {
                   </IconButton>
                 )}
 
-                {/* TOP LEFT CORNER - Responsive Stack */}
+                {/* ROW 1: Seller identity + quick actions */}
                 <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
+                  direction="row"
                   spacing={1}
-                  alignItems={{ xs: 'stretch', sm: 'center' }}
-                  flexWrap="wrap"
-                  sx={{
-                    position: 'static',
-                    mb: 2,
-                    maxWidth: '100%',
-                    justifyContent: 'flex-start',
-                    gap: 1,
-                    zIndex: 10
-                  }}
+                  alignItems="center"
+                  sx={{ mb: 1 }}
                 >
-
-                  {/* Meta dropdowns - Stack on mobile */}
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={1}
-                    flexWrap="wrap"
+                  <Chip
+                    label={getSellerName(selectedThread.sellerId)}
+                    size="small"
+                    icon={<PersonIcon style={{ fontSize: 16 }} />}
                     sx={{
-                      width: { xs: '100%', sm: 'auto' },
-                      maxWidth: { md: '100%' },
-                      gap: 1
+                      bgcolor: BRAND_DARK,
+                      color: BRAND_YELLOW,
+                      fontWeight: 'bold',
+                      height: 28,
+                      fontSize: '0.8rem'
                     }}
-                  >
-                    <FormControl
-                      size="small"
-                      fullWidth={isMobile}
-                      sx={{
-                        minWidth: { xs: '100%', sm: 120, md: 140 },
-                        maxWidth: { md: 180 },
-                        '& .MuiInputBase-root': { height: { xs: 40, sm: 32 } }
-                      }}
-                    >
-                      <InputLabel shrink sx={{ fontSize: '0.8rem' }}>About</InputLabel>
-                      <Select
-                        value={metaCategory}
-                        label="About"
-                        displayEmpty
-                        notched
-                        onChange={(e) => setMetaCategory(e.target.value)}
-                        sx={{ fontSize: '0.8rem' }}
-                        renderValue={(selected) => selected ? selected : <em style={{ color: '#999', fontSize: '0.8rem' }}>— Not a Case —</em>}
-                      >
-                        <MenuItem value=""><em>— Not a Case —</em></MenuItem>
-                        <MenuItem value="INR">INR</MenuItem>
-                        <MenuItem value="Cancellation">Cancellation</MenuItem>
-                        <MenuItem value="Return">Return</MenuItem>
-                        <MenuItem value="Refund">Refund</MenuItem>
-                        <MenuItem value="Replace">Replace</MenuItem>
-                        <MenuItem value="Out of Stock">Out of Stock</MenuItem>
-                        <MenuItem value="Issue with Product">Issue with Product</MenuItem>
-                        <MenuItem value="Inquiry">Inquiry</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    <FormControl
-                      size="small"
-                      fullWidth={isMobile}
-                      sx={{
-                        minWidth: { xs: '100%', sm: 120, md: 140 },
-                        maxWidth: { md: 180 },
-                        '& .MuiInputBase-root': { height: { xs: 40, sm: 32 } }
-                      }}
-                    >
-                      <InputLabel sx={{ fontSize: '0.8rem' }}>Status</InputLabel>
-                      <Select
-                        value={metaCaseStatus}
-                        label="Status"
-                        onChange={(e) => setMetaCaseStatus(e.target.value)}
-                        sx={{ fontSize: '0.8rem' }}
-                      >
-                        <MenuItem value="Case Not Opened">Case Not Opened</MenuItem>
-                        <MenuItem value="Open">Open</MenuItem>
-                        <MenuItem value="In Progress">In Progress</MenuItem>
-                        <MenuItem value="Resolved">Resolved</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    <FormControl
-                      size="small"
-                      fullWidth={isMobile}
-                      sx={{
-                        minWidth: { xs: '100%', sm: 130, md: 150 },
-                        maxWidth: { md: 200 },
-                        '& .MuiInputBase-root': { height: { xs: 40, sm: 32 } }
-                      }}
-                    >
-                      <InputLabel shrink sx={{ fontSize: '0.8rem' }}>Picked Up By</InputLabel>
-                      <Select
-                        value={metaPickedUpBy}
-                        label="Picked Up By"
-                        onChange={(e) => setMetaPickedUpBy(e.target.value)}
-                        sx={{ fontSize: '0.8rem' }}
-                        displayEmpty
-                        renderValue={(selected) => (selected ? selected : '— Unassigned —')}
-                      >
-                        <MenuItem value=""><em>— Unassigned —</em></MenuItem>
-                        {chatAgents.map(agent => (
-                          <MenuItem key={agent._id} value={agent.name}>{agent.name}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
+                  />
+                  {selectedThread.isNew && (
+                    <Chip label="New" size="small" color="success" sx={{ height: 24 }} />
+                  )}
+                  <Box sx={{ flex: 1 }} />
+                  <Tooltip title="Choose a response template">
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       size="small"
-                      onClick={handleSaveMeta}
-                      disabled={savingMeta}
-                      fullWidth={isMobile}
+                      onClick={handleTemplateClick}
+                      disabled={sending}
                       sx={{
-                        minWidth: { xs: '100%', sm: 40 },
-                        height: { xs: 40, sm: 32 },
-                        px: { xs: 2, sm: 1 }
+                        height: 28,
+                        fontSize: '0.72rem',
+                        minWidth: 90,
+                        bgcolor: 'background.paper',
+                        px: 1
                       }}
+                      endIcon={<ExpandMoreIcon sx={{ fontSize: '14px !important' }} />}
                     >
-                      {savingMeta ? <CircularProgress size={16} color="inherit" /> : <SaveIcon fontSize="small" />}
+                      Templates
                     </Button>
-                  </Stack>
-
-                  {/* Seller chip and actions */}
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={1}
-                    alignItems={{ xs: 'stretch', sm: 'center' }}
-                    sx={{ width: { xs: '100%', sm: 'auto' } }}
-                  >
-                    <Chip
-                      label={getSellerName(selectedThread.sellerId)}
-                      size="small"
-                      icon={<PersonIcon style={{ fontSize: 20 }} />}
-                      sx={{
-                        bgcolor: '#e3f2fd',
-                        color: '#1565c0',
-                        fontWeight: 'bold',
-                        height: { xs: 36, sm: 30 },
-                        fontSize: { xs: '0.9rem', sm: '1rem' },
-                        justifyContent: { xs: 'flex-start', sm: 'center' }
-                      }}
-                    />
-                    {selectedThread.isNew && (
-                      <Chip
-                        label="New"
-                        size="small"
-                        color="success"
-                        sx={{ height: { xs: 36, sm: 24 } }}
-                      />
-                    )}
-
-                    {/* Templates Button */}
-                    <Tooltip title="Choose a response template">
+                  </Tooltip>
+                  {!selectedThread.isNew && (
+                    <>
                       <Button
                         variant="outlined"
                         size="small"
-                        onClick={handleTemplateClick}
-                        disabled={sending}
-                        fullWidth={isMobile}
-                        sx={{
-                          height: { xs: 40, sm: 30 },
-                          fontSize: '0.75rem',
-                          minWidth: { xs: '100%', sm: 100 },
-                          bgcolor: 'white'
-                        }}
-                        endIcon={<ExpandMoreIcon fontSize="small" />}
+                        onClick={handleMarkAsRead}
+                        disabled={markingRead}
+                        startIcon={markingRead ? <CircularProgress size={12} color="inherit" /> : <MarkEmailReadIcon sx={{ fontSize: '14px !important' }} />}
+                        sx={{ height: 28, fontSize: '0.72rem', px: 1 }}
                       >
-                        Templates
+                        {markingRead ? 'Marking...' : 'Mark Read'}
                       </Button>
-                    </Tooltip>
-
-                    {!selectedThread.isNew && (
                       <Button
                         variant="outlined"
                         size="small"
                         onClick={handleMarkAsUnread}
                         disabled={markingUnread}
-                        startIcon={markingUnread ? <CircularProgress size={16} color="inherit" /> : <MarkAsUnreadIcon fontSize="small" />}
-                        fullWidth={isMobile}
-                        sx={{
-                          height: { xs: 40, sm: 30 },
-                          fontSize: '0.75rem'
-                        }}
+                        startIcon={markingUnread ? <CircularProgress size={12} color="inherit" /> : <MarkAsUnreadIcon sx={{ fontSize: '14px !important' }} />}
+                        sx={{ height: 28, fontSize: '0.72rem', px: 1 }}
                       >
                         {markingUnread ? 'Marking...' : 'Mark Unread'}
                       </Button>
-                    )}
+                    </>
+                  )}
+                  <IconButton
+                    onClick={() => setSelectedThread(null)}
+                    size="small"
+                    sx={{ color: 'text.disabled' }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
 
-                    {!isMobile && (
-                      <IconButton
-                        onClick={() => setSelectedThread(null)}
-                        size="small"
-                        sx={{ color: 'text.disabled', ml: 1 }}
-                      >
-                        <CloseIcon />
-                      </IconButton>
-                    )}
-                  </Stack>
+                {/* ROW 2: Case meta fields */}
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1}
+                  flexWrap="wrap"
+                  alignItems={{ xs: 'stretch', sm: 'center' }}
+                  sx={{ mb: 1.5, gap: 1 }}
+                >
+                  <FormControl
+                    size="small"
+                    sx={{
+                      minWidth: { xs: '100%', sm: 130, md: 150 },
+                      '& .MuiInputBase-root': { height: 32 }
+                    }}
+                  >
+                    <InputLabel shrink sx={{ fontSize: '0.78rem' }}>About</InputLabel>
+                    <Select
+                      value={metaCategory}
+                      label="About"
+                      displayEmpty
+                      notched
+                      onChange={(e) => setMetaCategory(e.target.value)}
+                      sx={{ fontSize: '0.78rem' }}
+                      renderValue={(selected) => selected ? selected : <em style={{ color: '#999', fontSize: '0.78rem' }}>— Not a Case —</em>}
+                    >
+                      <MenuItem value=""><em>— Not a Case —</em></MenuItem>
+                      <MenuItem value="INR">INR</MenuItem>
+                      <MenuItem value="Cancellation">Cancellation</MenuItem>
+                      <MenuItem value="Return">Return</MenuItem>
+                      <MenuItem value="Refund">Refund</MenuItem>
+                      <MenuItem value="Replace">Replace</MenuItem>
+                      <MenuItem value="Out of Stock">Out of Stock</MenuItem>
+                      <MenuItem value="Issue with Product">Issue with Product</MenuItem>
+                      <MenuItem value="Inquiry">Inquiry</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl
+                    size="small"
+                    sx={{
+                      minWidth: { xs: '100%', sm: 120, md: 140 },
+                      '& .MuiInputBase-root': { height: 32 }
+                    }}
+                  >
+                    <InputLabel sx={{ fontSize: '0.78rem' }}>Status</InputLabel>
+                    <Select
+                      value={metaCaseStatus}
+                      label="Status"
+                      onChange={(e) => setMetaCaseStatus(e.target.value)}
+                      sx={{ fontSize: '0.78rem' }}
+                    >
+                      <MenuItem value="Case Not Opened">Case Not Opened</MenuItem>
+                      <MenuItem value="Open">Open</MenuItem>
+                      <MenuItem value="In Progress">In Progress</MenuItem>
+                      <MenuItem value="Resolved">Resolved</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl
+                    size="small"
+                    sx={{
+                      minWidth: { xs: '100%', sm: 140, md: 170 },
+                      '& .MuiInputBase-root': { height: 32 }
+                    }}
+                  >
+                    <InputLabel shrink sx={{ fontSize: '0.78rem' }}>Picked Up By</InputLabel>
+                    <Select
+                      value={metaPickedUpBy}
+                      label="Picked Up By"
+                      onChange={(e) => setMetaPickedUpBy(e.target.value)}
+                      sx={{ fontSize: '0.78rem' }}
+                      displayEmpty
+                      renderValue={(selected) => (selected ? selected : '— Unassigned —')}
+                    >
+                      <MenuItem value=""><em>— Unassigned —</em></MenuItem>
+                      {chatAgents.map(agent => (
+                        <MenuItem key={agent._id} value={agent.name}>{agent.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={handleSaveMeta}
+                    disabled={savingMeta}
+                    sx={{
+                      ...yellowFilledButtonSx,
+                      height: 32,
+                      minWidth: 36,
+                      px: 1
+                    }}
+                  >
+                    {savingMeta ? <CircularProgress size={14} color="inherit" /> : <SaveIcon sx={{ fontSize: 16 }} />}
+                  </Button>
                 </Stack>
 
                 {/* Templates Menu - Positioned outside the header Stack */}
@@ -1397,7 +1496,7 @@ export default function BuyerChatPage() {
                       <Box key={index}>
                         <ListSubheader
                           sx={{
-                            bgcolor: '#f5f5f5',
+                            bgcolor: 'background.default',
                             fontWeight: 'bold',
                             lineHeight: '32px',
                             color: 'primary.main',
@@ -1573,11 +1672,11 @@ export default function BuyerChatPage() {
                           height: 30,
                           fontSize: '0.75rem',
                           fontWeight: 'bold',
-                          color: 'primary.main',
-                          borderColor: 'primary.main',
-                          bgcolor: '#f0f7ff',
+                          color: BRAND_DARK,
+                          borderColor: BRAND_YELLOW_DARK,
+                          bgcolor: BRAND_YELLOW + '15',
                           cursor: 'pointer',
-                          '&:hover': { bgcolor: '#dbeafe' }
+                          '&:hover': { bgcolor: BRAND_YELLOW + '33' }
                         }}
                       />
                     )}
@@ -1592,8 +1691,8 @@ export default function BuyerChatPage() {
                           height: 30,
                           fontSize: '0.75rem',
                           fontWeight: 'bold',
-                          bgcolor: selectedThread.marketplaceId === 'EBAY_US' ? '#e3f2fd' : '#fff3e0',
-                          color: selectedThread.marketplaceId === 'EBAY_US' ? '#1565c0' : '#e65100',
+                          bgcolor: BRAND_YELLOW + '22',
+                          color: BRAND_DARK,
                         }}
                       />
                     )}
@@ -1606,7 +1705,7 @@ export default function BuyerChatPage() {
                 flex: 1,
                 p: { xs: 1.5, md: 2 },
                 overflowY: 'auto',
-                bgcolor: '#f0f2f5'
+                bgcolor: dashboardSignatureTokens.tones.neutral.background
               }}>
                 {loadingMessages ? (
                   <Box display="flex" justifyContent="center" mt={4}><CircularProgress /></Box>
@@ -1628,8 +1727,10 @@ export default function BuyerChatPage() {
                           elevation={1}
                           sx={{
                             p: { xs: 1, md: 1.5 },
-                            bgcolor: msg.sender === 'SELLER' ? '#1976d2' : '#ffffff',
-                            color: msg.sender === 'SELLER' ? '#fff' : 'text.primary',
+                            bgcolor: msg.sender === 'SELLER' ? '#fef9e7' : 'background.paper',
+                            color: msg.sender === 'SELLER' ? BRAND_DARK : 'text.primary',
+                            border: msg.sender === 'SELLER' ? `1px solid ${BRAND_YELLOW}` : '1px solid',
+                            borderColor: msg.sender === 'SELLER' ? BRAND_YELLOW : 'divider',
                             borderRadius: 2,
                             position: 'relative'
                           }}
@@ -1691,9 +1792,9 @@ export default function BuyerChatPage() {
 
               <Box sx={{
                 p: { xs: 1.5, md: 2 },
-                borderTop: 1,
+                borderTop: '1px solid',
                 borderColor: 'divider',
-                bgcolor: '#fff',
+                bgcolor: 'background.paper',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 1
@@ -1757,6 +1858,7 @@ export default function BuyerChatPage() {
                       <Button
                         variant="contained"
                         sx={{
+                          ...yellowFilledButtonSx,
                           px: { xs: 2, md: 3 },
                           alignSelf: 'flex-end',
                           mb: 0.5,
@@ -1774,7 +1876,7 @@ export default function BuyerChatPage() {
               </Box>
             </>
           ) : (
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', bgcolor: '#fafafa' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', bgcolor: 'background.default' }}>
               <Stack alignItems="center" spacing={1}>
                 <QuestionAnswerIcon sx={{ fontSize: { xs: 40, md: 60 }, color: 'text.secondary', opacity: 0.2 }} />
                 <Typography color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
@@ -1784,7 +1886,7 @@ export default function BuyerChatPage() {
                   <Button
                     variant="contained"
                     onClick={() => setSidebarOpen(true)}
-                    sx={{ mt: 1 }}
+                    sx={{ ...yellowFilledButtonSx, mt: 1 }}
                     startIcon={<MenuIcon />}
                   >
                     View Conversations

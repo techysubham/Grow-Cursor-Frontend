@@ -28,91 +28,12 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import api from '../../lib/api';
 import OrderAnalyticsSkeleton from '../../components/skeletons/OrderAnalyticsSkeleton';
 import { dashboardSignatureTokens } from '../../theme/appTheme';
-
-const tableHeaderCellSx = {
-  backgroundColor: dashboardSignatureTokens.table.headerBackground,
-  color: dashboardSignatureTokens.table.headerForeground,
-  fontWeight: 700,
-  py: 1.75,
-  whiteSpace: 'nowrap',
-  borderBottom: 'none'
-};
-
-const tableBodyCellSx = {
-  py: 1.4,
-  px: 1.5,
-  borderBottom: `1px solid ${dashboardSignatureTokens.table.rowBorder}`,
-  whiteSpace: 'nowrap'
-};
-
-function SummaryCard({ label, value, tone = 'neutral' }) {
-  const palette = dashboardSignatureTokens.tones[tone] || dashboardSignatureTokens.tones.neutral;
-
-  return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 2,
-        borderRadius: `${dashboardSignatureTokens.radius.card}px`,
-        borderColor: palette.border,
-        background: dashboardSignatureTokens.surfaces.metricCard,
-        minHeight: 108,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between'
-      }}
-    >
-      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-        {label}
-      </Typography>
-      <Box
-        sx={{
-          mt: 1.5,
-          width: 'fit-content',
-          px: 1.25,
-          py: 0.5,
-          borderRadius: `${dashboardSignatureTokens.radius.pill}px`,
-          backgroundColor: palette.background,
-          border: '1px solid',
-          borderColor: palette.border,
-          color: palette.color
-        }}
-      >
-        <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
-          {value}
-        </Typography>
-      </Box>
-    </Paper>
-  );
-}
-
-function MetricPill({ value, tone = 'neutral', minWidth = 42 }) {
-  const palette = dashboardSignatureTokens.tones[tone] || dashboardSignatureTokens.tones.neutral;
-
-  return (
-    <Box
-      component="span"
-      sx={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minWidth,
-        px: 1.1,
-        py: 0.45,
-        borderRadius: `${dashboardSignatureTokens.radius.pill}px`,
-        border: '1px solid',
-        borderColor: palette.border,
-        backgroundColor: palette.background,
-        color: palette.color,
-        fontWeight: 700,
-        fontSize: '0.8125rem',
-        lineHeight: 1
-      }}
-    >
-      {value}
-    </Box>
-  );
-}
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
+import StatMetricCard from '../../components/StatMetricCard.jsx';
+import StatusChip from '../../components/StatusChip.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyCellSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 function getMarketplaceTone(value, marketplaceKey) {
   if (marketplaceKey === 'total') return value > 0 ? 'info' : 'neutral';
@@ -135,7 +56,6 @@ export default function OrderAnalyticsPage() {
   const [sellers, setSellers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [pollResults, setPollResults] = useState(null);
 
   // Filter states - Date filter defaults to single mode with today's date
   const [draftDateFilter, setDraftDateFilter] = useState(initialDateFilter);
@@ -143,7 +63,8 @@ export default function OrderAnalyticsPage() {
   const [selectedSeller, setSelectedSeller] = useState('');
   const [draftMarketplace, setDraftMarketplace] = useState('');
   const [appliedMarketplace, setAppliedMarketplace] = useState('');
-  const [excludeLowValue, setExcludeLowValue] = useState(false);
+  const [excludeClient, setExcludeClient] = useState(true);
+  const [excludeLowValue, setExcludeLowValue] = useState(true);
 
   // Summary statistics - only count
   const [totalOrders, setTotalOrders] = useState(0);
@@ -155,7 +76,7 @@ export default function OrderAnalyticsPage() {
   // Auto-fetch when applied filters change
   useEffect(() => {
     fetchStatistics();
-  }, [appliedDateFilter, selectedSeller, appliedMarketplace, excludeLowValue]);
+  }, [appliedDateFilter, selectedSeller, appliedMarketplace, excludeClient, excludeLowValue]);
 
   const fetchSellers = async () => {
     try {
@@ -184,6 +105,7 @@ export default function OrderAnalyticsPage() {
 
       if (selectedSeller) params.sellerId = selectedSeller;
       if (appliedMarketplace) params.marketplace = appliedMarketplace;
+      params.excludeClient = excludeClient;
       params.excludeLowValue = excludeLowValue;
 
       const statsResponse = await api.get('/orders/daily-statistics', { params });
@@ -208,28 +130,6 @@ export default function OrderAnalyticsPage() {
   const handleApplyFilters = () => {
     setAppliedDateFilter(draftDateFilter);
     setAppliedMarketplace(draftMarketplace);
-  };
-
-  // Poll for NEW orders (like FulfillmentDashboard)
-  const pollNewOrders = async () => {
-    setLoading(true);
-    setError('');
-    setPollResults(null);
-    try {
-      const { data } = await api.post('/ebay/poll-all-sellers');
-      setPollResults(data || null);
-
-      // Refresh statistics after polling
-      await fetchStatistics();
-
-      if (data && data.totalNewOrders > 0) {
-        console.log(`✅ Polled ${data.totalNewOrders} new orders`);
-      }
-    } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to poll orders');
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Transform statistics into table format
@@ -373,40 +273,24 @@ export default function OrderAnalyticsPage() {
 
   return (
     <Fade in timeout={600}>
-      <Box sx={{ p: 3 }}>
-        <Paper
+      <AdminPageShell>
+        <SectionCard
           sx={{
             p: { xs: 2, md: 3 },
             mb: 3,
-            borderRadius: `${dashboardSignatureTokens.radius.card}px`,
-            border: '1px solid',
-            borderColor: 'divider',
             background: dashboardSignatureTokens.surfaces.pageCard,
-            boxShadow: dashboardSignatureTokens.shadows.card
           }}
         >
           <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', lg: 'center' }} gap={2.5}>
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.6rem', md: '1.9rem' } }}>
-                Order Analytics
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                Daily seller and marketplace order totals in PST, including cancelled orders for full visibility.
-              </Typography>
+              <PageHeader
+                title="Order Analytics"
+                subtitle="Daily seller and marketplace order totals in PST, including cancelled orders for full visibility."
+                sx={{ pt: 0, pb: 0 }}
+              />
             </Box>
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', lg: 'auto' } }}>
-              <Button
-                variant="contained"
-                color="primary"
-                size="small"
-                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartIcon />}
-                onClick={pollNewOrders}
-                disabled={loading}
-                sx={{ minWidth: 170, height: 40, boxSizing: 'border-box' }}
-              >
-                {loading ? 'Polling...' : 'Poll New Orders'}
-              </Button>
               <Chip
                 icon={<ShoppingCartIcon />}
                 label={`${totalOrders} Total Orders`}
@@ -525,6 +409,22 @@ export default function OrderAnalyticsPage() {
               <FormControlLabel
                 control={
                   <Switch
+                    checked={excludeClient}
+                    onChange={(e) => setExcludeClient(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                    Exclude Client
+                  </Typography>
+                }
+                sx={{ m: 0, px: 1.5, minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, boxSizing: 'border-box' }}
+              />
+
+              <FormControlLabel
+                control={
+                  <Switch
                     checked={excludeLowValue}
                     onChange={(e) => setExcludeLowValue(e.target.checked)}
                     color="primary"
@@ -546,23 +446,21 @@ export default function OrderAnalyticsPage() {
             >
               <Button
                 variant="contained"
-                color="secondary"
                 size="small"
                 onClick={handleApplyFilters}
                 disabled={loading || !hasPendingFilterChanges}
-                sx={{ height: 40, boxSizing: 'border-box' }}
+                sx={{ ...yellowFilledButtonSx, height: 40 }}
               >
                 Apply Filters
               </Button>
 
               <Button
                 variant="outlined"
-                color="primary"
                 size="small"
                 startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
                 onClick={handleRefresh}
                 disabled={loading}
-                sx={{ height: 40, boxSizing: 'border-box' }}
+                sx={{ ...yellowOutlinedButtonSx, height: 40 }}
               >
                 Refresh
               </Button>
@@ -579,11 +477,11 @@ export default function OrderAnalyticsPage() {
               }}
             >
               {summaryCards.map((card) => (
-                <SummaryCard key={card.label} label={card.label} value={card.value} tone={card.tone} />
+                <StatMetricCard key={card.label} label={card.label} value={card.value} tone={card.tone} />
               ))}
             </Box>
           )}
-        </Paper>
+        </SectionCard>
 
         {/* Error Alert */}
         {error && (
@@ -786,19 +684,19 @@ export default function OrderAnalyticsPage() {
                                     borderColor: dashboardSignatureTokens.table.rowBorder
                                   }}
                                 >
-                                  <MetricPill value={data.total || '-'} tone={getMarketplaceTone(data.total, 'total')} minWidth={50} />
+                                  <StatusChip label={data.total || '-'} tone={getMarketplaceTone(data.total, 'total')} sx={{ minWidth: 50 }} />
                                 </TableCell>
                                 <TableCell align="center" sx={tableBodyCellSx}>
-                                  <MetricPill value={data.EBAY_US || '-'} tone={getMarketplaceTone(data.EBAY_US, 'EBAY_US')} />
+                                  <StatusChip label={data.EBAY_US || '-'} tone={getMarketplaceTone(data.EBAY_US, 'EBAY_US')} />
                                 </TableCell>
                                 <TableCell align="center" sx={tableBodyCellSx}>
-                                  <MetricPill value={data.EBAY_AU || '-'} tone={getMarketplaceTone(data.EBAY_AU, 'EBAY_AU')} />
+                                  <StatusChip label={data.EBAY_AU || '-'} tone={getMarketplaceTone(data.EBAY_AU, 'EBAY_AU')} />
                                 </TableCell>
                                 <TableCell align="center" sx={tableBodyCellSx}>
-                                  <MetricPill value={data.EBAY_CA || '-'} tone={getMarketplaceTone(data.EBAY_CA, 'EBAY_CA')} />
+                                  <StatusChip label={data.EBAY_CA || '-'} tone={getMarketplaceTone(data.EBAY_CA, 'EBAY_CA')} />
                                 </TableCell>
                                 <TableCell align="center" sx={tableBodyCellSx}>
-                                  <MetricPill value={data.EBAY_GB || '-'} tone={getMarketplaceTone(data.EBAY_GB, 'EBAY_GB')} />
+                                  <StatusChip label={data.EBAY_GB || '-'} tone={getMarketplaceTone(data.EBAY_GB, 'EBAY_GB')} />
                                 </TableCell>
                               </React.Fragment>
                             );
@@ -838,19 +736,19 @@ export default function OrderAnalyticsPage() {
                                   bgcolor: 'grey.200'
                                 }}
                               >
-                                <MetricPill value={sellerTotal || '-'} tone={getMarketplaceTone(sellerTotal, 'total')} minWidth={50} />
+                                <StatusChip label={sellerTotal || '-'} tone={getMarketplaceTone(sellerTotal, 'total')} sx={{ minWidth: 50 }} />
                               </TableCell>
                               <TableCell align="center" sx={tableBodyCellSx}>
-                                <MetricPill value={usTotal || '-'} tone={getMarketplaceTone(usTotal, 'EBAY_US')} />
+                                <StatusChip label={usTotal || '-'} tone={getMarketplaceTone(usTotal, 'EBAY_US')} />
                               </TableCell>
                               <TableCell align="center" sx={tableBodyCellSx}>
-                                <MetricPill value={auTotal || '-'} tone={getMarketplaceTone(auTotal, 'EBAY_AU')} />
+                                <StatusChip label={auTotal || '-'} tone={getMarketplaceTone(auTotal, 'EBAY_AU')} />
                               </TableCell>
                               <TableCell align="center" sx={tableBodyCellSx}>
-                                <MetricPill value={caTotal || '-'} tone={getMarketplaceTone(caTotal, 'EBAY_CA')} />
+                                <StatusChip label={caTotal || '-'} tone={getMarketplaceTone(caTotal, 'EBAY_CA')} />
                               </TableCell>
                               <TableCell align="center" sx={tableBodyCellSx}>
-                                <MetricPill value={gbTotal || '-'} tone={getMarketplaceTone(gbTotal, 'EBAY_GB')} />
+                                <StatusChip label={gbTotal || '-'} tone={getMarketplaceTone(gbTotal, 'EBAY_GB')} />
                               </TableCell>
                             </React.Fragment>
                           );
@@ -864,18 +762,7 @@ export default function OrderAnalyticsPage() {
           </TableContainer>
         )}
 
-        {/* Poll Results Display */}
-        {pollResults && pollResults.totalNewOrders > 0 && (
-          <Alert severity="success" sx={{ mt: 2 }} onClose={() => setPollResults(null)}>
-            <Typography variant="subtitle2" fontWeight="bold">
-              ✅ Successfully polled {pollResults.totalNewOrders} new order{pollResults.totalNewOrders !== 1 ? 's' : ''}!
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 0.5 }}>
-              Statistics have been refreshed with the latest data.
-            </Typography>
-          </Alert>
-        )}
-      </Box>
+      </AdminPageShell>
     </Fade>
   );
 }

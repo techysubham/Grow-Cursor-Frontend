@@ -29,9 +29,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PendingIcon from '@mui/icons-material/Pending';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import api from '../../lib/api.js';
 
 export default function LeaveAdminPage() {
     const [leaves, setLeaves] = useState([]);
@@ -53,10 +51,7 @@ export default function LeaveAdminPage() {
     const fetchLeaves = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('auth_token');
-            const res = await axios.get(`${API_URL}/leaves/admin`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get('/leaves/admin');
             setLeaves(res.data);
 
             // Extract unique departments
@@ -91,14 +86,12 @@ export default function LeaveAdminPage() {
 
         setSubmitting(true);
         try {
-            const token = localStorage.getItem('auth_token');
-            await axios.put(
-                `${API_URL}/leaves/${selectedLeave._id}/status`,
+            await api.put(
+                `/leaves/${selectedLeave._id}/status`,
                 {
                     status: actionType === 'approve' ? 'approved' : 'rejected',
                     rejectionReason: actionType === 'reject' ? rejectionReason : undefined
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
+                }
             );
 
             showSnackbar(

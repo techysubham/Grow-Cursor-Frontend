@@ -5,11 +5,13 @@ import {
     Chip,
     CircularProgress,
     FormControl,
+    FormControlLabel,
     InputLabel,
     MenuItem,
     Paper,
     Select,
     Stack,
+    Switch,
     Table,
     TableBody,
     TableCell,
@@ -20,101 +22,13 @@ import {
     Typography
 } from '@mui/material';
 import api from '../../lib/api';
-
-const pillTones = {
-    neutral: { background: 'rgba(15, 23, 42, 0.05)', border: 'rgba(15, 23, 42, 0.08)', color: '#0f172a' },
-    info: { background: 'rgba(2, 132, 199, 0.12)', border: 'rgba(2, 132, 199, 0.18)', color: '#075985' },
-    success: { background: 'rgba(22, 163, 74, 0.12)', border: 'rgba(22, 163, 74, 0.18)', color: '#166534' },
-    warning: { background: 'rgba(245, 158, 11, 0.14)', border: 'rgba(245, 158, 11, 0.2)', color: '#92400e' },
-    danger: { background: 'rgba(220, 38, 38, 0.1)', border: 'rgba(220, 38, 38, 0.15)', color: '#b91c1c' },
-    amazon: { background: 'rgba(249, 115, 22, 0.12)', border: 'rgba(249, 115, 22, 0.18)', color: '#9a3412' },
-    shipping: { background: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.18)', color: '#1d4ed8' }
-};
-
-const tableHeaderCellSx = {
-    backgroundColor: '#123b63',
-    color: '#ffffff',
-    fontWeight: 700,
-    py: 1.75,
-    whiteSpace: 'nowrap',
-    borderBottom: 'none'
-};
-
-const tableBodyCellSx = {
-    py: 1.5,
-    px: 2,
-    borderBottom: '1px solid rgba(15, 23, 42, 0.08)',
-    whiteSpace: 'nowrap'
-};
-
-function SummaryCard({ label, value, tone = 'neutral' }) {
-    const palette = pillTones[tone] || pillTones.neutral;
-
-    return (
-        <Paper
-            variant="outlined"
-            sx={{
-                p: 2,
-                borderRadius: 3,
-                borderColor: palette.border,
-                background: 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,252,0.92) 100%)',
-                minHeight: 108,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between'
-            }}
-        >
-            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                {label}
-            </Typography>
-            <Box
-                sx={{
-                    mt: 1.5,
-                    width: 'fit-content',
-                    px: 1.25,
-                    py: 0.5,
-                    borderRadius: 999,
-                    backgroundColor: palette.background,
-                    border: '1px solid',
-                    borderColor: palette.border,
-                    color: palette.color
-                }}
-            >
-                <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
-                    {value}
-                </Typography>
-            </Box>
-        </Paper>
-    );
-}
-
-function MetricPill({ value, tone = 'neutral' }) {
-    const palette = pillTones[tone] || pillTones.neutral;
-
-    return (
-        <Box
-            component="span"
-            sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 46,
-                px: 1.2,
-                py: 0.5,
-                borderRadius: 999,
-                border: '1px solid',
-                borderColor: palette.border,
-                backgroundColor: palette.background,
-                color: palette.color,
-                fontWeight: 700,
-                fontSize: '0.875rem',
-                lineHeight: 1
-            }}
-        >
-            {value}
-        </Box>
-    );
-}
+import { dashboardSignatureTokens } from '../../theme/appTheme';
+import AdminPageShell from '../../components/AdminPageShell.jsx';
+import SectionCard from '../../components/SectionCard.jsx';
+import StatMetricCard from '../../components/StatMetricCard.jsx';
+import StatusChip from '../../components/StatusChip.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
+import { tableHeaderCellSx, tableBodyCellSx, tableBodyRowSx, tableContainerSx } from '../../theme/tableStyles.js';
 
 function getMetricTone(value, type) {
     if (type === 'amazon') return value > 0 ? 'amazon' : 'neutral';
@@ -147,12 +61,13 @@ export default function AwaitingSheetPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [marketplace, setMarketplace] = useState('');
+    const [excludeClient, setExcludeClient] = useState(true);
 
     useEffect(() => {
         if (date) {
             fetchSummary();
         }
-    }, [date, marketplace]);
+    }, [date, marketplace, excludeClient]);
 
     async function fetchSummary() {
         setLoading(true);
@@ -160,6 +75,7 @@ export default function AwaitingSheetPage() {
         try {
             const params = { date };
             if (marketplace) params.marketplace = marketplace;
+            params.excludeClient = excludeClient;
             const { data: result } = await api.get('/ebay/awaiting-sheet-summary', {
                 params
             });
@@ -192,26 +108,20 @@ export default function AwaitingSheetPage() {
     }, [data]);
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Paper
+        <AdminPageShell>
+            <SectionCard
                 sx={{
                     p: { xs: 2, md: 3 },
                     mb: 3,
-                    borderRadius: 4,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)',
-                    boxShadow: '0 14px 36px rgba(15, 23, 42, 0.06)'
                 }}
             >
                 <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', lg: 'center' }} gap={2.5}>
                     <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.6rem', md: '1.9rem' } }}>
-                            Awaiting Sheet
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                            Ship-by summary grouped by store, with cleaner status cues and easier scanability.
-                        </Typography>
+                        <PageHeader
+                            title="Awaiting Sheet"
+                            subtitle="Ship-by summary grouped by store, with cleaner status cues and easier scanability."
+                            sx={{ pt: 0, pb: 0 }}
+                        />
                     </Box>
 
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', lg: 'auto' } }}>
@@ -238,6 +148,17 @@ export default function AwaitingSheetPage() {
                                 <MenuItem value="EBAY_GB">EBAY_GB</MenuItem>
                             </Select>
                         </FormControl>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={excludeClient}
+                                    onChange={(e) => setExcludeClient(e.target.checked)}
+                                    color="primary"
+                                />
+                            }
+                            label="Exclude Client"
+                            sx={{ m: 0, px: 1.5, minHeight: 40, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+                        />
                     </Stack>
                 </Stack>
 
@@ -251,7 +172,7 @@ export default function AwaitingSheetPage() {
                         }}
                     >
                         {summaryCards.map((card) => (
-                            <SummaryCard
+                            <StatMetricCard
                                 key={card.label}
                                 label={card.label}
                                 value={card.value}
@@ -260,7 +181,7 @@ export default function AwaitingSheetPage() {
                         ))}
                     </Box>
                 )}
-            </Paper>
+            </SectionCard>
 
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
@@ -275,13 +196,7 @@ export default function AwaitingSheetPage() {
             ) : data && data.summary.length > 0 ? (
                 <TableContainer
                     component={Paper}
-                    sx={{
-                        borderRadius: 4,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        boxShadow: '0 18px 40px rgba(15, 23, 42, 0.06)',
-                        overflow: 'hidden'
-                    }}
+                    sx={tableContainerSx}
                 >
                     <Table stickyHeader size="small" sx={{ minWidth: 1280 }}>
                         <TableHead>
@@ -310,18 +225,7 @@ export default function AwaitingSheetPage() {
                                     <TableRow
                                         key={row.sellerId}
                                         hover
-                                        sx={{
-                                            transition: 'background-color 0.2s ease',
-                                            '&:nth-of-type(odd)': {
-                                                backgroundColor: 'rgba(248, 250, 252, 0.7)'
-                                            },
-                                            '&:hover': {
-                                                backgroundColor: 'rgba(37, 99, 235, 0.04)'
-                                            },
-                                            '&:last-child td': {
-                                                borderBottom: 'none'
-                                            }
-                                        }}
+                                        sx={tableBodyRowSx}
                                     >
                                         <TableCell sx={tableBodyCellSx} align="center">
                                             <Box
@@ -333,8 +237,8 @@ export default function AwaitingSheetPage() {
                                                     minWidth: 32,
                                                     height: 32,
                                                     borderRadius: '50%',
-                                                    backgroundColor: 'rgba(18, 59, 99, 0.08)',
-                                                    color: '#123b63',
+                                                    backgroundColor: dashboardSignatureTokens.table.indexBadgeBackground,
+                                                    color: dashboardSignatureTokens.table.indexBadgeForeground,
                                                     fontWeight: 700,
                                                     fontSize: '0.875rem'
                                                 }}
@@ -351,34 +255,34 @@ export default function AwaitingSheetPage() {
                                             </Typography>
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={row.uploadTrackingCount} tone={getMetricTone(row.uploadTrackingCount, 'uploadTracking')} />
+                                            <StatusChip label={row.uploadTrackingCount} tone={getMetricTone(row.uploadTrackingCount, 'uploadTracking')} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={row.trackingIdCount} tone={getMetricTone(row.trackingIdCount, 'trackingLeft')} />
+                                            <StatusChip label={row.trackingIdCount} tone={getMetricTone(row.trackingIdCount, 'trackingLeft')} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={uploadedCount} tone={uploadedCount > 0 ? 'success' : 'neutral'} />
+                                            <StatusChip label={uploadedCount} tone={uploadedCount > 0 ? 'success' : 'neutral'} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={row.deliveredCount} tone={getMetricTone(row.deliveredCount, 'delivered')} />
+                                            <StatusChip label={row.deliveredCount} tone={getMetricTone(row.deliveredCount, 'delivered')} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={row.inTransitCount} tone={getMetricTone(row.inTransitCount, 'inTransit')} />
+                                            <StatusChip label={row.inTransitCount} tone={getMetricTone(row.inTransitCount, 'inTransit')} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={row.notYetShippedCount} tone={getMetricTone(row.notYetShippedCount, 'notYetShipped')} />
+                                            <StatusChip label={row.notYetShippedCount} tone={getMetricTone(row.notYetShippedCount, 'notYetShipped')} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={row.alreadyInUseCount} tone={getMetricTone(row.alreadyInUseCount, 'alreadyInUse')} />
+                                            <StatusChip label={row.alreadyInUseCount} tone={getMetricTone(row.alreadyInUseCount, 'alreadyInUse')} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={row.amazonCount} tone={getMetricTone(row.amazonCount, 'amazon')} />
+                                            <StatusChip label={row.amazonCount} tone={getMetricTone(row.amazonCount, 'amazon')} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={row.upsUspsCount} tone={getMetricTone(row.upsUspsCount, 'upsUsps')} />
+                                            <StatusChip label={row.upsUspsCount} tone={getMetricTone(row.upsUspsCount, 'upsUsps')} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
-                                            <MetricPill value={row.blankCount} tone={getMetricTone(row.blankCount, 'blank')} />
+                                            <StatusChip label={row.blankCount} tone={getMetricTone(row.blankCount, 'blank')} />
                                         </TableCell>
                                         <TableCell sx={tableBodyCellSx} align="center">
                                             <Chip
@@ -396,24 +300,15 @@ export default function AwaitingSheetPage() {
                     </Table>
                 </TableContainer>
             ) : data && data.summary.length === 0 ? (
-                <Paper
-                    sx={{
-                        p: 5,
-                        textAlign: 'center',
-                        borderRadius: 4,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        background: 'linear-gradient(180deg, #ffffff 0%, #fafcff 100%)'
-                    }}
-                >
+                <SectionCard sx={{ p: 5, textAlign: 'center' }}>
                     <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
                         No orders found
                     </Typography>
                     <Typography color="text.secondary">
                         There are no awaiting-sheet rows for the selected ship-by date and marketplace.
                     </Typography>
-                </Paper>
+                </SectionCard>
             ) : null}
-        </Box>
+        </AdminPageShell>
     );
 }
