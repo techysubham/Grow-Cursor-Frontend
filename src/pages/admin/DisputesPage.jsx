@@ -157,7 +157,7 @@ export default function DisputesPage({ initialTab = 0 }) {
     { id: 'status', label: 'Status' },
     { id: 'claimAmount', label: 'Claim Amount' },
     { id: 'created', label: 'Created (PST)' },
-    { id: 'responseDue', label: 'Response Due (PST)' },
+    { id: 'responseDue', label: 'Resolve By (PST)' },
     { id: 'logs', label: 'Logs' },
     { id: 'chat', label: 'Chat' },
   ];
@@ -489,6 +489,13 @@ export default function DisputesPage({ initialTab = 0 }) {
     return 'default';
   };
 
+  // eBay's respondByDate (stored pre-fix in sellerResponseDueDate) is the deadline for
+  // whoever acts next — for WAITING_BUYER_RESPONSE cases it's the BUYER's deadline, not
+  // the seller's. Only trust it as "resolve by" while it's the seller's turn; otherwise
+  // require the fixed caseDeadline synced from eBay's single-case API.
+  const isSellerTurn = (c) => ['OPEN', 'WAITING_SELLER_RESPONSE'].includes(c.status);
+  const getResolveByDate = (c) => c.caseDeadline || (isSellerTurn(c) ? c.sellerResponseDueDate : null);
+
   // Check if response due date is within next 2 days (urgent)
   const isResponseUrgent = (responseDate) => {
     if (!responseDate) return false;
@@ -586,7 +593,9 @@ export default function DisputesPage({ initialTab = 0 }) {
       'Status': 'status',
       'Claim Amount': (c) => c.claimAmount?.value ? `${c.claimAmount.currency || 'USD'} ${c.claimAmount.value}` : '',
       'Created Date': (c) => csvText(formatDate(c.creationDate)),
-      'Response Due': (c) => csvText(formatDate(c.sellerResponseDueDate)),
+      'Resolve By': (c) => csvText(formatDate(getResolveByDate(c))),
+      'Next Action By': (c) => c.nextActionBy || (c.status === 'WAITING_BUYER_RESPONSE' ? 'BUYER' : ''),
+      'Next Action Due': (c) => csvText(formatDate(c.nextActionDue)),
       'Logs': 'logs',
     });
     downloadCSV(csvData, 'INR_Cases');
@@ -813,9 +822,12 @@ export default function DisputesPage({ initialTab = 0 }) {
                 >
                   <MenuItem value="">All Statuses</MenuItem>
                   <MenuItem value="OPEN">Open</MenuItem>
-                  <MenuItem value="ON_HOLD">On Hold</MenuItem>
-                  <MenuItem value="WAITING_FOR_SELLER">Waiting for Seller</MenuItem>
+                  <MenuItem value="WAITING_SELLER_RESPONSE">Waiting for Seller</MenuItem>
+                  <MenuItem value="WAITING_BUYER_RESPONSE">Waiting for Buyer</MenuItem>
                   <MenuItem value="CLOSED">Closed</MenuItem>
+                  <MenuItem value="CS_CLOSED">Closed by eBay Support</MenuItem>
+                  <MenuItem value="CLOSED_WITH_ESCALATION">Closed with Escalation</MenuItem>
+                  <MenuItem value="OTHER">Other</MenuItem>
                 </Select>
               </FormControl>
 
@@ -885,7 +897,7 @@ export default function DisputesPage({ initialTab = 0 }) {
                     {inrVisibleColumns.includes('status') && <TableCell sx={tableHeaderCellSx}>Status</TableCell>}
                     {inrVisibleColumns.includes('claimAmount') && <TableCell sx={tableHeaderCellSx}>Claim Amount</TableCell>}
                     {inrVisibleColumns.includes('created') && <TableCell sx={tableHeaderCellSx}>Created (PST)</TableCell>}
-                    {inrVisibleColumns.includes('responseDue') && <TableCell sx={tableHeaderCellSx}>Response Due (PST)</TableCell>}
+                    {inrVisibleColumns.includes('responseDue') && <TableCell sx={tableHeaderCellSx}>Resolve By (PST)</TableCell>}
                     {inrVisibleColumns.includes('logs') && <TableCell sx={tableHeaderCellSx}>Logs</TableCell>}
                     {inrVisibleColumns.includes('chat') && <TableCell align="center" sx={tableHeaderCellSx}>Chat</TableCell>}
                   </TableRow>
@@ -970,19 +982,30 @@ export default function DisputesPage({ initialTab = 0 }) {
                             <Typography
                               variant="body2"
                               fontSize="0.75rem"
-                              color={c.status !== 'CLOSED' && isResponseUrgent(c.sellerResponseDueDate) ? 'error' : 'inherit'}
-                              fontWeight={c.status !== 'CLOSED' && isResponseUrgent(c.sellerResponseDueDate) ? 'bold' : 'normal'}
+                              color={c.status !== 'CLOSED' && isSellerTurn(c) && isResponseUrgent(getResolveByDate(c)) ? 'error' : 'inherit'}
+                              fontWeight={c.status !== 'CLOSED' && isSellerTurn(c) && isResponseUrgent(getResolveByDate(c)) ? 'bold' : 'normal'}
                             >
-                              {formatDate(c.sellerResponseDueDate)}
+                              {formatDate(getResolveByDate(c))}
                             </Typography>
-                            {/* Only show urgent badge if case is NOT closed */}
-                            {c.status !== 'CLOSED' && !isResponseOverdue(c.sellerResponseDueDate) && isResponseUrgent(c.sellerResponseDueDate) && (
+                            {/* Urgent only applies while the seller must act and the case is open */}
+                            {c.status !== 'CLOSED' && isSellerTurn(c) && !isResponseOverdue(getResolveByDate(c)) && isResponseUrgent(getResolveByDate(c)) && (
                               <Chip
                                 label="URGENT"
                                 color="error"
                                 size="small"
                                 sx={{ fontSize: '0.6rem', height: 18 }}
                               />
+                            )}
+                            {c.status === 'WAITING_BUYER_RESPONSE' && (
+                              <Tooltip title={c.nextActionDue ? `Buyer has until ${formatDate(c.nextActionDue)} to respond` : 'Waiting on the buyer to respond'}>
+                                <Chip
+                                  label="BUYER'S TURN"
+                                  color="info"
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.6rem', height: 18 }}
+                                />
+                              </Tooltip>
                             )}
                           </Stack>
                         </TableCell>}

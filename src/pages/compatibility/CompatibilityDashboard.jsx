@@ -141,6 +141,7 @@ export default function CompatibilityDashboard() {
   const [trimFilterKeyword, setTrimFilterKeyword] = useState('');
   const [aiSuggestedTrims, setAiSuggestedTrims] = useState([]);
   const [aiExcludedTrims, setAiExcludedTrims] = useState([]);
+  const [aiAllFitments, setAiAllFitments] = useState([]); // all fitments from AI Suggest (multi make/model/year)
 
   // BULK AI SUGGEST STATE
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -608,20 +609,14 @@ export default function CompatibilityDashboard() {
     finally { setLoadingTrims(false); }
   };
 
-  // --- AI SUGGEST FITMENT ---
-  const handleAiSuggest = async () => {
+  // Load one AI fitment (make/model/year range + trim hints) into the vehicle picker.
+  // Used by "AI Suggest" (best fitment) and by the per-fitment chips so the lister can
+  // add EVERY make/model/year the AI found, one after another.
+  const applyFitmentToPicker = async (data) => {
     if (!selectedItem) return;
     setAiLoading(true);
     setLoadingModels(true);
     try {
-      const { data } = await api.post('/ai/suggest-fitment', {
-        title: selectedItem.title || '',
-        description: selectedItem.descriptionPreview || ''
-      });
-      if (!data.make) {
-        showSnackbar('AI could not extract fitment info from this listing', 'warning');
-        return;
-      }
       // Step 1: Resolve Make alias (Chevy→Chevrolet etc.) then fetch models
       const resolvedMake = resolveMake(data.make);
       const resolvedModelStep1 = resolveModel(resolvedMake, data.model); // Apply model normalization
@@ -700,6 +695,28 @@ export default function CompatibilityDashboard() {
     } finally {
       setLoadingModels(false);
       setAiLoading(false);
+    }
+  };
+
+  // --- AI SUGGEST FITMENT ---
+  const handleAiSuggest = async () => {
+    if (!selectedItem) return;
+    setAiLoading(true);
+    try {
+      const { data } = await api.post('/ai/suggest-fitment', {
+        title: selectedItem.title || '',
+        description: selectedItem.descriptionPreview || ''
+      });
+      if (!data.make) {
+        showSnackbar('AI could not extract fitment info from this listing', 'warning');
+        setAiLoading(false);
+        return;
+      }
+      setAiAllFitments((data.allFitments || []).filter(f => f?.make && f?.model));
+      await applyFitmentToPicker(data);
+    } catch (e) {
+      setAiLoading(false);
+      showSnackbar('AI suggestion failed: ' + (e.response?.data?.error || e.message), 'error');
     }
   };
   // --- BULK AI SUGGEST ---
@@ -1203,6 +1220,7 @@ export default function CompatibilityDashboard() {
       setAiSuggestedTrims([]);
       setAiExcludedTrims([]);
     }
+    setAiAllFitments([]);
   };
 
   // Helper to create a unique key for a trim+engine entry
@@ -1410,6 +1428,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       setTrimFilterKeyword('');
       setAiSuggestedTrims([]);
       setAiExcludedTrims([]);
+      setAiAllFitments([]);
     } else if (page > 1) {
       // Load previous page and open last item
       setPendingNavigation('last');
@@ -1435,6 +1454,7 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
       setTrimFilterKeyword('');
       setAiSuggestedTrims([]);
       setAiExcludedTrims([]);
+      setAiAllFitments([]);
     } else if (page < totalPages) {
       // Load next page and open first item
       setPendingNavigation('first');
@@ -1997,6 +2017,26 @@ Resets in: ${rateLimitInfo.hoursUntilReset} hour${rateLimitInfo.hoursUntilReset 
                 Auto-fills Make, Model &amp; Year range from listing title/description
               </Typography>
             </Box>
+
+            {/* All make/model/year fitments the AI found — click one to load it, then Add Vehicle */}
+            {aiAllFitments.length > 1 && (
+              <Box sx={{ mb: 1.5, display: 'flex', flexWrap: 'wrap', gap: 0.5, p: 0.75, bgcolor: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 1 }}>
+                <Typography variant="caption" sx={{ width: '100%', color: '#7c3aed', fontWeight: 700 }}>
+                  AI found {aiAllFitments.length} vehicles — click each to load it into the picker, then press "Add Vehicle":
+                </Typography>
+                {aiAllFitments.map((f, i) => (
+                  <Chip
+                    key={i}
+                    size="small"
+                    clickable
+                    disabled={aiLoading}
+                    onClick={() => applyFitmentToPicker(f)}
+                    label={`${f.make} ${f.model}${f.startYear ? ` ${f.startYear}–${f.endYear}` : ''}`}
+                    sx={{ bgcolor: '#ede9fe', color: '#5b21b6', fontWeight: 600, '&:hover': { bgcolor: '#ddd6fe' } }}
+                  />
+                ))}
+              </Box>
+            )}
 
             <Grid container spacing={2} alignItems="flex-start" sx={{ mb: 2 }}>
               {/* MAKE */}

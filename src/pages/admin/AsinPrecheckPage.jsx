@@ -240,7 +240,9 @@ export default function AsinPrecheckPage() {
     return sourceRows.filter(row => {
       if (hideExcluded && row.intent === 'excluded') return false;
       if (hasIncludedRows && row.intent !== 'included') return false;
-      if (keyword && !String(row.title || '').toLowerCase().includes(keyword)) return false;
+      // Matched against brand as well as title so the Brand column is
+      // searchable, and so a whole brand can be included/excluded in one go.
+      if (keyword && ![row.title, row.brand].some(value => String(value || '').toLowerCase().includes(keyword))) return false;
       if (Number.isFinite(priceFrom) && String(options.priceFrom ?? filters.priceFrom) !== '' && !(Number(row.priceNumber) >= priceFrom)) return false;
       if (Number.isFinite(priceTo) && String(options.priceTo ?? filters.priceTo) !== '' && !(Number(row.priceNumber) <= priceTo)) return false;
       if (Number.isFinite(minRating) && String(options.minRating ?? filters.minRating) !== '' && !(Number(row.rating) >= minRating)) return false;
@@ -369,6 +371,7 @@ export default function AsinPrecheckPage() {
       active: false,
       title: '',
       image: '',
+      brand: '',
       price: '',
       priceNumber: null,
       rating: null,
@@ -431,6 +434,10 @@ export default function AsinPrecheckPage() {
                 ? { ...row, progressStage: message.progressStage || 'fetching' }
                 : row
             )));
+            break;
+          case 'item_blocked':
+            setRows(prev => prev.filter(row => row.asin !== message.asin));
+            setProgress({ current: message.progress || 0, total: message.total || asinsToCheck.length });
             break;
           case 'item':
             updateRow(message.item);
@@ -779,7 +786,7 @@ export default function AsinPrecheckPage() {
               </FormControl>
               <TextField
                 size="small"
-                label="Keyword in Title"
+                label="Keyword in Title or Brand"
                 value={keywordDraft}
                 onChange={(event) => {
                   setKeywordDraft(event.target.value);
@@ -841,6 +848,7 @@ export default function AsinPrecheckPage() {
                 </TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 130 }}>ASIN</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 132 }}>Amazon Image</TableCell>
+                <TableCell sx={{ ...tableHeaderCellSx, width: 140 }}>Brand</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: '38%' }}>Title</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 90 }}>Price</TableCell>
                 <TableCell sx={{ ...tableHeaderCellSx, width: 90 }}>Rating</TableCell>
@@ -854,7 +862,7 @@ export default function AsinPrecheckPage() {
             <TableBody>
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={12} align="center" sx={{ py: 6 }}>
                     <Typography color="text.secondary">Start a precheck to review ASINs.</Typography>
                   </TableCell>
                 </TableRow>
@@ -862,7 +870,7 @@ export default function AsinPrecheckPage() {
 
               {rows.length > 0 && visibleRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={12} align="center" sx={{ py: 6 }}>
                     <Typography color="text.secondary">No ASINs match the current filters.</Typography>
                   </TableCell>
                 </TableRow>
@@ -924,6 +932,15 @@ export default function AsinPrecheckPage() {
                       </ButtonBase>
                     ) : (
                       <Typography variant="caption" color="text.secondary">No image</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ width: 140 }}>
+                    {row.status === 'loading' ? (
+                      <Typography variant="body2" color="text.secondary">Fetching...</Typography>
+                    ) : row.brand ? (
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.brand}</Typography>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">Unknown</Typography>
                     )}
                   </TableCell>
                   <TableCell sx={{ width: '38%', minWidth: 240, maxWidth: 520 }}>

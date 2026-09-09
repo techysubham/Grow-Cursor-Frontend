@@ -1596,6 +1596,8 @@ function FulfillmentDashboard() {
   const [utcRefreshEndDate, setUtcRefreshEndDate] = useState(todayUTC);
   const [utcRefreshConfirmOpen, setUtcRefreshConfirmOpen] = useState(false);
   const utcRefreshClickTimeRef = useRef(null);
+  const [ptRefreshPreview, setPtRefreshPreview] = useState(null);
+  const [ptRefreshPreviewLoading, setPtRefreshPreviewLoading] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historyLogs, setHistoryLogs] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -1655,7 +1657,7 @@ function FulfillmentDashboard() {
 
   // Column visibility state - persisted in sessionStorage
   const DEFAULT_VISIBLE_COLUMNS = [
-    'seller', 'orderId', 'dateSold', 'shipBy', 'deliveryDate', 'productName', 'itemCategory', 'buyerNote',
+    'seller', 'orderId', 'dateSold', 'shipBy', 'deliveryDate', 'productName', 'amazonLink', 'itemCategory', 'buyerNote',
     'buyerName', 'shippingAddress', 'marketplace', 'subtotal',
     'shipping', 'salesTax', 'discount', 'transactionFees',
     'adFeeGeneral', 'cancelStatus', 'refunds', 'orderEarnings', 'trackingNumber',
@@ -1671,6 +1673,7 @@ function FulfillmentDashboard() {
     { id: 'shipBy', label: 'Ship By' },
     { id: 'deliveryDate', label: 'Delivery Date' },
     { id: 'productName', label: 'Product Name' },
+    { id: 'amazonLink', label: 'Amazon Link' },
     { id: 'itemCategory', label: 'Category' },
     { id: 'buyerNote', label: 'Buyer Note' },
     { id: 'buyerName', label: 'Buyer Name' },
@@ -2134,7 +2137,9 @@ function FulfillmentDashboard() {
     try {
       const params = {
         page: currentPage,
-        limit: ordersPerPage
+        limit: ordersPerPage,
+        // Resolves each order's SKU to its Amazon product link (Amazon Link column)
+        includeAmazonLink: true
       };
 
       if (selectedSeller) params.sellerId = selectedSeller;
@@ -2629,6 +2634,31 @@ function FulfillmentDashboard() {
     }
   }
 
+  async function fetchPtRefreshPreview() {
+    const endDate = utcRefreshMode === 'single'
+      ? utcRefreshStartDate
+      : (utcRefreshEndDate || utcRefreshStartDate);
+
+    setPtRefreshPreviewLoading(true);
+    setPtRefreshPreview(null);
+    try {
+      const { data } = await api.get('/ebay/pt-refresh-preview', {
+        params: {
+          startDate: utcRefreshStartDate,
+          endDate,
+          dateMode: utcRefreshMode,
+          ...(selectedSeller ? { sellerId: selectedSeller } : {})
+        }
+      });
+      setPtRefreshPreview(data || null);
+    } catch (e) {
+      const message = e?.response?.data?.error || 'Failed to check seller tokens and order count';
+      setPtRefreshPreview({ error: message });
+    } finally {
+      setPtRefreshPreviewLoading(false);
+    }
+  }
+
   function handleOpenUtcRefreshConfirm() {
     const endDate = utcRefreshMode === 'single'
       ? utcRefreshStartDate
@@ -2643,6 +2673,7 @@ function FulfillmentDashboard() {
 
     utcRefreshClickTimeRef.current = new Date().toISOString();
     setUtcRefreshConfirmOpen(true);
+    fetchPtRefreshPreview();
   }
 
   async function handleConfirmUtcRefresh() {
@@ -3139,7 +3170,7 @@ function FulfillmentDashboard() {
       setExportDialogOpen(false); // Close dialog immediately
 
       // Build params with all current filters, but without pagination limits
-      const params = {};
+      const params = { includeAmazonLink: true };
 
       if (selectedSeller) params.sellerId = selectedSeller;
       if (searchProductName.trim()) params.productName = searchProductName.trim();
@@ -3192,6 +3223,10 @@ function FulfillmentDashboard() {
           accessor: (o) => formatDeliveryDate(o)
         },
         productName: { header: 'Product Name', accessor: 'productName' },
+        amazonLink: {
+          header: 'Amazon Link',
+          accessor: (o) => o.amazonLinks?.map((link) => link.url).join(' | ') || o.amazonLink || ''
+        },
         buyerNote: { header: 'Buyer Note', accessor: 'buyerCheckoutNotes' },
         buyerName: { header: 'Buyer Name', accessor: 'shippingFullName' },
         shippingAddress: {
@@ -4173,6 +4208,7 @@ function FulfillmentDashboard() {
                       {visibleColumnsSet.has('shipBy') && <TableCell sx={HEADER_CELL_SX}>Ship By</TableCell>}
                       {visibleColumnsSet.has('deliveryDate') && <TableCell sx={HEADER_CELL_SX}>Delivery Date</TableCell>}
                       {visibleColumnsSet.has('productName') && <TableCell sx={HEADER_CELL_SX}>Product Name</TableCell>}
+                      {visibleColumnsSet.has('amazonLink') && <TableCell sx={HEADER_CELL_SX}>Amazon Link</TableCell>}
                       {visibleColumnsSet.has('itemCategory') && <TableCell sx={HEADER_CELL_SX}>Category</TableCell>}
                       {visibleColumnsSet.has('buyerNote') && <TableCell sx={HEADER_CELL_SX}>Buyer Note</TableCell>}
                       {visibleColumnsSet.has('buyerName') && <TableCell sx={HEADER_CELL_SX}>Buyer Name</TableCell>}
@@ -4420,6 +4456,42 @@ function FulfillmentDashboard() {
                                   </Box>
                                 )}
                               </Stack>
+                            </TableCell>
+                          )}
+                          {visibleColumnsSet.has('amazonLink') && (
+                            <TableCell sx={{ minWidth: 150, maxWidth: 220 }}>
+                              {order.amazonLinks?.length > 0 ? (
+                                <Stack spacing={0.5}>
+                                  {order.amazonLinks.map((entry, i) => (
+                                    <Stack key={`${entry.url}-${i}`} direction="row" spacing={0.3} alignItems="center">
+                                      <Tooltip title={entry.url} arrow placement="top">
+                                        <Link
+                                          href={entry.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          underline="hover"
+                                          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.3, minWidth: 0 }}
+                                        >
+                                          <Typography variant="caption" color="primary.main" sx={{ fontSize: '0.72rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                            {entry.asin || entry.sku}
+                                          </Typography>
+                                          <OpenInNewIcon sx={{ fontSize: 12, color: 'primary.main' }} />
+                                        </Link>
+                                      </Tooltip>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => handleCopy(entry.url)}
+                                        aria-label="copy amazon link"
+                                        sx={{ p: 0.3 }}
+                                      >
+                                        <ContentCopyIcon sx={{ fontSize: '0.85rem' }} />
+                                      </IconButton>
+                                    </Stack>
+                                  ))}
+                                </Stack>
+                              ) : (
+                                <Typography variant="caption" color="text.secondary">-</Typography>
+                              )}
                             </TableCell>
                           )}
                           {visibleColumnsSet.has('itemCategory') && (
@@ -5379,6 +5451,60 @@ function FulfillmentDashboard() {
               <Typography variant="body2" color="text.secondary">
                 New eBay orders will be ignored. Existing matching orders may have eBay fields, totals, earnings, and profit-related values recalculated.
               </Typography>
+
+              {ptRefreshPreviewLoading && (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <CircularProgress size={16} />
+                  <Typography variant="body2" color="text.secondary">
+                    Checking seller tokens and order count...
+                  </Typography>
+                </Stack>
+              )}
+
+              {!ptRefreshPreviewLoading && ptRefreshPreview?.error && (
+                <Alert severity="error">{ptRefreshPreview.error}</Alert>
+              )}
+
+              {!ptRefreshPreviewLoading && ptRefreshPreview && !ptRefreshPreview.error && (
+                <>
+                  <Typography variant="body2" fontWeight={600}>
+                    This will fetch ~{ptRefreshPreview.totalPreviewCount} order{ptRefreshPreview.totalPreviewCount === 1 ? '' : 's'} from{' '}
+                    {ptRefreshPreview.sellers.filter(s => s.tokenStatus === 'active' || s.tokenStatus === 'refreshed').length} of{' '}
+                    {ptRefreshPreview.sellers.length} seller{ptRefreshPreview.sellers.length === 1 ? '' : 's'}.
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                    {ptRefreshPreview.sellers.map(s => (
+                      <Tooltip key={s.sellerId} title={s.error || ''} disableHoverListener={!s.error}>
+                        <Chip
+                          size="small"
+                          icon={s.tokenStatus === 'active' || s.tokenStatus === 'refreshed' ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : undefined}
+                          label={`${s.sellerName}${s.tokenStatus === 'refreshed' ? ' (refreshed)' : ''}${s.orderCountPreview != null ? `: ${s.orderCountPreview}` : ''}`}
+                          color={
+                            s.tokenStatus === 'active' || s.tokenStatus === 'refreshed'
+                              ? 'success'
+                              : 'error'
+                          }
+                          variant="outlined"
+                        />
+                      </Tooltip>
+                    ))}
+                  </Stack>
+                  {ptRefreshPreview.sellersNeedingAttention.length > 0 && (
+                    <Alert severity="warning">
+                      <Typography variant="body2" fontWeight={600}>
+                        {ptRefreshPreview.sellersNeedingAttention.length} seller{ptRefreshPreview.sellersNeedingAttention.length === 1 ? '' : 's'} will be skipped and won't have orders refreshed:
+                      </Typography>
+                      <Stack spacing={0.25} sx={{ mt: 0.5 }}>
+                        {ptRefreshPreview.sellersNeedingAttention.map(s => (
+                          <Typography key={s.sellerId} variant="caption" component="div">
+                            {s.sellerName} ({s.tokenStatus === 'needs_reconnect' ? 'needs eBay reconnect' : 'fetch failed'}){s.error ? `: ${s.error}` : ''}
+                          </Typography>
+                        ))}
+                      </Stack>
+                    </Alert>
+                  )}
+                </>
+              )}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>

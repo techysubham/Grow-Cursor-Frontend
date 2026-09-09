@@ -3,7 +3,7 @@ import {
   Avatar, TextField, Button, Divider, Badge, Stack, CircularProgress, Fade,
   IconButton, Chip, Alert, FormControl, Select, MenuItem, InputLabel, Link,
   Snackbar, ListItemButton, Box, Paper, Typography, List, ListItem, ListItemText, ListItemAvatar,
-  useTheme, useMediaQuery, Menu, ListSubheader, Tooltip, Switch, FormControlLabel
+  useTheme, useMediaQuery, Menu, ListSubheader, Tooltip, Switch, FormControlLabel, Popover
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import PersonIcon from '@mui/icons-material/Person';
@@ -24,6 +24,7 @@ import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import MenuIcon from '@mui/icons-material/Menu';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SettingsIcon from '@mui/icons-material/Settings';
+import HistoryIcon from '@mui/icons-material/History';
 import api from '../../lib/api';
 import TemplateManagementModal from '../../components/TemplateManagementModal';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
@@ -35,6 +36,20 @@ import { BRAND_YELLOW, BRAND_DARK, BRAND_YELLOW_DARK } from '../../constants/bra
 const CHAT_STORAGE_KEY = 'buyer_chat_page_state';
 
 // CHAT_TEMPLATES are now fetched from API - see chatTemplates state in component
+
+// Format a timestamp in IST for the meta change history
+const formatIST = (date) => {
+  if (!date) return '';
+  return new Date(date).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }) + ' IST';
+};
 
 // Helper to get initial state from sessionStorage
 const getInitialState = (key, defaultValue) => {
@@ -93,6 +108,8 @@ export default function BuyerChatPage() {
   const [metaCaseStatus, setMetaCaseStatus] = useState('');
   const [metaPickedUpBy, setMetaPickedUpBy] = useState('');
   const [savingMeta, setSavingMeta] = useState(false);
+  const [metaChangeLog, setMetaChangeLog] = useState([]);
+  const [historyAnchorEl, setHistoryAnchorEl] = useState(null);
 
   // Chat agents for "Picked Up By" dropdown
   const [chatAgents, setChatAgents] = useState([]);
@@ -191,6 +208,7 @@ export default function BuyerChatPage() {
       setMetaCategory('');
       setMetaCaseStatus('');
       setMetaPickedUpBy('');
+      setMetaChangeLog([]);
     }
   }, [selectedThread]);
 
@@ -230,10 +248,12 @@ export default function BuyerChatPage() {
         setMetaCategory(data.category);
         setMetaCaseStatus(data.status || data.caseStatus || '');
         setMetaPickedUpBy(data.pickedUpBy || '');
+        setMetaChangeLog(data.changeLog || []);
       } else {
         setMetaCategory('');
         setMetaCaseStatus('');
         setMetaPickedUpBy('');
+        setMetaChangeLog([]);
       }
     } catch (e) {
       // Don't log 401 errors - they're handled by the interceptor
@@ -244,6 +264,7 @@ export default function BuyerChatPage() {
       setMetaCategory('');
       setMetaCaseStatus('');
       setMetaPickedUpBy('');
+      setMetaChangeLog([]);
     }
   }
 
@@ -255,7 +276,7 @@ export default function BuyerChatPage() {
 
     setSavingMeta(true);
     try {
-      await api.post('/ebay/conversation-meta', {
+      const { data } = await api.post('/ebay/conversation-meta', {
         sellerId: selectedThread.sellerId,
         buyerUsername: selectedThread.buyerUsername,
         orderId: selectedThread.orderId,
@@ -265,7 +286,7 @@ export default function BuyerChatPage() {
         status: metaCaseStatus,      // synced status field
         pickedUpBy: metaPickedUpBy || null
       });
-      // Optional: Show a small success toast or icon change
+      if (data?.meta?.changeLog) setMetaChangeLog(data.meta.changeLog);
     } catch (e) {
       alert("Failed to save tags: " + e.message);
     } finally {
@@ -1384,6 +1405,7 @@ export default function BuyerChatPage() {
                       <MenuItem value="Replace">Replace</MenuItem>
                       <MenuItem value="Out of Stock">Out of Stock</MenuItem>
                       <MenuItem value="Issue with Product">Issue with Product</MenuItem>
+                      <MenuItem value="Issue with Delivery">Issue with Delivery</MenuItem>
                       <MenuItem value="Inquiry">Inquiry</MenuItem>
                     </Select>
                   </FormControl>
@@ -1446,6 +1468,56 @@ export default function BuyerChatPage() {
                   >
                     {savingMeta ? <CircularProgress size={14} color="inherit" /> : <SaveIcon sx={{ fontSize: 16 }} />}
                   </Button>
+
+                  {metaChangeLog.length > 0 && (
+                    <>
+                      <Tooltip title="View change history">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => setHistoryAnchorEl(e.currentTarget)}
+                          sx={{ height: 32, width: 32 }}
+                        >
+                          <HistoryIcon sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: 'text.secondary', fontSize: '0.68rem', lineHeight: 1.2 }}
+                      >
+                        Last changed by <b>{metaChangeLog[metaChangeLog.length - 1].changedBy}</b>
+                        <br />
+                        {formatIST(metaChangeLog[metaChangeLog.length - 1].changedAt)}
+                      </Typography>
+                      <Popover
+                        open={Boolean(historyAnchorEl)}
+                        anchorEl={historyAnchorEl}
+                        onClose={() => setHistoryAnchorEl(null)}
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                      >
+                        <Box sx={{ p: 1.5, maxWidth: 380, maxHeight: 320, overflowY: 'auto' }}>
+                          <Typography variant="subtitle2" sx={{ mb: 1, fontSize: '0.78rem' }}>
+                            Change History (IST)
+                          </Typography>
+                          <Stack spacing={1}>
+                            {[...metaChangeLog].reverse().map((entry, idx) => (
+                              <Box key={idx} sx={{ borderBottom: idx < metaChangeLog.length - 1 ? '1px solid #eee' : 'none', pb: 0.75 }}>
+                                <Typography variant="body2" sx={{ fontSize: '0.74rem' }}>
+                                  <b>{entry.changedBy}</b> changed <b>{entry.field}</b>:{' '}
+                                  <span style={{ color: '#999' }}>{entry.oldValue || '— empty —'}</span>
+                                  {' → '}
+                                  <span style={{ fontWeight: 600 }}>{entry.newValue || '— empty —'}</span>
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.66rem' }}>
+                                  {formatIST(entry.changedAt)}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Stack>
+                        </Box>
+                      </Popover>
+                    </>
+                  )}
                 </Stack>
 
                 {/* Templates Menu - Positioned outside the header Stack */}

@@ -27,7 +27,7 @@ export const SUBMENUS = {
     id: 'templateListing',
     name: 'Template Listing',
     category: 'listingResearch',
-    pages: ['ManageTemplates', 'ListingsDatabase', 'SelectSeller', 'AsinPrecheck', 'ListingDirectory', 'TemplateDirectory'],
+    pages: ['ManageTemplates', 'ListingOverlays', 'ListingsDatabase', 'SelectSeller', 'AsinPrecheck', 'AsinPrecheckStats', 'ListingDirectory', 'TemplateDirectory'],
   },
   asinImporter: {
     id: 'asinImporter',
@@ -68,9 +68,11 @@ export const PAGE_REGISTRY = [
   // ====== LISTING & RESEARCH ======
   // Template Listing submenu
   { id: 'ManageTemplates', name: 'Manage Templates', path: '/manage-templates', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin'] },
+  { id: 'ListingOverlays', name: 'Listing Overlays', path: '/listing-overlays', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin'] },
   { id: 'ListingsDatabase', name: 'Listings Database', path: '/listings-database', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin'] },
   { id: 'SelectSeller', name: 'Add Template Listings', path: '/select-seller', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin', 'lister', 'advancelister', 'trainee'] },
   { id: 'AsinPrecheck', name: 'ASIN Precheck', path: '/asin-precheck', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin', 'lister', 'advancelister', 'trainee'] },
+  { id: 'AsinPrecheckStats', name: 'Precheck Stats', path: '/asin-precheck-stats', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin'] },
   { id: 'ListingDirectory', name: 'Listing Directory', path: '/listing-directory', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin', 'lister', 'advancelister', 'trainee'] },
   { id: 'TemplateDirectory', name: 'Template Directory', path: '/template-directory', category: 'listingResearch', submenu: 'templateListing', defaultRoles: ['superadmin', 'lister', 'advancelister', 'trainee'] },
   // ASIN Importer submenu
@@ -80,6 +82,7 @@ export const PAGE_REGISTRY = [
   { id: 'FeedUpload', name: 'Feed Upload (CSV)', path: '/feed-upload', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin', 'lister'] },
   { id: 'FeedUploadStats', name: 'Feed Upload Stats', path: '/feed-upload-stats', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'AiListingUsage', name: 'AI Listing Usage', path: '/ai-listing-usage', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'PrecheckAiUsage', name: 'Precheck AI Usage', path: '/precheck-ai-usage', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'DailyListingComparison', name: 'Daily Listing Comparison', path: '/daily-listing-comparison', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'ManualEndListing', name: 'Manual End Listing', path: '/manual-end-listing', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'SkuSellerOrderProfit', name: 'SKU Seller Profit', path: '/sku-seller-profit', category: 'listingResearch', defaultRoles: ['superadmin', 'listingadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
@@ -119,9 +122,17 @@ export const PAGE_REGISTRY = [
   { id: 'SkuIndexSync', name: 'SKU Index Sync', path: '/sku-index-sync', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'DuplicateSkus', name: 'Duplicate SKUs', path: '/duplicate-skus', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'SkuIndexDashboard', name: 'SKU Index Dashboard', path: '/sku-index-dashboard', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'SkuIndexLookup', name: 'SKU / ASIN Lookup', path: '/sku-index-lookup', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'SkuListingManager', name: 'SKU Listing Manager', path: '/sku-listing-manager', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'AmazonStockCheck', name: 'Amazon Stock Check', path: '/amazon-stock-check', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'SellerSkuStockCheck', name: 'Seller SKU Stock Check', path: '/seller-sku-stock-check', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'ListingRevisions', name: 'Listing Revisions', path: '/listing-revisions', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'EndListingStats', name: 'End Listing Stats', path: '/end-listing-stats', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'EndListingByDate', name: 'End Listing By Date', path: '/end-listing-by-date', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
+  { id: 'EndListingLookup', name: 'End Listing Lookup', path: '/end-listing-lookup', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin'] },
   { id: 'BestOffers', name: 'Best Offers', path: '/best-offers', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
+  { id: 'Discounts', name: 'Discounts', path: '/discounts', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
+  { id: 'QuantityUpdateExclusions', name: 'Quantity Update Exclusions', path: '/quantity-update-exclusions', category: 'ebayParams', defaultRoles: ['superadmin', 'listingadmin', 'fulfillmentadmin', 'hoc', 'compliancemanager'] },
 
   // ====== HR & MANAGEMENT ======
   { id: 'IdeasAndIssues', name: 'Ideas and Issues', path: '/ideas', category: 'hrManagement', defaultRoles: ['superadmin', 'hradmin', 'operationhead', 'listingadmin'] },
@@ -134,6 +145,7 @@ export const PAGE_REGISTRY = [
   { id: 'ViewAllMessages', name: 'View All Messages', path: '/internal-messages-admin', category: 'hrManagement', defaultRoles: ['superadmin'] },
   { id: 'Attendance', name: 'Working Hours Tracking', path: '/attendance', category: 'hrManagement', defaultRoles: ['superadmin'] },
   { id: 'PageAccessManagement', name: 'Page Access Management', path: '/page-access-management', category: 'hrManagement', defaultRoles: ['superadmin'] },
+  { id: 'PageAccessOverview', name: 'Page Access Overview', path: '/page-access-overview', category: 'hrManagement', defaultRoles: ['superadmin'] },
   { id: 'PageAccessAuditLog', name: 'Page Access Audit Log', path: '/page-access-audit-log', category: 'hrManagement', defaultRoles: ['superadmin'] },
   { id: 'UserPasswordManagement', name: 'User Password Management', path: '/user-password-management', category: 'hrManagement', defaultRoles: ['superadmin'] },
 

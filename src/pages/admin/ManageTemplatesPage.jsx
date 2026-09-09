@@ -20,6 +20,7 @@ import api from '../../lib/api.js';
 import FieldConfigList from '../../components/FieldConfigList.jsx';
 import CoreFieldDefaultsForm from '../../components/CoreFieldDefaultsForm.jsx';
 import PricingConfigSection from '../../components/PricingConfigSection.jsx';
+import OverlayOptionsSection from '../../components/OverlayOptionsSection.jsx';
 import { BRAND_DARK, BRAND_YELLOW, BRAND_YELLOW_DARK } from '../../constants/brandTheme.js';
 import { dashboardSignatureTokens } from '../../theme/appTheme.js';
 import AdminPageShell from '../../components/AdminPageShell.jsx';
@@ -79,6 +80,7 @@ export default function ManageTemplatesPage() {
   const [formData, setFormData] = useState({
     name: '',
     customColumns: [],
+    overlayOptions: [],
     asinAutomation: {
       enabled: false,
       fieldConfigs: []
@@ -240,6 +242,7 @@ export default function ManageTemplatesPage() {
       setFormData({
         name: '',
         customColumns: [],
+        overlayOptions: [],
         asinAutomation: {
           enabled: false,
           fieldConfigs: []
@@ -288,6 +291,7 @@ export default function ManageTemplatesPage() {
     setFormData({
       name: template.name,
       customColumns: template.customColumns || [],
+      overlayOptions: template.overlayOptions || [],
       asinAutomation: template.asinAutomation || {
         enabled: false,
         fieldConfigs: []
@@ -323,6 +327,7 @@ export default function ManageTemplatesPage() {
     setFormData({
       name: '',
       customColumns: [],
+      overlayOptions: [],
       asinAutomation: {
         enabled: false,
         fieldConfigs: []
@@ -363,6 +368,7 @@ export default function ManageTemplatesPage() {
       setFormData({
         name: '',
         customColumns: [],
+        overlayOptions: [],
         asinAutomation: {
           enabled: false,
           fieldConfigs: []
@@ -1075,6 +1081,13 @@ export default function ManageTemplatesPage() {
                       >
                         Add Field Configuration
                       </Button>
+
+                      <Divider />
+
+                      <OverlayOptionsSection
+                        options={formData.overlayOptions || []}
+                        onChange={(overlayOptions) => setFormData({ ...formData, overlayOptions })}
+                      />
                     </>
                   )}
                 </Stack>

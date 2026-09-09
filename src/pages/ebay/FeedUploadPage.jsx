@@ -19,7 +19,12 @@ import {
     useTheme,
     Divider,
     ToggleButton,
-    ToggleButtonGroup
+    ToggleButtonGroup,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
@@ -95,6 +100,10 @@ const FeedUploadPage = () => {
     const [uploading, setUploading] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+    // Opened only when the upload actually rewrote something. A dialog on every
+    // routine upload would be noise; one that appears solely when pictures were
+    // rebuilt stays worth reading.
+    const [imageNotice, setImageNotice] = useState(null);
     const [sellers, setSellers] = useState([]);
     const [selectedSeller, setSelectedSeller] = useState('');
 
@@ -375,6 +384,14 @@ const FeedUploadPage = () => {
                 }
             }
             setResult(response.data);
+
+            // Pictures get rebuilt when they belong to another seller or have
+            // expired, which rewrites the file and adds minutes to the upload.
+            // Both are worth interrupting for; a clean upload is not.
+            const images = response.data?.images;
+            if (images && (images.rehosted > 0 || images.warnings?.length > 0)) {
+                setImageNotice(images);
+            }
             fetchTasks(); // Refresh list
         } catch (err) {
             console.error('Upload failed', err);
@@ -818,8 +835,48 @@ const FeedUploadPage = () => {
                             <Alert severity="success">
                                 <Typography variant="subtitle1">Upload Successful!</Typography>
                                 <Typography variant="body2">Task ID: {result.taskId}</Typography>
+
+                                {/* Pictures are silently rebuilt when they belong to another
+                                    seller or have expired. Saying so turns a multi-minute wait
+                                    into something explained rather than unexplained. */}
+                                {result.images?.rehosted > 0 && (
+                                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                        {result.images.foreign > 0
+                                            ? `${result.images.rehosted} picture${result.images.rehosted === 1 ? '' : 's'} copied into this seller's account — ${result.images.foreign} belonged to a different seller.`
+                                            : `${result.images.rehosted} expired picture${result.images.rehosted === 1 ? '' : 's'} re-uploaded before sending.`}
+                                    </Typography>
+                                )}
+
                                 <Typography variant="caption">
                                     The file is being processed by eBay. Check the status later using the Task ID.
+                                </Typography>
+                            </Alert>
+                        )}
+
+                        {result?.images?.warnings?.length > 0 && (
+                            <Alert severity="warning">
+                                <Typography variant="subtitle2">
+                                    {result.images.warnings.length} picture{result.images.warnings.length === 1 ? '' : 's'} could not be prepared
+                                </Typography>
+
+                                {/* The upload still went ahead — these listings kept the links
+                                    they arrived with. Naming them beats a bare count, but a
+                                    whole batch of URLs would bury the message. */}
+                                <Box component="ul" sx={{ pl: 2, my: 0.5 }}>
+                                    {result.images.warnings.slice(0, 3).map((warning, i) => (
+                                        <Typography component="li" variant="caption" key={i} sx={{ wordBreak: 'break-all' }}>
+                                            {warning}
+                                        </Typography>
+                                    ))}
+                                    {result.images.warnings.length > 3 && (
+                                        <Typography component="li" variant="caption">
+                                            and {result.images.warnings.length - 3} more — see the server log
+                                        </Typography>
+                                    )}
+                                </Box>
+
+                                <Typography variant="caption">
+                                    Those listings kept their original picture links. If the pictures have expired on eBay, re-run the preview for them before listing.
                                 </Typography>
                             </Alert>
                         )}
@@ -1198,6 +1255,104 @@ const FeedUploadPage = () => {
                 )}
                 </Paper>
             </Box>
+
+            {/* Raised as a dialog rather than an inline note because the thing it
+                reports can mean a mistake — a file uploaded under the wrong
+                seller looks exactly like one uploaded under the right seller,
+                right up until the listings appear in the wrong account. */}
+            <Dialog
+                open={Boolean(imageNotice)}
+                onClose={() => setImageNotice(null)}
+                maxWidth="sm"
+                fullWidth
+            >
+                {/* Titled by what HAPPENED, with ownership only qualifying it.
+                    Neither count can carry the title alone:
+
+                    `rehosted` is 0 whenever nothing could be rebuilt, and the
+                    dialog still opens on the warnings — a picture with no ledger
+                    row is warned about and skipped, so foreign stays 0 there too.
+
+                    `foreign` is counted BEFORE the rebuild is attempted, and three
+                    paths after that point can still fail (missing badge, a refused
+                    upload, a thrown error). So foreign can be non-zero with nothing
+                    actually copied.
+
+                    Leading on `rehosted` covers both: no rebuild, no claim of one. */}
+                <DialogTitle>
+                    {imageNotice?.rehosted > 0
+                        ? imageNotice.foreign > 0
+                            ? 'Pictures were copied to this seller'
+                            : 'Expired pictures were re-uploaded'
+                        : 'Some pictures could not be prepared'}
+                </DialogTitle>
+
+                <DialogContent>
+                    <DialogContentText component="div">
+                        {imageNotice?.rehosted > 0 && (
+                            <Typography variant="body1" sx={{ mb: 1.5 }}>
+                                <strong>{imageNotice.rehosted}</strong> picture
+                                {imageNotice.rehosted === 1 ? ' was' : 's were'} uploaded again before
+                                the file was sent to eBay.
+                            </Typography>
+                        )}
+
+                        {/* "in this file", not "of them" — the sentence above only
+                            renders when something was rebuilt, so a back-reference
+                            would dangle on the failure path. The counts differ too:
+                            a partly-failed batch has more foreign pictures than
+                            rebuilt ones, and "6 of them" under a heading saying 3
+                            reads as a contradiction. */}
+                        {imageNotice?.foreign > 0 && (
+                            <Typography variant="body2" sx={{ mb: 1.5 }}>
+                                {imageNotice.foreign} picture{imageNotice.foreign === 1 ? '' : 's'} in this
+                                file belonged to a <strong>different seller's account</strong> — it was
+                                exported for someone else.
+                                {imageNotice.rehosted > 0
+                                    ? ' Copies have been made under this seller so the listings stay independent.'
+                                    : ' They could not be copied under this seller — see below.'}
+                                {' '}If you meant to upload under a different seller, check the account above.
+                            </Typography>
+                        )}
+
+                        {imageNotice?.warnings?.length > 0 && (
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle2" color="warning.main">
+                                    {imageNotice.warnings.length} picture
+                                    {imageNotice.warnings.length === 1 ? '' : 's'} could not be prepared
+                                </Typography>
+                                <Box component="ul" sx={{ pl: 2, my: 0.5 }}>
+                                    {imageNotice.warnings.slice(0, 3).map((warning, i) => (
+                                        <Typography
+                                            component="li"
+                                            variant="caption"
+                                            key={i}
+                                            sx={{ wordBreak: 'break-all', display: 'list-item' }}
+                                        >
+                                            {warning}
+                                        </Typography>
+                                    ))}
+                                    {imageNotice.warnings.length > 3 && (
+                                        <Typography component="li" variant="caption" sx={{ display: 'list-item' }}>
+                                            and {imageNotice.warnings.length - 3} more — see the server log
+                                        </Typography>
+                                    )}
+                                </Box>
+                                <Typography variant="caption">
+                                    Those listings kept their original picture links. If the pictures have
+                                    expired on eBay, re-run the preview for them before listing.
+                                </Typography>
+                            </Box>
+                        )}
+                    </DialogContentText>
+                </DialogContent>
+
+                <DialogActions>
+                    <Button onClick={() => setImageNotice(null)} variant="contained">
+                        Got it
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

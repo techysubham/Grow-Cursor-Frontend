@@ -19,19 +19,14 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Stack,
   Tooltip,
   Pagination,
   Tabs,
   Tab,
   Badge,
-  Switch,
-  FormControlLabel,
-  useTheme,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { alpha } from '@mui/material/styles';
@@ -40,7 +35,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import ReplyIcon from '@mui/icons-material/Reply';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import SendIcon from '@mui/icons-material/Send';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import api from '../../lib/api';
 import AdminPageShell from '../../components/AdminPageShell';
 import PageHeader from '../../components/PageHeader';
@@ -66,114 +61,25 @@ const STATUS_TONES = {
   Countered: 'info',
 };
 
-// ─── Send Offer to Interested Buyers Dialog ──────────────────────────────────
-function SendOfferDialog({ open, item, onClose, onSubmit, loading }) {
-  const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState('1');
-  const [message, setMessage] = useState('');
-  const [allowCounter, setAllowCounter] = useState(true);
+// ─── Per-action styling for the Respond dialog (header, toggle, CTA button) ──
+const ACTION_META = {
+  Accept: { icon: CheckCircleOutlineIcon, color: '#2e7d32', darkColor: '#1b5e20', textColor: '#fff', title: 'Accept Offer', cta: 'Confirm Accept' },
+  Decline: { icon: CancelOutlinedIcon, color: '#c62828', darkColor: '#b71c1c', textColor: '#fff', title: 'Decline Offer', cta: 'Confirm Decline' },
+  Counter: { icon: ReplyIcon, color: BRAND_YELLOW, darkColor: BRAND_YELLOW_DARK, textColor: BRAND_DARK, title: 'Counter Offer', cta: 'Send Counter Offer' },
+};
 
-  useEffect(() => {
-    if (open) {
-      setPrice(item?.minimumOfferPrice ? String(item.minimumOfferPrice) : '');
-      setQuantity('1');
-      setMessage('');
-      setAllowCounter(true);
-    }
-  }, [open, item]);
-
-  const isValid = price && parseFloat(price) > 0;
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700, bgcolor: BRAND_DARK, color: '#fff' }}>
-        Send Offer to Interested Buyers
-        {item && (
-          <Typography variant="body2" sx={{ color: alpha('#fff', 0.7), mt: 0.5, fontWeight: 400 }}>
-            {item.title}
-          </Typography>
-        )}
-      </DialogTitle>
-      <DialogContent sx={{ pt: 3 }}>
-        {item && (
-          <Stack spacing={0.5} sx={{ mb: 2.5, p: 1.5, bgcolor: alpha(BRAND_YELLOW, 0.08), borderRadius: 1.5 }}>
-            <Typography variant="body2">
-              <b>Interested Buyers:</b> {item.interestedBuyers}
-            </Typography>
-            {item.minimumOfferPrice && (
-              <Typography variant="body2">
-                <b>Minimum Offer Price:</b> {item.minimumOfferCurrency} {parseFloat(item.minimumOfferPrice).toFixed(2)}
-              </Typography>
-            )}
-            <Typography variant="body2">
-              <b>Listing ID:</b> {item.listingId}
-            </Typography>
-          </Stack>
-        )}
-
-        <Stack spacing={2}>
-          <Stack direction="row" spacing={2}>
-            <TextField
-              label="Offer Price"
-              type="number"
-              value={price}
-              onChange={e => setPrice(e.target.value)}
-              inputProps={{ min: 0.01, step: 0.01 }}
-              required
-              fullWidth
-              helperText={item?.minimumOfferPrice ? `Min: ${item.minimumOfferCurrency} ${parseFloat(item.minimumOfferPrice).toFixed(2)}` : ''}
-            />
-            <TextField
-              label="Quantity"
-              type="number"
-              value={quantity}
-              onChange={e => setQuantity(e.target.value)}
-              inputProps={{ min: 1, step: 1 }}
-              sx={{ maxWidth: 120 }}
-            />
-          </Stack>
-          <TextField
-            label="Message to Buyers (optional)"
-            multiline
-            rows={3}
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            fullWidth
-            inputProps={{ maxLength: 500 }}
-          />
-          <FormControlLabel
-            control={<Switch checked={allowCounter} onChange={e => setAllowCounter(e.target.checked)} />}
-            label="Allow buyers to counter offer"
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={loading} sx={{ color: BRAND_DARK }}>Cancel</Button>
-        <Button
-          variant="contained"
-          onClick={() => onSubmit({ price, quantity: parseInt(quantity) || 1, message, allowCounter })}
-          disabled={!isValid || loading}
-          startIcon={loading ? <CircularProgress size={16} /> : <SendIcon />}
-          sx={{ bgcolor: BRAND_DARK, color: '#fff', fontWeight: 700, '&:hover': { bgcolor: alpha(BRAND_DARK, 0.82) } }}
-        >
-          {loading ? 'Sending…' : 'Send Offer'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
 function RespondDialog({ open, offer, onClose, onSubmit, loading }) {
   const [action, setAction] = useState('Accept');
   const [counterPrice, setCounterPrice] = useState('');
   const [counterQuantity, setCounterQuantity] = useState('1');
   const [sellerResponse, setSellerResponse] = useState('');
-  const theme = useTheme();
 
   useEffect(() => {
     if (open) {
-      setAction('Accept');
+      // Pre-select whichever action the row's button the user actually clicked.
+      setAction(offer?._defaultAction || 'Accept');
       setCounterPrice(offer?.offerPrice ? String(offer.offerPrice) : '');
-      setCounterQuantity('1');
+      setCounterQuantity(String(offer?.quantity || 1));
       setSellerResponse('');
     }
   }, [open, offer]);
@@ -183,53 +89,126 @@ function RespondDialog({ open, offer, onClose, onSubmit, loading }) {
   };
 
   const isValid = action !== 'Counter' || (counterPrice && parseFloat(counterPrice) > 0);
+  const meta = ACTION_META[action];
+
+  const listPrice = parseFloat(offer?.listingPrice || 0);
+  const offerPrice = parseFloat(offer?.offerPrice || 0);
+  const discountPct = listPrice > 0 && offerPrice > 0 ? Math.round((1 - offerPrice / listPrice) * 100) : null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700, bgcolor: BRAND_DARK, color: '#fff' }}>
-        Respond to Offer
-        {offer && (
-          <Typography variant="body2" sx={{ color: alpha('#fff', 0.7), mt: 0.5 }}>
-            {offer.title} — Buyer: {offer.buyerId}
-          </Typography>
-        )}
+      <DialogTitle sx={{ fontWeight: 700, bgcolor: meta.color, color: meta.textColor, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <meta.icon sx={{ fontSize: 22 }} />
+        <Box>
+          {meta.title}
+          {offer && (
+            <Typography variant="body2" sx={{ color: alpha(meta.textColor, 0.75), mt: 0.25, fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {offer.title}
+            </Typography>
+          )}
+        </Box>
       </DialogTitle>
       <DialogContent sx={{ pt: 3 }}>
         {offer && (
-          <Stack spacing={0.5} sx={{ mb: 2, p: 1.5, bgcolor: alpha(BRAND_YELLOW, 0.08), borderRadius: 1.5 }}>
-            <Typography variant="body2">
-              <b>Offer Price:</b> {offer.offerCurrency} {parseFloat(offer.offerPrice || 0).toFixed(2)}
-            </Typography>
-            <Typography variant="body2">
-              <b>Listing Price:</b> {offer.listingCurrency} {parseFloat(offer.listingPrice || 0).toFixed(2)}
-            </Typography>
-            {offer.buyerMessage && (
-              <Typography variant="body2">
-                <b>Buyer Message:</b> {offer.buyerMessage}
+          <Stack spacing={1.5} sx={{ mb: 2.5 }}>
+            {/* Price comparison */}
+            <Box sx={{ p: 1.5, bgcolor: alpha(BRAND_YELLOW, 0.08), borderRadius: 1.5, border: '1px solid', borderColor: alpha(BRAND_DARK, 0.08) }}>
+              <Stack direction="row" alignItems="flex-end" spacing={3} flexWrap="wrap">
+                {offer.imageUrl && (
+                  <Box
+                    component="img"
+                    src={offer.imageUrl}
+                    alt=""
+                    sx={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 1, bgcolor: '#fff', border: '1px solid', borderColor: alpha(BRAND_DARK, 0.1), flexShrink: 0, alignSelf: 'center' }}
+                  />
+                )}
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 700, letterSpacing: 0.4 }}>
+                    BUYER OFFER
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: BRAND_DARK }}>
+                    {offer.offerCurrency} {offerPrice.toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 700, letterSpacing: 0.4 }}>
+                    LISTING PRICE
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                    {offer.listingCurrency} {listPrice.toFixed(2)}
+                  </Typography>
+                </Box>
+                {discountPct != null && discountPct > 0 && (
+                  <Chip label={`${discountPct}% below listing`} size="small" sx={{ bgcolor: alpha('#2e7d32', 0.12), color: '#2e7d32', fontWeight: 700, mb: 0.5 }} />
+                )}
+              </Stack>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                Offer for {offer.quantity || 1} item{(offer.quantity || 1) === 1 ? '' : 's'} · expires {offer.expirationTime ? new Date(offer.expirationTime).toLocaleString() : 'unknown'}
               </Typography>
+            </Box>
+
+            {/* Buyer / SKU / ASIN */}
+            <Stack spacing={0.5}>
+              <Typography variant="body2">
+                <b>Buyer:</b> {offer.buyerId || '—'}{offer.buyerFeedbackScore > 0 ? ` (★ ${offer.buyerFeedbackScore})` : ''}
+              </Typography>
+              {offer.sku && (
+                <Typography variant="body2">
+                  <b>SKU:</b> {offer.sku}
+                </Typography>
+              )}
+              <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <b>ASIN:</b>
+                {offer.asin ? (
+                  <>
+                    {offer.asin}
+                    <Tooltip title="Open on Amazon" arrow>
+                      <IconButton size="small" onClick={() => window.open(offer.amazonLink, '_blank', 'noopener')} sx={{ p: 0.3 }}>
+                        <OpenInNewIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                ) : (
+                  <Typography component="span" variant="body2" color="text.secondary">Not found</Typography>
+                )}
+              </Typography>
+            </Stack>
+
+            {offer.buyerMessage && (
+              <Box sx={{ pl: 1.5, borderLeft: '3px solid', borderColor: BRAND_YELLOW, py: 0.25 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 700, letterSpacing: 0.4 }}>
+                  BUYER SAYS
+                </Typography>
+                <Typography variant="body2" sx={{ fontStyle: 'italic' }}>“{offer.buyerMessage}”</Typography>
+              </Box>
             )}
           </Stack>
         )}
 
-        <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel>Action</InputLabel>
-          <Select value={action} label="Action" onChange={e => setAction(e.target.value)}>
-            <MenuItem value="Accept">Accept Offer</MenuItem>
-            <MenuItem value="Decline">Decline Offer</MenuItem>
-            <MenuItem value="Counter">Counter Offer</MenuItem>
-          </Select>
-        </FormControl>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>What would you like to do?</Typography>
+        <ToggleButtonGroup value={action} exclusive onChange={(e, val) => val && setAction(val)} fullWidth sx={{ mb: 2.5 }}>
+          <ToggleButton value="Accept" sx={{ fontWeight: 700, textTransform: 'none', '&.Mui-selected': { bgcolor: alpha('#2e7d32', 0.15), color: '#2e7d32', '&:hover': { bgcolor: alpha('#2e7d32', 0.22) } } }}>
+            <CheckCircleOutlineIcon sx={{ fontSize: 18, mr: 0.75 }} /> Accept
+          </ToggleButton>
+          <ToggleButton value="Decline" sx={{ fontWeight: 700, textTransform: 'none', '&.Mui-selected': { bgcolor: alpha('#c62828', 0.15), color: '#c62828', '&:hover': { bgcolor: alpha('#c62828', 0.22) } } }}>
+            <CancelOutlinedIcon sx={{ fontSize: 18, mr: 0.75 }} /> Decline
+          </ToggleButton>
+          <ToggleButton value="Counter" sx={{ fontWeight: 700, textTransform: 'none', '&.Mui-selected': { bgcolor: alpha(BRAND_YELLOW_DARK, 0.18), color: BRAND_DARK, '&:hover': { bgcolor: alpha(BRAND_YELLOW_DARK, 0.26) } } }}>
+            <ReplyIcon sx={{ fontSize: 18, mr: 0.75 }} /> Counter
+          </ToggleButton>
+        </ToggleButtonGroup>
 
         {action === 'Counter' && (
-          <Stack spacing={2} sx={{ mb: 2 }}>
+          <Stack spacing={2} sx={{ mb: 2.5, p: 1.5, bgcolor: alpha(BRAND_YELLOW, 0.06), borderRadius: 1.5 }}>
             <TextField
-              label="Counter Price"
+              label="Your Counter Price"
               type="number"
               value={counterPrice}
               onChange={e => setCounterPrice(e.target.value)}
               inputProps={{ min: 0.01, step: 0.01 }}
               required
               fullWidth
+              helperText={offer ? `Buyer offered ${offer.offerCurrency} ${offerPrice.toFixed(2)} · listing price is ${offer.listingCurrency} ${listPrice.toFixed(2)}` : ' '}
             />
             <TextField
               label="Counter Quantity"
@@ -243,7 +222,13 @@ function RespondDialog({ open, offer, onClose, onSubmit, loading }) {
         )}
 
         <TextField
-          label="Message to Buyer (optional)"
+          label={
+            action === 'Decline'
+              ? 'Reason for declining (optional)'
+              : action === 'Counter'
+              ? 'Message with your counter offer (optional)'
+              : 'Message to buyer (optional)'
+          }
           multiline
           rows={3}
           value={sellerResponse}
@@ -258,15 +243,15 @@ function RespondDialog({ open, offer, onClose, onSubmit, loading }) {
           variant="contained"
           onClick={handleSubmit}
           disabled={!isValid || loading}
-          startIcon={loading ? <CircularProgress size={16} /> : null}
+          startIcon={loading ? <CircularProgress size={16} sx={{ color: meta.textColor }} /> : null}
           sx={{
-            bgcolor: BRAND_DARK,
-            color: '#fff',
+            bgcolor: meta.color,
+            color: meta.textColor,
             fontWeight: 700,
-            '&:hover': { bgcolor: alpha(BRAND_DARK, 0.82) },
+            '&:hover': { bgcolor: meta.darkColor },
           }}
         >
-          {loading ? 'Sending…' : `Confirm ${action}`}
+          {loading ? 'Sending…' : meta.cta}
         </Button>
       </DialogActions>
     </Dialog>
@@ -275,18 +260,21 @@ function RespondDialog({ open, offer, onClose, onSubmit, loading }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 export default function BestOffersPage() {
-  const theme = useTheme();
-
   // ── State ──────────────────────────────────────────────────────────────────
   const [tab, setTab] = useState(0);
   const [sellers, setSellers] = useState([]);
   const [selectedSeller, setSelectedSeller] = useState(null);
 
   // Buyer offers tab
-  const [offers, setOffers] = useState([]);
-  const [totalPages, setTotalPages] = useState(1);
+  const OFFERS_PAGE_SIZE = 20;
+  const [offers, setOffers] = useState([]); // full result set from the server
   const [currentPage, setCurrentPage] = useState(1);
   const [totalEntries, setTotalEntries] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(offers.length / OFFERS_PAGE_SIZE));
+  const pagedOffers = useMemo(
+    () => offers.slice((currentPage - 1) * OFFERS_PAGE_SIZE, currentPage * OFFERS_PAGE_SIZE),
+    [offers, currentPage]
+  );
   const [loading, setLoading] = useState(false);
   const [respondTarget, setRespondTarget] = useState(null);
   const [respondLoading, setRespondLoading] = useState(false);
@@ -295,8 +283,6 @@ export default function BestOffersPage() {
   const [eligibleItems, setEligibleItems] = useState([]);
   const [eligibleTotal, setEligibleTotal] = useState(0);
   const [eligibleLoading, setEligibleLoading] = useState(false);
-  const [sendTarget, setSendTarget] = useState(null);
-  const [sendLoading, setSendLoading] = useState(false);
 
   // Shared alerts
   const [error, setError] = useState('');
@@ -313,6 +299,9 @@ export default function BestOffersPage() {
   }, []);
 
   // ── Fetch Buyer Offers ────────────────────────────────────────────────────
+  // The server walks every eBay result page internally and returns the full
+  // set of active offers in one response, so pagination here is purely a
+  // client-side slice of that list (see pagedOffers above).
   const fetchOffers = useCallback(async (page = 1) => {
     if (!selectedSeller) return;
     setLoading(true);
@@ -320,12 +309,13 @@ export default function BestOffersPage() {
     setSuccessMsg('');
     try {
       const { data } = await api.get('/ebay/best-offers', {
-        params: { sellerId: selectedSeller._id, page, limit: 20 },
+        params: { sellerId: selectedSeller._id },
       });
-      setOffers(data.offers || []);
-      setTotalPages(data.totalPages || 1);
-      setTotalEntries(data.totalEntries || 0);
-      setCurrentPage(page);
+      const fetched = data.offers || [];
+      setOffers(fetched);
+      setTotalEntries(data.totalEntries || fetched.length);
+      const maxPage = Math.max(1, Math.ceil(fetched.length / OFFERS_PAGE_SIZE));
+      setCurrentPage(Math.min(page, maxPage));
     } catch (err) {
       const msg = err.response?.data?.details || err.response?.data?.error || err.message;
       setError(`Failed to load offers: ${msg}`);
@@ -384,30 +374,6 @@ export default function BestOffersPage() {
       setError(`Action failed: ${msg}`);
     } finally {
       setRespondLoading(false);
-    }
-  };
-
-  // ── Send Offer to Interested Buyers ───────────────────────────────────────
-  const handleSendOffer = async ({ price, quantity, message, allowCounter }) => {
-    setSendLoading(true);
-    try {
-      await api.post('/ebay/eligible-offers/send', {
-        sellerId: selectedSeller._id,
-        listingId: sendTarget.listingId,
-        price,
-        currency: sendTarget.minimumOfferCurrency || 'USD',
-        quantity,
-        message,
-        allowCounter,
-      });
-      setSuccessMsg('Offer sent to interested buyers successfully.');
-      setSendTarget(null);
-      fetchEligible();
-    } catch (err) {
-      const msg = err.response?.data?.details || err.response?.data?.error || err.message;
-      setError(`Failed to send offer: ${msg}`);
-    } finally {
-      setSendLoading(false);
     }
   };
 
@@ -572,29 +538,45 @@ export default function BestOffersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  offers.map((offer, idx) => (
+                  pagedOffers.map((offer, idx) => (
                     <TableRow key={offer.bestOfferId} sx={tableBodyRowSx}>
                       <TableCell sx={tableBodyCellSx} align="center">
                         <Box component="span" sx={indexBadgeSx}>
-                          {(currentPage - 1) * 20 + idx + 1}
+                          {(currentPage - 1) * OFFERS_PAGE_SIZE + idx + 1}
                         </Box>
                       </TableCell>
 
                       {/* Item */}
-                      <TableCell sx={{ ...tableBodyCellSx, maxWidth: 240 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Tooltip title={offer.title || ''} placement="top" arrow>
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200, display: 'block' }}>
-                              {offer.title || offer.itemId}
-                            </Typography>
-                          </Tooltip>
-                          <Tooltip title="View on eBay" arrow>
-                            <IconButton size="small" onClick={() => window.open(`https://www.ebay.com/itm/${offer.itemId}`, '_blank', 'noopener')} sx={{ p: 0.3 }}>
-                              <OpenInNewIcon sx={{ fontSize: 14 }} />
-                            </IconButton>
-                          </Tooltip>
+                      <TableCell sx={{ ...tableBodyCellSx, maxWidth: 260 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {offer.imageUrl ? (
+                            <Box
+                              component="img"
+                              src={offer.imageUrl}
+                              alt=""
+                              sx={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 1, bgcolor: '#fff', border: '1px solid', borderColor: alpha(BRAND_DARK, 0.1), flexShrink: 0 }}
+                            />
+                          ) : (
+                            <Box sx={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 1, bgcolor: alpha(BRAND_DARK, 0.05), flexShrink: 0 }}>
+                              <ImageOutlinedIcon sx={{ fontSize: 24, color: alpha(BRAND_DARK, 0.3) }} />
+                            </Box>
+                          )}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Tooltip title={offer.title || ''} placement="top" arrow>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180, display: 'block' }}>
+                                  {offer.title || offer.itemId}
+                                </Typography>
+                              </Tooltip>
+                              <Tooltip title="View on eBay" arrow>
+                                <IconButton size="small" onClick={() => window.open(`https://www.ebay.com/itm/${offer.itemId}`, '_blank', 'noopener')} sx={{ p: 0.3 }}>
+                                  <OpenInNewIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">ID: {offer.itemId}</Typography>
+                          </Box>
                         </Box>
-                        <Typography variant="caption" color="text.secondary">ID: {offer.itemId}</Typography>
                       </TableCell>
 
                       {/* SKU */}
@@ -679,7 +661,7 @@ export default function BestOffersPage() {
 
           {totalPages > 1 && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2.5 }}>
-              <Pagination count={totalPages} page={currentPage} onChange={(_, p) => fetchOffers(p)} color="primary" shape="rounded" />
+              <Pagination count={totalPages} page={currentPage} onChange={(_, p) => setCurrentPage(p)} color="primary" shape="rounded" />
             </Box>
           )}
         </>
@@ -695,10 +677,10 @@ export default function BestOffersPage() {
               <TableRow>
                 <TableCell sx={tableHeaderCellSx} align="center">#</TableCell>
                   <TableCell sx={tableHeaderCellSx}>Listing</TableCell>
+                  <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'right' }}>Current Price</TableCell>
                   <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'right' }}>Min Offer Price</TableCell>
                   <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'center' }}>Interested Buyers</TableCell>
                   <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'center' }}>Status</TableCell>
-                  <TableCell sx={{ ...tableHeaderCellSx, textAlign: 'center' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
             <TableBody>
@@ -723,19 +705,51 @@ export default function BestOffersPage() {
 
                     {/* Listing */}
                     <TableCell sx={{ ...tableBodyCellSx, maxWidth: 320 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Tooltip title={item.title || ''} placement="top" arrow>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280, display: 'block' }}>
-                            {item.title || item.listingId}
-                          </Typography>
-                        </Tooltip>
-                        <Tooltip title="View on eBay" arrow>
-                          <IconButton size="small" onClick={() => window.open(`https://www.ebay.com/itm/${item.itemId || item.listingId}`, '_blank', 'noopener')} sx={{ p: 0.3 }}>
-                            <OpenInNewIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Tooltip>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {item.imageUrl ? (
+                          <Box
+                            component="img"
+                            src={item.imageUrl}
+                            alt=""
+                            sx={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 1, bgcolor: '#fff', border: '1px solid', borderColor: alpha(BRAND_DARK, 0.1), flexShrink: 0 }}
+                          />
+                        ) : (
+                          <Box sx={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 1, bgcolor: alpha(BRAND_DARK, 0.05), flexShrink: 0 }}>
+                            <ImageOutlinedIcon sx={{ fontSize: 24, color: alpha(BRAND_DARK, 0.3) }} />
+                          </Box>
+                        )}
+                        <Box sx={{ minWidth: 0 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Tooltip title={item.title || ''} placement="top" arrow>
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220, display: 'block' }}>
+                                {item.title || item.listingId}
+                              </Typography>
+                            </Tooltip>
+                            <Tooltip title="View on eBay" arrow>
+                              <IconButton size="small" onClick={() => window.open(`https://www.ebay.com/itm/${item.itemId || item.listingId}`, '_blank', 'noopener')} sx={{ p: 0.3 }}>
+                                <OpenInNewIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                          <Typography variant="caption" color="text.secondary">Listing ID: {item.listingId}</Typography>
+                          {item.bestOfferEnabled === false && (
+                            <Tooltip title="Counteroffers can't be sent for this listing until Best Offer is turned on in eBay Seller Hub." arrow>
+                              <Typography variant="caption" sx={{ display: 'block', color: 'error.main', fontWeight: 600 }}>
+                                Best Offer not enabled
+                              </Typography>
+                            </Tooltip>
+                          )}
+                        </Box>
                       </Box>
-                      <Typography variant="caption" color="text.secondary">Listing ID: {item.listingId}</Typography>
+                    </TableCell>
+
+                    {/* Current Price */}
+                    <TableCell sx={{ ...tableBodyCellSx, textAlign: 'right' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {item.currentPrice != null
+                          ? `${item.currentPriceCurrency} ${parseFloat(item.currentPrice).toFixed(2)}`
+                          : '—'}
+                      </Typography>
                     </TableCell>
 
                     {/* Min Offer Price */}
@@ -756,21 +770,6 @@ export default function BestOffersPage() {
                     <TableCell sx={{ ...tableBodyCellSx, textAlign: 'center' }}>
                       <StatusChip label={item.listingStatus} tone={item.listingStatus === 'ACTIVE' ? 'success' : 'neutral'} />
                     </TableCell>
-
-                    {/* Send Offer */}
-                    <TableCell sx={{ ...tableBodyCellSx, textAlign: 'center' }}>
-                      <Tooltip title="Send offer to interested buyers" arrow>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          startIcon={<SendIcon sx={{ fontSize: '14px !important' }} />}
-                          onClick={() => setSendTarget(item)}
-                          sx={{ bgcolor: BRAND_DARK, color: '#fff', fontWeight: 700, fontSize: '0.72rem', px: 1.2, py: 0.4, borderRadius: 1, '&:hover': { bgcolor: alpha(BRAND_DARK, 0.82) } }}
-                        >
-                          Send Offer
-                        </Button>
-                      </Tooltip>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -786,15 +785,6 @@ export default function BestOffersPage() {
         onClose={() => setRespondTarget(null)}
         onSubmit={handleRespond}
         loading={respondLoading}
-      />
-
-      {/* ── Send Offer Dialog (Eligible to Send tab) ── */}
-      <SendOfferDialog
-        open={Boolean(sendTarget)}
-        item={sendTarget}
-        onClose={() => setSendTarget(null)}
-        onSubmit={handleSendOffer}
-        loading={sendLoading}
       />
     </AdminPageShell>
   );

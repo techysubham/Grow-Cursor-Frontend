@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { alpha } from '@mui/material/styles';
 import {
     Box, Typography, Stack, Chip, Table, Fade,
@@ -33,6 +33,38 @@ import {
 } from '../../theme/tableStyles.js';
 
 const T = dashboardSignatureTokens;
+
+const PAGE_SIZE = 100;
+
+// Maps a listing's currency (from the seller SKU index) to the country vocabulary
+// used by EndListingLog / the End-Listing Stats page. Legacy UK rows carry "GB".
+const CURRENCY_TO_COUNTRY = {
+    USD: 'US',
+    AUD: 'AU',
+    CAD: 'Canada',
+    GBP: 'UK',
+    GB: 'UK',
+};
+
+function currencyToCountry(currency) {
+    if (!currency) return null;
+    return CURRENCY_TO_COUNTRY[String(currency).trim().toUpperCase()] || null;
+}
+
+// Countries selectable in the filter bar. Values match currencyToCountry output
+// and the `country` param understood by GET /sellers/sku-duplicates.
+const COUNTRY_OPTIONS = ['US', 'UK', 'AU', 'Canada'];
+
+// Distinct, currency-derived countries for a duplicate row (usually just one).
+function rowCountries(row) {
+    return [...new Set((row.currencies || []).map(currencyToCountry).filter(Boolean))];
+}
+
+// ─── Country chip helper ─────────────────────────────────────────────────────
+function CountryChip({ country, sx = {} }) {
+    if (!country) return null;
+    return <ToneChip label={country} tone="info" sx={{ height: 20, fontSize: '0.65rem', ...sx }} />;
+}
 
 // ─── Time-left helpers ───────────────────────────────────────────────────────
 function formatTimeLeft(endTime) {
@@ -79,7 +111,7 @@ function ToneChip({ label, tone = 'neutral', size = 'small', sx = {} }) {
 }
 
 // ─── ItemRow ─────────────────────────────────────────────────────────────────
-function ItemRow({ itemId, title, orderCount, endTime, loadingEndTimes, endTimesFetched, selected, onToggle }) {
+function ItemRow({ itemId, title, orderCount, country, endTime, loadingEndTimes, endTimesFetched, selected, onToggle }) {
     const [copied, setCopied] = useState(false);
     const handleCopy = (e) => {
         e.stopPropagation();
@@ -134,6 +166,8 @@ function ItemRow({ itemId, title, orderCount, endTime, loadingEndTimes, endTimes
                 tone={hasOrders ? 'success' : 'neutral'}
                 sx={{ height: 20, fontSize: '0.65rem' }}
             />
+
+            <CountryChip country={country} />
 
             {/* Time left — spinner while fetching, bold badge once loaded */}
             {loadingEndTimes && !endTime ? (
@@ -220,6 +254,23 @@ function DuplicateRow({ row, index, selectedIds, onToggle, endTimeMap, loadingEn
     const allSelected   = row.itemIds.length > 0 && row.itemIds.every(id => selectedIds.has(id));
     const someSelected  = row.itemIds.some(id => selectedIds.has(id));
     const countTone     = row.count >= 5 ? 'danger' : row.count >= 3 ? 'warning' : 'success';
+    const countries     = rowCountries(row);
+
+    // Display items ordered by ascending time-left (soonest to expire first);
+    // items with no known end time sort to the bottom.
+    const orderedItems = row.itemIds
+        .map((id, i) => ({
+            id,
+            title: row.titles?.[i],
+            orderCount: row.orderCounts?.[i] ?? 0,
+            country: currencyToCountry(row.currencies?.[i]),
+            endTime: endTimeMap?.[id] ?? null,
+        }))
+        .sort((a, b) => {
+            const at = a.endTime ? new Date(a.endTime).getTime() : Infinity;
+            const bt = b.endTime ? new Date(b.endTime).getTime() : Infinity;
+            return at - bt;
+        });
 
     const handleSelectAll = (e) => {
         e.stopPropagation();
@@ -245,6 +296,15 @@ function DuplicateRow({ row, index, selectedIds, onToggle, endTimeMap, loadingEn
                         {row.sku}
                     </Typography>
                 </TableCell>
+                <TableCell sx={{ ...tableBodyCellSx, width: 140 }}>
+                    {countries.length ? (
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                            {countries.map(c => <CountryChip key={c} country={c} />)}
+                        </Stack>
+                    ) : (
+                        <Typography variant="caption" sx={{ color: alpha(BRAND_DARK, 0.3) }}>—</Typography>
+                    )}
+                </TableCell>
                 <TableCell align="center" sx={{ ...tableBodyCellSx, width: 100 }}>
                     <ToneChip label={row.count} tone={countTone} />
                 </TableCell>
@@ -266,7 +326,7 @@ function DuplicateRow({ row, index, selectedIds, onToggle, endTimeMap, loadingEn
 
             <TableRow>
                 <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     sx={{
                         py: 0, px: 0,
                         borderBottom: open ? `1px solid ${alpha(BRAND_DARK, 0.08)}` : 'none',
@@ -292,16 +352,17 @@ function DuplicateRow({ row, index, selectedIds, onToggle, endTimeMap, loadingEn
                                 </Box>
                             </Box>
                             <Stack spacing={0.1}>
-                                {row.itemIds.map((id, i) => (
+                                {orderedItems.map(item => (
                                     <ItemRow
-                                        key={id}
-                                        itemId={id}
-                                        title={row.titles?.[i]}
-                                        orderCount={row.orderCounts?.[i] ?? 0}
-                                        endTime={endTimeMap?.[id] ?? null}
+                                        key={item.id}
+                                        itemId={item.id}
+                                        title={item.title}
+                                        orderCount={item.orderCount}
+                                        country={item.country}
+                                        endTime={item.endTime}
                                         loadingEndTimes={loadingEndTimes}
                                         endTimesFetched={endTimesFetched}
-                                        selected={selectedIds.has(id)}
+                                        selected={selectedIds.has(item.id)}
                                         onToggle={(itemId) => onToggle(itemId)}
                                     />
                                 ))}
@@ -318,6 +379,7 @@ function DuplicateRow({ row, index, selectedIds, onToggle, endTimeMap, loadingEn
 export default function DuplicateSkusPage() {
     const [sellers, setSellers] = useState([]);
     const [sellerId, setSellerId] = useState('');
+    const [country, setCountry] = useState(''); // '' = all countries
     const [result, setResult] = useState(null);
     const [loadingSellers, setLoadingSellers] = useState(true);
     const [loading, setLoading] = useState(false);
@@ -334,11 +396,37 @@ export default function DuplicateSkusPage() {
     const [loadingEndTimes, setLoadingEndTimes] = useState(false);
     const [endTimesFetched, setEndTimesFetched] = useState(false);
 
+    // Set before a result refresh that should NOT auto-select (i.e. after an end
+    // operation), so we only auto-select on a fresh search / page change.
+    const suppressAutoSelectRef = useRef(false);
+
     // End-listing
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [ending, setEnding] = useState(false);
     const [endProgress, setEndProgress] = useState({ done: 0, total: 0, errors: [] });
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+    // itemId → country (derived from the listing currency), so ended listings are
+    // tagged with a country instead of landing under "Unknown" in End-Listing Stats.
+    const countryByItemId = useMemo(() => {
+        const map = {};
+        for (const dup of result?.duplicates ?? []) {
+            dup.itemIds.forEach((id, i) => {
+                map[id] = currencyToCountry(dup.currencies?.[i]);
+            });
+        }
+        return map;
+    }, [result]);
+
+    // itemId → SKU, so ended listings are logged with their SKU (enables SKU
+    // lookup on the End-Listing Lookup page).
+    const skuByItemId = useMemo(() => {
+        const map = {};
+        for (const dup of result?.duplicates ?? []) {
+            dup.itemIds.forEach(id => { map[id] = dup.sku; });
+        }
+        return map;
+    }, [result]);
 
     useEffect(() => {
         api.get('/sellers/all')
@@ -361,21 +449,47 @@ export default function DuplicateSkusPage() {
             params: { sellerId, itemIds: ids.join(',') },
             signal: controller.signal,
         })
-            .then(({ data }) => setEndTimeMap(data))
+            .then(({ data }) => {
+                setEndTimeMap(data);
+                // Skip auto-selection when this refresh followed an end operation —
+                // we only auto-select on a fresh search / page change.
+                if (suppressAutoSelectRef.current) {
+                    suppressAutoSelectRef.current = false;
+                    return;
+                }
+                // Auto-select, per SKU row, the soonest-expiring listing that has
+                // no orders. Items are ranked by ascending time-left (nearest end
+                // time first); the first no-order listing in that order is chosen.
+                const autoIds = [];
+                for (const dup of result.duplicates) {
+                    const firstNoOrder = dup.itemIds
+                        .map((id, i) => ({ id, orderCount: dup.orderCounts?.[i] ?? 0, endTime: data[id] }))
+                        .filter(c => c.orderCount === 0 && c.endTime)
+                        .sort((a, b) => new Date(a.endTime).getTime() - new Date(b.endTime).getTime())[0];
+                    if (firstNoOrder) autoIds.push(firstNoOrder.id);
+                }
+                if (autoIds.length) {
+                    setSelectedIds(prev => {
+                        const next = new Set(prev);
+                        autoIds.forEach(id => next.add(id));
+                        return next;
+                    });
+                }
+            })
             .catch(err => { if (err?.name !== 'CanceledError' && err?.code !== 'ERR_CANCELED') { /* ignore */ } })
             .finally(() => { setLoadingEndTimes(false); setEndTimesFetched(true); });
 
         return () => controller.abort(); // cancel if page changes before response arrives
     }, [result, sellerId]);
 
-    const fetchPage = useCallback(async (p, sid) => {
+    const fetchPage = useCallback(async (p, sid, ctry) => {
         setLoading(true);
         setError(null);
         setEndTimeMap({});
         setEndTimesFetched(false);
         try {
             const { data } = await api.get('/sellers/sku-duplicates', {
-                params: { sellerId: sid, page: p, limit: 25 },
+                params: { sellerId: sid, page: p, limit: PAGE_SIZE, ...(ctry ? { country: ctry } : {}) },
             });
             setResult(data);
             setPage(p);
@@ -392,12 +506,12 @@ export default function DuplicateSkusPage() {
         setSelectedIds(new Set());
         setEndTimeMap({});
         setPage(1);
-        fetchPage(1, sellerId);
-    }, [sellerId, fetchPage]);
+        fetchPage(1, sellerId, country);
+    }, [sellerId, country, fetchPage]);
 
     const handlePageChange = useCallback((_, value) => {
-        fetchPage(value, sellerId);
-    }, [sellerId, fetchPage]);
+        fetchPage(value, sellerId, country);
+    }, [sellerId, country, fetchPage]);
 
     const handleToggle = useCallback((itemId, forceValue) => {
         setSelectedIds(prev => {
@@ -428,6 +542,8 @@ export default function DuplicateSkusPage() {
                     itemId: ids[i],
                     endingReason: 'NotAvailable',
                     source: 'duplicate_sku',
+                    country: countryByItemId[ids[i]] || null,
+                    sku: skuByItemId[ids[i]] || null,
                 });
             } catch (e) {
                 errors.push({ itemId: ids[i], msg: e?.response?.data?.error || e.message });
@@ -441,6 +557,9 @@ export default function DuplicateSkusPage() {
         const succeeded = ids.filter(id => !failedIds.has(id));
         setSelectedIds(new Set());
         if (result) {
+            // The result refresh below re-runs the end-times fetch; don't let it
+            // auto-select the next listings after an end.
+            suppressAutoSelectRef.current = true;
             setResult(prev => ({
                 ...prev,
                 duplicates: prev.duplicates
@@ -455,6 +574,7 @@ export default function DuplicateSkusPage() {
                             itemIds: kept.map(i => row.itemIds[i]),
                             titles: kept.map(i => row.titles?.[i]),
                             orderCounts: kept.map(i => row.orderCounts?.[i] ?? 0),
+                            currencies: kept.map(i => row.currencies?.[i]),
                         };
                     })
                     .filter(row => row.count > 1),
@@ -510,6 +630,25 @@ export default function DuplicateSkusPage() {
                                         <MenuItem key={s._id} value={s._id}>
                                             {s.user?.username || s.user?.email || s._id}
                                         </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+
+                            <FormControl size="small" sx={{ minWidth: 160 }}>
+                                <InputLabel>Country</InputLabel>
+                                <Select
+                                    value={country}
+                                    label="Country"
+                                    onChange={e => {
+                                        setCountry(e.target.value);
+                                        setResult(null);
+                                        setSelectedIds(new Set());
+                                        setPage(1);
+                                    }}
+                                >
+                                    <MenuItem value="">All countries</MenuItem>
+                                    {COUNTRY_OPTIONS.map(c => (
+                                        <MenuItem key={c} value={c}>{c}</MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
@@ -640,6 +779,7 @@ export default function DuplicateSkusPage() {
                                             <TableRow>
                                                 <TableCell sx={{ ...tableHeaderCellSx, width: 56 }}>#</TableCell>
                                                 <TableCell sx={tableHeaderCellSx}>SKU</TableCell>
+                                                <TableCell sx={{ ...tableHeaderCellSx, width: 140 }}>Country</TableCell>
                                                 <TableCell align="center" sx={{ ...tableHeaderCellSx, width: 100 }}>Listings</TableCell>
                                                 <TableCell sx={{ ...tableHeaderCellSx, width: 52 }} />
                                             </TableRow>
@@ -649,7 +789,7 @@ export default function DuplicateSkusPage() {
                                                 <DuplicateRow
                                                     key={row.sku}
                                                     row={row}
-                                                    index={(page - 1) * 25 + i}
+                                                    index={(page - 1) * PAGE_SIZE + i}
                                                     selectedIds={selectedIds}
                                                     onToggle={handleToggle}
                                                     endTimeMap={endTimeMap}

@@ -93,11 +93,47 @@ const ALL_COLUMNS = [
   { id: 'cardName', label: 'Card Name' },
   { id: 'notes', label: 'Notes' },
   { id: 'messagingStatus', label: 'Messaging' },
+  { id: 'buyerSla', label: 'Buyer SLA' },
   { id: 'remark', label: 'Remark' },
   { id: 'alreadyInUse', label: 'Already in use' }
 ];
 
 // ... (Rest of the file remains unchanged until ManualTrackingCell)
+
+// Buyer SLA: same 24h reply-window logic as ConversationManagementPage, based on
+// the last buyer/seller message timestamps the backend attaches per order.
+const SLA_ONE_HOUR_MS = 60 * 60 * 1000;
+const SLA_ONE_DAY_MS = 24 * SLA_ONE_HOUR_MS;
+
+function slaParseTimeMs(value) {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function slaFormatElapsed(ms) {
+  if (ms < SLA_ONE_HOUR_MS) return '<1 hr';
+  if (ms < SLA_ONE_DAY_MS) return `${Math.floor(ms / SLA_ONE_HOUR_MS)} hr(s)`;
+  return `${Math.floor(ms / SLA_ONE_DAY_MS)} day(s)`;
+}
+
+function getBuyerSlaLabel(order, nowMs) {
+  const buyerMs = slaParseTimeMs(order.lastBuyerMessageAt);
+  const sellerMs = slaParseTimeMs(order.lastSellerMessageAt);
+
+  if (!buyerMs) return { label: 'No buyer message', color: 'default' };
+
+  if (sellerMs && sellerMs >= buyerMs) {
+    return { label: `Replied ${slaFormatElapsed(nowMs - sellerMs)} ago`, color: 'success' };
+  }
+
+  const remainingMs = SLA_ONE_DAY_MS - (nowMs - buyerMs);
+  if (remainingMs > 0) {
+    return { label: `${slaFormatElapsed(remainingMs)} left`, color: 'warning' };
+  }
+
+  return { label: `Overdue ${slaFormatElapsed(Math.abs(remainingMs))}`, color: 'error' };
+}
 
 // Helper to get unique item IDs from order
 function getUniqueItemIds(order) {
@@ -391,6 +427,7 @@ function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
                           <MenuItem value="AUSTRALIA_POST">Australia Post</MenuItem>
                           <MenuItem value="AUSTRALIA_POST_GLOBAL">Australia Post Global</MenuItem>
                           <MenuItem value="ARAMEX_AUSTRALIA">Aramex Australia</MenuItem>
+                          <MenuItem value="TNT_AUSTRALIA">TNT Australia</MenuItem>
                           <MenuItem value="OTHER">Other</MenuItem>
                         </Select>
                       </FormControl>
@@ -417,6 +454,7 @@ function ManualTrackingCell({ order, onSaved, onCopy, onNotify }) {
                 <MenuItem value="AUSTRALIA_POST">Australia Post</MenuItem>
                 <MenuItem value="AUSTRALIA_POST_GLOBAL">Australia Post Global</MenuItem>
                 <MenuItem value="ARAMEX_AUSTRALIA">Aramex Australia</MenuItem>
+                <MenuItem value="TNT_AUSTRALIA">TNT Australia</MenuItem>
                 <MenuItem value="OTHER">Other</MenuItem>
               </Select>
             </FormControl>
@@ -452,6 +490,12 @@ export default function AwaitingShipmentPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [expandedShipping, setExpandedShipping] = useState({});
   const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
   const [selectedOrderForMessage, setSelectedOrderForMessage] = useState(null);
@@ -1145,6 +1189,17 @@ export default function AwaitingShipmentPage() {
             </Tooltip>
           </Box>
         );
+      case 'buyerSla': {
+        const buyerSla = getBuyerSlaLabel(order, nowMs);
+        return (
+          <Chip
+            label={buyerSla.label}
+            color={buyerSla.color}
+            size="small"
+            variant={buyerSla.color === 'default' ? 'outlined' : 'filled'}
+          />
+        );
+      }
       case 'remark':
         return (
           <FormControl size="small" sx={{ minWidth: 150 }}>

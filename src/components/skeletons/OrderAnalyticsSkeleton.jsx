@@ -25,10 +25,32 @@ export default function OrderAnalyticsSkeleton() {
         </Stack>
       </Paper>
 
-      {/* Data table */}
-      <Skeleton variant="rounded" height={52} sx={{ mb: '2px', borderRadius: 1 }} />
-      {Array.from({ length: 10 }).map((_, i) => (
-        <Skeleton key={i} variant="rounded" height={44} sx={{ mb: '2px', opacity: 1 - i * 0.06 }} />
+      {/* Daily breakdown table — first section, open by default */}
+      <Paper sx={{ p: 2.5, mb: 3 }} elevation={0}>
+        <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ mb: 2 }}>
+          <Skeleton variant="circular" width={24} height={24} sx={{ mt: 0.5 }} />
+          <Box>
+            <Skeleton variant="text" width={200} height={30} />
+            <Skeleton variant="text" width={320} height={18} />
+          </Box>
+        </Stack>
+        <Skeleton variant="rounded" height={52} sx={{ mb: '2px', borderRadius: 1 }} />
+        {Array.from({ length: 10 }).map((_, i) => (
+          <Skeleton key={i} variant="rounded" height={44} sx={{ mb: '2px', opacity: 1 - i * 0.06 }} />
+        ))}
+      </Paper>
+
+      {/* Trends and comparison — collapsed by default, so just their headers */}
+      {['trends', 'compare'].map((section) => (
+        <Paper key={section} sx={{ p: 2.5, mb: 3 }} elevation={0}>
+          <Stack direction="row" alignItems="flex-start" spacing={1}>
+            <Skeleton variant="circular" width={24} height={24} sx={{ mt: 0.5 }} />
+            <Box>
+              <Skeleton variant="text" width={200} height={30} />
+              <Skeleton variant="text" width={320} height={18} />
+            </Box>
+          </Stack>
+        </Paper>
       ))}
     </Box>
     </Fade>

@@ -307,6 +307,7 @@ export default function AutoCompatibilityPage() {
   const [aiSuggestedEngines, setAiSuggestedEngines] = useState([]);
   const [aiExcludedEngines, setAiExcludedEngines] = useState([]);
   const [aiSelectAllWhenUnfiltered, setAiSelectAllWhenUnfiltered] = useState(false);
+  const [aiAllFitments, setAiAllFitments] = useState([]); // all fitments from live AI Suggest (multi make/model/year)
 
   // History
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -584,6 +585,7 @@ export default function AutoCompatibilityPage() {
     setReviewIndex(0);
     setReviewAsinCache({});
     setReviewItem(null);
+    setAiAllFitments([]);
     try {
       const { data } = await api.get(`/ebay/auto-compatibility-batch/${batchId}`);
       setFullBatch(data);
@@ -686,6 +688,7 @@ export default function AutoCompatibilityPage() {
     setAiSuggestedEngines([]);
     setAiExcludedEngines([]);
     setAiSelectAllWhenUnfiltered(false);
+    setAiAllFitments([]);
   };
 
   const removeExistingCompatibility = async () => {
@@ -721,9 +724,12 @@ export default function AutoCompatibilityPage() {
     }
   };
 
-  // AI SUGGEST FITMENT
-  const handleAiSuggest = async () => {
-    if (!reviewItem || !sellerId) return;
+  // Load one AI fitment (make/model/year range + trim/engine hints) into the vehicle
+  // picker. Used by "AI Suggest" (best fitment) and by the per-fitment chips so the
+  // reviewer can add EVERY make/model/year the AI found, one after another.
+  const applyFitmentToPicker = async (data) => {
+    const resolvedSellerId = fullBatch?.seller?._id || sellerId;
+    if (!reviewItem || !resolvedSellerId) return;
     setAiLoading(true);
     setLoadingModels(true);
     setAiSuggestedTrims([]);
@@ -732,17 +738,6 @@ export default function AutoCompatibilityPage() {
     setAiExcludedEngines([]);
     setAiSelectAllWhenUnfiltered(false);
     try {
-      const { data } = await api.post('/ai/suggest-fitment', {
-        title: reviewItem.title || '',
-        description: reviewItem.descriptionPreview || ''
-      });
-      if (!data.make) {
-        setSnackbar({ open: true, message: 'AI could not extract fitment info from this listing', severity: 'warning' });
-        setAiLoading(false);
-        setLoadingModels(false);
-        return;
-      }
-
       // Step 1: Resolve Make alias (Chevy→Chevrolet etc.) then fetch models
       const resolvedMake = resolveMake(data.make);
       const resolvedModelStep1 = resolveModel(resolvedMake, data.model);
@@ -764,7 +759,7 @@ export default function AutoCompatibilityPage() {
       setAiSelectAllWhenUnfiltered(true);
 
       const modelsRes = await api.post('/ebay/compatibility/values', {
-        sellerId,
+        sellerId: resolvedSellerId,
         propertyName: 'Model',
         constraints: [{ name: 'Make', value: resolvedMake }]
       });
@@ -787,7 +782,7 @@ export default function AutoCompatibilityPage() {
       setSelectedYears([]);
       try {
         const yearsRes = await api.post('/ebay/compatibility/values', {
-          sellerId,
+          sellerId: resolvedSellerId,
           propertyName: 'Year',
           constraints: [
             { name: 'Make', value: resolvedMake },
@@ -828,6 +823,28 @@ export default function AutoCompatibilityPage() {
     } finally {
       setLoadingModels(false);
       setAiLoading(false);
+    }
+  };
+
+  // AI SUGGEST FITMENT
+  const handleAiSuggest = async () => {
+    if (!reviewItem || !sellerId) return;
+    setAiLoading(true);
+    try {
+      const { data } = await api.post('/ai/suggest-fitment', {
+        title: reviewItem.title || '',
+        description: reviewItem.descriptionPreview || ''
+      });
+      if (!data.make) {
+        setSnackbar({ open: true, message: 'AI could not extract fitment info from this listing', severity: 'warning' });
+        setAiLoading(false);
+        return;
+      }
+      setAiAllFitments((data.allFitments || []).filter(f => f?.make && f?.model));
+      await applyFitmentToPicker(data);
+    } catch (e) {
+      setAiLoading(false);
+      setSnackbar({ open: true, message: 'AI suggestion failed: ' + (e.response?.data?.error || e.message), severity: 'error' });
     }
   };
 
@@ -1294,6 +1311,7 @@ export default function AutoCompatibilityPage() {
       setAiSuggestedEngines([]);
       setAiExcludedEngines([]);
       setAiSelectAllWhenUnfiltered(false);
+      setAiAllFitments([]);
     } else {
       setReviewItem(updatedItems[reviewIndex]);
     }
@@ -2271,7 +2289,17 @@ export default function AutoCompatibilityPage() {
                       }
                     </Typography>
                   )}
-                  {detailItem.aiSuggestion.allFitments?.length > 1 && (
+                  {detailItem.fitmentResults?.length > 0 ? (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="caption" color="textSecondary">All AI fitments (processing result):</Typography>
+                      {detailItem.fitmentResults.map((f, i) => (
+                        <Typography key={i} variant="caption" display="block" sx={{ color: f.status === 'applied' ? 'success.main' : 'error.main' }}>
+                          {f.status === 'applied' ? '✓' : '✗'} {f.resolvedMake || f.make} {f.resolvedModel || f.model} {f.startYear && `(${f.startYear}–${f.endYear})`}
+                          {f.status === 'applied' ? ` — ${f.entryCount} entries` : f.reason ? ` — ${f.reason}` : ''}
+                        </Typography>
+                      ))}
+                    </Box>
+                  ) : detailItem.aiSuggestion.allFitments?.length > 1 && (
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="caption" color="textSecondary">All AI fitments found:</Typography>
                       {detailItem.aiSuggestion.allFitments.map((f, i) => (
@@ -2340,6 +2368,7 @@ export default function AutoCompatibilityPage() {
                 <SmartToyIcon sx={{ fontSize: 14, color: '#7c3aed' }} />
                 <Typography variant="caption" fontWeight={700} sx={{ color: '#7c3aed' }}>
                   AI Suggestion: {reviewItem.aiSuggestion.make} {reviewItem.aiSuggestion.model} ({reviewItem.aiSuggestion.startYear || '?'}–{reviewItem.aiSuggestion.endYear || '?'})
+                  {reviewItem.aiSuggestion.allFitments?.length > 1 && ` +${reviewItem.aiSuggestion.allFitments.length - 1} more vehicle${reviewItem.aiSuggestion.allFitments.length > 2 ? 's' : ''}`}
                 </Typography>
                 {reviewItem.resolvedMake && (
                   <Chip label={`→ ${reviewItem.resolvedMake} ${reviewItem.resolvedModel}`} color="primary" size="small" sx={{ height: 20 }} />
@@ -2481,6 +2510,17 @@ export default function AutoCompatibilityPage() {
                   <Typography variant="caption" display="block" color="primary.main" sx={{ mt: 0.5 }}>
                     → Resolved: {reviewItem.resolvedMake} {reviewItem.resolvedModel}
                   </Typography>
+                )}
+                {reviewItem.fitmentResults?.length > 1 && (
+                  <Box sx={{ mt: 0.5 }}>
+                    {reviewItem.fitmentResults.map((f, i) => (
+                      <Typography key={i} variant="caption" display="block" sx={{ color: f.status === 'applied' ? 'success.main' : 'error.main' }}>
+                        {f.status === 'applied' ? '✓' : '✗'} {f.resolvedMake || f.make} {f.resolvedModel || f.model}
+                        {f.startYear && ` (${f.startYear}–${f.endYear})`}
+                        {f.status === 'applied' ? ` — ${f.entryCount} entries` : f.reason ? ` — ${f.reason}` : ''}
+                      </Typography>
+                    ))}
+                  </Box>
                 )}
                 {reviewItem.failureReason && (
                   <Typography variant="caption" display="block" color="error.main" sx={{ mt: 0.5 }}>
@@ -2629,6 +2669,44 @@ export default function AutoCompatibilityPage() {
                     <Typography variant="caption" sx={{ color: trimStrategySummary.textColor, fontWeight: 600 }}>
                       {trimStrategySummary.text}
                     </Typography>
+                  </Box>
+                );
+              })()}
+              {(() => {
+                // All make/model/year fitments — live AI result first, else the ones stored by the cron batch
+                const fitmentChips = (aiAllFitments.length > 0
+                  ? aiAllFitments
+                  : (reviewItem?.aiSuggestion?.allFitments || [])).filter(f => f?.make && f?.model);
+                if (fitmentChips.length === 0) return null;
+                const frKey = (f) => [String(f.make || '').toLowerCase(), String(f.model || '').toLowerCase(), f.startYear || '', f.endYear || ''].join('|');
+                const resultByKey = {};
+                (reviewItem?.fitmentResults || []).forEach(fr => { resultByKey[frKey(fr)] = fr; });
+                return (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5, p: 0.75, bgcolor: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 1 }}>
+                    <Typography variant="caption" sx={{ width: '100%', color: '#7c3aed', fontWeight: 700 }}>
+                      AI found {fitmentChips.length} vehicle{fitmentChips.length > 1 ? 's' : ''} — click one to load it into the picker, then press "Add Vehicle(s)":
+                    </Typography>
+                    {fitmentChips.map((f, i) => {
+                      const fr = resultByKey[frKey(f)];
+                      const label = `${f.make} ${f.model}${f.startYear ? ` ${f.startYear}–${f.endYear}` : ''}${fr ? (fr.status === 'applied' ? ' ✓' : ' ✗') : ''}`;
+                      return (
+                        <Chip
+                          key={i}
+                          size="small"
+                          clickable
+                          disabled={aiLoading}
+                          onClick={() => applyFitmentToPicker(f)}
+                          label={label}
+                          title={fr?.reason || ''}
+                          sx={{
+                            bgcolor: fr?.status === 'failed' ? '#fee2e2' : '#ede9fe',
+                            color: fr?.status === 'failed' ? '#991b1b' : '#5b21b6',
+                            fontWeight: 600,
+                            '&:hover': { bgcolor: fr?.status === 'failed' ? '#fecaca' : '#ddd6fe' }
+                          }}
+                        />
+                      );
+                    })}
                   </Box>
                 );
               })()}

@@ -24,6 +24,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LayersIcon from '@mui/icons-material/Layers';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import usePageAccess from '../../hooks/usePageAccess';
 import { PAGE_CATEGORIES, PAGE_REGISTRY, SUBMENUS } from '../../constants/pages';
 import {
@@ -72,6 +73,20 @@ const ROLE_LABELS = {
   trainee:             'Trainee',
   seller:              'Seller',
 };
+
+const HOLIDAYS = [
+  { month: 'FEB', day: 15, name: 'Shiv Ratri',       weekday: 'Sun' },
+  { month: 'MAR', day: 4,  name: 'Holi',             weekday: 'Wed' },
+  { month: 'MAR', day: 26, name: 'Rama Navami',      weekday: 'Thu' },
+  { month: 'JUN', day: 15, name: 'Raja Sankranti',   weekday: 'Mon' },
+  { month: 'JUL', day: 16, name: 'Rath Yatra',       weekday: 'Thu' },
+  { month: 'AUG', day: 28, name: 'Raksha Bandhan',   weekday: 'Fri' },
+  { month: 'SEP', day: 4,  name: 'Janmashtami',      weekday: 'Fri' },
+  { month: 'SEP', day: 14, name: 'Ganesh Chaturthi', weekday: 'Mon' },
+  { month: 'OCT', day: 19, name: 'Maha Ashtami',     weekday: 'Mon' },
+  { month: 'OCT', day: 20, name: 'Dussehra',         weekday: 'Tue' },
+  { month: 'NOV', day: 8,  name: 'Diwali',           weekday: 'Sun' },
+];
 
 const QUICK_LINKS = [
   { label: 'About Me',      path: '/admin/about-me',           icon: PersonIcon,         color: '#8b5cf6' },
@@ -188,6 +203,10 @@ export default function WelcomePage({ user }) {
           </Box>
         </Box>
       </Paper>
+
+      {/* ─── MAIN + HOLIDAYS SIDEBAR ─────────────────────────────────────── */}
+      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', flexDirection: { xs: 'column', lg: 'row' } }}>
+        <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
 
       {/* ─── QUICK LINKS (non-superadmin) ────────────────────────────────── */}
       {!isSuper && (
@@ -380,7 +399,110 @@ export default function WelcomePage({ user }) {
           </Grid>
         </>
       )}
+        </Box>
+
+        {/* ─── HOLIDAYS CARD (right corner) ──────────────────────────────── */}
+        <Box sx={{ width: { xs: '100%', lg: 320 }, flexShrink: 0 }}>
+          <HolidayCard />
+        </Box>
+      </Box>
     </Box>
+  );
+}
+
+function HolidayCard() {
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        borderRadius: 3,
+        border: '1px solid #fde68a',
+        overflow: 'hidden',
+        position: { lg: 'sticky' },
+        top: 24,
+      }}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          p: 2,
+          background: 'linear-gradient(135deg,#f59e0b,#d97706)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+        }}
+      >
+        <Box
+          sx={{
+            width: 38,
+            height: 38,
+            borderRadius: 2,
+            bgcolor: 'rgba(255,255,255,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <CalendarMonthIcon sx={{ color: '#fff', fontSize: '1.3rem' }} />
+        </Box>
+        <Box>
+          <Typography sx={{ fontWeight: 800, color: '#fff', fontSize: '0.95rem', lineHeight: 1.2 }}>
+            Upcoming Holidays
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+            {new Date().getFullYear()}
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* List */}
+      <Box sx={{ p: 1.2 }}>
+        {HOLIDAYS.map(h => (
+          <Box
+            key={h.name}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.2,
+              px: 1,
+              py: 0.8,
+              borderRadius: 2,
+              transition: 'background-color 0.15s',
+              '&:hover': { bgcolor: '#fffbeb' },
+            }}
+          >
+            {/* Date badge */}
+            <Box
+              sx={{
+                flexShrink: 0,
+                width: 42,
+                textAlign: 'center',
+                borderRadius: 1.5,
+                border: '1px solid #fde68a',
+                overflow: 'hidden',
+              }}
+            >
+              <Typography sx={{ fontSize: '0.55rem', fontWeight: 800, bgcolor: '#fef3c7', color: '#b45309', py: 0.2, letterSpacing: '0.06em' }}>
+                {h.month}
+              </Typography>
+              <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: BRAND_DARK, lineHeight: 1.35 }}>
+                {h.day}
+              </Typography>
+            </Box>
+            {/* Name + weekday */}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography noWrap sx={{ fontWeight: 600, fontSize: '0.82rem', color: '#334155', lineHeight: 1.25 }}>
+                {h.name}
+              </Typography>
+              <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 500 }}>
+                {h.weekday}
+              </Typography>
+            </Box>
+          </Box>
+        ))}
+      </Box>
+    </Card>
   );
 }
 

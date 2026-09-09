@@ -6,7 +6,7 @@ import {
   TableHead, TableRow, Typography, IconButton, Dialog, DialogTitle, 
   DialogContent, DialogActions, Alert, Pagination, TextField, Tabs, Tab, MenuItem,
   Chip, CircularProgress, Switch, FormControlLabel, LinearProgress, FormControl, Divider,
-  InputLabel, Select, Breadcrumbs, Link, Checkbox, OutlinedInput, Tooltip
+  InputLabel, Select, Breadcrumbs, Link, Checkbox, OutlinedInput, Tooltip, FormHelperText
 } from '@mui/material';
 import { 
   Delete as DeleteIcon, 
@@ -53,6 +53,11 @@ function extractMarketplace(customActionField) {
 }
 const MARKETPLACE_TO_COUNTRY = { Australia: 'AU', US: 'US', UK: 'UK', Canada: 'Canada', Motors: 'US' };
 
+// Tells the server this batch wants no overlay at all, which is different from
+// not saying anything — that inherits the template's default badge. Must match
+// NO_OVERLAY in the backend's utils/overlayImage.js.
+const NO_OVERLAY = 'none';
+
 export default function TemplateListingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -64,6 +69,9 @@ export default function TemplateListingsPage() {
   const fromAsinList = searchParams.get('fromAsinList') === 'true';
 
   const [template, setTemplate] = useState(null);
+  // The badge the server falls back to when the batch names none. Drives both
+  // the picker's wording and whether "no overlay" needs to be sent explicitly.
+  const defaultOverlayOption = template?.overlayOptions?.find(o => o.isDefault) || null;
   const [listings, setListings] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
   const [loading, setLoading] = useState(false);
@@ -102,6 +110,16 @@ export default function TemplateListingsPage() {
   const [asinError, setAsinError] = useState('');
   const [asinSuccess, setAsinSuccess] = useState('');
   const [autoFilledFields, setAutoFilledFields] = useState(new Set());
+  // Overlay badge applied to the primary image of every ASIN in this batch.
+  // Empty string means "no preference", which the server reads as the
+  // template's default badge — NOT as "no overlay". Opting out is NO_OVERLAY.
+  // Options come from the template.
+  const [overlayBadgeId, setOverlayBadgeId] = useState('');
+  // Whether this batch will end up badged, which is what the confirmation
+  // message should reflect — not merely whether a badge was picked by hand.
+  const overlayExpected = overlayBadgeId
+    ? overlayBadgeId !== NO_OVERLAY
+    : Boolean(defaultOverlayOption);
 
   // Bulk mode state
   const [bulkMode, setBulkMode] = useState(true);
@@ -473,6 +491,10 @@ export default function TemplateListingsPage() {
         : `/listing-templates/${templateId}`;
       const { data } = await api.get(endpoint);
       setTemplate(data);
+      // A badge chosen for the previous template means nothing under this one,
+      // and would leave the picker showing a value it no longer offers. Back to
+      // "no preference", which resolves to whatever this template defaults to.
+      setOverlayBadgeId('');
     } catch (err) {
       setError('Failed to fetch template');
       console.error(err);
@@ -745,7 +767,11 @@ export default function TemplateListingsPage() {
       const { data } = await api.post('/template-listings/autofill-from-asin', {
         asin: asinInput.trim(),
         templateId,
-        region
+        // Needed for the overlay: the composited image is hosted on the
+        // seller's eBay account.
+        sellerId,
+        region,
+        overlayBadgeId
       });
 
       const { coreFields, customFields } = data.autoFilledData;
@@ -783,7 +809,18 @@ export default function TemplateListingsPage() {
       } else if (data.pricingCalculation?.error) {
         console.error('Pricing calculation error:', data.pricingCalculation.error);
       }
-      
+
+      // Say so either way — an overlay that silently doesn't apply is the one
+      // failure you can't see from this form, since there's no image preview.
+      // Keyed off whether a badge was *expected*, not whether one was picked:
+      // a template default applies with the picker left untouched, and that is
+      // the case most likely to go unnoticed.
+      if (overlayExpected) {
+        successMsg += data.overlayApplied
+          ? `\n🏷️ Overlay applied to the main image`
+          : `\n⚠️ Overlay was NOT applied — the main image is the original Amazon photo`;
+      }
+
       setAsinSuccess(successMsg);
     } catch (err) {
       setAsinError(err.response?.data?.error || 'Failed to auto-fill from ASIN');
@@ -868,7 +905,8 @@ export default function TemplateListingsPage() {
       const asinParam = asins.join(',');
       const authToken = getAuthToken();
       const cacheParam = preferCachedAmazonData ? '&preferCachedAmazonData=true' : '';
-      const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(effectiveRegion)}&token=${encodeURIComponent(authToken)}${cacheParam}`;
+      const overlayParam = overlayBadgeId ? `&overlayBadgeId=${encodeURIComponent(overlayBadgeId)}` : '';
+      const sseUrl = `/template-listings/bulk-preview-stream?templateId=${templateId}&sellerId=${sellerId}&asins=${encodeURIComponent(asinParam)}&region=${encodeURIComponent(effectiveRegion)}&token=${encodeURIComponent(authToken)}${cacheParam}${overlayParam}`;
       
       if (window._currentEventSource) {
         window._currentEventSource.close();
@@ -932,8 +970,16 @@ export default function TemplateListingsPage() {
                     }
                   : item
               )));
+
+              // The single-ASIN path says so on screen when an overlay doesn't
+              // apply; without this the bulk path stayed silent about it. The
+              // log, not the item: the 'item' message below replaces the item
+              // wholesale, so anything stashed on it here would be lost.
+              if (message.overlayWarning) {
+                setProcessingLog(prev => [...prev, `⚠️ ${message.asin}: ${message.overlayWarning}`]);
+              }
               break;
-              
+
             case 'item':
               // Update preview items with completed item
               setPreviewItems(prev => {
@@ -2032,7 +2078,45 @@ export default function TemplateListingsPage() {
                     ))}
                   </Select>
                 </FormControl>
-                
+
+                {/* Only rendered when the template has badges configured, so
+                    templates that don't use overlays are unchanged. */}
+                {template?.overlayOptions?.length > 0 && (
+                  <FormControl size="small" sx={{ maxWidth: 280 }}>
+                    <InputLabel>Image overlay</InputLabel>
+                    <Select
+                      value={overlayBadgeId}
+                      label="Image overlay"
+                      onChange={(e) => setOverlayBadgeId(e.target.value)}
+                      disabled={loadingAsin || loadingBulk}
+                    >
+                      {/* Empty means "no preference", which the server resolves
+                          to the template default. Labelled as such so it can't
+                          read as "no overlay" while quietly badging the batch. */}
+                      <MenuItem value="">
+                        {defaultOverlayOption
+                          ? `Template default — ${defaultOverlayOption.label || defaultOverlayOption.badgeKey}`
+                          : 'None'}
+                      </MenuItem>
+                      {template.overlayOptions.map((opt) => (
+                        <MenuItem key={opt.badgeKey} value={opt.badgeKey}>
+                          {opt.label || opt.badgeKey}
+                        </MenuItem>
+                      ))}
+                      {/* Only meaningful when there is a default to override.
+                          Without one, the empty option already means no badge. */}
+                      {defaultOverlayOption && (
+                        <MenuItem value={NO_OVERLAY}>None — no overlay on this batch</MenuItem>
+                      )}
+                    </Select>
+                    <FormHelperText>
+                      {overlayExpected
+                        ? 'Applied to the main image — check it matches every ASIN in this batch'
+                        : 'No overlay will be applied to this batch'}
+                    </FormHelperText>
+                  </FormControl>
+                )}
+
                 <Stack direction="row" spacing={2}>
                   {!bulkMode ? (
                     <Button
@@ -2828,6 +2912,7 @@ export default function TemplateListingsPage() {
         marketplace={region}
         sellerId={sellerId}
         templateName={template?.name}
+        templateId={templateId}
         onClose={() => {
           // Clean up EventSource if still active
           if (window._currentEventSource) {

@@ -50,6 +50,41 @@ import {
 } from '../../constants/remarkTemplates';
 import AmazonArrivalsSkeleton from '../../components/skeletons/AmazonArrivalsSkeleton';
 
+// Buyer SLA: same 24h reply-window logic as ConversationManagementPage, based on
+// the last buyer/seller message timestamps the backend attaches per order.
+const SLA_ONE_HOUR_MS = 60 * 60 * 1000;
+const SLA_ONE_DAY_MS = 24 * SLA_ONE_HOUR_MS;
+
+function slaParseTimeMs(value) {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function slaFormatElapsed(ms) {
+  if (ms < SLA_ONE_HOUR_MS) return '<1 hr';
+  if (ms < SLA_ONE_DAY_MS) return `${Math.floor(ms / SLA_ONE_HOUR_MS)} hr(s)`;
+  return `${Math.floor(ms / SLA_ONE_DAY_MS)} day(s)`;
+}
+
+function getBuyerSlaLabel(order, nowMs) {
+  const buyerMs = slaParseTimeMs(order.lastBuyerMessageAt);
+  const sellerMs = slaParseTimeMs(order.lastSellerMessageAt);
+
+  if (!buyerMs) return { label: 'No buyer message', color: 'default' };
+
+  if (sellerMs && sellerMs >= buyerMs) {
+    return { label: `Replied ${slaFormatElapsed(nowMs - sellerMs)} ago`, color: 'success' };
+  }
+
+  const remainingMs = SLA_ONE_DAY_MS - (nowMs - buyerMs);
+  if (remainingMs > 0) {
+    return { label: `${slaFormatElapsed(remainingMs)} left`, color: 'warning' };
+  }
+
+  return { label: `Overdue ${slaFormatElapsed(Math.abs(remainingMs))}`, color: 'error' };
+}
+
 const REMARK_COUNT_CARDS = [
   { key: 'Processing', label: 'Processing', color: '#2563eb' },
   { key: 'Shipped', label: 'Shipped', color: '#059669' },
@@ -150,6 +185,12 @@ export default function AmazonArrivalsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Pagination State
   const [page, setPage] = useState(1);
@@ -727,6 +768,7 @@ export default function AmazonArrivalsPage() {
                     <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Notes</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Remark</TableCell>
                     <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100, textAlign: 'center' }}>Messaging</TableCell>
+                    <TableCell sx={{ ...tableHeaderCellSx, position: 'sticky', top: 0, zIndex: 100 }}>Buyer SLA</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -889,6 +931,19 @@ export default function AmazonArrivalsPage() {
                             <ChatIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const buyerSla = getBuyerSlaLabel(order, nowMs);
+                          return (
+                            <Chip
+                              label={buyerSla.label}
+                              color={buyerSla.color}
+                              size="small"
+                              variant={buyerSla.color === 'default' ? 'outlined' : 'filled'}
+                            />
+                          );
+                        })()}
                       </TableCell>
                     </TableRow>
                   ))}

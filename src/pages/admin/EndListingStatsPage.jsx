@@ -9,6 +9,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import LayersClearIcon from '@mui/icons-material/LayersClear';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 import AdminPageShell from '../../components/AdminPageShell';
 import api from '../../lib/api';
 
@@ -80,6 +82,8 @@ export default function EndListingStatsPage() {
   // Totals across all displayed rows
   const totalDupSku = rows.reduce((s, r) => s + r.duplicateSkuCount, 0);
   const totalExpiry = rows.reduce((s, r) => s + r.expiryListingCount, 0);
+  const totalAmazon = rows.reduce((s, r) => s + (r.amazonStockCheckCount || 0), 0);
+  const totalSkuManager = rows.reduce((s, r) => s + (r.skuListingManagerCount || 0), 0);
   const grandTotal = rows.reduce((s, r) => s + r.total, 0);
 
   return (
@@ -183,6 +187,20 @@ export default function EndListingStatsPage() {
               sx={{ fontWeight: 600, fontSize: '0.9rem', px: 1 }}
             />
             <Chip
+              icon={<Inventory2OutlinedIcon fontSize="small" />}
+              label={`Amazon Stock Check: ${totalAmazon}`}
+              color="info"
+              variant="outlined"
+              sx={{ fontWeight: 600, fontSize: '0.9rem', px: 1 }}
+            />
+            <Chip
+              icon={<ManageSearchIcon fontSize="small" />}
+              label={`SKU Listing Manager: ${totalSkuManager}`}
+              color="secondary"
+              variant="outlined"
+              sx={{ fontWeight: 600, fontSize: '0.9rem', px: 1 }}
+            />
+            <Chip
               icon={<RemoveCircleOutlineIcon fontSize="small" />}
               label={`Total: ${grandTotal}`}
               color="error"
@@ -216,6 +234,8 @@ export default function EndListingStatsPage() {
                   <TableCell>Seller</TableCell>
                   <TableCell align="center">Duplicate SKU</TableCell>
                   <TableCell align="center">Expiry Listing</TableCell>
+                  <TableCell align="center">Amazon Stock Check</TableCell>
+                  <TableCell align="center">SKU Listing Manager</TableCell>
                   <TableCell>Breakdown</TableCell>
                   <TableCell align="center">Total</TableCell>
                 </TableRow>
@@ -239,6 +259,20 @@ export default function EndListingStatsPage() {
                         <Typography variant="body2" color="text.disabled">—</Typography>
                       )}
                     </TableCell>
+                    <TableCell align="center">
+                      {row.amazonStockCheckCount > 0 ? (
+                        <Chip label={row.amazonStockCheckCount} color="info" size="small" />
+                      ) : (
+                        <Typography variant="body2" color="text.disabled">—</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell align="center">
+                      {row.skuListingManagerCount > 0 ? (
+                        <Chip label={row.skuListingManagerCount} color="secondary" size="small" />
+                      ) : (
+                        <Typography variant="body2" color="text.disabled">—</Typography>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {row.countryBreakdown?.length > 0 ? (
                         <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
@@ -248,7 +282,7 @@ export default function EndListingStatsPage() {
                               size="small"
                               variant="outlined"
                               label={`${countryLabel(countryRow.country)}: ${countryRow.total}`}
-                              title={`Duplicate SKU: ${countryRow.duplicateSkuCount || 0}, Expiry Listings: ${countryRow.expiryListingCount || 0}`}
+                              title={`Duplicate SKU: ${countryRow.duplicateSkuCount || 0}, Expiry Listings: ${countryRow.expiryListingCount || 0}, Amazon Stock Check: ${countryRow.amazonStockCheckCount || 0}, SKU Listing Manager: ${countryRow.skuListingManagerCount || 0}`}
                               sx={{ fontWeight: 600 }}
                             />
                           ))}
@@ -267,12 +301,14 @@ export default function EndListingStatsPage() {
                 {rows.length > 1 && (
                   <>
                     <TableRow>
-                      <TableCell colSpan={6}><Divider /></TableCell>
+                      <TableCell colSpan={8}><Divider /></TableCell>
                     </TableRow>
                     <TableRow sx={{ '& td': { fontWeight: 700, bgcolor: 'action.hover' } }}>
                       <TableCell colSpan={2}>TOTAL</TableCell>
                       <TableCell align="center">{totalDupSku}</TableCell>
                       <TableCell align="center">{totalExpiry}</TableCell>
+                      <TableCell align="center">{totalAmazon}</TableCell>
+                      <TableCell align="center">{totalSkuManager}</TableCell>
                       <TableCell />
                       <TableCell align="center">{grandTotal}</TableCell>
                     </TableRow>

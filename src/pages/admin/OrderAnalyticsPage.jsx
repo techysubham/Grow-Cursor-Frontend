@@ -33,6 +33,10 @@ import SectionCard from '../../components/SectionCard.jsx';
 import StatMetricCard from '../../components/StatMetricCard.jsx';
 import StatusChip from '../../components/StatusChip.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import OrderTrendCharts from '../../components/OrderTrendCharts.jsx';
+import OrderComparisonPanel from '../../components/OrderComparisonPanel.jsx';
+import CollapsibleSection from '../../components/CollapsibleSection.jsx';
+import FilterScopeBadge from '../../components/charts/FilterScopeBadge.jsx';
 import { tableHeaderCellSx, tableBodyCellSx, yellowFilledButtonSx, yellowOutlinedButtonSx } from '../../theme/tableStyles.js';
 
 function getMarketplaceTone(value, marketplaceKey) {
@@ -130,6 +134,24 @@ export default function OrderAnalyticsPage() {
   const handleApplyFilters = () => {
     setAppliedDateFilter(draftDateFilter);
     setAppliedMarketplace(draftMarketplace);
+  };
+
+  // Jump the date filter to the trailing N days (inclusive of today) so the
+  // day-wise charts have a trend to draw.
+  const handleQuickRange = (days) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - (days - 1));
+
+    const rangeFilter = {
+      mode: 'range',
+      single: draftDateFilter.single,
+      from: start.toISOString().split('T')[0],
+      to: end.toISOString().split('T')[0]
+    };
+
+    setDraftDateFilter(rangeFilter);
+    setAppliedDateFilter(rangeFilter);
   };
 
   // Transform statistics into table format
@@ -497,13 +519,18 @@ export default function OrderAnalyticsPage() {
           </Box>
         ) : (
           /* Statistics Table - Sellers as Columns, Dates as Rows */
+          <CollapsibleSection
+            title="Daily breakdown"
+            subtitle="Every date against every seller and marketplace."
+            storageKey="table"
+            badge={<FilterScopeBadge scope="page" />}
+          >
           <TableContainer
             component={Paper}
             sx={{
               borderRadius: `${dashboardSignatureTokens.radius.card}px`,
               border: '1px solid',
               borderColor: 'divider',
-              boxShadow: dashboardSignatureTokens.shadows.table,
               overflow: 'hidden'
             }}
           >
@@ -760,6 +787,26 @@ export default function OrderAnalyticsPage() {
               </Table>
             </TableContainer>
           </TableContainer>
+          </CollapsibleSection>
+        )}
+
+        {/* Day-wise trend charts */}
+        {!loading && !error && (
+          <OrderTrendCharts
+            tableData={tableData}
+            sellersList={sellersList}
+            onQuickRange={handleQuickRange}
+          />
+        )}
+
+        {/* Period / seller comparison */}
+        {!loading && !error && (
+          <OrderComparisonPanel
+            sellers={sellers}
+            marketplace={appliedMarketplace}
+            excludeClient={excludeClient}
+            excludeLowValue={excludeLowValue}
+          />
         )}
 
       </AdminPageShell>

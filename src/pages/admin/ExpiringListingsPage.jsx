@@ -233,6 +233,7 @@ export default function ExpiringListingsPage() {
           source: 'expiry_listing',
           country: CURRENCY_TO_COUNTRY[item.currency] || item.country || null,
           marketplaceId: item.marketplaceId || null,
+          sku: item.sku || null,
         });
         results.success.push(item.itemId);
       } catch (err) {

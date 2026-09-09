@@ -77,10 +77,13 @@ const EmployeeManagementPage = lazy(() => import('../pages/admin/EmployeeManagem
 const BuyerChatPage = lazy(() => import('../pages/admin/BuyerChatPage.jsx'));
 const FeedUploadPage = lazy(() => import('../pages/ebay/FeedUploadPage.jsx'));
 const BestOffersPage = lazy(() => import('../pages/admin/BestOffersPage.jsx'));
+const DiscountsPage = lazy(() => import('../pages/admin/DiscountsPage.jsx'));
+const QuantityUpdateExclusionsPage = lazy(() => import('../pages/admin/QuantityUpdateExclusionsPage.jsx'));
 const SellingPrivilegesPage = lazy(() => import('../pages/admin/SellingPrivilegesPage.jsx'));
 const EbayApiUsagePage = lazy(() => import('../pages/admin/EbayApiUsagePage.jsx'));
 const FeedUploadStatsPage = lazy(() => import('../pages/admin/FeedUploadStatsPage.jsx'));
 const AiListingUsagePage = lazy(() => import('../pages/admin/AiListingUsagePage.jsx'));
+const PrecheckAiUsagePage = lazy(() => import('../pages/admin/PrecheckAiUsagePage.jsx'));
 const DailyListingComparisonPage = lazy(() => import('../pages/admin/DailyListingComparisonPage.jsx'));
 const ManualEndListingPage = lazy(() => import('../pages/admin/ManualEndListingPage.jsx'));
 const SellerUploadLimitsPage = lazy(() => import('../pages/admin/SellerUploadLimitsPage.jsx'));
@@ -114,9 +117,14 @@ const ExpiringListingsPage = lazy(() => import('../pages/admin/ExpiringListingsP
 const SkuIndexSyncPage = lazy(() => import('../pages/admin/SkuIndexSyncPage.jsx'));
 const DuplicateSkusPage = lazy(() => import('../pages/admin/DuplicateSkusPage.jsx'));
 const SkuIndexDashboardPage = lazy(() => import('../pages/admin/SkuIndexDashboardPage.jsx'));
+const SkuListingManagerPage = lazy(() => import('../pages/admin/SkuListingManagerPage.jsx'));
 const AmazonStockCheckPage = lazy(() => import('../pages/admin/AmazonStockCheckPage.jsx'));
+const ListingRevisionsPage = lazy(() => import('../pages/admin/ListingRevisionsPage.jsx'));
+const SellerSkuStockCheckPage = lazy(() => import('../pages/admin/SellerSkuStockCheckPage.jsx'));
 const SkuSellerProfitPage = lazy(() => import('../pages/admin/SkuSellerProfitPage.jsx'));
 const EndListingStatsPage = lazy(() => import('../pages/admin/EndListingStatsPage.jsx'));
+const EndListingByDatePage = lazy(() => import('../pages/admin/EndListingByDatePage.jsx'));
+const EndListingLookupPage = lazy(() => import('../pages/admin/EndListingLookupPage.jsx'));
 const CRPAnalyticsPage = lazy(() => import('../pages/admin/CRPAnalyticsPage.jsx'));
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 const SellerAnalyticsPage = lazy(() => import('../pages/admin/SellerAnalyticsPage.jsx'));
@@ -129,10 +137,12 @@ import ImportExportIcon from '@mui/icons-material/ImportExport';
 import LayersIcon from '@mui/icons-material/Layers';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 const ManageTemplatesPage = lazy(() => import('../pages/admin/ManageTemplatesPage.jsx'));
+const ListingOverlaysPage = lazy(() => import('../pages/admin/ListingOverlaysPage.jsx'));
 const TemplateListingsPage = lazy(() => import('../pages/admin/TemplateListingsPage.jsx'));
 const TemplateListingAnalyticsPage = lazy(() => import('../pages/admin/TemplateListingAnalyticsPage.jsx'));
 const SelectSellerPage = lazy(() => import('../pages/admin/SelectSellerPage.jsx'));
 const AsinPrecheckPage = lazy(() => import('../pages/admin/AsinPrecheckPage.jsx'));
+const AsinPrecheckStatsPage = lazy(() => import('../pages/admin/AsinPrecheckStatsPage.jsx'));
 const SellerTemplatesPage = lazy(() => import('../pages/admin/SellerTemplatesPage.jsx'));
 const ListingDirectoryPage = lazy(() => import('../pages/admin/ListingDirectoryPage.jsx'));
 const TemplateDirectoryPage = lazy(() => import('../pages/admin/TemplateDirectoryPage.jsx'));
@@ -168,12 +178,15 @@ import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import SecurityIcon from '@mui/icons-material/Security';
 
 const PageAccessManagementPage = lazy(() => import('../pages/admin/PageAccessManagementPage.jsx'));
+const PageAccessOverviewPage = lazy(() => import('../pages/admin/PageAccessOverviewPage.jsx'));
 const PageAccessAuditLogPage = lazy(() => import('../pages/admin/PageAccessAuditLogPage.jsx'));
 const UserPasswordManagementPage = lazy(() => import('../pages/admin/UserPasswordManagementPage.jsx'));
 const WelcomePage = lazy(() => import('../pages/admin/WelcomePage.jsx'));
 
 import PageLoader from '../components/PageLoader.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
+import DiscountAlertsBell from '../components/DiscountAlertsBell.jsx';
+import SkuIndexSyncBell from '../components/SkuIndexSyncBell.jsx';
 import usePageAccess from '../hooks/usePageAccess';
 import api, { getAuthToken } from '../lib/api.js';
 import { PAGE_REGISTRY, PAGE_CATEGORIES, SUBMENUS } from '../constants/pages';
@@ -304,9 +317,11 @@ const COMPONENT_MAP = {
   'CompatibilityEditor': EditorDashboard,
   'AddCompatibilityEditor': AddListerPage,
   'ManageTemplates': ManageTemplatesPage,
+  'ListingOverlays': ListingOverlaysPage,
   'ListingsDatabase': TemplateDatabasePage,
   'SelectSeller': SelectSellerPage,
   'AsinPrecheck': AsinPrecheckPage,
+  'AsinPrecheckStats': AsinPrecheckStatsPage,
   'ListingDirectory': ListingDirectoryPage,
   'TemplateDirectory': TemplateDirectoryPage,
   'AsinDirectory': AsinDirectoryPage,
@@ -314,6 +329,7 @@ const COMPONENT_MAP = {
   'FeedUpload': FeedUploadPage,
   'FeedUploadStats': FeedUploadStatsPage,
   'AiListingUsage': AiListingUsagePage,
+  'PrecheckAiUsage': PrecheckAiUsagePage,
   'DailyListingComparison': DailyListingComparisonPage,
   'ManualEndListing': ManualEndListingPage,
   'SellerUploadLimits': SellerUploadLimitsPage,
@@ -344,10 +360,20 @@ const COMPONENT_MAP = {
   'SkuIndexSync': SkuIndexSyncPage,
   'DuplicateSkus': DuplicateSkusPage,
   'SkuIndexDashboard': SkuIndexDashboardPage,
+  // Both routes render the same component: it withholds every write control
+  // from anyone without SkuListingManager access, so this stays read-only.
+  'SkuIndexLookup': SkuListingManagerPage,
+  'SkuListingManager': SkuListingManagerPage,
   'AmazonStockCheck': AmazonStockCheckPage,
+  'ListingRevisions': ListingRevisionsPage,
+  'SellerSkuStockCheck': SellerSkuStockCheckPage,
   'SkuSellerOrderProfit': SkuSellerProfitPage,
   'EndListingStats': EndListingStatsPage,
+  'EndListingByDate': EndListingByDatePage,
+  'EndListingLookup': EndListingLookupPage,
   'BestOffers': BestOffersPage,
+  'Discounts': DiscountsPage,
+  'QuantityUpdateExclusions': QuantityUpdateExclusionsPage,
   'IdeasAndIssues': IdeasPage,
   'TeamChat': InternalMessagesPage,
   'LeaveAdmin': LeaveAdminPage,
@@ -360,6 +386,7 @@ const COMPONENT_MAP = {
   'ViewAllMessages': InternalMessagesAdminPage,
   'Attendance': AttendanceAdminPage,
   'PageAccessManagement': PageAccessManagementPage,
+  'PageAccessOverview': PageAccessOverviewPage,
   'PageAccessAuditLog': PageAccessAuditLogPage,
   'UserPasswordManagement': UserPasswordManagementPage,
   'ManageCategories': ManageCategoriesPage,
@@ -1007,6 +1034,8 @@ export default function AdminLayout({ user, onLogout }) {
               Grow Mentality | Nurture Proper for The Future
             </Typography>
           </Box>
+          <SkuIndexSyncBell />
+          <DiscountAlertsBell />
           <Button
             startIcon={(
               <Badge

@@ -40,7 +40,9 @@ import {
   Visibility as VisibilityIcon,
   Update as UpdateIcon,
   Autorenew as AutorenewIcon,
-  InfoOutlined as InfoOutlinedIcon
+  InfoOutlined as InfoOutlinedIcon,
+  ContentCopy as CopyIcon,
+  DoneAll as DoneAllIcon
 } from '@mui/icons-material';
 import { Undo as UndoIcon } from '@mui/icons-material';
 import api from '../lib/api.js';
@@ -288,7 +290,8 @@ export default function AsinReviewModal({
   templateColumns = [],
   marketplace = 'US',
   sellerId = null,
-  templateName = ''
+  templateName = '',
+  templateId = null
 }) {
   const amazonDomain = MARKETPLACE_DOMAINS[marketplace] || MARKETPLACE_DOMAINS.US;
   const wasOpenRef = useRef(false);
@@ -304,10 +307,13 @@ export default function AsinReviewModal({
   const [showAmazonPreview, setShowAmazonPreview] = useState(false);
   const [appliedDescTemplates, setAppliedDescTemplates] = useState({}); // { [itemId]: templateKey | '' }
   const [rephrasing, setRephrasing] = useState({}); // { [itemId]: true|false }
+  const [rephraseError, setRephraseError] = useState({}); // { [itemId]: string } — why a rephrase was refused
   const [startPriceEditMode, setStartPriceEditMode] = useState({}); // { [itemId]: true|false }
   const [skuStatus, setSkuStatus] = useState({}); // { [itemId]: { status: 'loading'|'active'|'inactive'|null, count: number } }
   const [autoPriceAdjustments, setAutoPriceAdjustments] = useState({}); // { [itemId]: { from, to } }
   const [vehicleInputs, setVehicleInputs] = useState({}); // { [itemId]: string } — Steering Wheel Cover only
+  const [copyState, setCopyState] = useState({ status: 'idle', count: 0 }); // 'idle' | 'copied' | 'error'
+  const copyResetRef = useRef(null);
   const isSteeringWheelCover = templateName?.toLowerCase() === 'steering wheel cover';
 
   // Filter out dismissed items
@@ -344,6 +350,23 @@ export default function AsinReviewModal({
   const crossSellerSummary = getCrossSellerMatchSummary(currentSkuStatus, itemData);
   const currentAutoPriceAdjustment = currentItem?.id ? autoPriceAdjustments[currentItem.id] : null;
 
+  // ASINs still in the review queue (dismissed ones excluded), de-duplicated in review order.
+  const reviewAsins = [...new Set(activeItems.map(item => item.asin).filter(Boolean))];
+
+  const handleCopyReviewAsins = async () => {
+    if (reviewAsins.length === 0) return;
+    if (copyResetRef.current) clearTimeout(copyResetRef.current);
+
+    try {
+      await navigator.clipboard.writeText(reviewAsins.join('\n'));
+      setCopyState({ status: 'copied', count: reviewAsins.length });
+    } catch {
+      setCopyState({ status: 'error', count: 0 });
+    }
+
+    copyResetRef.current = setTimeout(() => setCopyState({ status: 'idle', count: 0 }), 2000);
+  };
+
   // Reset modal-local session state only when the modal opens.
   useEffect(() => {
     const justOpened = open && !wasOpenRef.current;
@@ -358,14 +381,21 @@ export default function AsinReviewModal({
       setDescriptionViewMode('preview');
       setAppliedDescTemplates({});
       setRephrasing({});
+      setRephraseError({});
       setStartPriceEditMode({});
       setSkuStatus({});
       setAutoPriceAdjustments({});
+      setCopyState({ status: 'idle', count: 0 });
       checkedSkuIdsRef.current = new Set();
     }
 
     wasOpenRef.current = open;
   }, [open, previewItems]);
+
+  // Clear the pending "copied" reset when the modal unmounts.
+  useEffect(() => () => {
+    if (copyResetRef.current) clearTimeout(copyResetRef.current);
+  }, []);
 
   // Check each SKU as soon as its customLabel becomes available (items generate via SSE stream).
   // Uses a ref to ensure each item is only checked once even as editedItems keeps changing.
@@ -660,15 +690,30 @@ export default function AsinReviewModal({
         sourceTitle: currentItem.sourceData?.title || '',
         brand: currentItem.sourceData?.brand || '',
         color: currentItem.sourceData?.color || '',
-        compatibility: currentItem.sourceData?.compatibility || ''
+        compatibility: currentItem.sourceData?.compatibility || '',
+        // Sent so the rephrase obeys the template's own title rules instead of
+        // inventing its own — must stay in sync with the normal generation run.
+        templateId: templateId || '',
+        asin: currentItem.asin || '',
+        description: currentItem.sourceData?.description || '',
+        price: currentItem.sourceData?.price || '',
+        productInfo: currentItem.sourceData?.productInfo || null
       };
       if (isSteeringWheelCover && vehicleInputs[currentItem.id]?.trim()) {
         payload.vehicleMentions = vehicleInputs[currentItem.id].trim();
       }
       const { data } = await api.post('/ai/rephrase-title', payload);
       handleFieldChange('title', data.rephrasedTitle, false);
+      setRephraseError(prev => ({ ...prev, [currentItem.id]: '' }));
     } catch (error) {
       console.error('[Rephrase Title] Error:', error);
+      // The server refuses to rephrase when the template's title rules can't be
+      // resolved, rather than guessing — surface that reason to the user.
+      const res = error?.response?.data;
+      setRephraseError(prev => ({
+        ...prev,
+        [currentItem.id]: res?.details || res?.error || 'Rephrase failed. Please try again.'
+      }));
     } finally {
       setRephrasing(prev => ({ ...prev, [currentItem.id]: false }));
     }
@@ -947,6 +992,22 @@ export default function AsinReviewModal({
           </Box>
           
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+            {currentItem && (
+              <Tooltip title="Rephrase title">
+                <span>
+                  <IconButton
+                    onClick={handleRephrase}
+                    disabled={!itemData.title || !!rephrasing[currentItem.id]}
+                    size="small"
+                  >
+                    {rephrasing[currentItem.id]
+                      ? <CircularProgress size={18} />
+                      : <AutorenewIcon fontSize="small" />}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
+
             <Button
               variant={showAmazonPreview ? "contained" : "outlined"}
               onClick={toggleAmazonPreview}
@@ -970,6 +1031,45 @@ export default function AsinReviewModal({
                 ↗ Amazon
               </Button>
             )}
+
+            <Tooltip
+              title={
+                copyState.status === 'copied'
+                  ? `Copied ${copyState.count} ASIN${copyState.count === 1 ? '' : 's'}`
+                  : copyState.status === 'error'
+                    ? 'Could not copy ASINs to clipboard'
+                    : `Copy the ${reviewAsins.length} ASIN${reviewAsins.length === 1 ? '' : 's'} still in this review`
+              }
+            >
+              <span>
+                {showAmazonPreview ? (
+                  <IconButton
+                    size="small"
+                    color={copyState.status === 'copied' ? 'success' : 'default'}
+                    onClick={handleCopyReviewAsins}
+                    disabled={reviewAsins.length === 0}
+                  >
+                    {copyState.status === 'copied'
+                      ? <DoneAllIcon fontSize="small" />
+                      : <CopyIcon fontSize="small" />}
+                  </IconButton>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color={copyState.status === 'copied' ? 'success' : 'primary'}
+                    startIcon={copyState.status === 'copied' ? <DoneAllIcon /> : <CopyIcon />}
+                    onClick={handleCopyReviewAsins}
+                    disabled={reviewAsins.length === 0}
+                    sx={{ whiteSpace: 'nowrap' }}
+                  >
+                    {copyState.status === 'copied'
+                      ? `Copied ${copyState.count}`
+                      : `Copy ASINs (${reviewAsins.length})`}
+                  </Button>
+                )}
+              </span>
+            </Tooltip>
 
             {currentItem?.asin && (
               <Button
@@ -1812,44 +1912,36 @@ export default function AsinReviewModal({
                     );
                   }
 
-                  // Title field — with rephrase button
+                  // Title field — rephrase button lives in the header toolbar
                   if (col.name === 'title') {
                     return (
                       <Box key="title">
-                        <Stack direction="row" alignItems="flex-start" spacing={1}>
-                          <TextField
-                            label={col.label || col.name}
-                            value={itemData.title || ''}
-                            onChange={(e) => handleFieldChange('title', e.target.value, false)}
-                            size="small"
-                            fullWidth
-                            required
-                            helperText={
-                              crossSellerSummary.records.length > 0
-                                ? `${(itemData.title || '').length}/80 • ${
-                                    crossSellerSummary.hasTitleMatch
-                                      ? `Title matches ${crossSellerSummary.titleMatches.length} synced same-SKU listing${crossSellerSummary.titleMatches.length === 1 ? '' : 's'}`
-                                      : 'Title does not match synced listings with this SKU'
-                                  }`
-                                : `${(itemData.title || '').length}/80`
-                            }
-                            sx={{ flex: 1 }}
-                          />
-                          <Tooltip title="Rephrase title">
-                            <span>
-                              <IconButton
-                                onClick={handleRephrase}
-                                disabled={!itemData.title || !!rephrasing[currentItem.id]}
-                                size="small"
-                                sx={{ mt: 0.5 }}
-                              >
-                                {rephrasing[currentItem.id]
-                                  ? <CircularProgress size={18} />
-                                  : <AutorenewIcon fontSize="small" />}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </Stack>
+                        <TextField
+                          label={col.label || col.name}
+                          value={itemData.title || ''}
+                          onChange={(e) => handleFieldChange('title', e.target.value, false)}
+                          size="small"
+                          fullWidth
+                          required
+                          helperText={
+                            crossSellerSummary.records.length > 0
+                              ? `${(itemData.title || '').length}/80 • ${
+                                  crossSellerSummary.hasTitleMatch
+                                    ? `Title matches ${crossSellerSummary.titleMatches.length} synced same-SKU listing${crossSellerSummary.titleMatches.length === 1 ? '' : 's'}`
+                                    : 'Title does not match synced listings with this SKU'
+                                }`
+                              : `${(itemData.title || '').length}/80`
+                          }
+                        />
+                        {rephraseError[currentItem?.id] && (
+                          <Alert
+                            severity="warning"
+                            sx={{ mt: 1 }}
+                            onClose={() => setRephraseError(prev => ({ ...prev, [currentItem.id]: '' }))}
+                          >
+                            {rephraseError[currentItem.id]}
+                          </Alert>
+                        )}
                         {isSteeringWheelCover && (
                           <TextField
                             label="Vehicle models (from reviews)"
